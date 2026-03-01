@@ -1,0 +1,89 @@
+generator client{
+    provider = "prisma-client-js"
+}
+datasource db{
+    provider = "postgresql"
+    url = env("DATABASE_URL")
+}
+
+// パスワード（ハッシュ化した文字列）でログインする店舗アカウント
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // 1店舗1アカウント：User 1 : 1 Shop
+  shop Shop?
+}
+// 店舗情報（ユーザーに紐づく）
+model Shop {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  name        String
+  description String?  // 店の説明（任意）
+  address     String?  // 住所（任意）
+  hours       String?  // 営業時間（任意）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menus MenuItem[]
+}
+
+// メニュー（商品）
+model MenuItem {
+  id            String          @id @default(cuid())
+  shopId        String
+  name          String
+  description   String?         // 商品説明（任意）
+  priceYen      Int?            // 価格（任意。無料/時価などもあるならnull許容）
+  category      String?         // ★自由入力カテゴリ（例：主食/麺/ドリンク）
+  ingredients   String?         // 原材料（テキスト）
+  precaution    String?         // 注意書き（コンタミはここに書く方針）
+  imageUrl      String?         // 画像URL（後でBlob/Cloudinaryを入れて保存）
+  isPublished   Boolean         @default(false) // 公開/非公開（2段階）
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  shop          Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  allergenLinks MenuItemAllergen[]
+}
+
+// アレルゲン28品目マスタ（表示用に日英併用）
+model Allergen {
+  id        String   @id @default(cuid())
+  slug      String   @unique // API/フィルタ用（egg,milk...）
+  nameJa    String
+  nameEn    String
+  sortOrder Int      @default(0) // 表示順固定したい時に使う
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  menuLinks MenuItemAllergen[]
+}
+
+// 商品×アレルゲン（中間テーブル）
+// ここに「含む/含まない/注意」を保持する
+model MenuItemAllergen {
+  menuItemId String
+  allergenId String
+  status     AllergenStatus @default(FREE)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  allergen Allergen @relation(fields: [allergenId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, allergenId]) // 同じ商品に同じアレルゲンが重複登録されない
+  @@index([allergenId])
+  @@index([menuItemId])
+}
+
+// 三択状態（あなたの回答3Aに固定）
+enum AllergenStatus {
+  CONTAINS     // 含む
+  FREE         // 含まない
+  MAY_CONTAIN  // 注意（混入の可能性）
+}
