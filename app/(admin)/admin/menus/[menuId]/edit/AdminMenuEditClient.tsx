@@ -13,7 +13,6 @@ type Allergen = {
 
 export default function AdminMenuEditClient(props: {
     menuId: string;
-    shopId: string;
     initialName: string;
     initialIsPublished: boolean;
     allergens: Allergen[];
@@ -21,7 +20,6 @@ export default function AdminMenuEditClient(props: {
 }) {
     const {
         menuId,
-        shopId,
         initialName,
         initialIsPublished,
         allergens,
@@ -48,7 +46,6 @@ export default function AdminMenuEditClient(props: {
 
         try {
             const body = {
-                shopId,
                 name,
                 isPublished,
                 allergenStatusBySlug: statusBySlug,

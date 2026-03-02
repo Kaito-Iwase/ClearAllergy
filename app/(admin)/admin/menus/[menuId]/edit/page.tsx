@@ -1,57 +1,65 @@
 // app/(admin)/admin/menus/[menuId]/edit/page.tsx
 // 管理画面：メニュー編集ページ（Server Component）
-// 役割：初期データ取得 → Clientへ渡す（操作はClient）
+// 役割：
+// 1) セッションから shopId を取得
+// 2) menuId のメニューがその shopId に属するか確認（権限チェック）
+// 3) アレルゲン28品目と現在状態をDBから取得
+// 4) Clientへ初期値を渡す
 
 import AdminMenuEditClient from "./AdminMenuEditClient";
+import { prisma } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { notFound, redirect } from "next/navigation";
 
 type Status = "FREE" | "MAY_CONTAIN" | "CONTAINS";
-
-type Allergen = {
-    slug: string;
-    nameJa: string;
-    nameEn: string;
-    sortOrder: number;
-};
-
-type MenuDetail = {
-    id: string;
-    shopId: string;
-    name: string;
-    isPublished: boolean;
-    allergens: Array<{
-        slug: string;
-        status: Status;
-    }>;
-};
 
 type PageProps = {
     params: Promise<{ menuId: string }> | { menuId: string };
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${url}`);
-    return (await res.json()) as T;
-}
-
 export default async function AdminMenuEditPage({ params }: PageProps) {
+    // 0) ログイン必須
+    const session = await getServerSession(authOptions);
+    if (!session) redirect("/admin/login"); // あなたのログインURLに合わせる
+
+    const shopId = session.user.shopId;
+
+    // 1) menuId
     const { menuId } = await params;
 
-    const allergensRes = await fetchJson<{ allergens: Allergen[] }>(
-        "http://localhost:3000/api/allergens",
-    );
+    // 2) アレルゲンマスタ（28品目）
+    const allergens = await prisma.allergen.findMany({
+        orderBy: { sortOrder: "asc" },
+        select: { slug: true, nameJa: true, nameEn: true, sortOrder: true },
+    });
 
-    const menuRes = await fetchJson<{ menu: MenuDetail }>(
-        `http://localhost:3000/api/menus/${menuId}`,
-    );
+    // 3) メニュー取得（★shopIdで絞る＝権限チェック）
+    const menu = await prisma.menuItem.findFirst({
+        where: { id: menuId, shopId },
+        select: {
+            id: true,
+            shopId: true,
+            name: true,
+            isPublished: true,
+            allergenLinks: {
+                select: {
+                    status: true,
+                    allergen: { select: { slug: true } },
+                },
+            },
+        },
+    });
 
-    const allergens = allergensRes.allergens;
-    const menu = menuRes.menu;
+    // 自分の店のメニューじゃない（または存在しない）なら 404 扱い
+    if (!menu) notFound();
 
-    // 28品目をFREEで初期化 → 既存状態で上書き
+    // 4) 初期状態：全部FREE → 既存状態で上書き
     const initialStatusBySlug: Record<string, Status> = {};
     for (const a of allergens) initialStatusBySlug[a.slug] = "FREE";
-    for (const a of menu.allergens) initialStatusBySlug[a.slug] = a.status;
+    for (const link of menu.allergenLinks) {
+        initialStatusBySlug[link.allergen.slug] = link.status as Status;
+    }
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -66,7 +74,6 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                 <div className="mt-6">
                     <AdminMenuEditClient
                         menuId={menuId}
-                        shopId={menu.shopId}
                         initialName={menu.name}
                         initialIsPublished={menu.isPublished}
                         allergens={allergens}
