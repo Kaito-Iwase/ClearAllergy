@@ -1,10 +1,17 @@
-// app/api/menus/[menuId]/route.ts
-// GET /api/menus/:menuId  : 取得（アレルゲン込み）
-// PUT /api/menus/:menuId  : 更新（基本情報 + アレルゲン状態）
+// app/api/admin/menus/[menuId]/route.ts
+// 管理API：
+// GET  /api/admin/menus/:menuId ・・・ 管理用の詳細取得（必要なら）
+// PUT  /api/admin/menus/:menuId ・・・ 更新（bodyからshopIdを受けない。セッションから取得）
+//
+// 目的：
+// - ログイン中の店舗（session.user.shopId）だけが、その店舗のメニューを更新できるようにする
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
+// Next.jsの環境で params の形が揺れることがあるので両対応
 type Context = {
     params?: { menuId?: string } | Promise<{ menuId?: string }>;
 };
@@ -24,13 +31,11 @@ async function getMenuId(
     return p?.menuId ?? getMenuIdFromUrl(req);
 }
 
-// 3択の状態
+// 3択の状態（DB enumに合わせる）
 type Status = "CONTAINS" | "FREE" | "MAY_CONTAIN";
 
-// 更新ボディ
+// 更新ボディ（★shopIdは受け取らない！）
 type UpdateMenuBody = {
-    shopId: string;
-
     name?: string;
     description?: string | null;
     priceYen?: number | null;
@@ -39,13 +44,26 @@ type UpdateMenuBody = {
     precaution?: string | null;
     isPublished?: boolean;
 
+    // 例：{ egg: "CONTAINS", milk: "FREE" }
     allergenStatusBySlug?: Record<string, Status>;
 };
 
 export async function GET(req: Request, context: Context) {
     try {
-        const menuId = await getMenuId(req, context);
+        // 1) セッション確認（未ログインなら401）
+        const session = await getServerSession(authOptions);
+        if (!session) {
+            return NextResponse.json(
+                { error: "unauthorized" },
+                { status: 401 },
+            );
+        }
 
+        // 2) shopIdはセッションから
+        const shopId = session.user.shopId;
+
+        // 3) menuId取得
+        const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },
@@ -53,8 +71,9 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
-        const menu = await prisma.menuItem.findUnique({
-            where: { id: menuId },
+        // 4) DBから取得（このshopのmenuだけ許可）
+        const menu = await prisma.menuItem.findFirst({
+            where: { id: menuId, shopId },
             select: {
                 id: true,
                 shopId: true,
@@ -85,6 +104,7 @@ export async function GET(req: Request, context: Context) {
         });
 
         if (!menu) {
+            // 他店舗のmenuIdを指定しても「見つからない」にする（情報漏えいを減らす）
             return NextResponse.json(
                 { error: "menu not found" },
                 { status: 404 },
@@ -136,9 +156,20 @@ export async function GET(req: Request, context: Context) {
 
 export async function PUT(req: Request, context: Context) {
     try {
-        console.log("HIT PUT menus/[menuId]", new Date().toISOString());
-        const menuId = await getMenuId(req, context);
+        // 1) セッション確認（未ログインなら401）
+        const session = await getServerSession(authOptions);
+        if (!session) {
+            return NextResponse.json(
+                { error: "unauthorized" },
+                { status: 401 },
+            );
+        }
 
+        // 2) shopIdはセッションから
+        const shopId = session.user.shopId;
+
+        // 3) menuId取得
+        const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },
@@ -146,32 +177,26 @@ export async function PUT(req: Request, context: Context) {
             );
         }
 
+        // 4) body取得（shopIdは受け取らない）
         const body = (await req.json()) as UpdateMenuBody;
 
-        if (!body.shopId || typeof body.shopId !== "string") {
-            return NextResponse.json(
-                { error: "shopId is required" },
-                { status: 400 },
-            );
-        }
-
-        // menuが存在するか & shopId一致か（最低限の防御）
-        const existing = await prisma.menuItem.findUnique({
-            where: { id: menuId },
+        // 5) menuの存在 & このshopのものかチェック
+        // findUnique(id) → shopId照合、でも良い。
+        // ここは一発で絞れる findFirst を使う（whereに shopId を含める）。
+        const existing = await prisma.menuItem.findFirst({
+            where: { id: menuId, shopId },
             select: { id: true, shopId: true },
         });
 
         if (!existing) {
+            // 他店舗のmenuIdを指定しても404（安全）
             return NextResponse.json(
                 { error: "menu not found" },
                 { status: 404 },
             );
         }
-        if (existing.shopId !== body.shopId) {
-            return NextResponse.json({ error: "forbidden" }, { status: 403 });
-        }
 
-        // MenuItem更新（undefinedなら更新しない）
+        // 6) MenuItem更新（undefinedなら更新しない）
         const updatedMenu = await prisma.menuItem.update({
             where: { id: menuId },
             data: {
@@ -192,11 +217,12 @@ export async function PUT(req: Request, context: Context) {
             },
         });
 
-        // アレルゲン状態更新（送ってきたslugだけ）
+        // 7) アレルゲン状態更新（送ってきたslugだけ）
         const map = body.allergenStatusBySlug ?? {};
         const slugs = Object.keys(map);
 
         if (slugs.length > 0) {
+            // slug -> allergenId
             const allergens = await prisma.allergen.findMany({
                 where: { slug: { in: slugs } },
                 select: { id: true, slug: true },
@@ -205,7 +231,7 @@ export async function PUT(req: Request, context: Context) {
             for (const a of allergens) {
                 await prisma.menuItemAllergen.upsert({
                     where: {
-                        // @@id([menuItemId, allergenId]) 前提の複合キー
+                        // schema.prisma で @@id([menuItemId, allergenId]) の前提
                         menuItemId_allergenId: {
                             menuItemId: menuId,
                             allergenId: a.id,
