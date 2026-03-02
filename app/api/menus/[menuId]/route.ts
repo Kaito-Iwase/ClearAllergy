@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-
+console.log("LOADED route.ts /api/menus/[menuId]");
 type Context = {
     // Next.jsのバージョン/環境で params の形が揺れるので両対応
     params?: { menuId?: string } | Promise<{ menuId?: string }>;
