@@ -60,7 +60,13 @@ export async function GET(req: Request, context: Context) {
         }
 
         // 2) shopIdはセッションから
-        const shopId = session.user.shopId;
+        const shopId = session.user?.shopId;
+        if (!shopId) {
+            return NextResponse.json(
+                { error: "unauthorized: shopId missing in session" },
+                { status: 401 },
+            );
+        }
 
         // 3) menuId取得
         const menuId = await getMenuId(req, context);
@@ -166,7 +172,13 @@ export async function PUT(req: Request, context: Context) {
         }
 
         // 2) shopIdはセッションから
-        const shopId = session.user.shopId;
+        const shopId = session.user?.shopId;
+        if (!shopId) {
+            return NextResponse.json(
+                { error: "unauthorized: shopId missing in session" },
+                { status: 401 },
+            );
+        }
 
         // 3) menuId取得
         const menuId = await getMenuId(req, context);
@@ -228,10 +240,20 @@ export async function PUT(req: Request, context: Context) {
                 select: { id: true, slug: true },
             });
 
-            for (const a of allergens) {
-                await prisma.menuItemAllergen.upsert({
+            // ★ 追加：存在しないslugを検出して400で返す（黙って無視しない）
+            const found = new Set(allergens.map((a) => a.slug));
+            const missing = slugs.filter((s) => !found.has(s));
+            if (missing.length > 0) {
+                return NextResponse.json(
+                    { error: "unknown allergen slug(s)", missing },
+                    { status: 400 },
+                );
+            }
+
+            // ★ 変更：全部まとめてtransaction（途中失敗で中途半端にならない）
+            const ops = allergens.map((a) =>
+                prisma.menuItemAllergen.upsert({
                     where: {
-                        // schema.prisma で @@id([menuItemId, allergenId]) の前提
                         menuItemId_allergenId: {
                             menuItemId: menuId,
                             allergenId: a.id,
@@ -243,8 +265,10 @@ export async function PUT(req: Request, context: Context) {
                         allergenId: a.id,
                         status: map[a.slug] ?? "FREE",
                     },
-                });
-            }
+                }),
+            );
+
+            await prisma.$transaction(ops);
         }
 
         return NextResponse.json({ menu: updatedMenu });
