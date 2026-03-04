@@ -1,35 +1,14 @@
 // app/api/admin/menus/[menuId]/route.ts
-// 管理API：
-// GET  /api/admin/menus/:menuId ・・・ 管理用の詳細取得（必要なら）
-// PUT  /api/admin/menus/:menuId ・・・ 更新（bodyからshopIdを受けない。セッションから取得）
-//
-// 目的：
-// - ログイン中の店舗（session.user.shopId）だけが、その店舗のメニューを更新できるようにする
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-
-// Next.jsの環境で params の形が揺れることがあるので両対応
-type Context = {
-    params?: { menuId?: string } | Promise<{ menuId?: string }>;
-};
-
-function getMenuIdFromUrl(req: Request) {
-    const url = new URL(req.url);
-    const parts = url.pathname.split("/").filter(Boolean);
-    return parts[parts.length - 1];
-}
-
-// menuIdを「params優先、ダメならURL末尾」から取る
-async function getMenuId(
-    req: Request,
-    context: Context,
-): Promise<string | undefined> {
-    const p = context.params ? await context.params : undefined;
-    return p?.menuId ?? getMenuIdFromUrl(req);
-}
+import {
+    Context,
+    getMenuId,
+    internalError,
+    readJson,
+    requireShopId,
+} from "@/app/api/admin/_utils";
 
 // 3択の状態（DB enumに合わせる）
 type Status = "CONTAINS" | "FREE" | "MAY_CONTAIN";
@@ -44,31 +23,20 @@ type UpdateMenuBody = {
     precaution?: string | null;
     isPublished?: boolean;
 
+    // ★追加：画像URL（まずはこれで十分）
+    imageUrl?: string | null;
+
     // 例：{ egg: "CONTAINS", milk: "FREE" }
     allergenStatusBySlug?: Record<string, Status>;
 };
 
 export async function GET(req: Request, context: Context) {
     try {
-        // 1) セッション確認（未ログインなら401）
-        const session = await getServerSession(authOptions);
-        if (!session) {
-            return NextResponse.json(
-                { error: "unauthorized" },
-                { status: 401 },
-            );
-        }
+        // 1) セッション確認 + shopId 取得
+        const auth = await requireShopId();
+        if (!auth.ok) return auth.res;
 
-        // 2) shopIdはセッションから
-        const shopId = session.user?.shopId;
-        if (!shopId) {
-            return NextResponse.json(
-                { error: "unauthorized: shopId missing in session" },
-                { status: 401 },
-            );
-        }
-
-        // 3) menuId取得
+        // 2) menuId 取得
         const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
@@ -77,9 +45,9 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
-        // 4) DBから取得（このshopのmenuだけ許可）
+        // 3) DBから取得（このshopのmenuだけ許可）
         const menu = await prisma.menuItem.findFirst({
-            where: { id: menuId, shopId },
+            where: { id: menuId, shopId: auth.shopId },
             select: {
                 id: true,
                 shopId: true,
@@ -109,14 +77,15 @@ export async function GET(req: Request, context: Context) {
             },
         });
 
+        // 4) 無ければ404（他店のIDでも同じ扱い）
         if (!menu) {
-            // 他店舗のmenuIdを指定しても「見つからない」にする（情報漏えいを減らす）
             return NextResponse.json(
                 { error: "menu not found" },
                 { status: 404 },
             );
         }
 
+        // 5) 返却用の形に整形
         const allergens = menu.allergenLinks
             .map((link) => ({
                 slug: link.allergen.slug,
@@ -145,42 +114,17 @@ export async function GET(req: Request, context: Context) {
             },
         });
     } catch (e) {
-        console.error(e);
-        if (process.env.NODE_ENV !== "production") {
-            const msg = e instanceof Error ? e.message : String(e);
-            return NextResponse.json(
-                { error: "Internal Server Error", message: msg },
-                { status: 500 },
-            );
-        }
-        return NextResponse.json(
-            { error: "Internal Server Error" },
-            { status: 500 },
-        );
+        return internalError(e);
     }
 }
 
 export async function PUT(req: Request, context: Context) {
     try {
-        // 1) セッション確認（未ログインなら401）
-        const session = await getServerSession(authOptions);
-        if (!session) {
-            return NextResponse.json(
-                { error: "unauthorized" },
-                { status: 401 },
-            );
-        }
+        // 1) セッション確認 + shopId 取得
+        const auth = await requireShopId();
+        if (!auth.ok) return auth.res;
 
-        // 2) shopIdはセッションから
-        const shopId = session.user?.shopId;
-        if (!shopId) {
-            return NextResponse.json(
-                { error: "unauthorized: shopId missing in session" },
-                { status: 401 },
-            );
-        }
-
-        // 3) menuId取得
+        // 2) menuId 取得
         const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
@@ -189,26 +133,28 @@ export async function PUT(req: Request, context: Context) {
             );
         }
 
-        // 4) body取得（shopIdは受け取らない）
-        const body = (await req.json()) as UpdateMenuBody;
+        // 3) body 取得（壊れてたら400）
+        const body = await readJson<UpdateMenuBody>(req);
+        if (!body) {
+            return NextResponse.json(
+                { error: "bad request: invalid json" },
+                { status: 400 },
+            );
+        }
 
-        // 5) menuの存在 & このshopのものかチェック
-        // findUnique(id) → shopId照合、でも良い。
-        // ここは一発で絞れる findFirst を使う（whereに shopId を含める）。
+        // 4) この店のメニューか確認（他店なら404）
         const existing = await prisma.menuItem.findFirst({
-            where: { id: menuId, shopId },
-            select: { id: true, shopId: true },
+            where: { id: menuId, shopId: auth.shopId },
+            select: { id: true },
         });
-
         if (!existing) {
-            // 他店舗のmenuIdを指定しても404（安全）
             return NextResponse.json(
                 { error: "menu not found" },
                 { status: 404 },
             );
         }
 
-        // 6) MenuItem更新（undefinedなら更新しない）
+        // 5) メニュー本体を更新（undefinedは更新しない）
         const updatedMenu = await prisma.menuItem.update({
             where: { id: menuId },
             data: {
@@ -219,28 +165,32 @@ export async function PUT(req: Request, context: Context) {
                 ingredients: body.ingredients ?? undefined,
                 precaution: body.precaution ?? undefined,
                 isPublished: body.isPublished ?? undefined,
+
+                // ★追加：imageUrlを更新できるようにした
+                imageUrl: body.imageUrl ?? undefined,
             },
             select: {
                 id: true,
                 shopId: true,
                 name: true,
                 isPublished: true,
+                imageUrl: true,
                 updatedAt: true,
             },
         });
 
-        // 7) アレルゲン状態更新（送ってきたslugだけ）
+        // 6) アレルゲン状態更新（送ってきたslugだけ）
         const map = body.allergenStatusBySlug ?? {};
         const slugs = Object.keys(map);
 
         if (slugs.length > 0) {
-            // slug -> allergenId
+            // 7) slug -> allergenId
             const allergens = await prisma.allergen.findMany({
                 where: { slug: { in: slugs } },
                 select: { id: true, slug: true },
             });
 
-            // ★ 追加：存在しないslugを検出して400で返す（黙って無視しない）
+            // 8) 存在しないslugが混ざってたら400（黙殺しない）
             const found = new Set(allergens.map((a) => a.slug));
             const missing = slugs.filter((s) => !found.has(s));
             if (missing.length > 0) {
@@ -250,7 +200,7 @@ export async function PUT(req: Request, context: Context) {
                 );
             }
 
-            // ★ 変更：全部まとめてtransaction（途中失敗で中途半端にならない）
+            // 9) upsertをtransactionでまとめる（途中失敗で中途半端防止）
             const ops = allergens.map((a) =>
                 prisma.menuItemAllergen.upsert({
                     where: {
@@ -273,17 +223,49 @@ export async function PUT(req: Request, context: Context) {
 
         return NextResponse.json({ menu: updatedMenu });
     } catch (e) {
-        console.error(e);
-        if (process.env.NODE_ENV !== "production") {
-            const msg = e instanceof Error ? e.message : String(e);
+        return internalError(e);
+    }
+}
+
+export async function DELETE(req: Request, context: Context) {
+    try {
+        // 1) セッション確認 + shopId 取得
+        const auth = await requireShopId();
+        if (!auth.ok) return auth.res;
+
+        // 2) menuId 取得
+        const menuId = await getMenuId(req, context);
+        if (!menuId) {
             return NextResponse.json(
-                { error: "Internal Server Error", message: msg },
-                { status: 500 },
+                { error: "menuId is required" },
+                { status: 400 },
             );
         }
-        return NextResponse.json(
-            { error: "Internal Server Error" },
-            { status: 500 },
-        );
+
+        // 3) この店のメニューか確認（他店なら404）
+        const existing = await prisma.menuItem.findFirst({
+            where: { id: menuId, shopId: auth.shopId },
+            select: { id: true },
+        });
+        if (!existing) {
+            return NextResponse.json(
+                { error: "menu not found" },
+                { status: 404 },
+            );
+        }
+
+        // 4) FK制約対策：中間テーブルを先に削除
+        await prisma.menuItemAllergen.deleteMany({
+            where: { menuItemId: menuId },
+        });
+
+        // 5) 本体削除
+        await prisma.menuItem.delete({
+            where: { id: menuId },
+        });
+
+        return NextResponse.json({ ok: true });
+    } catch (e) {
+        return internalError(e);
     }
 }
