@@ -2,32 +2,47 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { internalError, readJson, requireShopId } from "@/app/api/admin/_utils";
+
+// GET /api/admin/menus ・・・ 一覧（管理用）
+export async function GET() {
+    try {
+        // 1) セッション確認 + shopId 取得
+        const auth = await requireShopId();
+        if (!auth.ok) return auth.res;
+
+        // 2) この店舗のメニューを更新日時の新しい順で取得
+        const menus = await prisma.menuItem.findMany({
+            where: { shopId: auth.shopId },
+            orderBy: { updatedAt: "desc" },
+            select: {
+                id: true,
+                name: true,
+                priceYen: true,
+                category: true,
+                imageUrl: true,
+                isPublished: true,
+                updatedAt: true,
+            },
+        });
+
+        // 3) 返す
+        return NextResponse.json({ menus });
+    } catch (e) {
+        return internalError(e);
+    }
+}
 
 // POST /api/admin/menus ・・・ 新規作成
 export async function POST(req: Request) {
     try {
-        // 1) セッションを取る（ログイン確認）
-        const session = await getServerSession(authOptions);
-        if (!session) {
-            return NextResponse.json(
-                { error: "unauthorized" },
-                { status: 401 },
-            );
-        }
+        // 1) セッション確認 + shopId 取得
+        const auth = await requireShopId();
+        if (!auth.ok) return auth.res;
 
-        // 2) shopIdをセッションから取る（bodyでは受けない）
-        const shopId = session.user?.shopId;
-        if (!shopId) {
-            return NextResponse.json(
-                { error: "unauthorized: shopId missing in session" },
-                { status: 401 },
-            );
-        }
-
-        // 3) bodyを読む
-        const body = await req.json().catch(() => null);
+        // 2) body を読む（壊れてたら400）
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const body = await readJson<any>(req);
         if (!body) {
             return NextResponse.json(
                 { error: "bad request: invalid json" },
@@ -35,7 +50,7 @@ export async function POST(req: Request) {
             );
         }
 
-        // 4) name必須（空白だけもNG）
+        // 3) name 必須（空白はNG）
         const name = typeof body.name === "string" ? body.name.trim() : "";
         if (!name) {
             return NextResponse.json(
@@ -44,10 +59,10 @@ export async function POST(req: Request) {
             );
         }
 
-        // 5) DBに作成（shopIdはセッション由来で固定）
+        // 4) DBに作成（shopIdはセッション由来で固定）
         const created = await prisma.menuItem.create({
             data: {
-                shopId,
+                shopId: auth.shopId,
                 name,
                 description:
                     typeof body.description === "string"
@@ -71,17 +86,17 @@ export async function POST(req: Request) {
                     typeof body.isPublished === "boolean"
                         ? body.isPublished
                         : false,
+                imageUrl:
+                    typeof body.imageUrl === "string"
+                        ? body.imageUrl.trim()
+                        : null,
             },
             select: { id: true },
         });
 
-        // 6) 作れたidを返す（次に編集画面へ飛ぶため）
+        // 5) 作れたidを返す
         return NextResponse.json({ id: created.id }, { status: 201 });
     } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return NextResponse.json(
-            { error: "Internal Server Error", message: msg },
-            { status: 500 },
-        );
+        return internalError(e);
     }
 }
