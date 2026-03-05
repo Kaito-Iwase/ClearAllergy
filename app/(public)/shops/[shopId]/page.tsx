@@ -1,25 +1,149 @@
 // app/(public)/shops/[shopId]/page.tsx
-// 公開側：店舗詳細（テンプレ風）
-// 修正：params を await して shopId を使う（Turbopack対策）
+// 公開側：店舗詳細（layout側がヘッダーを持つので、ここではヘッダーを出さない）
+// - 公開メニュー：?q=... で検索（name/description/category）
+// - メニューカード：要約（最大3つ）＋赤/黄/緑バッジ
+// - N+1回避：Allergenマスタ1回 + 店舗/メニュー/links 1回
 
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
+import { prisma } from "@/lib/db";
+import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 
 type Params = { shopId: string };
 
+type AllergenStatus = "CONTAINS" | "FREE" | "MAY_CONTAIN";
+type BadgeKind = "danger" | "caution" | "safe";
+
+function badgeClass(kind: BadgeKind): string {
+    if (kind === "danger")
+        return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200";
+    if (kind === "caution")
+        return "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-200";
+    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+}
+
+function badgeLabel(kind: BadgeKind): string {
+    if (kind === "danger") return "含む";
+    if (kind === "caution") return "可能性";
+    return "ALL FREE";
+}
+
+function buildAllergenSummary(args: {
+    links: Array<{ status: AllergenStatus; allergen: { slug: string } }>;
+    nameJaBySlug: Map<string, string>;
+    rankBySlug: Map<string, number>;
+}): {
+    summaryText: string;
+    badge: BadgeKind;
+    containsCount: number;
+    mayCount: number;
+} {
+    const { links, nameJaBySlug, rankBySlug } = args;
+
+    const containsSlugs: string[] = [];
+    const maySlugs: string[] = [];
+
+    // 1) CONTAINS/MAYだけ集める（FREEは要約に出さない）
+    for (const link of links) {
+        const slug = link.allergen.slug;
+        if (link.status === "CONTAINS") containsSlugs.push(slug);
+        else if (link.status === "MAY_CONTAIN") maySlugs.push(slug);
+    }
+
+    // 2) バッジ判定
+    const badge: BadgeKind =
+        containsSlugs.length > 0
+            ? "danger"
+            : maySlugs.length > 0
+              ? "caution"
+              : "safe";
+
+    // 3) 表示順の安定化（sortOrder由来）
+    const byRank = (a: string, b: string) =>
+        (rankBySlug.get(a) ?? 9999) - (rankBySlug.get(b) ?? 9999);
+
+    containsSlugs.sort(byRank);
+    maySlugs.sort(byRank);
+
+    // 4) slug -> nameJa（無ければslug）
+    const toName = (slug: string) => nameJaBySlug.get(slug) ?? slug;
+    const containsNames = containsSlugs.map(toName);
+    const mayNames = maySlugs.map(toName);
+
+    // 5) 最大3つ（CONTAINS優先）
+    const pickedContains = containsNames.slice(0, 3);
+    const remain = 3 - pickedContains.length;
+    const pickedMay = remain > 0 ? mayNames.slice(0, remain) : [];
+
+    // 6) 表示文
+    const parts: string[] = [];
+    if (pickedContains.length > 0)
+        parts.push(`${pickedContains.join("・")}（含む）`);
+    if (pickedMay.length > 0) parts.push(`${pickedMay.join("・")}（可能性）`);
+
+    const summaryText = parts.length > 0 ? parts.join(" / ") : "特記事項なし";
+
+    return {
+        summaryText,
+        badge,
+        containsCount: containsSlugs.length,
+        mayCount: maySlugs.length,
+    };
+}
+
 export default async function PublicShopDetailPage({
     params,
+    searchParams,
 }: {
     params: Params | Promise<Params>;
+    searchParams?: { q?: string };
 }) {
-    // 1) params が Promise の可能性があるので await してから使う
+    // 1) Turbopack対策：paramsをawait
     const { shopId } = await params;
-
-    // 2) shopId が無いなら 404
     if (!shopId) notFound();
 
-    // 3) 店舗＋公開メニューを取得
+    // 2) メニュー検索語
+    const qRaw = searchParams?.q ?? "";
+    const q = qRaw.trim();
+
+    // 3) Allergenマスタを1回取得（表示名＆順位）
+    const allergenMaster = await prisma.allergen.findMany({
+        select: { slug: true, nameJa: true, sortOrder: true },
+        orderBy: { sortOrder: "asc" },
+    });
+
+    const nameJaBySlug = new Map<string, string>();
+    const rankBySlug = new Map<string, number>();
+    for (let i = 0; i < allergenMaster.length; i++) {
+        const a = allergenMaster[i];
+        nameJaBySlug.set(a.slug, a.nameJa);
+        rankBySlug.set(a.slug, i);
+    }
+
+    // 4) メニュー検索条件（qが空なら公開メニュー全部）
+    const menuWhere =
+        q === ""
+            ? { isPublished: true }
+            : {
+                  isPublished: true,
+                  OR: [
+                      { name: { contains: q, mode: "insensitive" as const } },
+                      {
+                          description: {
+                              contains: q,
+                              mode: "insensitive" as const,
+                          },
+                      },
+                      {
+                          category: {
+                              contains: q,
+                              mode: "insensitive" as const,
+                          },
+                      },
+                  ],
+              };
+
+    // 5) 店舗＋公開メニュー＋linksをまとめて取得（N+1回避）
     const shop = await prisma.shop.findUnique({
         where: { id: shopId },
         select: {
@@ -30,207 +154,257 @@ export default async function PublicShopDetailPage({
             hours: true,
             updatedAt: true,
             menus: {
-                where: { isPublished: true },
+                where: menuWhere,
                 orderBy: { updatedAt: "desc" },
                 select: {
                     id: true,
                     name: true,
+                    description: true,
                     priceYen: true,
                     category: true,
-                    imageUrl: true,
                     updatedAt: true,
+                    allergenLinks: {
+                        select: {
+                            status: true,
+                            allergen: { select: { slug: true } },
+                        },
+                    },
                 },
             },
         },
     });
 
-    // 4) 無ければ404
     if (!shop) notFound();
 
     return (
-        <main className="pb-10">
-            {/* Breadcrumb */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-10 pt-6">
-                <div className="text-sm text-text-sub dark:text-slate-300">
-                    <Link href="/shops" className="underline">
+        <main className="flex justify-center px-4 py-6 md:px-8">
+            <div className="flex w-full max-w-[1024px] flex-col gap-6">
+                {/* パンくず */}
+                <nav className="flex flex-wrap gap-2 text-sm">
+                    <Link
+                        className="text-gray-500 hover:text-[#13ec13]"
+                        href="/shops"
+                    >
                         店舗一覧
-                    </Link>{" "}
-                    <span className="mx-2">/</span>
-                    <span className="text-text-main dark:text-white">
-                        {shop.name}
-                    </span>
-                </div>
-            </div>
+                    </Link>
+                    <span className="text-gray-400">/</span>
+                    <span className="font-medium">{shop.name}</span>
+                </nav>
 
-            {/* Hero（テンプレっぽく：グラデ + CTA） */}
-            <section className="max-w-7xl mx-auto px-4 sm:px-10 mt-4">
-                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-surface-light shadow-sm">
-                    <div className="h-56 sm:h-72 bg-gradient-to-r from-primary/25 via-primary/10 to-white" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-black/0" />
-
-                    <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7">
-                        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                            <div className="min-w-0">
-                                <h1 className="text-2xl sm:text-3xl font-extrabold text-white drop-shadow">
+                {/* ヒーロー（スクショ風の大きいグラデ帯） */}
+                <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <div className="h-56 w-full bg-gradient-to-r from-[#13ec13]/25 via-[#13ec13]/10 to-transparent md:h-64" />
+                    <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                            <div>
+                                <h1 className="text-3xl font-extrabold text-white drop-shadow md:text-4xl">
                                     {shop.name}
                                 </h1>
-                                <p className="mt-2 text-sm sm:text-base text-white/90 line-clamp-2">
-                                    {shop.description ?? "説明はまだありません"}
+                                <p className="mt-1 text-sm font-semibold text-white/90 drop-shadow">
+                                    {shop.description ? shop.description : "—"}
                                 </p>
+                                {q !== "" ? (
+                                    <p className="mt-2 text-xs font-semibold text-white/90 drop-shadow">
+                                        検索: {q}（{shop.menus.length}件）
+                                    </p>
+                                ) : null}
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-3">
                                 <a
-                                    href="#menus"
-                                    className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-text-main hover:bg-primary-dark transition-colors"
+                                    href="#public-menus"
+                                    className="rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-bold text-black shadow-sm transition hover:bg-[#0db80d]"
                                 >
                                     公開メニューを見る
                                 </a>
                                 <a
-                                    href="#info"
-                                    className="inline-flex items-center justify-center rounded-xl bg-white/90 px-4 py-2 text-sm font-semibold text-text-main hover:bg-white transition-colors"
+                                    href="#shop-info"
+                                    className="rounded-lg bg-white/90 px-4 py-2 text-sm font-bold text-gray-800 shadow-sm transition hover:bg-white"
                                 >
                                     店舗情報
                                 </a>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            {/* 本文：左=カード群 / 右=店舗情報(sticky) */}
-            <section className="max-w-7xl mx-auto px-4 sm:px-10 mt-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* 左（2列分） */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* 説明カード */}
-                        <div className="rounded-2xl border border-gray-100 bg-surface-light p-5 shadow-sm">
-                            <h2 className="text-lg font-bold text-text-main">
+                {/* 下段 */}
+                <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    {/* 左 */}
+                    <div className="flex flex-col gap-6 lg:col-span-2">
+                        {/* お店の説明 */}
+                        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                            <h2 className="text-base font-extrabold">
                                 お店の説明
                             </h2>
-                            <p className="mt-2 text-sm text-text-sub whitespace-pre-wrap">
-                                {shop.description ?? "説明はまだありません"}
+                            <p className="mt-2 text-sm text-gray-700">
+                                {shop.description ? shop.description : "未設定"}
                             </p>
                         </div>
 
-                        {/* メニュー一覧（カードグリッド） */}
+                        {/* 公開メニュー */}
                         <div
-                            id="menus"
-                            className="rounded-2xl border border-gray-100 bg-surface-light p-5 shadow-sm"
+                            id="public-menus"
+                            className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm"
                         >
-                            <div className="flex items-center justify-between gap-3">
-                                <h2 className="text-lg font-bold text-text-main">
+                            <div className="mb-4 flex items-end justify-between">
+                                <h2 className="text-base font-extrabold">
                                     公開メニュー
                                 </h2>
-                                <div className="text-sm text-text-sub">
+                                <p className="text-xs text-gray-500">
                                     {shop.menus.length} 件
-                                </div>
+                                </p>
                             </div>
 
                             {shop.menus.length === 0 ? (
-                                <div className="mt-4 rounded-xl border border-gray-100 bg-background-light p-6 text-center text-sm text-text-sub">
-                                    公開中のメニューがありません
+                                <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
+                                    <p className="text-sm text-gray-700">
+                                        {q !== ""
+                                            ? "検索条件に一致する公開メニューがありません。"
+                                            : "現在公開中のメニューはありません。"}
+                                    </p>
                                 </div>
                             ) : (
-                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {shop.menus.map((m) => (
-                                        <Link
-                                            key={m.id}
-                                            href={`/shops/${shop.id}/menus/${m.id}`}
-                                            className="group block rounded-2xl border border-gray-100 bg-white p-4 hover:shadow transition-shadow"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <div className="font-semibold text-text-main truncate">
-                                                        {m.name}
-                                                    </div>
-                                                    <div className="mt-1 text-sm text-text-sub">
-                                                        {(m.category ??
-                                                            "カテゴリ未設定") +
-                                                            " · " +
-                                                            (m.priceYen != null
-                                                                ? `${m.priceYen}円`
-                                                                : "価格未設定")}
-                                                    </div>
-                                                </div>
-                                                <span className="material-symbols-outlined text-text-sub group-hover:text-primary transition-colors">
-                                                    chevron_right
-                                                </span>
-                                            </div>
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    {shop.menus.map((menu) => {
+                                        const {
+                                            summaryText,
+                                            badge,
+                                            containsCount,
+                                            mayCount,
+                                        } = buildAllergenSummary({
+                                            links: menu.allergenLinks as Array<{
+                                                status: AllergenStatus;
+                                                allergen: { slug: string };
+                                            }>,
+                                            nameJaBySlug,
+                                            rankBySlug,
+                                        });
 
-                                            {m.imageUrl && (
-                                                <div className="mt-2 text-xs text-gray-500 break-all">
-                                                    画像URL: {m.imageUrl}
-                                                </div>
-                                            )}
+                                        const priceText =
+                                            typeof menu.priceYen === "number"
+                                                ? `${menu.priceYen.toLocaleString("ja-JP")}円`
+                                                : "価格未設定";
 
-                                            <div className="mt-3 text-xs text-gray-400">
-                                                更新:{" "}
-                                                {new Date(
-                                                    m.updatedAt,
-                                                ).toLocaleString("ja-JP")}
-                                            </div>
-                                        </Link>
-                                    ))}
+                                        return (
+                                            <Link
+                                                key={menu.id}
+                                                href={`/shops/${shop.id}/menus/${menu.id}`}
+                                                className="group rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md"
+                                            >
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <h3 className="truncate text-base font-extrabold text-gray-900">
+                                                            {menu.name}
+                                                        </h3>
+
+                                                        <p className="mt-1 text-xs font-semibold text-gray-600">
+                                                            含む{containsCount}
+                                                            ・可能性{mayCount}
+                                                        </p>
+
+                                                        <p className="mt-2 text-sm text-gray-700">
+                                                            {menu.category
+                                                                ? menu.category
+                                                                : "カテゴリ未設定"}{" "}
+                                                            ・ {priceText}
+                                                        </p>
+                                                    </div>
+
+                                                    <span className="text-gray-400 group-hover:text-gray-600">
+                                                        ›
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-3 flex items-center justify-between gap-3">
+                                                    <span
+                                                        className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${badgeClass(badge)}`}
+                                                    >
+                                                        {badgeLabel(badge)}
+                                                    </span>
+                                                    <p className="text-right text-xs text-gray-500">
+                                                        更新:{" "}
+                                                        {new Date(
+                                                            menu.updatedAt,
+                                                        ).toLocaleString(
+                                                            "ja-JP",
+                                                        )}
+                                                    </p>
+                                                </div>
+
+                                                <p className="mt-2 text-xs text-gray-600">
+                                                    {summaryText}
+                                                </p>
+                                            </Link>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* 右（sticky店舗情報） */}
-                    <aside id="info" className="lg:col-span-1">
-                        <div className="lg:sticky lg:top-24 rounded-2xl border border-gray-100 bg-surface-light p-5 shadow-sm">
-                            <h2 className="text-lg font-bold text-text-main">
+                    {/* 右：店舗情報 */}
+                    <aside id="shop-info" className="flex flex-col gap-6">
+                        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                            <h2 className="text-base font-extrabold">
                                 店舗情報
                             </h2>
 
-                            <div className="mt-3 space-y-3 text-sm">
-                                <div className="flex gap-2">
-                                    <span className="material-symbols-outlined text-text-sub">
-                                        location_on
+                            <div className="mt-4 space-y-3 text-sm text-gray-700">
+                                <div className="flex items-start gap-2">
+                                    <span className="mt-0.5 text-gray-500">
+                                        📍
                                     </span>
-                                    <div className="text-text-sub">
-                                        {shop.address ?? "住所: 未設定"}
+                                    <div>
+                                        <p className="font-semibold">住所</p>
+                                        <p className="text-gray-600">
+                                            {shop.address
+                                                ? shop.address
+                                                : "未設定"}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2">
-                                    <span className="material-symbols-outlined text-text-sub">
-                                        schedule
+                                <div className="flex items-start gap-2">
+                                    <span className="mt-0.5 text-gray-500">
+                                        🕒
                                     </span>
-                                    <div className="text-text-sub">
-                                        {shop.hours ?? "営業時間: 未設定"}
+                                    <div>
+                                        <p className="font-semibold">
+                                            営業時間
+                                        </p>
+                                        <p className="text-gray-600">
+                                            {shop.hours ? shop.hours : "未設定"}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2">
-                                    <span className="material-symbols-outlined text-text-sub">
-                                        update
+                                <div className="flex items-start gap-2">
+                                    <span className="mt-0.5 text-gray-500">
+                                        🔄
                                     </span>
-                                    <div className="text-text-sub">
-                                        更新:{" "}
-                                        {new Date(
-                                            shop.updatedAt,
-                                        ).toLocaleString("ja-JP")}
+                                    <div>
+                                        <p className="font-semibold">更新</p>
+                                        <p className="text-gray-600">
+                                            {new Date(
+                                                shop.updatedAt,
+                                            ).toLocaleString("ja-JP")}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="mt-5">
-                                <Link
-                                    href={`/shops/${shop.id}`}
-                                    className="inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-text-main hover:bg-primary-dark transition-colors"
-                                >
-                                    この店舗のURLを共有
-                                </Link>
-                                <p className="mt-2 text-xs text-text-sub">
-                                    ※QR表示は次で追加できます
-                                </p>
+                                <ShareShopUrlButton shopId={shop.id} />
                             </div>
+
+                            <p className="mt-3 text-xs text-gray-500">
+                                ※QR表示は次で追加できます
+                            </p>
                         </div>
                     </aside>
-                </div>
-            </section>
+                </section>
+            </div>
         </main>
     );
 }
