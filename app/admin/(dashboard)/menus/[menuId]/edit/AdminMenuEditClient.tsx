@@ -90,6 +90,7 @@ export default function AdminMenuEditClient(props: {
                         {error}
                     </div>
                 )}
+
                 {saved && (
                     <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
                         保存しました
@@ -128,58 +129,68 @@ export default function AdminMenuEditClient(props: {
                     「含まない / 注意 / 含む」を選んでください。
                 </p>
 
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
                     {allergens.map((a) => {
                         const current = statusBySlug[a.slug] ?? "FREE";
+
                         return (
                             <div
                                 key={a.slug}
-                                className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2"
+                                className="rounded-xl border border-gray-100 px-4 py-3"
                             >
-                                <div>
-                                    <div className="font-medium text-gray-900">
-                                        {a.nameJa}
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0">
+                                        <div className="font-medium text-gray-900">
+                                            {a.nameJa}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            {a.nameEn}
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-gray-500">
-                                        {a.nameEn}
-                                    </div>
-                                </div>
 
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setOne(a.slug, "FREE")}
-                                        className={`rounded-lg px-3 py-1 text-sm ${
-                                            current === "FREE"
-                                                ? "bg-gray-900 text-white"
-                                                : "bg-gray-100 text-gray-800"
-                                        }`}
-                                    >
-                                        含まない
-                                    </button>
-                                    <button
-                                        onClick={() =>
-                                            setOne(a.slug, "MAY_CONTAIN")
-                                        }
-                                        className={`rounded-lg px-3 py-1 text-sm ${
-                                            current === "MAY_CONTAIN"
-                                                ? "bg-amber-500 text-white"
-                                                : "bg-gray-100 text-gray-800"
-                                        }`}
-                                    >
-                                        注意
-                                    </button>
-                                    <button
-                                        onClick={() =>
-                                            setOne(a.slug, "CONTAINS")
-                                        }
-                                        className={`rounded-lg px-3 py-1 text-sm ${
-                                            current === "CONTAINS"
-                                                ? "bg-red-600 text-white"
-                                                : "bg-gray-100 text-gray-800"
-                                        }`}
-                                    >
-                                        含む
-                                    </button>
+                                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setOne(a.slug, "FREE")
+                                            }
+                                            className={`rounded-lg px-3 py-1 text-sm transition-colors ${
+                                                current === "FREE"
+                                                    ? "bg-gray-900 text-white"
+                                                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                                            }`}
+                                        >
+                                            含まない
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setOne(a.slug, "MAY_CONTAIN")
+                                            }
+                                            className={`rounded-lg px-3 py-1 text-sm transition-colors ${
+                                                current === "MAY_CONTAIN"
+                                                    ? "bg-amber-500 text-white"
+                                                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                                            }`}
+                                        >
+                                            注意
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setOne(a.slug, "CONTAINS")
+                                            }
+                                            className={`rounded-lg px-3 py-1 text-sm transition-colors ${
+                                                current === "CONTAINS"
+                                                    ? "bg-red-600 text-white"
+                                                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                                            }`}
+                                        >
+                                            含む
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         );

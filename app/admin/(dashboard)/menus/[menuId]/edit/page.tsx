@@ -1,4 +1,4 @@
-// app/(admin)/admin/menus/[menuId]/edit/page.tsx
+// app/admin/(dashboard)/menus/[menuId]/edit/page.tsx
 // 管理画面：メニュー編集ページ（Server Component）
 // 役割：
 // 1) セッションから shopId を取得
@@ -21,9 +21,14 @@ type PageProps = {
 export default async function AdminMenuEditPage({ params }: PageProps) {
     // 0) ログイン必須
     const session = await getServerSession(authOptions);
-    if (!session) redirect("/admin/login"); // あなたのログインURLに合わせる
+    if (!session) {
+        redirect("/admin/login");
+    }
 
     const shopId = session.user.shopId;
+    if (!shopId) {
+        redirect("/admin/login");
+    }
 
     // 1) menuId
     const { menuId } = await params;
@@ -31,10 +36,15 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
     // 2) アレルゲンマスタ（28品目）
     const allergens = await prisma.allergen.findMany({
         orderBy: { sortOrder: "asc" },
-        select: { slug: true, nameJa: true, nameEn: true, sortOrder: true },
+        select: {
+            slug: true,
+            nameJa: true,
+            nameEn: true,
+            sortOrder: true,
+        },
     });
 
-    // 3) メニュー取得（★shopIdで絞る＝権限チェック）
+    // 3) メニュー取得（shopIdで絞る＝権限チェック）
     const menu = await prisma.menuItem.findFirst({
         where: { id: menuId, shopId },
         select: {
@@ -51,12 +61,17 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
         },
     });
 
-    // 自分の店のメニューじゃない（または存在しない）なら 404 扱い
-    if (!menu) notFound();
+    // 自分の店のメニューじゃない（または存在しない）なら404扱い
+    if (!menu) {
+        notFound();
+    }
 
     // 4) 初期状態：全部FREE → 既存状態で上書き
     const initialStatusBySlug: Record<string, Status> = {};
-    for (const a of allergens) initialStatusBySlug[a.slug] = "FREE";
+    for (const a of allergens) {
+        initialStatusBySlug[a.slug] = "FREE";
+    }
+
     for (const link of menu.allergenLinks) {
         initialStatusBySlug[link.allergen.slug] = link.status as Status;
     }
@@ -68,12 +83,12 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                     メニュー編集
                 </h1>
                 <p className="mt-1 text-gray-600">
-                    アレルゲン情報を正確に入力してください。お客様の安全に関わります。
+                    アレルゲン情報を正確に入力してください。
                 </p>
 
                 <div className="mt-6">
                     <AdminMenuEditClient
-                        menuId={menuId}
+                        menuId={menu.id}
                         initialName={menu.name}
                         initialIsPublished={menu.isPublished}
                         allergens={allergens}
