@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 
 export default function AdminLoginPage() {
@@ -60,11 +61,13 @@ export default function AdminLoginPage() {
     };
 
     return (
-        // 13) body相当の背景とレイアウト
         <div className="bg-background-light dark:bg-background-dark text-text-main min-h-screen flex flex-col font-display antialiased selection:bg-primary/30">
-            {/* 14) Header */}
+            {/* Header */}
             <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#e5e7eb] dark:border-white/10 bg-surface-light dark:bg-surface-dark px-6 lg:px-10 py-4 sticky top-0 z-50">
-                <div className="flex items-center gap-3 text-text-main dark:text-white cursor-pointer">
+                <Link
+                    href="/"
+                    className="flex items-center gap-3 text-text-main dark:text-white"
+                >
                     <div className="size-8 text-primary">
                         <span className="material-symbols-outlined text-3xl">
                             local_florist
@@ -73,26 +76,23 @@ export default function AdminLoginPage() {
                     <h2 className="text-text-main dark:text-white text-xl font-bold leading-tight tracking-[-0.015em]">
                         ClearAllergy
                     </h2>
-                </div>
+                </Link>
 
                 <div className="flex items-center gap-4">
                     <span className="hidden sm:block text-sm font-medium text-text-sub dark:text-gray-400">
                         アカウントをお持ちでないですか？
                     </span>
 
-                    <button
-                        type="button"
+                    <Link
+                        href="/admin/register"
                         className="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-5 bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/90 transition-colors text-sm font-bold leading-normal tracking-[0.015em]"
-                        onClick={() => {
-                            alert("新規登録（未実装）");
-                        }}
                     >
                         <span className="truncate">新規登録</span>
-                    </button>
+                    </Link>
                 </div>
             </header>
 
-            {/* 15) Main */}
+            {/* Main */}
             <main className="flex-1 flex items-center justify-center p-4 py-12 lg:py-20">
                 <div className="w-full max-w-[480px] bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border border-[#e5e7eb] dark:border-white/5 overflow-hidden">
                     <div className="p-8 pb-6">
@@ -105,19 +105,16 @@ export default function AdminLoginPage() {
                             </p>
                         </div>
 
-                        {/* 16) エラー表示（ここが追加） */}
                         {error && (
                             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                                 {error}
                             </div>
                         )}
 
-                        {/* 17) form */}
                         <form
                             className="flex flex-col gap-5"
                             onSubmit={onSubmit}
                         >
-                            {/* 18) Email */}
                             <div className="flex flex-col gap-2">
                                 <label
                                     className="text-text-main dark:text-white text-sm font-bold leading-normal"
@@ -142,7 +139,6 @@ export default function AdminLoginPage() {
                                 </div>
                             </div>
 
-                            {/* 19) Password */}
                             <div className="flex flex-col gap-2">
                                 <div className="flex justify-between items-center">
                                     <label
@@ -186,7 +182,6 @@ export default function AdminLoginPage() {
                                 </div>
                             </div>
 
-                            {/* 20) Actions */}
                             <div className="flex flex-col gap-4 mt-2">
                                 <button
                                     className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
@@ -214,7 +209,6 @@ export default function AdminLoginPage() {
                         </form>
                     </div>
 
-                    {/* 21) カード下部 */}
                     <div className="bg-background-light dark:bg-black/20 p-4 text-center border-t border-[#e5e7eb] dark:border-white/5">
                         <p className="text-xs text-text-sub dark:text-gray-500">
                             保護された接続でログインしています。
@@ -231,10 +225,9 @@ export default function AdminLoginPage() {
                 </div>
             </main>
 
-            {/* 22) Footer */}
             <footer className="py-6 text-center">
                 <p className="text-xs text-text-sub dark:text-gray-500 font-medium">
-                    © 2024 ClearAllergy Inc.
+                    © 2026 ClearAllergy
                 </p>
             </footer>
         </div>

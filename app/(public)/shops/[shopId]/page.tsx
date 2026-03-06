@@ -10,15 +10,20 @@ import { prisma } from "@/lib/db";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 
 type Params = { shopId: string };
+type SearchParams = { q?: string };
 
 type AllergenStatus = "CONTAINS" | "FREE" | "MAY_CONTAIN";
 type BadgeKind = "danger" | "caution" | "safe";
 
 function badgeClass(kind: BadgeKind): string {
-    if (kind === "danger")
+    if (kind === "danger") {
         return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200";
-    if (kind === "caution")
+    }
+
+    if (kind === "caution") {
         return "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-200";
+    }
+
     return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
 }
 
@@ -26,6 +31,50 @@ function badgeLabel(kind: BadgeKind): string {
     if (kind === "danger") return "含む";
     if (kind === "caution") return "可能性";
     return "ALL FREE";
+}
+
+function formatDateTime(value: Date): string {
+    return value.toLocaleString("ja-JP");
+}
+
+function formatPriceYen(priceYen: number | null): string {
+    if (typeof priceYen !== "number") {
+        return "価格未設定";
+    }
+
+    return `${priceYen.toLocaleString("ja-JP")}円`;
+}
+
+function buildMenuWhere(q: string) {
+    if (q === "") {
+        return {
+            isPublished: true,
+        };
+    }
+
+    return {
+        isPublished: true,
+        OR: [
+            {
+                name: {
+                    contains: q,
+                    mode: "insensitive" as const,
+                },
+            },
+            {
+                description: {
+                    contains: q,
+                    mode: "insensitive" as const,
+                },
+            },
+            {
+                category: {
+                    contains: q,
+                    mode: "insensitive" as const,
+                },
+            },
+        ],
+    };
 }
 
 function buildAllergenSummary(args: {
@@ -46,8 +95,12 @@ function buildAllergenSummary(args: {
     // 1) CONTAINS/MAYだけ集める（FREEは要約に出さない）
     for (const link of links) {
         const slug = link.allergen.slug;
-        if (link.status === "CONTAINS") containsSlugs.push(slug);
-        else if (link.status === "MAY_CONTAIN") maySlugs.push(slug);
+
+        if (link.status === "CONTAINS") {
+            containsSlugs.push(slug);
+        } else if (link.status === "MAY_CONTAIN") {
+            maySlugs.push(slug);
+        }
     }
 
     // 2) バッジ判定
@@ -77,9 +130,12 @@ function buildAllergenSummary(args: {
 
     // 6) 表示文
     const parts: string[] = [];
-    if (pickedContains.length > 0)
+    if (pickedContains.length > 0) {
         parts.push(`${pickedContains.join("・")}（含む）`);
-    if (pickedMay.length > 0) parts.push(`${pickedMay.join("・")}（可能性）`);
+    }
+    if (pickedMay.length > 0) {
+        parts.push(`${pickedMay.join("・")}（可能性）`);
+    }
 
     const summaryText = parts.length > 0 ? parts.join(" / ") : "特記事項なし";
 
@@ -96,52 +152,42 @@ export default async function PublicShopDetailPage({
     searchParams,
 }: {
     params: Params | Promise<Params>;
-    searchParams?: { q?: string };
+    searchParams?: SearchParams | Promise<SearchParams>;
 }) {
-    // 1) Turbopack対策：paramsをawait
+    // 1) params は Promise のことがあるので await してから使う
     const { shopId } = await params;
-    if (!shopId) notFound();
+    if (!shopId) {
+        notFound();
+    }
 
-    // 2) メニュー検索語
-    const qRaw = searchParams?.q ?? "";
+    // 2) searchParams も Promise のことがあるので await してから使う
+    const resolvedSearchParams = (await searchParams) ?? {};
+    const qRaw = resolvedSearchParams.q ?? "";
     const q = qRaw.trim();
 
     // 3) Allergenマスタを1回取得（表示名＆順位）
     const allergenMaster = await prisma.allergen.findMany({
-        select: { slug: true, nameJa: true, sortOrder: true },
-        orderBy: { sortOrder: "asc" },
+        select: {
+            slug: true,
+            nameJa: true,
+            sortOrder: true,
+        },
+        orderBy: {
+            sortOrder: "asc",
+        },
     });
 
     const nameJaBySlug = new Map<string, string>();
     const rankBySlug = new Map<string, number>();
+
     for (let i = 0; i < allergenMaster.length; i++) {
-        const a = allergenMaster[i];
-        nameJaBySlug.set(a.slug, a.nameJa);
-        rankBySlug.set(a.slug, i);
+        const allergen = allergenMaster[i];
+        nameJaBySlug.set(allergen.slug, allergen.nameJa);
+        rankBySlug.set(allergen.slug, i);
     }
 
-    // 4) メニュー検索条件（qが空なら公開メニュー全部）
-    const menuWhere =
-        q === ""
-            ? { isPublished: true }
-            : {
-                  isPublished: true,
-                  OR: [
-                      { name: { contains: q, mode: "insensitive" as const } },
-                      {
-                          description: {
-                              contains: q,
-                              mode: "insensitive" as const,
-                          },
-                      },
-                      {
-                          category: {
-                              contains: q,
-                              mode: "insensitive" as const,
-                          },
-                      },
-                  ],
-              };
+    // 4) メニュー検索条件
+    const menuWhere = buildMenuWhere(q);
 
     // 5) 店舗＋公開メニュー＋linksをまとめて取得（N+1回避）
     const shop = await prisma.shop.findUnique({
@@ -166,7 +212,11 @@ export default async function PublicShopDetailPage({
                     allergenLinks: {
                         select: {
                             status: true,
-                            allergen: { select: { slug: true } },
+                            allergen: {
+                                select: {
+                                    slug: true,
+                                },
+                            },
                         },
                     },
                 },
@@ -174,7 +224,9 @@ export default async function PublicShopDetailPage({
         },
     });
 
-    if (!shop) notFound();
+    if (!shop) {
+        notFound();
+    }
 
     return (
         <main className="flex justify-center px-4 py-6 md:px-8">
@@ -191,18 +243,21 @@ export default async function PublicShopDetailPage({
                     <span className="font-medium">{shop.name}</span>
                 </nav>
 
-                {/* ヒーロー（スクショ風の大きいグラデ帯） */}
+                {/* ヒーロー */}
                 <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
                     <div className="h-56 w-full bg-gradient-to-r from-[#13ec13]/25 via-[#13ec13]/10 to-transparent md:h-64" />
+
                     <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
                         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                             <div>
                                 <h1 className="text-3xl font-extrabold text-white drop-shadow md:text-4xl">
                                     {shop.name}
                                 </h1>
+
                                 <p className="mt-1 text-sm font-semibold text-white/90 drop-shadow">
-                                    {shop.description ? shop.description : "—"}
+                                    {shop.description || "—"}
                                 </p>
+
                                 {q !== "" ? (
                                     <p className="mt-2 text-xs font-semibold text-white/90 drop-shadow">
                                         検索: {q}（{shop.menus.length}件）
@@ -217,6 +272,7 @@ export default async function PublicShopDetailPage({
                                 >
                                     公開メニューを見る
                                 </a>
+
                                 <a
                                     href="#shop-info"
                                     className="rounded-lg bg-white/90 px-4 py-2 text-sm font-bold text-gray-800 shadow-sm transition hover:bg-white"
@@ -238,7 +294,7 @@ export default async function PublicShopDetailPage({
                                 お店の説明
                             </h2>
                             <p className="mt-2 text-sm text-gray-700">
-                                {shop.description ? shop.description : "未設定"}
+                                {shop.description || "未設定"}
                             </p>
                         </div>
 
@@ -281,10 +337,9 @@ export default async function PublicShopDetailPage({
                                             rankBySlug,
                                         });
 
-                                        const priceText =
-                                            typeof menu.priceYen === "number"
-                                                ? `${menu.priceYen.toLocaleString("ja-JP")}円`
-                                                : "価格未設定";
+                                        const priceText = formatPriceYen(
+                                            menu.priceYen,
+                                        );
 
                                         return (
                                             <Link
@@ -304,9 +359,8 @@ export default async function PublicShopDetailPage({
                                                         </p>
 
                                                         <p className="mt-2 text-sm text-gray-700">
-                                                            {menu.category
-                                                                ? menu.category
-                                                                : "カテゴリ未設定"}{" "}
+                                                            {menu.category ||
+                                                                "カテゴリ未設定"}{" "}
                                                             ・ {priceText}
                                                         </p>
                                                     </div>
@@ -318,16 +372,17 @@ export default async function PublicShopDetailPage({
 
                                                 <div className="mt-3 flex items-center justify-between gap-3">
                                                     <span
-                                                        className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${badgeClass(badge)}`}
+                                                        className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${badgeClass(
+                                                            badge,
+                                                        )}`}
                                                     >
                                                         {badgeLabel(badge)}
                                                     </span>
+
                                                     <p className="text-right text-xs text-gray-500">
                                                         更新:{" "}
-                                                        {new Date(
+                                                        {formatDateTime(
                                                             menu.updatedAt,
-                                                        ).toLocaleString(
-                                                            "ja-JP",
                                                         )}
                                                     </p>
                                                 </div>
@@ -358,9 +413,7 @@ export default async function PublicShopDetailPage({
                                     <div>
                                         <p className="font-semibold">住所</p>
                                         <p className="text-gray-600">
-                                            {shop.address
-                                                ? shop.address
-                                                : "未設定"}
+                                            {shop.address || "未設定"}
                                         </p>
                                     </div>
                                 </div>
@@ -374,7 +427,7 @@ export default async function PublicShopDetailPage({
                                             営業時間
                                         </p>
                                         <p className="text-gray-600">
-                                            {shop.hours ? shop.hours : "未設定"}
+                                            {shop.hours || "未設定"}
                                         </p>
                                     </div>
                                 </div>
@@ -386,9 +439,7 @@ export default async function PublicShopDetailPage({
                                     <div>
                                         <p className="font-semibold">更新</p>
                                         <p className="text-gray-600">
-                                            {new Date(
-                                                shop.updatedAt,
-                                            ).toLocaleString("ja-JP")}
+                                            {formatDateTime(shop.updatedAt)}
                                         </p>
                                     </div>
                                 </div>
