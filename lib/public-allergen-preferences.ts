@@ -6,6 +6,12 @@ export type UserAllergenPreferences = {
     selectedSlugs: string[];
 };
 
+/**
+ * 配列が string[] かどうかをざっくり安全に整える
+ * - 配列でなければ []
+ * - string 以外は捨てる
+ * - 重複は消す
+ */
 function normalizeSlugs(values: unknown): string[] {
     if (!Array.isArray(values)) {
         return [];
@@ -20,6 +26,11 @@ function normalizeSlugs(values: unknown): string[] {
     );
 }
 
+/**
+ * localStorage から設定を読む
+ * - ブラウザ以外では空を返す
+ * - JSONが壊れていても空を返す
+ */
 export function loadUserAllergenPreferences(): UserAllergenPreferences {
     if (typeof window === "undefined") {
         return { selectedSlugs: [] };
@@ -27,6 +38,7 @@ export function loadUserAllergenPreferences(): UserAllergenPreferences {
 
     try {
         const raw = window.localStorage.getItem(USER_ALLERGEN_STORAGE_KEY);
+
         if (!raw) {
             return { selectedSlugs: [] };
         }
@@ -41,9 +53,13 @@ export function loadUserAllergenPreferences(): UserAllergenPreferences {
     }
 }
 
+/**
+ * localStorage に設定を保存する
+ * - string[] に正規化してから保存
+ */
 export function saveUserAllergenPreferences(
     preferences: UserAllergenPreferences,
-) {
+): void {
     if (typeof window === "undefined") {
         return;
     }
@@ -58,7 +74,10 @@ export function saveUserAllergenPreferences(
     );
 }
 
-export function clearUserAllergenPreferences() {
+/**
+ * 保存済み設定を削除する
+ */
+export function clearUserAllergenPreferences(): void {
     if (typeof window === "undefined") {
         return;
     }

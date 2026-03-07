@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import UserAllergenPreferenceClient from "@/components/public/UserAllergenPreferenceClient";
 
 type SearchParams = {
     q?: string;

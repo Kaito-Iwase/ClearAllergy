@@ -1,53 +1,78 @@
 "use client";
 
-// components/public/ShareShopUrlButton.tsx
-// 「この店舗のURLを共有」ボタン
-// - 対応ブラウザ：Web Share APIがあれば share()、無ければ clipboard にコピー
-
-import { useMemo, useState } from "react";
+import React from "react";
 
 export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
-    const [copied, setCopied] = useState(false);
+    // 1) 初回は server/client で同じ値にする
+    const [shopUrl, setShopUrl] = React.useState<string | null>(null);
 
-    // 1) 現在のオリジン（例：http://localhost:3000）を使ってURLを組み立てる
-    //    windowはクライアントでのみ存在するので useMemo 内で参照する
-    const url = useMemo(() => {
-        if (typeof window === "undefined") return "";
-        return `${window.location.origin}/shops/${shopId}`;
+    // 2) 共有メッセージ
+    const [message, setMessage] = React.useState("");
+
+    // 3) マウント後にだけブラウザの origin を使ってURLを作る
+    React.useEffect(() => {
+        const origin = window.location.origin;
+        setShopUrl(`${origin}/shops/${shopId}`);
     }, [shopId]);
 
-    const onClick = async () => {
+    // 4) 一時メッセージを消す
+    function showMessage(text: string) {
+        setMessage(text);
+
+        window.setTimeout(() => {
+            setMessage("");
+        }, 2500);
+    }
+
+    // 5) ボタンを押したときの処理
+    async function onClick() {
+        if (!shopUrl) {
+            return;
+        }
+
         try {
-            // 2) Web Share APIがあれば優先（スマホで自然）
+            // 5-1) 共有APIが使える端末なら共有UIを開く
             if (navigator.share) {
                 await navigator.share({
-                    title: "店舗URL",
-                    url,
+                    title: "ClearAllergy 店舗ページ",
+                    text: "この店舗のアレルゲン情報ページです。",
+                    url: shopUrl,
                 });
                 return;
             }
 
-            // 3) 無ければclipboardにコピー
-            await navigator.clipboard.writeText(url);
-            setCopied(true);
+            // 5-2) 共有APIが使えない場合はクリップボードへコピー
+            await navigator.clipboard.writeText(shopUrl);
+            showMessage("店舗URLをコピーしました。");
+        } catch (error) {
+            // 5-3) ユーザーキャンセル時は何もしない
+            if (error instanceof DOMException && error.name === "AbortError") {
+                return;
+            }
 
-            // 4) 1.5秒後に表示を戻す
-            window.setTimeout(() => setCopied(false), 1500);
-        } catch {
-            // 5) 失敗しても落とさない（何もしない）
-            setCopied(false);
+            // 5-4) フォールバック：prompt で見せる
+            window.prompt("このURLをコピーしてください", shopUrl);
         }
-    };
+    }
+
+    const disabled = shopUrl === null;
+    const title = shopUrl ?? "URL取得中...";
 
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="w-full rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d]"
-            disabled={!url}
-            title={url ? url : "URL取得中..."}
-        >
-            {copied ? "コピーしました" : "この店舗のURLを共有"}
-        </button>
+        <div className="space-y-2">
+            <button
+                type="button"
+                onClick={onClick}
+                disabled={disabled}
+                title={title}
+                className="w-full rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                この店舗のURLを共有
+            </button>
+
+            {message ? (
+                <p className="text-xs text-gray-600">{message}</p>
+            ) : null}
+        </div>
     );
 }
