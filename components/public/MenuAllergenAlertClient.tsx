@@ -3,12 +3,14 @@
 import React from "react";
 import { loadUserAllergenPreferences } from "@/lib/public-allergen-preferences";
 
-type AllergenStatus = "CONTAINS" | "FREE" | "MAY_CONTAIN";
+type AllergenStatus = "FREE" | "MAY_CONTAIN" | "CONTAINS";
 
 type Allergen = {
     slug: string;
     nameJa: string;
 };
+
+const USER_ALLERGENS_UPDATED_EVENT = "clearallergy:user-allergens-updated";
 
 export default function MenuAllergenAlertClient({
     allergens,
@@ -21,9 +23,29 @@ export default function MenuAllergenAlertClient({
     const [loaded, setLoaded] = React.useState(false);
 
     React.useEffect(() => {
-        const stored = loadUserAllergenPreferences();
-        setSelectedSlugs(stored.selectedSlugs);
-        setLoaded(true);
+        function syncPreferences() {
+            const stored = loadUserAllergenPreferences();
+            setSelectedSlugs(stored.selectedSlugs);
+            setLoaded(true);
+        }
+
+        syncPreferences();
+
+        window.addEventListener("storage", syncPreferences);
+        window.addEventListener("focus", syncPreferences);
+        window.addEventListener(
+            USER_ALLERGENS_UPDATED_EVENT,
+            syncPreferences as EventListener,
+        );
+
+        return () => {
+            window.removeEventListener("storage", syncPreferences);
+            window.removeEventListener("focus", syncPreferences);
+            window.removeEventListener(
+                USER_ALLERGENS_UPDATED_EVENT,
+                syncPreferences as EventListener,
+            );
+        };
     }, []);
 
     const allergenNameBySlug = React.useMemo(() => {
@@ -56,24 +78,17 @@ export default function MenuAllergenAlertClient({
         return null;
     }
 
+    // ここが重要：
+    // 何も選択されていないなら、警告UI自体を出さない
     if (selectedSlugs.length === 0) {
-        return (
-            <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900">
-                    あなた向けの警告表示は未設定です
-                </h3>
-                <p className="mt-2 text-sm text-gray-600">
-                    上のアレルゲン設定を保存すると、一致したときだけ警告表示できます。
-                </p>
-            </div>
-        );
+        return null;
     }
 
     if (containsNames.length === 0 && mayContainNames.length === 0) {
         return (
             <div className="rounded-xl border border-green-200 bg-green-50 p-6 shadow-sm">
                 <h3 className="text-lg font-bold text-green-800">
-                    保存済み設定との一致は見つかりませんでした
+                    選択中アレルゲンとの一致は見つかりませんでした
                 </h3>
                 <p className="mt-2 text-sm text-green-800/90">
                     この端末で選んだアレルゲンについて、現在の登録上は 「含む /
@@ -92,8 +107,9 @@ export default function MenuAllergenAlertClient({
                         ? `（他：${mayContainNames.join("・")} は可能性あり）`
                         : ""}
                 </h3>
+
                 <p className="mt-3 text-sm font-medium text-red-900/90">
-                    この商品は、この端末で保存したアレルゲン設定と一致しています。
+                    この商品は、あなたが選択したアレルゲンと一致しています。
                     必ず店舗の表示・注意事項も確認してください。
                 </p>
             </div>
@@ -105,8 +121,9 @@ export default function MenuAllergenAlertClient({
             <h3 className="text-xl font-extrabold text-yellow-800 md:text-2xl">
                 あなた向け注意：{mayContainNames.join("・")} は可能性があります
             </h3>
+
             <p className="mt-3 text-sm font-medium text-yellow-900/90">
-                この商品は、この端末で保存したアレルゲン設定について
+                この商品は、あなたが選択したアレルゲンについて
                 「可能性あり」として登録されています。必要に応じて店舗へ確認してください。
             </p>
         </div>

@@ -21,7 +21,7 @@ export default function PublicLayout({
                                 <span className="text-[#13ec13]">🛡️</span>
                             </div>
                             <span className="text-xl font-bold tracking-tight">
-                                AllerFree
+                                ClearAllergy
                             </span>
                         </Link>
 
