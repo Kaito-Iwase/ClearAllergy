@@ -19,14 +19,15 @@ model User {
 }
 // 店舗情報（ユーザーに紐づく）
 model Shop {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  name        String
-  description String?  // 店の説明（任意）
-  address     String?  // 住所（任意）
-  hours       String?  // 営業時間（任意）
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  name          String
+  description   String?
+  address       String?
+  hours         String?
+  coverImageUrl String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   menus MenuItem[]

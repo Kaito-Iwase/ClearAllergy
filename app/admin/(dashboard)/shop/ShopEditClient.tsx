@@ -9,6 +9,7 @@ type ShopViewModel = {
     description: string | null;
     address: string | null;
     hours: string | null;
+    coverImageUrl: string | null;
     updatedAt: string;
     publishedMenuCount: number;
 };
@@ -24,13 +25,88 @@ export default function ShopEditClient({
     );
     const [address, setAddress] = React.useState(initialShop.address ?? "");
     const [hours, setHours] = React.useState(initialShop.hours ?? "");
+    const [coverImageUrl, setCoverImageUrl] = React.useState(
+        initialShop.coverImageUrl ?? "",
+    );
+
+    const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+    const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(
+        null,
+    );
 
     const [saving, setSaving] = React.useState(false);
+    const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [savedMessage, setSavedMessage] = React.useState("");
     const [updatedAtText, setUpdatedAtText] = React.useState(
         new Date(initialShop.updatedAt).toLocaleString("ja-JP"),
     );
+
+    React.useEffect(() => {
+        return () => {
+            if (localPreviewUrl) {
+                URL.revokeObjectURL(localPreviewUrl);
+            }
+        };
+    }, [localPreviewUrl]);
+
+    function onSelectImage(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        if (!file.type.startsWith("image/")) {
+            setError("画像ファイルを選択してください。");
+            return;
+        }
+
+        if (localPreviewUrl) {
+            URL.revokeObjectURL(localPreviewUrl);
+        }
+
+        const nextPreviewUrl = URL.createObjectURL(file);
+
+        setSelectedFile(file);
+        setLocalPreviewUrl(nextPreviewUrl);
+        setError(null);
+        setSavedMessage("");
+    }
+
+    async function uploadSelectedImage(): Promise<string | null> {
+        if (!selectedFile) {
+            const trimmedUrl = coverImageUrl.trim();
+            return trimmedUrl === "" ? null : trimmedUrl;
+        }
+
+        setUploading(true);
+
+        try {
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+
+            const res = await fetch("/api/admin/upload-shop-image", {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = (await res.json().catch(() => null)) as {
+                url?: string;
+                error?: string;
+            } | null;
+
+            if (!res.ok || !data?.url) {
+                throw new Error(
+                    data?.error ?? "画像アップロードに失敗しました。",
+                );
+            }
+
+            setCoverImageUrl(data.url);
+            return data.url;
+        } finally {
+            setUploading(false);
+        }
+    }
 
     async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
@@ -47,6 +123,8 @@ export default function ShopEditClient({
         setSaving(true);
 
         try {
+            const uploadedCoverImageUrl = await uploadSelectedImage();
+
             const res = await fetch("/api/admin/shop", {
                 method: "PUT",
                 headers: {
@@ -57,6 +135,7 @@ export default function ShopEditClient({
                     description: description.trim(),
                     address: address.trim(),
                     hours: hours.trim(),
+                    coverImageUrl: uploadedCoverImageUrl,
                 }),
             });
 
@@ -64,6 +143,7 @@ export default function ShopEditClient({
                 error?: string;
                 shop?: {
                     updatedAt: string;
+                    coverImageUrl?: string | null;
                 };
             } | null;
 
@@ -74,11 +154,17 @@ export default function ShopEditClient({
 
             setSavedMessage("店舗情報を保存しました。");
 
+            if (data?.shop?.coverImageUrl !== undefined) {
+                setCoverImageUrl(data.shop.coverImageUrl ?? "");
+            }
+
             if (data?.shop?.updatedAt) {
                 setUpdatedAtText(
                     new Date(data.shop.updatedAt).toLocaleString("ja-JP"),
                 );
             }
+
+            setSelectedFile(null);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             setError(`保存中にエラーが発生しました: ${msg}`);
@@ -87,16 +173,28 @@ export default function ShopEditClient({
         }
     }
 
+    const previewImageUrl = localPreviewUrl || coverImageUrl.trim() || "";
+
     return (
         <div className="space-y-6">
             <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
                 <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
-                    <div className="relative min-h-[280px] bg-gradient-to-r from-green-200 via-green-100 to-gray-50 p-8 md:p-10">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.55),transparent_35%)]" />
+                    <div className="relative min-h-[360px] overflow-hidden bg-gradient-to-r from-green-200 via-green-100 to-gray-50 p-8 md:p-10">
+                        {previewImageUrl ? (
+                            <div
+                                className="absolute inset-0 bg-cover bg-center"
+                                style={{
+                                    backgroundImage: `url("${previewImageUrl}")`,
+                                }}
+                            />
+                        ) : null}
+
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.45),transparent_35%)]" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/10 to-white/10" />
 
                         <div className="relative z-10 flex h-full flex-col justify-between">
                             <div>
-                                <p className="text-sm font-semibold text-gray-700">
+                                <p className="text-sm font-semibold text-white/90 drop-shadow">
                                     公開プレビュー
                                 </p>
                                 <h2 className="mt-6 text-4xl font-extrabold tracking-tight text-white drop-shadow md:text-5xl">
@@ -106,21 +204,6 @@ export default function ShopEditClient({
                                     {description.trim() ||
                                         "店舗説明は未設定です。"}
                                 </p>
-                            </div>
-
-                            <div className="mt-8 flex flex-wrap items-center gap-3">
-                                <Link
-                                    href="/admin/menus"
-                                    className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black shadow-md transition hover:bg-[#0db80d]"
-                                >
-                                    公開メニューを見る
-                                </Link>
-                                <button
-                                    type="button"
-                                    className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-bold text-gray-800 shadow-sm"
-                                >
-                                    店舗情報
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -209,10 +292,14 @@ export default function ShopEditClient({
 
                         <button
                             type="submit"
-                            disabled={saving}
+                            disabled={saving || uploading}
                             className="rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition hover:bg-black/80 disabled:opacity-60"
                         >
-                            {saving ? "保存中..." : "保存する"}
+                            {uploading
+                                ? "画像アップロード中..."
+                                : saving
+                                  ? "保存中..."
+                                  : "保存する"}
                         </button>
                     </div>
 
@@ -266,6 +353,47 @@ export default function ShopEditClient({
 
                         <div>
                             <label
+                                htmlFor="shop-cover-image-file"
+                                className="mb-2 block text-sm font-bold text-gray-900"
+                            >
+                                店舗画像ファイル
+                            </label>
+                            <input
+                                id="shop-cover-image-file"
+                                type="file"
+                                accept="image/*"
+                                onChange={onSelectImage}
+                                className="block w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-gray-100 file:px-4 file:py-2 file:font-bold file:text-gray-700 hover:file:bg-gray-200"
+                            />
+                            <p className="mt-2 text-xs text-gray-500">
+                                保存時に画像をアップロードし、取得したURLを店舗情報に保存します。
+                            </p>
+                        </div>
+
+                        <div>
+                            <label
+                                htmlFor="shop-cover-image-url"
+                                className="mb-2 block text-sm font-bold text-gray-900"
+                            >
+                                現在の画像URL
+                            </label>
+                            <input
+                                id="shop-cover-image-url"
+                                type="url"
+                                value={coverImageUrl}
+                                onChange={(e) =>
+                                    setCoverImageUrl(e.target.value)
+                                }
+                                placeholder="アップロード後に自動入力されます"
+                                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                            />
+                            <p className="mt-2 text-xs text-gray-500">
+                                通常は自動更新されます。必要な場合のみ手動で変更してください。
+                            </p>
+                        </div>
+
+                        <div>
+                            <label
                                 htmlFor="shop-address"
                                 className="mb-2 block text-sm font-bold text-gray-900"
                             >
@@ -304,10 +432,14 @@ export default function ShopEditClient({
                     <div className="mt-6 flex flex-wrap gap-3">
                         <button
                             type="submit"
-                            disabled={saving}
+                            disabled={saving || uploading}
                             className="inline-flex items-center justify-center rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
-                            {saving ? "保存中..." : "変更を保存"}
+                            {uploading
+                                ? "画像アップロード中..."
+                                : saving
+                                  ? "保存中..."
+                                  : "変更を保存"}
                         </button>
 
                         <Link
@@ -325,6 +457,13 @@ export default function ShopEditClient({
                     </h3>
 
                     <div className="mt-5 space-y-4 text-sm text-gray-700">
+                        <div className="rounded-2xl bg-gray-50 p-4">
+                            <p className="font-bold text-gray-900">店舗画像</p>
+                            <p className="mt-1">
+                                横長で明るすぎない写真だと、店名の白文字が読みやすくなります。まずはWebPかJPGがおすすめです。
+                            </p>
+                        </div>
+
                         <div className="rounded-2xl bg-gray-50 p-4">
                             <p className="font-bold text-gray-900">店舗名</p>
                             <p className="mt-1">

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
     title: "ClearAllergy",
-    description: "Allergy menu information for restaurants and customers.",
+    description: "Allergy-friendly menu viewer",
 };
 
 export default function RootLayout({
@@ -26,8 +26,8 @@ export default function RootLayout({
         <html lang="ja">
             <head>
                 <link
-                    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
                     rel="stylesheet"
+                    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
                 />
             </head>
             <body

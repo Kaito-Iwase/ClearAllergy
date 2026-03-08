@@ -1,13 +1,13 @@
-// app/(admin)/admin/menus/page.tsx
+// app/admin/(dashboard)/menus/page.tsx
 // 管理画面：メニュー一覧（Server）
 // 役割：ログイン確認→DBから一覧取得→Clientに渡す
 
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import MenuListClient from "./MenuListClient";
+import CreateMenuButton from "./CreateMenuButton";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type MenuRow = {
@@ -42,21 +42,14 @@ export default async function AdminMenusPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="mx-auto max-w-6xl px-4 py-6">
-                {/* 5) ヘッダー：タイトル + 新規作成 */}
                 <div className="flex items-center justify-between gap-3">
                     <h1 className="text-2xl font-bold text-gray-900">
                         メニュー一覧
                     </h1>
 
-                    <Link
-                        href="/admin/menus/new"
-                        className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
-                    >
-                        ＋ 新規作成
-                    </Link>
+                    <CreateMenuButton />
                 </div>
 
-                {/* 6) 検索・削除など“動くUI”はClientに任せる */}
                 <div className="mt-6">
                     <MenuListClient initialMenus={initialMenus} />
                 </div>

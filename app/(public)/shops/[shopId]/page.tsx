@@ -5,6 +5,7 @@
 // - 「あなた向けのアレルゲン設定」は右カラムの店舗情報カードの下に配置
 // - 「公開メニューを見る」は最初の公開メニュー詳細へ遷移
 // - N+1回避：Allergenマスタ1回 + 店舗/メニュー/links 1回
+// - coverImageUrl があればヒーロー背景に表示、なければ既存グラデーション表示
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -83,6 +84,7 @@ export default async function PublicShopDetailPage({
             description: true,
             address: true,
             hours: true,
+            coverImageUrl: true,
             updatedAt: true,
             menus: {
                 where: menuWhere,
@@ -131,6 +133,15 @@ export default async function PublicShopDetailPage({
 
     const firstPublishedMenuId = shop.menus[0]?.id ?? null;
 
+    const heroStyle = shop.coverImageUrl
+        ? {
+              backgroundImage: `url("${shop.coverImageUrl}")`,
+          }
+        : {
+              backgroundImage:
+                  "linear-gradient(90deg, rgba(19,236,19,0.25) 0%, rgba(19,236,19,0.10) 55%, rgba(255,255,255,0) 100%)",
+          };
+
     return (
         <main className="flex justify-center px-4 py-6 md:px-8">
             <div className="flex w-full max-w-[1024px] flex-col gap-6">
@@ -146,40 +157,40 @@ export default async function PublicShopDetailPage({
                 </nav>
 
                 <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                    <div className="h-56 w-full bg-gradient-to-r from-[#13ec13]/25 via-[#13ec13]/10 to-transparent md:h-64" />
-                    <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                            <div>
-                                <h1 className="text-3xl font-extrabold text-white drop-shadow md:text-4xl">
-                                    {shop.name}
-                                </h1>
-                                <p className="mt-1 text-sm font-semibold text-white/90 drop-shadow">
-                                    {shop.description || "—"}
-                                </p>
-                                {q !== "" ? (
-                                    <p className="mt-2 text-xs font-semibold text-white/90 drop-shadow">
-                                        検索: {q}（{shop.menus.length}件）
-                                    </p>
-                                ) : null}
-                            </div>
+                    <div
+                        className="relative h-56 w-full bg-cover bg-center bg-no-repeat md:h-64"
+                        style={heroStyle}
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-black/15 to-transparent" />
 
-                            <div className="flex gap-3">
-                                <Link
-                                    href={
-                                        firstPublishedMenuId
-                                            ? `/shops/${shop.id}/menus/${firstPublishedMenuId}`
-                                            : "#public-menus"
-                                    }
-                                    className="rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-bold text-black shadow-sm transition hover:bg-[#0db80d]"
-                                >
-                                    公開メニューを見る
-                                </Link>
-                                <a
-                                    href="#shop-info"
-                                    className="rounded-lg bg-white/90 px-4 py-2 text-sm font-bold text-gray-800 shadow-sm transition hover:bg-white"
-                                >
-                                    店舗情報
-                                </a>
+                        <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                                <div className="relative z-10">
+                                    <h1 className="text-3xl font-extrabold text-white drop-shadow md:text-4xl">
+                                        {shop.name}
+                                    </h1>
+                                    <p className="mt-1 text-sm font-semibold text-white/90 drop-shadow">
+                                        {shop.description || "—"}
+                                    </p>
+                                    {q !== "" ? (
+                                        <p className="mt-2 text-xs font-semibold text-white/90 drop-shadow">
+                                            検索: {q}（{shop.menus.length}件）
+                                        </p>
+                                    ) : null}
+                                </div>
+
+                                <div className="relative z-10 flex gap-3">
+                                    <Link
+                                        href={
+                                            firstPublishedMenuId
+                                                ? `/shops/${shop.id}/menus/${firstPublishedMenuId}`
+                                                : "#public-menus"
+                                        }
+                                        className="rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-bold text-black shadow-sm transition hover:bg-[#0db80d]"
+                                    >
+                                        公開メニューを見る
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     </div>

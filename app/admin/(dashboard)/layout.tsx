@@ -9,15 +9,17 @@ export default function AdminDashboardLayout({
     return (
         <div className="relative flex min-h-screen w-full flex-row overflow-hidden bg-background-light text-text-main">
             <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-gray-100 bg-surface-light lg:sticky lg:top-0 lg:flex">
-                <div className="flex items-center gap-3 p-6">
-                    <div className="size-8 text-primary">
-                        <span className="material-symbols-outlined text-4xl">
-                            health_and_safety
-                        </span>
-                    </div>
-                    <h1 className="text-xl font-bold tracking-tight">
-                        ClearAllergy
-                    </h1>
+                <div className="p-6">
+                    <Link href="/" className="flex items-center gap-3">
+                        <div className="size-8 text-primary">
+                            <span className="material-symbols-outlined text-4xl">
+                                health_and_safety
+                            </span>
+                        </div>
+                        <h1 className="text-xl font-bold tracking-tight">
+                            ClearAllergy
+                        </h1>
+                    </Link>
                 </div>
 
                 <div className="px-6 py-4">
@@ -63,12 +65,15 @@ export default function AdminDashboardLayout({
 
             <main className="flex h-screen flex-1 flex-col overflow-y-auto bg-background-light">
                 <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-surface-light p-4 lg:hidden">
-                    <div className="flex items-center gap-2 text-lg font-bold text-primary">
+                    <Link
+                        href="/"
+                        className="flex items-center gap-2 text-lg font-bold text-primary"
+                    >
                         <span className="material-symbols-outlined">
                             health_and_safety
                         </span>
                         ClearAllergy
-                    </div>
+                    </Link>
                 </header>
 
                 <div className="mx-auto flex w-full max-w-6xl flex-1 p-4 md:p-8">

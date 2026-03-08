@@ -40,10 +40,10 @@ function badgeClass(kind: BadgeKind): string {
     return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
 }
 
-function badgeLabel(kind: BadgeKind, hasPreference: boolean): string {
+function badgeLabel(kind: BadgeKind): string {
     if (kind === "danger") return "含む";
-    if (kind === "caution") return "可能性";
-    return hasPreference ? "含まない" : "ALL FREE";
+    if (kind === "caution") return "含む可能性があります";
+    return "含まない";
 }
 
 function formatDateTime(value: string): string {
@@ -108,11 +108,11 @@ function buildOverallSummary(args: {
         parts.push(`${pickedContains.join("・")}（含む）`);
     }
     if (pickedMay.length > 0) {
-        parts.push(`${pickedMay.join("・")}（可能性）`);
+        parts.push(`${pickedMay.join("・")}（含む可能性があります）`);
     }
 
     return {
-        summaryText: parts.length > 0 ? parts.join(" / ") : "特記事項なし",
+        summaryText: parts.length > 0 ? parts.join(" / ") : "該当なし",
         badge,
         containsCount: containsSlugs.length,
         mayCount: maySlugs.length,
@@ -177,7 +177,7 @@ function buildPersonalizedSummary(args: {
         parts.push(`${pickedContains.join("・")}（含む）`);
     }
     if (pickedMay.length > 0) {
-        parts.push(`${pickedMay.join("・")}（可能性）`);
+        parts.push(`${pickedMay.join("・")}（含む可能性があります）`);
     }
 
     return {
@@ -310,8 +310,9 @@ export default function ShopMenuListClient({
                                         </h3>
 
                                         <p className="mt-1 text-xs font-semibold text-gray-600">
-                                            含む{activeSummary.containsCount}
-                                            ・可能性{activeSummary.mayCount}
+                                            含む {activeSummary.containsCount}{" "}
+                                            件 ・ 含む可能性があります{" "}
+                                            {activeSummary.mayCount} 件
                                         </p>
 
                                         <p className="mt-2 text-sm text-gray-700">
@@ -331,14 +332,11 @@ export default function ShopMenuListClient({
                                             activeSummary.badge,
                                         )}`}
                                     >
-                                        {badgeLabel(
-                                            activeSummary.badge,
-                                            hasPreference,
-                                        )}
+                                        {badgeLabel(activeSummary.badge)}
                                     </span>
 
                                     <p className="text-right text-xs text-gray-500">
-                                        更新: {formatDateTime(menu.updatedAt)}
+                                        更新：{formatDateTime(menu.updatedAt)}
                                     </p>
                                 </div>
 

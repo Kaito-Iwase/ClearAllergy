@@ -7,6 +7,7 @@ type ShopUpdateBody = {
     description?: unknown;
     address?: unknown;
     hours?: unknown;
+    coverImageUrl?: unknown;
 };
 
 function toTrimmedNullableString(value: unknown): string | null {
@@ -42,6 +43,7 @@ export async function GET() {
                 description: true,
                 address: true,
                 hours: true,
+                coverImageUrl: true,
                 updatedAt: true,
             },
         });
@@ -85,6 +87,7 @@ export async function PUT(req: Request) {
         const description = toTrimmedNullableString(body.description);
         const address = toTrimmedNullableString(body.address);
         const hours = toTrimmedNullableString(body.hours);
+        const coverImageUrl = toTrimmedNullableString(body.coverImageUrl);
 
         const shop = await prisma.shop.update({
             where: { id: auth.shopId },
@@ -93,6 +96,7 @@ export async function PUT(req: Request) {
                 description,
                 address,
                 hours,
+                coverImageUrl,
             },
             select: {
                 id: true,
@@ -100,6 +104,7 @@ export async function PUT(req: Request) {
                 description: true,
                 address: true,
                 hours: true,
+                coverImageUrl: true,
                 updatedAt: true,
             },
         });
