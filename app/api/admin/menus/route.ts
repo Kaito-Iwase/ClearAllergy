@@ -46,12 +46,10 @@ function toBooleanOrDefault(value: unknown, defaultValue: boolean): boolean {
 function parsePriceYen(
     value: unknown,
 ): { ok: true; value: number | null } | { ok: false; message: string } {
-    // 1) 未入力は null
     if (value === undefined || value === null || value === "") {
         return { ok: true, value: null };
     }
 
-    // 2) number でも string でも受ける
     let parsed: number;
 
     if (typeof value === "number") {
@@ -68,22 +66,18 @@ function parsePriceYen(
         return { ok: false, message: "価格は数値で入力してください。" };
     }
 
-    // 3) 数値でない
     if (!Number.isFinite(parsed) || Number.isNaN(parsed)) {
         return { ok: false, message: "価格は数値で入力してください。" };
     }
 
-    // 4) 整数でない
     if (!Number.isInteger(parsed)) {
         return { ok: false, message: "価格は整数で入力してください。" };
     }
 
-    // 5) マイナス不可
     if (parsed < 0) {
         return { ok: false, message: "価格は0以上で入力してください。" };
     }
 
-    // 6) Prisma Int の上限超過
     if (parsed > PRISMA_INT_MAX) {
         return {
             ok: false,
@@ -97,13 +91,11 @@ function parsePriceYen(
 // GET /api/admin/menus ・・・ 一覧（管理用）
 export async function GET() {
     try {
-        // 1) セッション確認 + shopId 取得
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
         }
 
-        // 2) この店舗のメニューを更新日時の新しい順で取得
         const menus = await prisma.menuItem.findMany({
             where: { shopId: auth.shopId },
             orderBy: { updatedAt: "desc" },
@@ -118,42 +110,26 @@ export async function GET() {
             },
         });
 
-        // 3) 返す
         return NextResponse.json({ menus });
     } catch (e) {
         return internalError(e);
     }
 }
 
-// POST /api/admin/menus ・・・ 新規作成
+// POST /api/admin/menus ・・・ 新規作成（下書き作成対応）
 export async function POST(req: Request) {
     try {
-        // 1) セッション確認 + shopId 取得
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
         }
 
-        // 2) body を読む（壊れてたら400）
         const body = await readJson<MenuCreateBody>(req);
-        if (!body) {
-            return NextResponse.json(
-                { error: "bad request: invalid json" },
-                { status: 400 },
-            );
-        }
 
-        // 3) 必須 name を検証
-        const name = toRequiredTrimmedString(body.name);
-        if (!name) {
-            return NextResponse.json(
-                { error: "bad request: name is required" },
-                { status: 400 },
-            );
-        }
+        // body が無くても仮タイトルで下書きを作れるようにする
+        const name = toRequiredTrimmedString(body?.name) ?? "新しいメニュー";
 
-        // 4) priceYen を安全に解釈
-        const priceResult = parsePriceYen(body.priceYen);
+        const priceResult = parsePriceYen(body?.priceYen);
         if (!priceResult.ok) {
             return NextResponse.json(
                 { error: priceResult.message },
@@ -161,15 +137,15 @@ export async function POST(req: Request) {
             );
         }
 
-        // 5) その他の入力を整形
-        const description = toTrimmedNullableString(body.description);
-        const category = toTrimmedNullableString(body.category);
-        const ingredients = toTrimmedNullableString(body.ingredients);
-        const precaution = toTrimmedNullableString(body.precaution);
-        const imageUrl = toTrimmedNullableString(body.imageUrl);
-        const isPublished = toBooleanOrDefault(body.isPublished, false);
+        const description = toTrimmedNullableString(body?.description);
+        const category = toTrimmedNullableString(body?.category);
+        const ingredients = toTrimmedNullableString(body?.ingredients);
+        const precaution = toTrimmedNullableString(body?.precaution);
+        const imageUrl = toTrimmedNullableString(body?.imageUrl);
 
-        // 6) DBに作成（shopIdはセッション由来で固定）
+        // 新規作成時は基本下書き
+        const isPublished = toBooleanOrDefault(body?.isPublished, false);
+
         const created = await prisma.menuItem.create({
             data: {
                 shopId: auth.shopId,
@@ -187,7 +163,6 @@ export async function POST(req: Request) {
             },
         });
 
-        // 7) 作れたidを返す
         return NextResponse.json({ id: created.id }, { status: 201 });
     } catch (e) {
         return internalError(e);

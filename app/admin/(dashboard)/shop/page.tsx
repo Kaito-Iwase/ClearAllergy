@@ -24,6 +24,7 @@ export default async function AdminShopPage() {
             description: true,
             address: true,
             hours: true,
+            coverImageUrl: true,
             updatedAt: true,
             _count: {
                 select: {
@@ -48,7 +49,7 @@ export default async function AdminShopPage() {
                     店舗情報編集
                 </h1>
                 <p className="mt-2 text-sm text-gray-600">
-                    公開ページに表示する店舗名・説明・住所・営業時間を更新できます。
+                    公開ページに表示する店舗名・説明・住所・営業時間・画像を更新できます。
                 </p>
             </div>
 
@@ -59,6 +60,7 @@ export default async function AdminShopPage() {
                     description: shop.description,
                     address: shop.address,
                     hours: shop.hours,
+                    coverImageUrl: shop.coverImageUrl,
                     updatedAt: shop.updatedAt.toISOString(),
                     publishedMenuCount: shop._count.menus,
                 }}

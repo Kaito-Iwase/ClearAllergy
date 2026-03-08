@@ -1,6 +1,6 @@
 // app/(public)/shops/[shopId]/menus/[menuId]/page.tsx
 // 公開側：メニュー詳細
-// - 28品目を常に表示（未登録はFREE）
+// - 28品目を常に表示（未登録は「含まない」として扱う）
 // - localStorage の一般ユーザー設定に応じて「あなた向け警告」を表示
 // - 特定原材料8品目の含有状況を明記して表示
 // - ヘッダーは layout 側を使うので、このページでは出さない
@@ -26,10 +26,13 @@ const SPECIFIED_INGREDIENT_SLUGS = [
     "peanut",
 ] as const;
 
+const SPECIFIED_INGREDIENT_LABEL =
+    "対象：えび・かに・くるみ・小麦・そば・卵・乳・落花生（ピーナッツ）";
+
 function statusLabelJa(status: AllergenStatus): string {
     if (status === "CONTAINS") return "含む";
-    if (status === "MAY_CONTAIN") return "可能性";
-    return "FREE";
+    if (status === "MAY_CONTAIN") return "含む可能性があります";
+    return "含まない";
 }
 
 function statusBadgeClass(status: AllergenStatus): string {
@@ -58,7 +61,6 @@ function buildSpecifiedIngredientNotice(args: {
         (row) => row.status === "MAY_CONTAIN",
     );
 
-    const allTargetNames = specifiedRows.map((row) => row.nameJa);
     const containsNames = containsRows.map((row) => row.nameJa);
     const mayContainNames = mayContainRows.map((row) => row.nameJa);
 
@@ -66,8 +68,8 @@ function buildSpecifiedIngredientNotice(args: {
         return {
             kind: "danger" as const,
             title: "特定原材料を含みます",
-            names: containsNames,
-            desc: "対象：えび・かに・くるみ・小麦・そば・卵・乳・落花生（ピーナッツ）",
+            resultText: containsNames.join("・"),
+            desc: SPECIFIED_INGREDIENT_LABEL,
             boxClass: "border border-red-200 bg-red-50",
             titleClass: "text-red-700",
             textClass: "text-red-900/90",
@@ -78,8 +80,8 @@ function buildSpecifiedIngredientNotice(args: {
         return {
             kind: "caution" as const,
             title: "特定原材料を含む可能性があります",
-            names: mayContainNames,
-            desc: "対象：えび・かに・くるみ・小麦・そば・卵・乳・落花生（ピーナッツ）",
+            resultText: mayContainNames.join("・"),
+            desc: SPECIFIED_INGREDIENT_LABEL,
             boxClass: "border border-yellow-200 bg-yellow-50",
             titleClass: "text-yellow-800",
             textClass: "text-yellow-900/90",
@@ -88,9 +90,9 @@ function buildSpecifiedIngredientNotice(args: {
 
     return {
         kind: "safe" as const,
-        title: "特定原材料の該当なし",
-        names: allTargetNames,
-        desc: "対象：えび・かに・くるみ・小麦・そば・卵・乳・落花生（ピーナッツ）",
+        title: "特定原材料は含まれていません",
+        resultText: "該当なし",
+        desc: SPECIFIED_INGREDIENT_LABEL,
         boxClass: "border border-green-200 bg-green-50",
         titleClass: "text-green-800",
         textClass: "text-green-900/90",
@@ -229,10 +231,7 @@ export default async function PublicMenuDetailPage({
                     <p
                         className={`mt-2 text-sm ${specifiedIngredientNotice.textClass}`}
                     >
-                        判定結果：
-                        {specifiedIngredientNotice.names.length > 0
-                            ? specifiedIngredientNotice.names.join("・")
-                            : "該当なし"}
+                        判定結果：{specifiedIngredientNotice.resultText}
                     </p>
                 </div>
 
@@ -293,15 +292,20 @@ export default async function PublicMenuDetailPage({
                                     {priceText}
                                 </span>
                                 <span className="text-sm text-gray-500">
-                                    (税込)
+                                    （税込）
                                 </span>
                             </div>
                         </div>
 
-                        <SelectedFreeAllergenCardsClient
-                            allergens={allergensForClient}
-                            statusBySlug={statusBySlugForClient}
-                        />
+                        <div>
+                            <p className="mb-3 text-sm font-bold text-gray-900">
+                                選択中アレルゲンのうち含まない項目
+                            </p>
+                            <SelectedFreeAllergenCardsClient
+                                allergens={allergensForClient}
+                                statusBySlug={statusBySlugForClient}
+                            />
+                        </div>
 
                         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                             <Link
@@ -319,7 +323,7 @@ export default async function PublicMenuDetailPage({
                         </div>
 
                         <p className="text-xs text-gray-500">
-                            更新:{" "}
+                            更新：{" "}
                             {new Date(menu.updatedAt).toLocaleString("ja-JP")}
                         </p>
                     </div>
@@ -345,7 +349,7 @@ export default async function PublicMenuDetailPage({
 
                             {menu.precaution ? (
                                 <div className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-                                    ※ 注意：{menu.precaution}
+                                    ※ 注意事項：{menu.precaution}
                                 </div>
                             ) : null}
                         </div>
@@ -396,7 +400,7 @@ export default async function PublicMenuDetailPage({
                                     コンタミネーションの可能性がある場合は店舗へ確認してください。
                                 </li>
                                 <li>
-                                    表示内容は更新されることがあります（最終更新日時も確認してください）。
+                                    表示内容は更新されることがあります。最終更新日時も確認してください。
                                 </li>
                             </ul>
                         </div>
