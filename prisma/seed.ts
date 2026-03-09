@@ -1,4 +1,3 @@
-// prisma/seed.ts
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -10,7 +9,7 @@ type AllergenSeed = {
     sortOrder: number;
 };
 
-// 日本（消費者庁の「特定原材料等」）の28品目に合わせた一般的な英語表記（※表記は運用で固定する）
+// 日本（消費者庁の「特定原材料等」）の現行28品目に合わせた固定マスタ
 const ALLERGENS: AllergenSeed[] = [
     { slug: "shrimp", nameJa: "えび", nameEn: "Shrimp", sortOrder: 1 },
     { slug: "crab", nameJa: "かに", nameEn: "Crab", sortOrder: 2 },
@@ -57,19 +56,36 @@ const ALLERGENS: AllergenSeed[] = [
     { slug: "banana", nameJa: "バナナ", nameEn: "Banana", sortOrder: 22 },
     { slug: "pork", nameJa: "豚肉", nameEn: "Pork", sortOrder: 23 },
     {
-        slug: "matsutake",
-        nameJa: "まつたけ",
-        nameEn: "Matsutake mushroom",
+        slug: "macadamia_nut",
+        nameJa: "マカダミアナッツ",
+        nameEn: "Macadamia nut",
         sortOrder: 24,
     },
     { slug: "peach", nameJa: "もも", nameEn: "Peach", sortOrder: 25 },
-    { slug: "yam", nameJa: "やまいも", nameEn: "Yam", sortOrder: 26 },
-    { slug: "apple", nameJa: "りんご", nameEn: "Apple", sortOrder: 27 },
+    { slug: "apple", nameJa: "りんご", nameEn: "Apple", sortOrder: 26 },
+    { slug: "yam", nameJa: "やまいも", nameEn: "Yam", sortOrder: 27 },
     { slug: "gelatin", nameJa: "ゼラチン", nameEn: "Gelatin", sortOrder: 28 },
 ];
 
 async function main() {
-    // upsert = 既にあれば更新、なければ作成（何回実行しても壊れない）
+    // 1) 旧マスタ「まつたけ」が残っていたら削除
+    //    MenuItemAllergen が matsutake を参照している場合も先に消す
+    const oldMatsutake = await prisma.allergen.findUnique({
+        where: { slug: "matsutake" },
+        select: { id: true },
+    });
+
+    if (oldMatsutake) {
+        await prisma.menuItemAllergen.deleteMany({
+            where: { allergenId: oldMatsutake.id },
+        });
+
+        await prisma.allergen.delete({
+            where: { slug: "matsutake" },
+        });
+    }
+
+    // 2) 現行28品目を upsert
     for (const a of ALLERGENS) {
         await prisma.allergen.upsert({
             where: { slug: a.slug },
