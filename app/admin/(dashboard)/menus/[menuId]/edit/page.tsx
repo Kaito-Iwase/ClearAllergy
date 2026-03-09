@@ -1,10 +1,5 @@
 // app/admin/(dashboard)/menus/[menuId]/edit/page.tsx
 // 管理画面：メニュー編集ページ（Server Component）
-// 役割：
-// 1) セッションから shopId を取得
-// 2) menuId のメニューがその shopId に属するか確認（権限チェック）
-// 3) アレルゲン28品目と現在状態をDBから取得
-// 4) Clientへ初期値を渡す
 
 import AdminMenuEditClient from "./AdminMenuEditClient";
 import { prisma } from "@/lib/db";
@@ -19,7 +14,7 @@ type PageProps = {
 };
 
 export default async function AdminMenuEditPage({ params }: PageProps) {
-    // 0) ログイン必須
+    // 1) ログイン必須
     const session = await getServerSession(authOptions);
     if (!session) {
         redirect("/admin/login");
@@ -30,10 +25,10 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
         redirect("/admin/login");
     }
 
-    // 1) menuId
+    // 2) menuId
     const { menuId } = await params;
 
-    // 2) アレルゲンマスタ（28品目）
+    // 3) アレルゲンマスタ
     const allergens = await prisma.allergen.findMany({
         orderBy: { sortOrder: "asc" },
         select: {
@@ -44,13 +39,19 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
         },
     });
 
-    // 3) メニュー取得（shopIdで絞る＝権限チェック）
+    // 4) メニュー取得（この店舗のものだけ）
     const menu = await prisma.menuItem.findFirst({
         where: { id: menuId, shopId },
         select: {
             id: true,
             shopId: true,
             name: true,
+            description: true,
+            priceYen: true,
+            category: true,
+            ingredients: true,
+            precaution: true,
+            imageUrl: true,
             isPublished: true,
             allergenLinks: {
                 select: {
@@ -61,12 +62,11 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
         },
     });
 
-    // 自分の店のメニューじゃない（または存在しない）なら404扱い
     if (!menu) {
         notFound();
     }
 
-    // 4) 初期状態：全部FREE → 既存状態で上書き
+    // 5) 初期状態：全部FREE → 既存状態で上書き
     const initialStatusBySlug: Record<string, Status> = {};
     for (const a of allergens) {
         initialStatusBySlug[a.slug] = "FREE";
@@ -83,13 +83,19 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                     メニュー編集
                 </h1>
                 <p className="mt-1 text-gray-600">
-                    アレルゲン情報を正確に入力してください。
+                    基本情報、原材料名、食品画像、アレルゲン情報を入力してください。
                 </p>
 
                 <div className="mt-6">
                     <AdminMenuEditClient
                         menuId={menu.id}
                         initialName={menu.name}
+                        initialDescription={menu.description}
+                        initialPriceYen={menu.priceYen}
+                        initialCategory={menu.category}
+                        initialIngredients={menu.ingredients}
+                        initialPrecaution={menu.precaution}
+                        initialImageUrl={menu.imageUrl}
                         initialIsPublished={menu.isPublished}
                         allergens={allergens}
                         initialStatusBySlug={initialStatusBySlug}

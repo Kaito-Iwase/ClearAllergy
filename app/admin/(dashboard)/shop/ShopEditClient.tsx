@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import React from "react";
+import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
+import ShopQrCard from "@/components/admin/ShopQrCard";
 
 type ShopViewModel = {
     id: string;
@@ -261,19 +263,21 @@ export default function ShopEditClient({
                             </div>
                         </div>
 
-                        <button
-                            type="button"
-                            className="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-[#13ec13] px-4 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d]"
-                        >
-                            この店舗のURLを共有
-                        </button>
+                        <div className="mt-8">
+                            <ShareShopUrlButton shopId={initialShop.id} />
+                        </div>
 
                         <p className="mt-3 text-xs text-gray-500">
-                            ※ QR表示は次で追加できます
+                            ※ QR表示は下のカードで確認できます
                         </p>
                     </div>
                 </div>
             </section>
+
+            <ShopQrCard
+                shopId={initialShop.id}
+                shopName={name.trim() || initialShop.name}
+            />
 
             <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <form
