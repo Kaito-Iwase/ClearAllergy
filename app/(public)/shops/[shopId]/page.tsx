@@ -132,6 +132,7 @@ export default async function PublicShopDetailPage({
     }));
 
     const firstPublishedMenuId = shop.menus[0]?.id ?? null;
+    const publishedMenuCount = shop.menus.length;
 
     const heroStyle = shop.coverImageUrl
         ? {
@@ -166,6 +167,9 @@ export default async function PublicShopDetailPage({
                         <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
                             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                 <div className="relative z-10">
+                                    <p className="text-sm font-semibold text-white/90 drop-shadow">
+                                        公開メニュー {publishedMenuCount}件
+                                    </p>
                                     <h1 className="text-3xl font-extrabold text-white drop-shadow md:text-4xl">
                                         {shop.name}
                                     </h1>
@@ -205,6 +209,17 @@ export default async function PublicShopDetailPage({
                             <p className="mt-2 text-sm text-gray-700">
                                 {shop.description || "未設定"}
                             </p>
+                            <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
+                                <span className="rounded-full bg-gray-100 px-2 py-1">
+                                    公開メニュー {publishedMenuCount}件
+                                </span>
+                                <span className="rounded-full bg-gray-100 px-2 py-1">
+                                    アレルゲン28品目を表示
+                                </span>
+                                <span className="rounded-full bg-gray-100 px-2 py-1">
+                                    価格表示あり
+                                </span>
+                            </div>
                         </div>
 
                         <ShopMenuListClient

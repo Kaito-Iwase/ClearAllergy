@@ -3,7 +3,6 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import UserAllergenPreferenceClient from "@/components/public/UserAllergenPreferenceClient";
 
 type SearchParams = {
     q?: string;
@@ -22,9 +21,14 @@ export default async function PublicShopListPage({
     const q = qRaw.trim();
 
     // 3) 検索条件を作る（qが空なら undefined にして全件）
-    const where =
-        q === ""
-            ? undefined
+    const where = {
+        menus: {
+            some: {
+                isPublished: true,
+            },
+        },
+        ...(q === ""
+            ? {}
             : {
                   OR: [
                       {
@@ -40,7 +44,8 @@ export default async function PublicShopListPage({
                           },
                       },
                   ],
-              };
+              }),
+    };
 
     // 4) 店舗一覧を取得
     const shops = await prisma.shop.findMany({
@@ -50,7 +55,25 @@ export default async function PublicShopListPage({
             id: true,
             name: true,
             description: true,
+            address: true,
             updatedAt: true,
+            menus: {
+                where: { isPublished: true },
+                orderBy: { updatedAt: "desc" },
+                take: 1,
+                select: {
+                    priceYen: true,
+                },
+            },
+            _count: {
+                select: {
+                    menus: {
+                        where: {
+                            isPublished: true,
+                        },
+                    },
+                },
+            },
         },
     });
 
@@ -64,9 +87,21 @@ export default async function PublicShopListPage({
 
     return (
         <main className="mx-auto max-w-5xl px-4 py-8">
+            <section className="mb-6 rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
+                <p className="text-sm font-semibold text-green-700">
+                    まず試すなら
+                </p>
+                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900">
+                    公開店舗から、メニューごとの価格とアレルゲン情報を確認できます
+                </h1>
+                <p className="mt-3 text-sm leading-7 text-neutral-600">
+                    各店舗ページでは公開メニュー一覧、各メニュー詳細ではアレルゲン28品目の状態を確認できます。未ログインでも閲覧できます。
+                </p>
+            </section>
+
             <div className="mb-6 flex items-end justify-between gap-4">
                 <div>
-                    <p className="text-xs text-neutral-500">AllerFree</p>
+                    <p className="text-xs text-neutral-500">ClearAllergy</p>
                     <h1 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900">
                         店舗一覧
                     </h1>
@@ -115,6 +150,23 @@ export default async function PublicShopListPage({
                                         >
                                             {descriptionText}
                                         </p>
+
+                                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-neutral-600">
+                                            <span className="rounded-full bg-neutral-100 px-2 py-1">
+                                                公開メニュー {shop._count.menus}
+                                                件
+                                            </span>
+                                            <span className="rounded-full bg-neutral-100 px-2 py-1">
+                                                {typeof shop.menus[0]?.priceYen ===
+                                                "number"
+                                                    ? `価格例 ¥${shop.menus[0].priceYen.toLocaleString("ja-JP")}`
+                                                    : "価格例 近日追加"}
+                                            </span>
+                                            <span className="rounded-full bg-neutral-100 px-2 py-1">
+                                                {shop.address?.trim() ||
+                                                    "住所未設定"}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <span className="shrink-0 text-neutral-400 group-hover:text-neutral-600">

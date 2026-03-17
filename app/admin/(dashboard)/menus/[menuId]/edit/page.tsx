@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 
 type Status = "FREE" | "MAY_CONTAIN" | "CONTAINS";
 
@@ -79,11 +80,20 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="mx-auto max-w-6xl px-4 py-6">
+                <nav className="mb-4 text-sm text-gray-500">
+                    <Link href="/admin/menus" className="hover:text-gray-900">
+                        メニュー一覧
+                    </Link>
+                    <span className="mx-2">/</span>
+                    <span className="font-medium text-gray-900">
+                        編集: {menu.name}
+                    </span>
+                </nav>
                 <h1 className="text-2xl font-bold text-gray-900">
                     メニュー編集
                 </h1>
                 <p className="mt-1 text-gray-600">
-                    基本情報、原材料名、食品画像、アレルゲン情報を入力してください。
+                    基本情報、価格、原材料名、食品画像、アレルゲン28品目を入力してください。
                 </p>
 
                 <div className="mt-6">

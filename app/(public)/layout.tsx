@@ -4,6 +4,7 @@
 // - 検索プレースホルダーも「店舗を検索」に寄せる
 
 import Link from "next/link";
+import { Suspense } from "react";
 import PublicSearchBox from "@/components/public/PublicSearchBox";
 
 export default function PublicLayout({
@@ -38,7 +39,9 @@ export default function PublicLayout({
                     {/* ✅ 検索の意図も「店舗」に寄せる */}
                     {/* // layout.tsx の検索部分だけ差し替え */}
                     <div className="hidden w-full max-w-xs md:block">
-                        <PublicSearchBox />
+                        <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100" />}>
+                            <PublicSearchBox />
+                        </Suspense>
                     </div>
                 </div>
             </header>

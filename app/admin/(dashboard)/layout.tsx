@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import AdminLogoutButton from "./AdminLogoutButton";
 
 export default function AdminDashboardLayout({
     children,
@@ -51,15 +52,7 @@ export default function AdminDashboardLayout({
                 </div>
 
                 <div className="mt-auto border-t border-gray-100 p-6">
-                    <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-                    >
-                        <span className="material-symbols-outlined text-lg">
-                            logout
-                        </span>
-                        ログアウト
-                    </button>
+                    <AdminLogoutButton />
                 </div>
             </aside>
 

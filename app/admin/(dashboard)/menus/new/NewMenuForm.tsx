@@ -180,6 +180,11 @@ export default function NewMenuForm() {
                     一覧に戻る
                 </button>
             </div>
+
+            <p className="text-xs text-neutral-500">
+                作成後は `/admin/menus/[menuId]/edit`
+                に移動して、価格やアレルゲン28品目を続けて編集できます。
+            </p>
         </form>
     );
 }
