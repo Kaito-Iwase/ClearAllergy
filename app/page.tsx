@@ -1,7 +1,62 @@
-// app/page.tsx
 import Link from "next/link";
+import { prisma } from "@/lib/db";
 
-export default function HomePage() {
+function formatPriceYen(priceYen: number | null): string {
+    if (typeof priceYen !== "number") {
+        return "価格未設定";
+    }
+
+    return `¥${priceYen.toLocaleString("ja-JP")}`;
+}
+
+export default async function HomePage() {
+    const featuredShop = await prisma.shop.findFirst({
+        where: {
+            menus: {
+                some: {
+                    isPublished: true,
+                },
+            },
+        },
+        orderBy: {
+            updatedAt: "desc",
+        },
+        select: {
+            id: true,
+            name: true,
+            description: true,
+            menus: {
+                where: { isPublished: true },
+                orderBy: { updatedAt: "desc" },
+                take: 3,
+                select: {
+                    id: true,
+                    name: true,
+                    priceYen: true,
+                    allergenLinks: {
+                        where: {
+                            status: {
+                                in: ["CONTAINS", "MAY_CONTAIN"],
+                            },
+                        },
+                        select: {
+                            status: true,
+                        },
+                    },
+                },
+            },
+            _count: {
+                select: {
+                    menus: {
+                        where: {
+                            isPublished: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
     return (
         <main className="min-h-screen bg-[#f6f8f6] text-[#111811]">
             <header className="sticky top-0 z-50 border-b border-gray-200 bg-white px-4 py-3 shadow-sm md:px-10">
@@ -79,6 +134,16 @@ export default function HomePage() {
                                     「店舗ページでメニューごとのアレルゲン情報を確認できる」
                                     体験に集中して開発しています。
                                 </p>
+                                {featuredShop ? (
+                                    <p className="mt-2 leading-6">
+                                        デモ用として
+                                        <span className="font-semibold">
+                                            {" "}
+                                            Clear Cafe Demo と Cafe Hibi
+                                        </span>
+                                        を公開しています。
+                                    </p>
+                                ) : null}
                             </div>
                         </div>
 
@@ -101,37 +166,93 @@ export default function HomePage() {
                                     </div>
 
                                     <div className="mt-5 space-y-3">
-                                        <div className="flex items-center justify-between rounded-xl bg-white p-3 shadow-sm">
-                                            <p className="text-sm font-semibold text-neutral-900">
-                                                季節の野菜カレー
-                                            </p>
-                                            <span className="rounded-full bg-yellow-50 px-2 py-1 text-[11px] font-bold text-yellow-800 ring-1 ring-inset ring-yellow-200">
-                                                可能性
-                                            </span>
-                                        </div>
+                                        {featuredShop ? (
+                                            featuredShop.menus.map((menu) => {
+                                                const hasContains =
+                                                    menu.allergenLinks.some(
+                                                        (link) =>
+                                                            link.status ===
+                                                            "CONTAINS",
+                                                    );
+                                                const hasMayContain =
+                                                    !hasContains &&
+                                                    menu.allergenLinks.some(
+                                                        (link) =>
+                                                            link.status ===
+                                                            "MAY_CONTAIN",
+                                                    );
 
-                                        <div className="flex items-center justify-between rounded-xl bg-white p-3 shadow-sm">
-                                            <p className="text-sm font-semibold text-neutral-900">
-                                                チキン南蛮
-                                            </p>
-                                            <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 ring-1 ring-inset ring-red-200">
-                                                含む
-                                            </span>
-                                        </div>
+                                                const badgeClass = hasContains
+                                                    ? "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200"
+                                                    : hasMayContain
+                                                      ? "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-200"
+                                                      : "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
 
-                                        <div className="flex items-center justify-between rounded-xl bg-white p-3 shadow-sm">
-                                            <p className="text-sm font-semibold text-neutral-900">
-                                                塩むすび
-                                            </p>
-                                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                                                ALL FREE
-                                            </span>
-                                        </div>
+                                                const badgeText = hasContains
+                                                    ? "含む"
+                                                    : hasMayContain
+                                                      ? "可能性"
+                                                      : "含まない";
+
+                                                return (
+                                                    <div
+                                                        key={menu.id}
+                                                        className="rounded-xl bg-white p-3 shadow-sm"
+                                                    >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-sm font-semibold text-neutral-900">
+                                                                {menu.name}
+                                                            </p>
+                                                            <span
+                                                                className={`rounded-full px-2 py-1 text-[11px] font-bold ${badgeClass}`}
+                                                            >
+                                                                {badgeText}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-1 text-xs text-neutral-500">
+                                                            {formatPriceYen(
+                                                                menu.priceYen,
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center justify-between rounded-xl bg-white p-3 shadow-sm">
+                                                    <p className="text-sm font-semibold text-neutral-900">
+                                                        季節の野菜カレー
+                                                    </p>
+                                                    <span className="rounded-full bg-yellow-50 px-2 py-1 text-[11px] font-bold text-yellow-800 ring-1 ring-inset ring-yellow-200">
+                                                        可能性
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center justify-between rounded-xl bg-white p-3 shadow-sm">
+                                                    <p className="text-sm font-semibold text-neutral-900">
+                                                        チキン南蛮
+                                                    </p>
+                                                    <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 ring-1 ring-inset ring-red-200">
+                                                        含む
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center justify-between rounded-xl bg-white p-3 shadow-sm">
+                                                    <p className="text-sm font-semibold text-neutral-900">
+                                                        塩むすび
+                                                    </p>
+                                                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                                                        ALL FREE
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
 
                                     <p className="mt-5 text-xs leading-5 text-neutral-600">
-                                        例：店舗ごとのメニュー情報とアレルゲン情報が、
-                                        事前に見やすく整理されている状態
+                                        {featuredShop
+                                            ? `${featuredShop.name} の公開メニュー例。メニューごとの価格とアレルゲン状況を事前に確認できます。`
+                                            : "例：店舗ごとのメニュー情報とアレルゲン情報が、事前に見やすく整理されている状態"}
                                     </p>
                                 </div>
                             </div>

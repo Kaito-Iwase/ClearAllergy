@@ -1,9 +1,5 @@
-// middleware.ts
-// /admin 配下をログイン必須にする。
-// 未ログインなら /admin/login に飛ばす。
-
-export { default } from "next-auth/middleware";
+export { default as middleware } from "next-auth/middleware";
 
 export const config = {
-    matcher: ["/admin/((?!login).*)"],
+    matcher: ["/admin/menus/:path*", "/admin/shop/:path*"],
 };

@@ -261,6 +261,9 @@ export default async function PublicMenuDetailPage({
 
                     <div className="flex flex-col gap-6">
                         <div>
+                            <p className="mb-2 text-sm font-semibold text-gray-500">
+                                {menu.shop.name} の公開メニュー
+                            </p>
                             <div className="mb-2 flex items-center gap-2">
                                 {menu.category ? (
                                     <span className="rounded-full bg-[#13ec13]/20 px-2.5 py-0.5 text-xs font-bold text-green-800">
@@ -421,7 +424,7 @@ export default async function PublicMenuDetailPage({
                 </div>
 
                 <footer className="mt-8 border-t border-gray-200 py-10 text-center text-xs text-gray-500">
-                    © AllerFree. All rights reserved.
+                    © ClearAllergy. All rights reserved.
                 </footer>
             </div>
         </main>
