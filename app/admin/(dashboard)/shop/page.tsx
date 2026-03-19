@@ -1,20 +1,10 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import ShopEditClient from "@/components/admin/ShopEditClient";
+import { redirect } from "next/navigation";
+import { requireSessionShopIdOrRedirect } from "@/lib/admin-auth";
+import ShopEditClient from "@/components/admin/shop/ShopEditClient";
 
 export default async function AdminShopPage() {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-        redirect("/admin/login");
-    }
-
-    const shopId = session.user.shopId;
-    if (!shopId) {
-        redirect("/admin/login");
-    }
+    const shopId = await requireSessionShopIdOrRedirect();
 
     const shop = await prisma.shop.findUnique({
         where: { id: shopId },

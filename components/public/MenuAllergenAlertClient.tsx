@@ -1,16 +1,16 @@
 "use client";
 
 import React from "react";
-import { loadUserAllergenPreferences } from "@/lib/public-allergen-preferences";
-
-type AllergenStatus = "FREE" | "MAY_CONTAIN" | "CONTAINS";
+import { type AllergenStatus } from "@/lib/allergens";
+import {
+    loadUserAllergenPreferences,
+    USER_ALLERGENS_UPDATED_EVENT,
+} from "@/lib/public-allergen-preferences";
 
 type Allergen = {
     slug: string;
     nameJa: string;
 };
-
-const USER_ALLERGENS_UPDATED_EVENT = "clearallergy:user-allergens-updated";
 
 export default function MenuAllergenAlertClient({
     allergens,

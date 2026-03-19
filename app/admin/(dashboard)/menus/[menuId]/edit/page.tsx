@@ -1,30 +1,19 @@
 // app/admin/(dashboard)/menus/[menuId]/edit/page.tsx
 // 管理画面：メニュー編集ページ（Server Component）
 
-import AdminMenuEditClient from "@/components/admin/AdminMenuEditClient";
+import MenuEditClient from "@/components/admin/menu/MenuEditClient";
 import { prisma } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
-
-type Status = "FREE" | "MAY_CONTAIN" | "CONTAINS";
+import { createStatusBySlug } from "@/lib/allergens";
+import { requireSessionShopIdOrRedirect } from "@/lib/admin-auth";
 
 type PageProps = {
     params: Promise<{ menuId: string }> | { menuId: string };
 };
 
 export default async function AdminMenuEditPage({ params }: PageProps) {
-    // 1) ログイン必須
-    const session = await getServerSession(authOptions);
-    if (!session) {
-        redirect("/admin/login");
-    }
-
-    const shopId = session.user.shopId;
-    if (!shopId) {
-        redirect("/admin/login");
-    }
+    const shopId = await requireSessionShopIdOrRedirect();
 
     // 2) menuId
     const { menuId } = await params;
@@ -68,14 +57,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
     }
 
     // 5) 初期状態：全部FREE → 既存状態で上書き
-    const initialStatusBySlug: Record<string, Status> = {};
-    for (const a of allergens) {
-        initialStatusBySlug[a.slug] = "FREE";
-    }
-
-    for (const link of menu.allergenLinks) {
-        initialStatusBySlug[link.allergen.slug] = link.status as Status;
-    }
+    const initialStatusBySlug = createStatusBySlug(allergens, menu.allergenLinks);
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -97,7 +79,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                 </p>
 
                 <div className="mt-6">
-                    <AdminMenuEditClient
+                    <MenuEditClient
                         menuId={menu.id}
                         initialName={menu.name}
                         initialDescription={menu.description}

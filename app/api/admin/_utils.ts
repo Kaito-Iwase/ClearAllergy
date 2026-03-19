@@ -1,8 +1,7 @@
 // app/api/admin/_utils.ts
 
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAdminSession } from "@/lib/admin-auth";
 
 // 1) JSONの読み取り（壊れてても落ちない）
 export async function readJson<T>(req: Request): Promise<T | null> {
@@ -12,10 +11,8 @@ export async function readJson<T>(req: Request): Promise<T | null> {
 
 // 2) ログイン確認 + shopId取得（毎回書くのをやめる）
 export async function requireShopId() {
-    // セッション取得
-    const session = await getServerSession(authOptions);
+    const session = await getAdminSession();
 
-    // 未ログインなら401
     if (!session) {
         return {
             ok: false as const,
@@ -23,7 +20,6 @@ export async function requireShopId() {
         };
     }
 
-    // shopId が無いセッションは不正扱い
     const shopId = session.user?.shopId;
     if (!shopId) {
         return {
@@ -35,7 +31,6 @@ export async function requireShopId() {
         };
     }
 
-    // 正常
     return { ok: true as const, shopId };
 }
 

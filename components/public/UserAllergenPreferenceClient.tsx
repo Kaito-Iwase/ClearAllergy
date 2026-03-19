@@ -5,14 +5,13 @@ import {
     clearUserAllergenPreferences,
     loadUserAllergenPreferences,
     saveUserAllergenPreferences,
+    USER_ALLERGENS_UPDATED_EVENT,
 } from "@/lib/public-allergen-preferences";
 
 type Allergen = {
     slug: string;
     nameJa: string;
 };
-
-const USER_ALLERGENS_UPDATED_EVENT = "clearallergy:user-allergens-updated";
 
 export default function UserAllergenPreferenceClient({
     allergens,
