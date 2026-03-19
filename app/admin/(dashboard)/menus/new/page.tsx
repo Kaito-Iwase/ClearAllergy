@@ -1,7 +1,7 @@
 // app/(admin)/admin/menus/new/page.tsx
 
 import Link from "next/link";
-import NewMenuForm from "./NewMenuForm";
+import NewMenuForm from "@/components/admin/NewMenuForm";
 
 export default function AdminMenuNewPage() {
     return (
