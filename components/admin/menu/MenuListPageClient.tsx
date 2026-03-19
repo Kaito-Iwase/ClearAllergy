@@ -10,7 +10,7 @@ type MenuRow = {
     updatedAt: string;
 };
 
-export default function MenuListClient({
+export default function MenuListPageClient({
     initialMenus,
 }: {
     initialMenus: MenuRow[];

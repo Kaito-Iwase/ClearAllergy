@@ -2,9 +2,13 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { loadUserAllergenPreferences } from "@/lib/public-allergen-preferences";
+import { type AllergenStatus } from "@/lib/allergens";
+import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
+import {
+    loadUserAllergenPreferences,
+    USER_ALLERGENS_UPDATED_EVENT,
+} from "@/lib/public-allergen-preferences";
 
-type AllergenStatus = "CONTAINS" | "FREE" | "MAY_CONTAIN";
 type BadgeKind = "danger" | "caution" | "safe";
 
 type AllergenMasterItem = {
@@ -28,8 +32,6 @@ type MenuItemCard = {
     }>;
 };
 
-const USER_ALLERGENS_UPDATED_EVENT = "clearallergy:user-allergens-updated";
-
 function badgeClass(kind: BadgeKind): string {
     if (kind === "danger") {
         return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200";
@@ -44,17 +46,6 @@ function badgeLabel(kind: BadgeKind): string {
     if (kind === "danger") return "含む";
     if (kind === "caution") return "含む可能性があります";
     return "含まない";
-}
-
-function formatDateTime(value: string): string {
-    return new Date(value).toLocaleString("ja-JP");
-}
-
-function formatPriceYen(priceYen: number | null): string {
-    if (typeof priceYen !== "number") {
-        return "価格未設定";
-    }
-    return `${priceYen.toLocaleString("ja-JP")}円`;
 }
 
 function buildOverallSummary(args: {
@@ -317,7 +308,7 @@ export default function ShopMenuListClient({
 
                                         <p className="mt-2 text-sm text-gray-700">
                                             {menu.category || "カテゴリ未設定"}{" "}
-                                            ・ {formatPriceYen(menu.priceYen)}
+                                            ・ {formatPriceYenLabel(menu.priceYen)}
                                         </p>
                                     </div>
 
@@ -336,7 +327,7 @@ export default function ShopMenuListClient({
                                     </span>
 
                                     <p className="text-right text-xs text-gray-500">
-                                        更新：{formatDateTime(menu.updatedAt)}
+                                        更新：{formatDateTimeJa(menu.updatedAt)}
                                     </p>
                                 </div>
 

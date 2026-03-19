@@ -3,7 +3,8 @@
 import Link from "next/link";
 import React from "react";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
-import ShopQrCard from "@/components/admin/ShopQrCard";
+import ShopQrCard from "@/components/admin/shop/ShopQrCard";
+import { formatDateTimeJa } from "@/lib/formatters";
 
 type ShopViewModel = {
     id: string;
@@ -41,7 +42,7 @@ export default function ShopEditClient({
     const [error, setError] = React.useState<string | null>(null);
     const [savedMessage, setSavedMessage] = React.useState("");
     const [updatedAtText, setUpdatedAtText] = React.useState(
-        new Date(initialShop.updatedAt).toLocaleString("ja-JP"),
+        formatDateTimeJa(initialShop.updatedAt),
     );
 
     React.useEffect(() => {
@@ -162,7 +163,7 @@ export default function ShopEditClient({
 
             if (data?.shop?.updatedAt) {
                 setUpdatedAtText(
-                    new Date(data.shop.updatedAt).toLocaleString("ja-JP"),
+                    formatDateTimeJa(data.shop.updatedAt),
                 );
             }
 

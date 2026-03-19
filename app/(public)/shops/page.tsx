@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { formatDateTimeJa } from "@/lib/formatters";
 
 type SearchParams = {
     q?: string;
@@ -176,9 +177,7 @@ export default async function PublicShopListPage({
 
                                 <p className="mt-3 text-xs text-neutral-500">
                                     更新:{" "}
-                                    {new Date(shop.updatedAt).toLocaleString(
-                                        "ja-JP",
-                                    )}
+                                    {formatDateTimeJa(shop.updatedAt)}
                                 </p>
                             </Link>
                         );

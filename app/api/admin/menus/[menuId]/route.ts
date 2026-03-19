@@ -9,9 +9,7 @@ import {
     readJson,
     requireShopId,
 } from "@/app/api/admin/_utils";
-
-// 3択の状態（DB enumに合わせる）
-type Status = "CONTAINS" | "FREE" | "MAY_CONTAIN";
+import { type AllergenStatus } from "@/lib/allergens";
 
 // 更新ボディ（★shopIdは受け取らない！）
 type UpdateMenuBody = {
@@ -27,7 +25,7 @@ type UpdateMenuBody = {
     imageUrl?: string | null;
 
     // 例：{ egg: "CONTAINS", milk: "FREE" }
-    allergenStatusBySlug?: Record<string, Status>;
+    allergenStatusBySlug?: Record<string, AllergenStatus>;
 };
 
 export async function GET(req: Request, context: Context) {

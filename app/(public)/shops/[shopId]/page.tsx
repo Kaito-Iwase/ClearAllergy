@@ -13,13 +13,10 @@ import { prisma } from "@/lib/db";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 import ShopMenuListClient from "@/components/public/ShopMenuListClient";
 import UserAllergenPreferenceClient from "@/components/public/UserAllergenPreferenceClient";
+import { formatDateTimeJa } from "@/lib/formatters";
 
 type Params = { shopId: string };
 type SearchParams = { q?: string };
-
-function formatDateTime(value: Date): string {
-    return value.toLocaleString("ja-JP");
-}
 
 function buildMenuWhere(q: string) {
     if (q === "") {
@@ -270,7 +267,7 @@ export default async function PublicShopDetailPage({
                                     <div>
                                         <p className="font-semibold">更新</p>
                                         <p className="text-gray-600">
-                                            {formatDateTime(shop.updatedAt)}
+                                            {formatDateTimeJa(shop.updatedAt)}
                                         </p>
                                     </div>
                                 </div>

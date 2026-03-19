@@ -1,6 +1,8 @@
 // lib/public-allergen-preferences.ts
 
 export const USER_ALLERGEN_STORAGE_KEY = "clearallergy:user-allergens";
+export const USER_ALLERGENS_UPDATED_EVENT =
+    "clearallergy:user-allergens-updated";
 
 export type UserAllergenPreferences = {
     selectedSlugs: string[];

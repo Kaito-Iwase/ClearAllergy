@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/app/api/admin/_utils";
+import {
+    toRequiredTrimmedString,
+    toTrimmedNullableString,
+} from "@/lib/admin-validators";
 
 type ShopUpdateBody = {
     name?: unknown;
@@ -9,24 +13,6 @@ type ShopUpdateBody = {
     hours?: unknown;
     coverImageUrl?: unknown;
 };
-
-function toTrimmedNullableString(value: unknown): string | null {
-    if (typeof value !== "string") {
-        return null;
-    }
-
-    const trimmed = value.trim();
-    return trimmed === "" ? null : trimmed;
-}
-
-function toRequiredTrimmedString(value: unknown): string | null {
-    if (typeof value !== "string") {
-        return null;
-    }
-
-    const trimmed = value.trim();
-    return trimmed === "" ? null : trimmed;
-}
 
 export async function GET() {
     try {

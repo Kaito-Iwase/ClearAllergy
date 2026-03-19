@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 
-export default function AdminLoginPage() {
+export default function AdminLoginPageClient() {
     // 1) パスワード表示のON/OFF（UIの状態）
     const [showPassword, setShowPassword] = useState(false);
 

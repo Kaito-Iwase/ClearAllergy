@@ -3,28 +3,12 @@
 // 役割：ログイン確認→DBから一覧取得→Clientに渡す
 
 import { prisma } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import MenuListClient from "@/components/admin/MenuListClient";
-import CreateMenuButton from "@/components/admin/CreateMenuButton";
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type MenuRow = {
-    id: string;
-    name: string;
-    isPublished: boolean;
-    updatedAt: Date;
-};
+import { requireSessionShopIdOrRedirect } from "@/lib/admin-auth";
+import MenuListPageClient from "@/components/admin/menu/MenuListPageClient";
+import CreateMenuButton from "@/components/admin/menu/CreateMenuButton";
 
 export default async function AdminMenusPage() {
-    // 1) セッション取得（未ログインならログインへ）
-    const session = await getServerSession(authOptions);
-    if (!session) redirect("/admin/login");
-
-    // 2) shopId はセッションから（安全に）
-    const shopId = session.user?.shopId;
-    if (!shopId) redirect("/admin/login");
+    const shopId = await requireSessionShopIdOrRedirect();
 
     // 3) DBから直接一覧取得（APIを挟まない：あなたの方針を維持）
     const menus = await prisma.menuItem.findMany({
@@ -34,9 +18,9 @@ export default async function AdminMenusPage() {
     });
 
     // 4) Clientに渡しやすい形へ変換（Date→string）
-    const initialMenus = menus.map((m) => ({
-        ...m,
-        updatedAt: m.updatedAt.toISOString(),
+    const initialMenus = menus.map((menu) => ({
+        ...menu,
+        updatedAt: menu.updatedAt.toISOString(),
     }));
 
     return (
@@ -58,7 +42,7 @@ export default async function AdminMenusPage() {
                 </div>
 
                 <div className="mt-6">
-                    <MenuListClient initialMenus={initialMenus} />
+                    <MenuListPageClient initialMenus={initialMenus} />
                 </div>
             </div>
         </div>

@@ -2,8 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-
-type Status = "FREE" | "MAY_CONTAIN" | "CONTAINS";
+import { type AllergenStatus } from "@/lib/allergens";
 
 type Allergen = {
     slug: string;
@@ -23,7 +22,7 @@ type UploadResponse = {
     error?: string;
 };
 
-export default function AdminMenuEditClient(props: {
+export default function MenuEditClient(props: {
     menuId: string;
     initialName: string;
     initialDescription: string | null;
@@ -34,7 +33,7 @@ export default function AdminMenuEditClient(props: {
     initialImageUrl: string | null;
     initialIsPublished: boolean;
     allergens: Allergen[];
-    initialStatusBySlug: Record<string, Status>;
+    initialStatusBySlug: Record<string, AllergenStatus>;
 }) {
     const router = useRouter();
 
@@ -74,7 +73,7 @@ export default function AdminMenuEditClient(props: {
 
     const [isPublished, setIsPublished] = React.useState(initialIsPublished);
     const [statusBySlug, setStatusBySlug] =
-        React.useState<Record<string, Status>>(initialStatusBySlug);
+        React.useState<Record<string, AllergenStatus>>(initialStatusBySlug);
 
     const [saving, setSaving] = React.useState(false);
     const [creating, setCreating] = React.useState(false);
@@ -90,7 +89,7 @@ export default function AdminMenuEditClient(props: {
         };
     }, [localPreviewUrl]);
 
-    function setOne(slug: string, status: Status) {
+    function setOne(slug: string, status: AllergenStatus) {
         setStatusBySlug((prev) => ({ ...prev, [slug]: status }));
     }
 
