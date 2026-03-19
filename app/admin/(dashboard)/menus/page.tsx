@@ -6,8 +6,8 @@ import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import MenuListClient from "./MenuListClient";
-import CreateMenuButton from "./CreateMenuButton";
+import MenuListClient from "@/components/admin/MenuListClient";
+import CreateMenuButton from "@/components/admin/CreateMenuButton";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type MenuRow = {

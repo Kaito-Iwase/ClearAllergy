@@ -1,78 +1,10 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import AdminLogoutButton from "./AdminLogoutButton";
+import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
 
 export default function AdminDashboardLayout({
     children,
 }: {
     children: ReactNode;
 }) {
-    return (
-        <div className="relative flex min-h-screen w-full flex-row overflow-hidden bg-background-light text-text-main">
-            <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-gray-100 bg-surface-light lg:sticky lg:top-0 lg:flex">
-                <div className="p-6">
-                    <Link href="/" className="flex items-center gap-3">
-                        <div className="size-8 text-primary">
-                            <span className="material-symbols-outlined text-4xl">
-                                health_and_safety
-                            </span>
-                        </div>
-                        <h1 className="text-xl font-bold tracking-tight">
-                            ClearAllergy
-                        </h1>
-                    </Link>
-                </div>
-
-                <div className="px-6 py-4">
-                    <nav className="flex flex-col gap-2">
-                        <Link
-                            href="/admin/menus"
-                            className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50"
-                        >
-                            <span className="material-symbols-outlined text-text-sub group-hover:text-primary">
-                                menu_book
-                            </span>
-                            <span className="text-sm font-medium">
-                                メニュー管理
-                            </span>
-                        </Link>
-
-                        <Link
-                            href="/admin/shop"
-                            className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50"
-                        >
-                            <span className="material-symbols-outlined text-text-sub group-hover:text-primary">
-                                storefront
-                            </span>
-                            <span className="text-sm font-medium">
-                                店舗情報
-                            </span>
-                        </Link>
-                    </nav>
-                </div>
-
-                <div className="mt-auto border-t border-gray-100 p-6">
-                    <AdminLogoutButton />
-                </div>
-            </aside>
-
-            <main className="flex h-screen flex-1 flex-col overflow-y-auto bg-background-light">
-                <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-surface-light p-4 lg:hidden">
-                    <Link
-                        href="/"
-                        className="flex items-center gap-2 text-lg font-bold text-primary"
-                    >
-                        <span className="material-symbols-outlined">
-                            health_and_safety
-                        </span>
-                        ClearAllergy
-                    </Link>
-                </header>
-
-                <div className="mx-auto flex w-full max-w-6xl flex-1 p-4 md:p-8">
-                    <div className="w-full">{children}</div>
-                </div>
-            </main>
-        </div>
-    );
+    return <AdminDashboardShell>{children}</AdminDashboardShell>;
 }

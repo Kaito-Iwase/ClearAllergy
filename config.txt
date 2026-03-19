@@ -2,86 +2,194 @@
 ボリューム シリアル番号は BEB5-6750 です
 C:.
 ├─.next
-│  └─dev
-│      ├─build
-│      │  └─chunks
-│      ├─cache
-│      │  └─turbopack
-│      │      └─23c46498
-│      ├─logs
-│      ├─node_modules
-│      │  ├─@prisma
-│      │  │  └─client-2c3a283f134fdcb6
-│      │  │      ├─generator-build
-│      │  │      ├─runtime
-│      │  │      └─scripts
-│      │  └─bcrypt-a3fecf8c027c10c9
-│      │      ├─.github
-│      │      │  └─workflows
-│      │      ├─examples
-│      │      ├─prebuilds
-│      │      │  ├─darwin-arm64
-│      │      │  ├─darwin-x64
-│      │      │  ├─linux-arm
-│      │      │  ├─linux-arm64
-│      │      │  ├─linux-x64
-│      │      │  ├─win32-arm64
-│      │      │  └─win32-x64
-│      │      ├─src
-│      │      └─test
-│      ├─server
-│      │  ├─app
-│      │  │  ├─(public)
-│      │  │  │  └─shops
-│      │  │  │      ├─page
-│      │  │  │      └─[shopId]
-│      │  │  │          ├─menus
-│      │  │  │          │  └─[menuId]
-│      │  │  │          │      └─page
-│      │  │  │          └─page
-│      │  │  ├─admin
-│      │  │  │  ├─(auth)
-│      │  │  │  │  └─login
-│      │  │  │  │      └─page
-│      │  │  │  └─(dashboard)
-│      │  │  │      ├─menus
-│      │  │  │      │  ├─new
-│      │  │  │      │  │  └─page
-│      │  │  │      │  ├─page
-│      │  │  │      │  └─[menuId]
-│      │  │  │      │      └─edit
-│      │  │  │      │          └─page
-│      │  │  │      └─shop
-│      │  │  │          └─page
-│      │  │  ├─api
-│      │  │  │  ├─admin
-│      │  │  │  │  ├─menus
-│      │  │  │  │  │  ├─route
-│      │  │  │  │  │  └─[menuId]
-│      │  │  │  │  │      └─route
-│      │  │  │  │  ├─shop
-│      │  │  │  │  │  └─route
-│      │  │  │  │  └─upload-shop-image
-│      │  │  │  │      └─route
-│      │  │  │  └─auth
-│      │  │  │      └─[...nextauth]
-│      │  │  │          └─route
-│      │  │  └─page
-│      │  ├─chunks
-│      │  │  └─ssr
-│      │  ├─edge
-│      │  │  └─chunks
-│      │  ├─middleware
-│      │  └─pages
-│      │      ├─_app
-│      │      ├─_document
-│      │      └─_error
-│      ├─static
-│      │  ├─chunks
-│      │  │  └─pages
-│      │  ├─development
-│      │  └─media
-│      └─types
+│  ├─build
+│  │  └─chunks
+│  ├─cache
+│  ├─dev
+│  │  ├─build
+│  │  │  └─chunks
+│  │  ├─cache
+│  │  │  └─turbopack
+│  │  │      └─23c46498
+│  │  ├─logs
+│  │  ├─node_modules
+│  │  │  ├─@prisma
+│  │  │  │  └─client-2c3a283f134fdcb6
+│  │  │  │      ├─generator-build
+│  │  │  │      ├─runtime
+│  │  │  │      └─scripts
+│  │  │  └─bcrypt-a3fecf8c027c10c9
+│  │  │      ├─.github
+│  │  │      │  └─workflows
+│  │  │      ├─examples
+│  │  │      ├─prebuilds
+│  │  │      │  ├─darwin-arm64
+│  │  │      │  ├─darwin-x64
+│  │  │      │  ├─linux-arm
+│  │  │      │  ├─linux-arm64
+│  │  │      │  ├─linux-x64
+│  │  │      │  ├─win32-arm64
+│  │  │      │  └─win32-x64
+│  │  │      ├─src
+│  │  │      └─test
+│  │  ├─server
+│  │  │  ├─app
+│  │  │  │  ├─(public)
+│  │  │  │  │  └─shops
+│  │  │  │  │      ├─page
+│  │  │  │  │      └─[shopId]
+│  │  │  │  │          ├─menus
+│  │  │  │  │          │  └─[menuId]
+│  │  │  │  │          │      └─page
+│  │  │  │  │          └─page
+│  │  │  │  ├─admin
+│  │  │  │  │  ├─(auth)
+│  │  │  │  │  │  └─login
+│  │  │  │  │  │      └─page
+│  │  │  │  │  └─(dashboard)
+│  │  │  │  │      ├─menus
+│  │  │  │  │      │  ├─new
+│  │  │  │  │      │  │  └─page
+│  │  │  │  │      │  ├─page
+│  │  │  │  │      │  └─[menuId]
+│  │  │  │  │      │      └─edit
+│  │  │  │  │      │          └─page
+│  │  │  │  │      └─shop
+│  │  │  │  │          └─page
+│  │  │  │  ├─api
+│  │  │  │  │  ├─admin
+│  │  │  │  │  │  ├─menus
+│  │  │  │  │  │  │  ├─route
+│  │  │  │  │  │  │  └─[menuId]
+│  │  │  │  │  │  │      └─route
+│  │  │  │  │  │  ├─shop
+│  │  │  │  │  │  │  └─route
+│  │  │  │  │  │  └─upload-shop-image
+│  │  │  │  │  │      └─route
+│  │  │  │  │  └─auth
+│  │  │  │  │      └─[...nextauth]
+│  │  │  │  │          └─route
+│  │  │  │  └─page
+│  │  │  ├─chunks
+│  │  │  │  └─ssr
+│  │  │  ├─edge
+│  │  │  │  └─chunks
+│  │  │  ├─middleware
+│  │  │  └─pages
+│  │  │      ├─_app
+│  │  │      ├─_document
+│  │  │      └─_error
+│  │  ├─static
+│  │  │  ├─chunks
+│  │  │  │  └─pages
+│  │  │  ├─development
+│  │  │  └─media
+│  │  └─types
+│  ├─diagnostics
+│  ├─node_modules
+│  │  ├─@prisma
+│  │  │  └─client-2c3a283f134fdcb6
+│  │  │      ├─generator-build
+│  │  │      ├─runtime
+│  │  │      └─scripts
+│  │  └─bcrypt-a3fecf8c027c10c9
+│  │      ├─.github
+│  │      │  └─workflows
+│  │      ├─examples
+│  │      ├─prebuilds
+│  │      │  ├─darwin-arm64
+│  │      │  ├─darwin-x64
+│  │      │  ├─linux-arm
+│  │      │  ├─linux-arm64
+│  │      │  ├─linux-x64
+│  │      │  ├─win32-arm64
+│  │      │  └─win32-x64
+│  │      ├─src
+│  │      └─test
+│  ├─server
+│  │  ├─app
+│  │  │  ├─(public)
+│  │  │  │  └─shops
+│  │  │  │      ├─page
+│  │  │  │      └─[shopId]
+│  │  │  │          ├─menus
+│  │  │  │          │  └─[menuId]
+│  │  │  │          │      └─page
+│  │  │  │          └─page
+│  │  │  ├─admin
+│  │  │  │  ├─(auth)
+│  │  │  │  │  ├─login
+│  │  │  │  │  │  └─page
+│  │  │  │  │  └─register
+│  │  │  │  │      └─page
+│  │  │  │  ├─(dashboard)
+│  │  │  │  │  ├─menus
+│  │  │  │  │  │  ├─new
+│  │  │  │  │  │  │  └─page
+│  │  │  │  │  │  ├─page
+│  │  │  │  │  │  └─[menuId]
+│  │  │  │  │  │      └─edit
+│  │  │  │  │  │          └─page
+│  │  │  │  │  └─shop
+│  │  │  │  │      └─page
+│  │  │  │  ├─login.segments
+│  │  │  │  │  └─admin
+│  │  │  │  │      └─!KGF1dGgp
+│  │  │  │  │          └─login
+│  │  │  │  ├─menus
+│  │  │  │  │  └─new.segments
+│  │  │  │  │      └─admin
+│  │  │  │  │          └─!KGRhc2hib2FyZCk
+│  │  │  │  │              └─menus
+│  │  │  │  │                  └─new
+│  │  │  │  └─register.segments
+│  │  │  │      └─admin
+│  │  │  │          └─!KGF1dGgp
+│  │  │  │              └─register
+│  │  │  ├─api
+│  │  │  │  ├─admin
+│  │  │  │  │  ├─menus
+│  │  │  │  │  │  ├─route
+│  │  │  │  │  │  └─[menuId]
+│  │  │  │  │  │      └─route
+│  │  │  │  │  ├─register
+│  │  │  │  │  │  └─route
+│  │  │  │  │  ├─shop
+│  │  │  │  │  │  └─route
+│  │  │  │  │  ├─upload-menu-image
+│  │  │  │  │  │  └─route
+│  │  │  │  │  └─upload-shop-image
+│  │  │  │  │      └─route
+│  │  │  │  ├─allergens
+│  │  │  │  │  └─route
+│  │  │  │  ├─auth
+│  │  │  │  │  └─[...nextauth]
+│  │  │  │  │      └─route
+│  │  │  │  └─menus
+│  │  │  │      └─[menuId]
+│  │  │  │          └─route
+│  │  │  ├─favicon.ico
+│  │  │  │  └─route
+│  │  │  ├─index.segments
+│  │  │  ├─page
+│  │  │  ├─_global-error
+│  │  │  │  └─page
+│  │  │  ├─_global-error.segments
+│  │  │  ├─_not-found
+│  │  │  │  └─page
+│  │  │  └─_not-found.segments
+│  │  │      └─_not-found
+│  │  ├─chunks
+│  │  │  └─ssr
+│  │  ├─edge
+│  │  │  └─chunks
+│  │  ├─middleware
+│  │  └─pages
+│  ├─static
+│  │  ├─chunks
+│  │  ├─media
+│  │  └─YEjc6BQ59P5uf46yz7slJ
+│  └─types
 ├─.vercel
 ├─app
 │  ├─(public)
@@ -105,7 +213,9 @@ C:.
 │      │  │  └─[menuId]
 │      │  ├─register
 │      │  ├─shop
-│      │  └─upload-shop-image
+│      │  ├─upload-menu-image
+│      │  ├─upload-shop-image
+│      │  └─uploads
 │      ├─allergens
 │      ├─auth
 │      │  └─[...nextauth]
@@ -113,9 +223,11 @@ C:.
 │          ├─[menuId]
 │          └─_disabled
 ├─components
+│  ├─admin
 │  ├─layout
 │  └─public
 ├─document
+│  └─screenshot
 ├─lib
 │  ├─constants
 │  └─validators
@@ -2620,6 +2732,9 @@ C:.
 │  │          ├─distribution
 │  │          │  └─internals
 │  │          └─generator
+│  ├─qrcode.react
+│  │  └─lib
+│  │      └─esm
 │  ├─queue-microtask
 │  ├─rc9
 │  │  └─dist

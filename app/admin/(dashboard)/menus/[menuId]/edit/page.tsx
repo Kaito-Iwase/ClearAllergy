@@ -1,7 +1,7 @@
 // app/admin/(dashboard)/menus/[menuId]/edit/page.tsx
 // 管理画面：メニュー編集ページ（Server Component）
 
-import AdminMenuEditClient from "./AdminMenuEditClient";
+import AdminMenuEditClient from "@/components/admin/AdminMenuEditClient";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
