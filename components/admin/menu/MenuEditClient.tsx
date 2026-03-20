@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { type AllergenStatus } from "@/lib/allergens";
+import { createMenuButtonClassName } from "@/components/admin/menu/CreateMenuButton";
 
 type Allergen = {
     slug: string;
@@ -268,7 +269,7 @@ export default function MenuEditClient(props: {
                             type="button"
                             onClick={handleCreateMenu}
                             disabled={creating || saving || uploading}
-                            className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                            className={createMenuButtonClassName}
                         >
                             {creating ? "作成中..." : "＋ 新しいメニューを作る"}
                         </button>
