@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-console.log("LOADED route.ts /api/menus/[menuId]");
+
 type Context = {
     // Next.jsのバージョン/環境で params の形が揺れるので両対応
     params?: { menuId?: string } | Promise<{ menuId?: string }>;
@@ -32,9 +32,12 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
-        // 4) DBから取得（メニュー＋アレルゲン状態）
-        const menu = await prisma.menuItem.findUnique({
-            where: { id: menuId },
+        // 4) DBから取得。非公開メニューは未存在と同じ 404 扱いにする
+        const menu = await prisma.menuItem.findFirst({
+            where: {
+                id: menuId,
+                isPublished: true,
+            },
             select: {
                 id: true,
                 shopId: true,
