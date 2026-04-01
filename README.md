@@ -6,113 +6,64 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748)](https://www.prisma.io/)
 
----
+## できること
 
-## 背景・課題
+### 公開側
 
-食物アレルギーを持つ人が外食する際、アレルゲン情報の提示方法は店舗によってばらつきがあり、
-来店のたびにスタッフへ確認しなければならないケースも少なくない。
+- 公開中の店舗一覧を閲覧する
+- 店舗ページで公開メニューを検索し、価格やカテゴリを確認する
+- メニュー詳細でアレルゲン28品目を確認する
+- `localStorage` に保存した個人設定に基づいて警告表示を出す
 
-ClearAllergy は「聞かなくても分かる」外食体験を増やすことを目標に、以下の 2 点を重視して設計した。
+### 管理側
 
-- **店舗側**：管理画面からメニューとアレルゲン28品目を自分で登録・更新できる
-- **利用者側**：QR コードや URL からスマートフォンで素早く確認できる
-
----
-
-## スクリーンショット
-
-|                    トップページ                     |                    店舗公開ページ                     |                    メニュー編集画面                     |
-| :-------------------------------------------------: | :---------------------------------------------------: | :-----------------------------------------------------: |
-| ![トップページ](./document/screenshot/rootpage.png) | ![店舗公開ページ](./document/screenshot/menuview.png) | ![メニュー編集画面](./document/screenshot/shopedit.png) |
-
----
-
-## 機能一覧
-
-### 店舗側（管理画面・要ログイン）
-
-- 店舗情報・画像の編集
-- メニューの新規作成・編集・公開切り替え
-- アレルゲン28品目の状態設定（含む／含まない／含む可能性あり）
-- 価格設定
-- 店舗公開 URL の共有・QR コード表示
-
-### 利用者側（公開画面・ログイン不要）
-
-- 店舗・メニュー一覧の閲覧
-- メニュー詳細（特定原材料8品目の強調表示・アレルゲン28品目一覧）
-- `localStorage` を使った個人アレルゲン設定
-- 設定済みアレルゲンを含むメニューへの警告表示
-
----
+- 店舗アカウントを新規登録する
+- メニューを作成し、そのまま編集画面へ遷移する
+- メニューの公開 / 非公開、価格、画像、原材料、注意書き、アレルゲン28品目を更新する
+- 店舗情報、カバー画像、公開URL用QRコードを更新する
 
 ## 技術スタック
 
-| カテゴリ       | 技術                 |
-| -------------- | -------------------- |
-| フレームワーク | Next.js (App Router) |
-| 言語           | TypeScript           |
-| スタイリング   | Tailwind CSS         |
-| ORM            | Prisma               |
-| データベース   | PostgreSQL           |
-| 認証           | NextAuth.js          |
-| ストレージ     | Vercel Blob          |
-| ホスティング   | Vercel               |
+| カテゴリ | 技術 |
+| --- | --- |
+| フレームワーク | Next.js 16 (App Router) |
+| 言語 | TypeScript |
+| スタイリング | Tailwind CSS |
+| ORM | Prisma |
+| データベース | PostgreSQL |
+| 認証 | NextAuth.js (Credentials) |
+| 画像アップロード | Vercel Blob |
 
----
+## 主要ルーティング
 
-## 設計上の判断
+### 画面ルート
 
-### 1. 管理側と公開側のルーティングを分離する
+| ルート | 用途 |
+| --- | --- |
+| `/` | トップページ。公開中メニューを持つ店舗を 1 件ピックアップ表示 |
+| `/shops` | 公開店舗一覧。`?q=` で店舗名 / 説明を検索可能 |
+| `/shops/[shopId]` | 公開店舗ページ。公開メニュー一覧、店舗情報、共有導線を表示 |
+| `/shops/[shopId]/menus/[menuId]` | 公開メニュー詳細。アレルゲン28品目、原材料、注意書きを表示 |
+| `/admin/register` | 店舗アカウント新規登録 |
+| `/admin/login` | 管理画面ログイン |
+| `/admin/menus` | 自店舗のメニュー一覧 |
+| `/admin/menus/new` | メニュー新規作成。作成後 `/admin/menus/[menuId]/edit` へ遷移 |
+| `/admin/menus/[menuId]/edit` | メニュー編集 |
+| `/admin/shop` | 店舗情報編集、QRコード表示 |
 
-`app/admin/(dashboard)` と `app/(public)` を明確に分け、API の責務も分離した。
-認証が必要な操作と、誰でも閲覧できる操作を混在させないことで、
-ミドルウェアによる保護範囲を明確に保てる。
+### 主な API ルート
 
-### 2. アレルゲン情報を DB マスタとして管理する
-
-アレルゲン28品目をハードコードせず、DB のマスタとして持ち `sortOrder` で表示順を制御した。
-公開側と管理側が同じ基準で描画できるほか、将来の品目追加にも対応しやすい。
-
-### 3. メニュー作成フローを edit 画面に集約する
-
-「新規作成 → 専用ページで入力」ではなく、
-「空の下書きを作成 → edit 画面へリダイレクト」する形にした。
-作成と編集の UI を統一することで、コードの重複を排除しつつ動作の一貫性を担保している。
-
-### 4. 利用者側の設定をログイン不要にする
-
-利用者のアレルゲン設定は `localStorage` で保持し、アカウント登録を不要にした。
-店頭で QR を読み取った人が即座に使えることを優先した判断であり、
-導入コストを下げることが利用率に直結するという考えに基づいている。
-
----
-
-## ルーティング構成
-
-```
-app/
-├── (public)/
-│   ├── page.tsx                          # トップ
-│   ├── shops/
-│   │   ├── page.tsx                      # 店舗一覧
-│   │   └── [shopId]/
-│   │       ├── page.tsx                  # 店舗・メニュー一覧
-│   │       └── menus/[menuId]/page.tsx   # メニュー詳細
-└── admin/
-    ├── (auth)/
-    │   ├── login/page.tsx
-    │   └── register/page.tsx
-    └── (dashboard)/
-        ├── menus/
-        │   ├── page.tsx                  # メニュー管理一覧
-        │   ├── new/page.tsx
-        │   └── [menuId]/edit/page.tsx
-        └── shop/page.tsx                 # 店舗情報編集
-```
-
----
+| ルート | 用途 |
+| --- | --- |
+| `/api/auth/[...nextauth]` | NextAuth の認証エンドポイント |
+| `/api/admin/register` | 店舗アカウント登録 |
+| `/api/admin/shop` | ログイン中店舗の取得 / 更新 |
+| `/api/admin/menus` | ログイン中店舗のメニュー一覧 / 新規作成 |
+| `/api/admin/menus/[menuId]` | ログイン中店舗のメニュー取得 / 更新 / 削除 |
+| `/api/admin/upload-shop-image` | 店舗画像アップロード |
+| `/api/admin/upload-menu-image` | メニュー画像アップロード |
+| `/api/allergens` | アレルゲン28品目一覧 |
+| `/api/menus/[menuId]` | 公開中メニューの取得 |
 
 ## セットアップ
 
@@ -121,30 +72,46 @@ app/
 - Node.js 20 以上
 - PostgreSQL が起動していること
 
-### 1. リポジトリをクローン
-
-```bash
-git clone https://github.com/your-name/ClearAllergy.git
-cd ClearAllergy
-```
-
-### 2. 依存関係をインストール
+### 1. 依存関係をインストール
 
 ```bash
 npm install
 ```
 
+### 2. 環境変数ファイルを作成
+
+`.env.example` をコピーして `.env` を作成します。Prisma CLI は `.env` を読むため、まずは `.env` を基準にするのが安全です。必要なら `.env.local` で上書きしてください。
+
+```bash
+cp .env.example .env
+```
+
+PowerShell の場合:
+
+```powershell
+Copy-Item .env.example .env
+```
+
 ### 3. 環境変数を設定
 
-`.env.local` を作成し、以下を設定する。
+| 変数名 | 必須 | 用途 |
+| --- | --- | --- |
+| `DATABASE_URL` | 必須 | Prisma / PostgreSQL 接続先 |
+| `NEXTAUTH_SECRET` | 必須 | NextAuth のセッション署名用シークレット |
+| `NEXTAUTH_URL` | 推奨 | NextAuth が参照するアプリのベース URL。ローカルでは `http://localhost:3000` |
+| `NEXT_PUBLIC_APP_URL` | 任意 | 管理画面の QR コード生成時に使う公開 URL のベース。未設定時は現在のブラウザ origin を使う |
+| `BLOB_READ_WRITE_TOKEN` | 任意 | 店舗画像 / メニュー画像のアップロードを有効にする Vercel Blob トークン |
+
+最小構成でローカル起動する場合は `DATABASE_URL` と `NEXTAUTH_SECRET` が必須です。画像アップロードまで確認する場合は `BLOB_READ_WRITE_TOKEN` も設定してください。
+
+`.env.example` の初期値:
 
 ```env
-DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/clearallergy
-NEXTAUTH_SECRET=your-secret-here
-NEXTAUTH_URL=http://localhost:3000
-
-# 画像アップロードを使う場合（Vercel Blob）
-BLOB_READ_WRITE_TOKEN=your-vercel-blob-token
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/clearallergy"
+NEXTAUTH_SECRET="replace-with-a-long-random-string"
+NEXTAUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+BLOB_READ_WRITE_TOKEN=""
 ```
 
 ### 4. DB スキーマを適用
@@ -159,17 +126,17 @@ npx prisma migrate dev
 npm run seed
 ```
 
-以下が作成される：
+この seed で以下が作成されます。
 
 - アレルゲン28品目マスタ
 - デモ店舗 `Clear Cafe Demo`
 - 公開メニュー数件
 - デモ管理アカウント
 
-| デモ管理アカウント | 値                        |
-| ------------------ | ------------------------- |
-| メールアドレス     | `demo@clearallergy.local` |
-| パスワード         | `demo1234`                |
+| 項目 | 値 |
+| --- | --- |
+| メールアドレス | `demo@clearallergy.local` |
+| パスワード | `demo1234` |
 
 ### 6. 開発サーバーを起動
 
@@ -177,24 +144,23 @@ npm run seed
 npm run dev
 ```
 
-[http://localhost:3000](http://localhost:3000) で確認できる。
+ブラウザで [http://localhost:3000](http://localhost:3000) を開きます。
 
----
+## 動作確認の流れ
 
-## 動作確認チェックリスト
+1. `/shops` を開き、seed で作成された `Clear Cafe Demo` が見えることを確認する
+2. 店舗ページ `/shops/[shopId]` で公開メニュー一覧と店舗情報が表示されることを確認する
+3. メニュー詳細 `/shops/[shopId]/menus/[menuId]` でアレルゲン28品目、原材料、注意書きが見えることを確認する
+4. 公開側で個人アレルゲン設定を変更し、再読み込み後も `localStorage` 由来の表示が維持されることを確認する
+5. `/admin/login` からデモアカウントでログインし、`/admin/menus` と `/admin/shop` が表示できることを確認する
+6. `/admin/menus/new` からメニューを作成し、作成後に編集画面へ遷移することを確認する
+7. `BLOB_READ_WRITE_TOKEN` を設定した場合は、店舗画像とメニュー画像のアップロードが成功することを確認する
 
-- [ ] `/` からデモ店舗へ遷移できる
-- [ ] `/shops/[shopId]/menus/[menuId]` でアレルゲン28品目が表示される
-- [ ] 未ログインで `/admin/menus` にアクセスすると `/admin/login` にリダイレクトされる
-- [ ] ログイン後にメニューの新規作成・編集が完了できる
-- [ ] 個人アレルゲンを設定すると対象メニューに警告が表示される
+## 公開前の注意
 
----
-
-## 今後の課題
-
-- テスト追加（現状ゼロ）
-- 画像アップロードのエラーハンドリング改善
-- 空状態（メニュー未登録など）の UI 改善
-- QR カードの印刷最適化
-- スクリーンショット・デモ動画の整備
+- `admin/register` は現状公開されているため、誰でも店舗アカウントを作成できます。公開運用で自己登録を許可しない場合は制限が必要です。
+- `npm run seed` のデモアカウントとデモデータは開発確認用です。本番 DB には投入しないでください。
+- 本番では少なくとも `DATABASE_URL`、`NEXTAUTH_SECRET`、`NEXTAUTH_URL` を適切な値に置き換えてください。
+- 独自ドメインや固定URLで QR を配布するなら `NEXT_PUBLIC_APP_URL` を本番 URL に合わせて設定してください。
+- 画像アップロードを使う場合は `BLOB_READ_WRITE_TOKEN` が必要です。未設定のままだとアップロード API は失敗します。
+- 公開側の個人アレルゲン設定は `localStorage` 保存です。端末間同期はされません。
