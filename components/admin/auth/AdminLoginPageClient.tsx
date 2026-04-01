@@ -182,7 +182,7 @@ export default function AdminLoginPageClient() {
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-4 mt-2">
+                            <div className="mt-2">
                                 <button
                                     className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
                                     type="submit"
@@ -192,19 +192,6 @@ export default function AdminLoginPageClient() {
                                         {loading ? "ログイン中..." : "ログイン"}
                                     </span>
                                 </button>
-
-                                <div className="flex justify-center">
-                                    <a
-                                        className="text-text-sub dark:text-gray-400 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal underline underline-offset-4 transition-colors"
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            alert("パスワード再発行（未実装）");
-                                        }}
-                                    >
-                                        パスワードをお忘れですか？
-                                    </a>
-                                </div>
                             </div>
                         </form>
                     </div>
@@ -212,14 +199,6 @@ export default function AdminLoginPageClient() {
                     <div className="bg-background-light dark:bg-black/20 p-4 text-center border-t border-[#e5e7eb] dark:border-white/5">
                         <p className="text-xs text-text-sub dark:text-gray-500">
                             保護された接続でログインしています。
-                            <br />
-                            <a className="hover:underline" href="#">
-                                プライバシーポリシー
-                            </a>{" "}
-                            •{" "}
-                            <a className="hover:underline" href="#">
-                                利用規約
-                            </a>
                         </p>
                     </div>
                 </div>
