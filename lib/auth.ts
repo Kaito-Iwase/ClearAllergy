@@ -2,6 +2,7 @@
 import type { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
+import { normalizeEmail } from "@/lib/email";
 import bcrypt from "bcrypt";
 
 export const authOptions: NextAuthOptions = {
@@ -16,7 +17,7 @@ export const authOptions: NextAuthOptions = {
             },
 
             async authorize(credentials) {
-                const email = credentials?.email;
+                const email = normalizeEmail(credentials?.email);
                 const password = credentials?.password;
 
                 if (!email || !password) return null;

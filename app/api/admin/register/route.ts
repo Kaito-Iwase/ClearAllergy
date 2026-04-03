@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/db";
+import { isValidEmail, normalizeEmail } from "@/lib/email";
 
 type RegisterRequestBody = {
     shopName?: string;
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
         const body = (await req.json()) as RegisterRequestBody;
 
         const shopName = body.shopName?.trim() ?? "";
-        const email = body.email?.trim().toLowerCase() ?? "";
+        const email = normalizeEmail(body.email);
         const password = body.password ?? "";
 
         if (!shopName) {
@@ -26,6 +27,13 @@ export async function POST(req: Request) {
         if (!email) {
             return NextResponse.json(
                 { message: "メールアドレスは必須です。" },
+                { status: 400 },
+            );
+        }
+
+        if (!isValidEmail(email)) {
+            return NextResponse.json(
+                { message: "メールアドレスの形式が正しくありません。" },
                 { status: 400 },
             );
         }

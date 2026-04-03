@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import { normalizeEmail } from "@/lib/email";
 
 export default function AdminLoginPageClient() {
     // 1) パスワード表示のON/OFF（UIの状態）
@@ -26,10 +27,13 @@ export default function AdminLoginPageClient() {
         setLoading(true);
 
         try {
+            const normalizedEmail = normalizeEmail(email);
+            setEmail(normalizedEmail);
+
             // 7) NextAuthにログイン要求
             // redirect:false にすると、成功/失敗を自分で制御できる
             const res = await signIn("credentials", {
-                email,
+                email: normalizedEmail,
                 password,
                 redirect: false,
             });
@@ -129,11 +133,16 @@ export default function AdminLoginPageClient() {
                                         id="email"
                                         name="email"
                                         placeholder="manager@example.com"
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
                                         required
+                                        spellCheck={false}
                                         type="email"
                                         value={email}
                                         onChange={(e) =>
-                                            setEmail(e.target.value)
+                                            setEmail(
+                                                normalizeEmail(e.target.value),
+                                            )
                                         }
                                     />
                                 </div>

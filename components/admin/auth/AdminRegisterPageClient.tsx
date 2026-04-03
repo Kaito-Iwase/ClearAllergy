@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import { normalizeEmail } from "@/lib/email";
 
 export default function AdminRegisterPageClient() {
     // 1) パスワード表示のON/OFF
@@ -49,6 +50,9 @@ export default function AdminRegisterPageClient() {
         setLoading(true);
 
         try {
+            const normalizedEmail = normalizeEmail(email);
+            setEmail(normalizedEmail);
+
             // 6) 新規登録APIを呼ぶ
             const response = await fetch("/api/admin/register", {
                 method: "POST",
@@ -57,7 +61,7 @@ export default function AdminRegisterPageClient() {
                 },
                 body: JSON.stringify({
                     shopName,
-                    email,
+                    email: normalizedEmail,
                     password,
                 }),
             });
@@ -74,7 +78,7 @@ export default function AdminRegisterPageClient() {
 
             // 8) 登録成功後、そのまま自動ログイン
             const signInResult = await signIn("credentials", {
-                email,
+                email: normalizedEmail,
                 password,
                 redirect: false,
             });
@@ -195,10 +199,17 @@ export default function AdminRegisterPageClient() {
                                     id="email"
                                     name="email"
                                     placeholder="manager@example.com"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
                                     required
+                                    spellCheck={false}
                                     type="email"
                                     value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    onChange={(e) =>
+                                        setEmail(
+                                            normalizeEmail(e.target.value),
+                                        )
+                                    }
                                 />
                             </div>
 
