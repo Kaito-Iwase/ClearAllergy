@@ -1,3 +1,7 @@
+// この schema は ClearAllergy の業務データ全体を定義します。
+// Prisma がこの定義をもとに SQL と TypeScript の型を生成します。
+// 認証用 User、1店舗1アカウントの Shop、公開メニュー、アレルゲン情報をここで管理します。
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,9 +11,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Clerk とひもづくアプリ内ユーザー情報
-// まだ移行中なので clerkUserId は nullable
-// 旧ログインも残すため passwordHash も一旦残す
+// アプリ内の利用者です。
+// Clerk 移行中のため clerkUserId は任意、旧認証の passwordHash も一時的に残しています。
+// ここで持つのは「認証に近い情報」で、店舗そのものの情報は Shop 側に分けています。
 model User {
   id           String   @id @default(cuid())
   clerkUserId  String?  @unique
@@ -18,11 +22,12 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // 1店舗1アカウント：User 1 : 1 Shop
+  // 1ユーザーにつき 1 店舗だけ持てる前提なので 1:1 関係です。
   shop Shop?
 }
 
-// 店舗情報（ユーザーに紐づく）
+// 店舗の公開情報です。
+// 住所や営業時間のように、来店前にユーザーへ見せたい情報をここに持たせます。
 model Shop {
   id            String   @id @default(cuid())
   userId        String   @unique
@@ -34,11 +39,14 @@ model Shop {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // userId を外部キーとして User と結び付けます。
+  // User が消えた時に店舗も消えるよう onDelete: Cascade にしています。
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   menus MenuItem[]
 }
 
-// メニュー（商品）
+// 店舗ごとのメニューです。
+// 1 店舗に複数メニューがあるので Shop とは 1:N 関係です。
 model MenuItem {
   id            String             @id @default(cuid())
   shopId        String
@@ -53,13 +61,16 @@ model MenuItem {
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
+  // menu と allergen は多対多なので、直接はつながず中間テーブルを介します。
   shop          Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
   allergenLinks MenuItemAllergen[]
 
+  // 店舗別メニュー一覧を取りやすくするための索引です。
   @@index([shopId])
 }
 
-// アレルゲン28品目マスタ
+// アレルゲンのマスタです。
+// 表示名や並び順など、全メニューで共通に使う基準データを置いています。
 model Allergen {
   id        String   @id @default(cuid())
   slug      String   @unique
@@ -72,7 +83,9 @@ model Allergen {
   menuLinks MenuItemAllergen[]
 }
 
-// 商品 × アレルゲン の中間テーブル
+// メニューとアレルゲンを結ぶ中間テーブルです。
+// 「卵を含む」「乳は含まない」のように、組み合わせごとの状態をここで持ちます。
+// 多対多を表現したいので、中間テーブルが必要になります。
 model MenuItemAllergen {
   menuItemId String
   allergenId String
@@ -83,12 +96,13 @@ model MenuItemAllergen {
   menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   allergen Allergen @relation(fields: [allergenId], references: [id], onDelete: Cascade)
 
+  // 同じメニューと同じアレルゲンの組み合わせは 1 回だけ登録できるよう複合主キーにします。
   @@id([menuItemId, allergenId])
   @@index([allergenId])
   @@index([menuItemId])
 }
 
-// 三択状態
+// 公開画面で見せるアレルゲン状態の三択です。
 enum AllergenStatus {
   CONTAINS
   FREE

@@ -1,5 +1,9 @@
 "use client";
 
+// このボタンは既存の日本語 UI の中から Google OAuth を始めるための部品です。
+// Clerk の既定サインイン画面は使わず、必要な認証開始処理だけをここで呼びます。
+// login / register の両画面から使えるよう、文言だけ props で受け取ります。
+
 import { useSignIn } from "@clerk/nextjs";
 
 type AdminGoogleAuthButtonProps = {
@@ -13,9 +17,11 @@ export default function AdminGoogleAuthButton({
     label,
     onError,
 }: AdminGoogleAuthButtonProps) {
+    // useSignIn() は Clerk のサインイン開始用 hook です。
     const { fetchStatus, signIn } = useSignIn();
 
     async function handleGoogleSignIn() {
+        // 初期化途中では signIn がまだ使えないことがあるため、先に確認します。
         if (!signIn) {
             onError?.("認証の初期化がまだ完了していません。少し待ってから再度お試しください。");
             return;
@@ -24,6 +30,7 @@ export default function AdminGoogleAuthButton({
         onError?.("");
 
         try {
+            // 既定 UI ではなく、直接 Google の SSO フローを開始します。
             await signIn.sso({
                 strategy: "oauth_google",
                 redirectUrl: "/admin",
@@ -33,6 +40,7 @@ export default function AdminGoogleAuthButton({
             const fallbackMessage =
                 "Google ログインの開始に失敗しました。時間をおいて再度お試しください。";
 
+            // Clerk 独自のエラー構造があれば、なるべくそのまま利用者へ返します。
             if (
                 typeof error === "object" &&
                 error !== null &&

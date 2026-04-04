@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは管理者ログイン画面の表示と送信処理を担当します。
+// app/admin/(auth)/login/page.tsx から呼ばれる Client Component で、
+// 旧メール+パスワード認証と Google ログイン導線を同じ画面にまとめています。
+
 import React, { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
@@ -7,7 +11,7 @@ import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton
 import { normalizeEmail } from "@/lib/email";
 
 export default function AdminLoginPageClient() {
-    // 1) パスワード表示のON/OFF（UIの状態）
+    // state（画面の状態）として、入力欄の見た目や内容を保持します。
     const [showPassword, setShowPassword] = useState(false);
 
     // 2) フォーム入力値（メール/パスワード）
@@ -18,9 +22,9 @@ export default function AdminLoginPageClient() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // 4) 送信時：NextAuth Credentials へログイン要求を投げる
+    // フォーム送信時に NextAuth Credentials へログイン要求を送ります。
     const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        // 5) ブラウザのデフォルト送信（ページ遷移）を止める
+        // フォーム既定の再読み込みを止め、React 側で結果を制御します。
         e.preventDefault();
 
         // 6) 前回のエラーを消して送信開始
@@ -28,6 +32,7 @@ export default function AdminLoginPageClient() {
         setLoading(true);
 
         try {
+            // email は保存前の形式と揃えるため、ここでも正規化します。
             const normalizedEmail = normalizeEmail(email);
             setEmail(normalizedEmail);
 
@@ -53,7 +58,7 @@ export default function AdminLoginPageClient() {
                 return;
             }
 
-            // 10) 成功：管理メニュー一覧へ
+            // 認証成功後は管理画面トップへ進めます。
             window.location.href = "/admin/menus";
         } catch (err) {
             // 11) 例外が起きたとき（ネットワークなど）
@@ -111,6 +116,7 @@ export default function AdminLoginPageClient() {
                         </div>
 
                         <div className="mb-5">
+                            {/* Clerk の既定画面は使わず、この UI の中から Google 認証だけ開始します。 */}
                             <AdminGoogleAuthButton
                                 label="Google でログイン"
                                 onError={(message) =>

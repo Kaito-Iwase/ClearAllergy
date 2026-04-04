@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは店舗情報編集フォームです。
+// Server Component から受け取った初期店舗情報を state に展開し、保存と画像アップロードを担当します。
+// 公開プレビューも同じ state を参照し、入力中の変化が画面で分かるようにしています。
+
 import Link from "next/link";
 import React from "react";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
@@ -22,6 +26,7 @@ export default function ShopEditClient({
 }: {
     initialShop: ShopViewModel;
 }) {
+    // フォーム入力値と UI 状態を state として持ちます。
     const [name, setName] = React.useState(initialShop.name);
     const [description, setDescription] = React.useState(
         initialShop.description ?? "",
@@ -46,6 +51,7 @@ export default function ShopEditClient({
     );
 
     React.useEffect(() => {
+        // プレビュー用 Object URL は不要になったら解放し、メモリを圧迫しないようにします。
         return () => {
             if (localPreviewUrl) {
                 URL.revokeObjectURL(localPreviewUrl);
@@ -54,6 +60,7 @@ export default function ShopEditClient({
     }, [localPreviewUrl]);
 
     function onSelectImage(e: React.ChangeEvent<HTMLInputElement>) {
+        // 選んだ画像を保存前に確認できるよう、ローカルプレビューを作ります。
         const file = e.target.files?.[0];
         if (!file) {
             return;
@@ -77,6 +84,7 @@ export default function ShopEditClient({
     }
 
     async function uploadSelectedImage(): Promise<string | null> {
+        // 新しい画像未選択なら、入力欄にある URL をそのまま使います。
         if (!selectedFile) {
             const trimmedUrl = coverImageUrl.trim();
             return trimmedUrl === "" ? null : trimmedUrl;
@@ -88,6 +96,7 @@ export default function ShopEditClient({
             const formData = new FormData();
             formData.append("file", selectedFile);
 
+            // 店舗画像は専用 API にアップロードし、返ってきた URL を保存へ使います。
             const res = await fetch("/api/admin/upload-shop-image", {
                 method: "POST",
                 body: formData,
@@ -112,11 +121,13 @@ export default function ShopEditClient({
     }
 
     async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+        // フォーム既定の再読み込みを止め、画面内で成功・失敗を表示します。
         e.preventDefault();
 
         setError(null);
         setSavedMessage("");
 
+        // 店舗名だけは必須なので、空なら API を呼ばずに止めます。
         const trimmedName = name.trim();
         if (!trimmedName) {
             setError("店舗名は必須です。");
@@ -126,8 +137,10 @@ export default function ShopEditClient({
         setSaving(true);
 
         try {
+            // 画像アップロードが必要なら先に終わらせ、その URL を店舗更新 API に送ります。
             const uploadedCoverImageUrl = await uploadSelectedImage();
 
+            // 保存処理そのものは API に任せ、DB 更新ロジックはサーバー側へ集約します。
             const res = await fetch("/api/admin/shop", {
                 method: "PUT",
                 headers: {
@@ -155,6 +168,7 @@ export default function ShopEditClient({
                 return;
             }
 
+            // API が返した最新の updatedAt と coverImageUrl を画面にも反映します。
             setSavedMessage("店舗情報を保存しました。");
 
             if (data?.shop?.coverImageUrl !== undefined) {
@@ -176,6 +190,7 @@ export default function ShopEditClient({
         }
     }
 
+    // プレビュー領域では「ローカルプレビュー > 入力済み URL > 空」の順に表示します。
     const previewImageUrl = localPreviewUrl || coverImageUrl.trim() || "";
 
     return (

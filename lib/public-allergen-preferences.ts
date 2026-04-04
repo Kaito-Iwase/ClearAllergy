@@ -1,3 +1,7 @@
+// このファイルは公開画面向けの「端末内アレルゲン設定」を扱います。
+// ログイン不要で localStorage に保存し、メニュー一覧や詳細の警告表示に使います。
+// Server Component では localStorage を触れないため、Client Component から呼ばれます。
+
 // lib/public-allergen-preferences.ts
 
 export const USER_ALLERGEN_STORAGE_KEY = "clearallergy:user-allergens";
@@ -8,12 +12,8 @@ export type UserAllergenPreferences = {
     selectedSlugs: string[];
 };
 
-/**
- * 配列が string[] かどうかをざっくり安全に整える
- * - 配列でなければ []
- * - string 以外は捨てる
- * - 重複は消す
- */
+// localStorage の値は壊れている可能性もあるため、
+// string 配列だけを残し、重複も消して安全な形へ整えます。
 function normalizeSlugs(values: unknown): string[] {
     if (!Array.isArray(values)) {
         return [];
@@ -28,11 +28,6 @@ function normalizeSlugs(values: unknown): string[] {
     );
 }
 
-/**
- * localStorage から設定を読む
- * - ブラウザ以外では空を返す
- * - JSONが壊れていても空を返す
- */
 export function loadUserAllergenPreferences(): UserAllergenPreferences {
     if (typeof window === "undefined") {
         return { selectedSlugs: [] };
@@ -55,10 +50,6 @@ export function loadUserAllergenPreferences(): UserAllergenPreferences {
     }
 }
 
-/**
- * localStorage に設定を保存する
- * - string[] に正規化してから保存
- */
 export function saveUserAllergenPreferences(
     preferences: UserAllergenPreferences,
 ): void {
@@ -76,9 +67,6 @@ export function saveUserAllergenPreferences(
     );
 }
 
-/**
- * 保存済み設定を削除する
- */
 export function clearUserAllergenPreferences(): void {
     if (typeof window === "undefined") {
         return;

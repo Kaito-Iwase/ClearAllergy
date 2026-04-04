@@ -1,3 +1,7 @@
+// このファイルは管理画面のメニュー一覧取得と新規作成 API です。
+// /api/admin/menus の GET は一覧、POST は新規作成を担当します。
+// どちらも requireShopId() を通し、ログイン中の店舗だけを対象にします。
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/app/api/admin/_utils";
@@ -12,7 +16,7 @@ import {
     type AllergenStatus,
 } from "@/lib/allergens";
 
-// リクエスト body の型
+// request.json() の結果は unknown に近いので、まず期待する形を宣言しておきます。
 type MenuCreateBody = {
     name?: unknown;
     description?: unknown;
@@ -25,14 +29,17 @@ type MenuCreateBody = {
     allergenStatusBySlug?: unknown;
 };
 
-// GET /api/admin/menus ・・・ 一覧（管理用）
+// GET は保存済みメニュー一覧の取得です。
+// 管理画面トップで表示するため、必要な列だけ絞って返します。
 export async function GET() {
     try {
+        // 認証済みかつ shopId を持つ管理者だけに絞ります。
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
         }
 
+        // shopId で絞ることで、他店舗のメニューが混ざらないようにします。
         const menus = await prisma.menuItem.findMany({
             where: { shopId: auth.shopId },
             orderBy: { updatedAt: "desc" },
@@ -53,7 +60,8 @@ export async function GET() {
     }
 }
 
-// POST /api/admin/menus ・・・ 新規作成（下書き作成対応）
+// POST は新規メニュー作成です。
+// 編集画面にすぐ遷移できるよう、最小情報でも下書きを作れるようにしています。
 export async function POST(req: Request) {
     try {
         const auth = await requireShopId();
@@ -63,9 +71,10 @@ export async function POST(req: Request) {
 
         const body = await readJson<MenuCreateBody>(req);
 
-        // body が無くても仮タイトルで下書きを作れるようにする
+        // 下書き作成では、名前未入力でも仮タイトルで進められるようにします。
         const name = toRequiredTrimmedString(body?.name) ?? "新しいメニュー";
 
+        // 価格だけは数値ルールが多いので専用 helper で検証します。
         const priceResult = parsePriceYen(body?.priceYen);
         if (!priceResult.ok) {
             return NextResponse.json(
@@ -81,11 +90,12 @@ export async function POST(req: Request) {
         const imageUrl = toTrimmedNullableString(body?.imageUrl);
         const allergenStatusBySlug = body?.allergenStatusBySlug;
 
-        // 新規作成時は基本下書き
+        // 新規作成直後は誤公開を防ぐため、既定は非公開です。
         const isPublished = toBooleanOrDefault(body?.isPublished, false);
         let allergenMap: Record<string, AllergenStatus> = {};
 
         if (allergenStatusBySlug !== undefined) {
+            // アレルゲン状態は { slug: status } の連想配列だけを受け付けます。
             if (
                 typeof allergenStatusBySlug !== "object" ||
                 allergenStatusBySlug === null ||
@@ -115,6 +125,8 @@ export async function POST(req: Request) {
             );
         }
 
+        // 送られてきた slug が本当にマスタに存在するか確認します。
+        // 存在しない値を黙って通すと、入力ミスに気付きにくくなるためです。
         const slugs = Object.keys(allergenMap);
         const allergens =
             slugs.length > 0
@@ -136,6 +148,8 @@ export async function POST(req: Request) {
             }
         }
 
+        // MenuItem と中間テーブルを同時に保存するため transaction を使います。
+        // 途中で失敗したら両方とも取り消され、中途半端なデータを防げます。
         const created = await prisma.$transaction(async (tx) => {
             const menu = await tx.menuItem.create({
                 data: {
@@ -173,6 +187,7 @@ export async function POST(req: Request) {
             e instanceof Error &&
             e.message.startsWith("invalid allergen status:")
         ) {
+            // バリデーション系の失敗は 400 として返します。
             return NextResponse.json({ error: e.message }, { status: 400 });
         }
         return internalError(e);

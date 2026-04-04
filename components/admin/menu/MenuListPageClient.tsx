@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントはメニュー一覧の表示とクライアント側操作を担当します。
+// Server Component から受け取った initialMenus をもとに、検索と削除だけを画面上で扱います。
+// Client Component なのは、入力 state と削除ボタンのイベント処理が必要だからです。
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -15,10 +19,12 @@ export default function MenuListPageClient({
 }: {
     initialMenus: MenuRow[];
 }) {
+    // state として一覧・検索語・エラーメッセージを持ちます。
     const [menus, setMenus] = useState<MenuRow[]>(initialMenus);
     const [q, setQ] = useState("");
     const [error, setError] = useState<string | null>(null);
 
+    // 検索語が変わった時だけ一覧を絞り込み、不要な再計算を減らします。
     const filtered = useMemo(() => {
         const needle = q.trim().toLowerCase();
         if (!needle) return menus;
@@ -29,13 +35,16 @@ export default function MenuListPageClient({
     }, [menus, q]);
 
     const onDelete = async (menuId: string, menuName: string) => {
+        // 前回のエラーを消してから削除処理を始めます。
         setError(null);
 
+        // 取り消し不能な操作なので、まずブラウザ確認ダイアログを出します。
         const ok = window.confirm(
             `「${menuName}」を削除します。よろしいですか？`,
         );
         if (!ok) return;
 
+        // 実際の削除は API に任せ、成功時だけローカル一覧から外します。
         const res = await fetch(`/api/admin/menus/${menuId}`, {
             method: "DELETE",
         });

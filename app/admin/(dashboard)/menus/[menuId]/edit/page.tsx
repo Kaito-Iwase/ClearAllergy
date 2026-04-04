@@ -1,5 +1,8 @@
+// このページはメニュー編集画面です。
+// menuId に対応する 1 件のメニューを取得し、編集用の初期値を作って Client Component へ渡します。
+// Server Component なので、他店舗メニューのアクセス制御と初期データ取得を先に行えます。
+
 // app/admin/(dashboard)/menus/[menuId]/edit/page.tsx
-// 管理画面：メニュー編集ページ（Server Component）
 
 import MenuEditClient from "@/components/admin/menu/MenuEditClient";
 import { prisma } from "@/lib/db";
@@ -13,13 +16,14 @@ type PageProps = {
 };
 
 export default async function AdminMenuEditPage({ params }: PageProps) {
+    // menuId が正しくても他店舗データは見せないため、最初に管理者文脈を確定します。
     const adminContext = await requireCurrentAdminContextOrRedirect();
     const shopId = adminContext.shop.id;
 
-    // 2) menuId
+    // 動的ルートの menuId を使って、どのメニューを編集中か決めます。
     const { menuId } = await params;
 
-    // 3) アレルゲンマスタ
+    // 編集フォームの選択肢として使うアレルゲンマスタを取得します。
     const allergens = await prisma.allergen.findMany({
         orderBy: { sortOrder: "asc" },
         select: {
@@ -30,7 +34,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
         },
     });
 
-    // 4) メニュー取得（この店舗のものだけ）
+    // where に shopId を含め、他店舗のメニュー ID を直接入力されても取れないようにします。
     const menu = await prisma.menuItem.findFirst({
         where: { id: menuId, shopId },
         select: {
@@ -57,7 +61,8 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
         notFound();
     }
 
-    // 5) 初期状態：全部FREE → 既存状態で上書き
+    // 未登録アレルゲンも含めて 28 品目を常に表示したいので、
+    // まず FREE で埋めてから既存の保存状態で上書きします。
     const initialStatusBySlug = createStatusBySlug(allergens, menu.allergenLinks);
 
     return (

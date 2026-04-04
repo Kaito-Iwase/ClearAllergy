@@ -1,3 +1,7 @@
+// このファイルは管理画面用の認証入口です。
+// Clerk と旧 NextAuth の両方を受け付け、段階移行中でも同じ helper で扱えるようにします。
+// Server Component や API から「今の管理者」と「その店舗」を取得する時に使います。
+
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
@@ -47,8 +51,8 @@ type AdminContext = {
     authProvider: "clerk" | "legacy";
 };
 
-// 既存コードの変更量を抑えるため、
-// NextAuth の session に近い形を Clerk 由来の情報で返す。
+// 既存のコードが session.user.shopId 前提で書かれているため、
+// できるだけ近い形の値を返して移行コストを下げます。
 export async function getAdminSession(): Promise<AdminSessionLike | null> {
     const context = await getCurrentAdminContext();
 
@@ -66,8 +70,8 @@ export async function getAdminSession(): Promise<AdminSessionLike | null> {
     };
 }
 
-// 管理画面向けに「アプリ内ユーザー + 店舗」をまとめて返す。
-// Server Component 側で appUser を扱いたい時はこの helper を使う。
+// 管理画面で必要な「アプリ内 User」と「紐づく Shop」をまとめて返します。
+// まず Clerk を試し、未ログインなら旧 NextAuth セッションへフォールバックします。
 export async function getCurrentAdminContext(): Promise<AdminContext | null> {
     const clerkAppUser = await getCurrentAppUser();
 
@@ -86,6 +90,7 @@ export async function getCurrentAdminContext(): Promise<AdminContext | null> {
         return null;
     }
 
+    // 旧認証では session に userId だけがあるので、ここで DB の User / Shop を引き直します。
     const legacyAppUser = await prisma.user.findUnique({
         where: { id: legacyUserId },
         include: { shop: true },
@@ -107,6 +112,8 @@ export async function requireCurrentAdminContextOrRedirect(): Promise<{
     shop: NonNullable<AdminContext["shop"]>;
     authProvider: AdminContext["authProvider"];
 }> {
+    // 管理画面で必須の認証ガードです。
+    // 未ログインならログイン画面、店舗未作成なら登録画面へ送ります。
     const context = await getCurrentAdminContext();
 
     if (!context) {
@@ -125,6 +132,7 @@ export async function requireCurrentAdminContextOrRedirect(): Promise<{
 }
 
 export async function getSessionShopId(): Promise<string | null> {
+    // API などで shopId だけあればよい時の軽量 helper です。
     const context = await getCurrentAdminContext();
     return context?.shop?.id ?? null;
 }

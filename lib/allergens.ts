@@ -1,3 +1,7 @@
+// このファイルはアレルゲン表示に関する共通ロジックです。
+// 管理画面と公開画面の両方から使い、状態ラベルや色、特定原材料の注意文を共通化します。
+// UI ごとに判定ロジックがずれないよう、なるべくここへ集めています。
+
 export const ALLERGEN_STATUS_VALUES = [
     "CONTAINS",
     "FREE",
@@ -6,6 +10,8 @@ export const ALLERGEN_STATUS_VALUES = [
 
 export type AllergenStatus = (typeof ALLERGEN_STATUS_VALUES)[number];
 
+// えび・かに・くるみ・小麦・そば・卵・乳・落花生は、
+// 公開画面で特に強調して見せたい「特定原材料」として別扱いしています。
 export const SPECIFIED_INGREDIENT_SLUGS = [
     "shrimp",
     "crab",
@@ -35,6 +41,8 @@ export function createStatusBySlug(
     allergens: AllergenLike[],
     links: AllergenLinkLike[],
 ): Record<string, AllergenStatus> {
+    // まず全品目を FREE で埋めてから、DB に保存されている実データで上書きします。
+    // こうしておくと、未登録のアレルゲンも画面で必ず表示できます。
     const statusBySlug: Record<string, AllergenStatus> = {};
 
     for (const allergen of allergens) {
@@ -67,6 +75,7 @@ export function statusBadgeClass(status: AllergenStatus): string {
 export function buildSpecifiedIngredientNotice(args: {
     rows: Array<{ slug: string; nameJa: string; status: AllergenStatus }>;
 }) {
+    // 28品目のうち、特定原材料だけを抜き出して警告 UI 用の文言を作ります。
     const specifiedRows = args.rows.filter((row) =>
         SPECIFIED_INGREDIENT_SLUGS.includes(
             row.slug as (typeof SPECIFIED_INGREDIENT_SLUGS)[number],

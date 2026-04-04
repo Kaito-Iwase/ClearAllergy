@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは旧認証向けの新規登録フォームです。
+// app/admin/(auth)/register/page.tsx から呼ばれる Client Component で、
+// 登録 API 呼び出しから自動ログインまでを 1 画面で行います。
+
 import React, { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
@@ -7,7 +11,7 @@ import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton
 import { normalizeEmail } from "@/lib/email";
 
 export default function AdminRegisterPageClient() {
-    // 1) パスワード表示のON/OFF
+    // state（画面の状態）として、入力値と UI 表示状態を保持します。
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
@@ -21,13 +25,14 @@ export default function AdminRegisterPageClient() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // 4) 登録処理
+    // フォーム送信時に旧認証の登録 API を呼び、その後で自動ログインします。
     const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        // フォーム既定の再読み込みを止めて、エラー表示を自前で制御します。
         e.preventDefault();
 
         setError(null);
 
-        // 5) 入力チェック
+        // API を呼ぶ前に、画面側で分かりやすい入力エラーを先に出します。
         if (!shopName.trim()) {
             setError("店舗名を入力してください。");
             return;
@@ -51,10 +56,11 @@ export default function AdminRegisterPageClient() {
         setLoading(true);
 
         try {
+            // email の揺れを減らすため、送信前に正規化します。
             const normalizedEmail = normalizeEmail(email);
             setEmail(normalizedEmail);
 
-            // 6) 新規登録APIを呼ぶ
+            // 登録そのものは API に任せ、DB 更新ロジックはサーバー側へ寄せます。
             const response = await fetch("/api/admin/register", {
                 method: "POST",
                 headers: {
@@ -77,7 +83,7 @@ export default function AdminRegisterPageClient() {
                 return;
             }
 
-            // 8) 登録成功後、そのまま自動ログイン
+            // 登録直後に再入力させないため、そのまま自動ログインします。
             const signInResult = await signIn("credentials", {
                 email: normalizedEmail,
                 password,
@@ -154,6 +160,7 @@ export default function AdminRegisterPageClient() {
                         </div>
 
                         <div className="mb-5">
+                            {/* Google 登録は Clerk を使うが、画面自体は既存 UI を維持します。 */}
                             <AdminGoogleAuthButton
                                 label="Google で新規登録"
                                 onError={(message) =>

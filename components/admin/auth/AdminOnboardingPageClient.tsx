@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは Clerk ログイン直後の初回店舗作成画面です。
+// app/admin/(auth)/register/page.tsx から呼ばれる Client Component で、
+// Shop がまだ無い appUser に対して最小限の店舗情報だけ作成します。
+
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -16,15 +20,18 @@ type OnboardingResponse = {
 };
 
 export default function AdminOnboardingPageClient({ email }: Props) {
+    // 入力値、エラー、送信中状態を画面側で持ちます。
     const router = useRouter();
     const [shopName, setShopName] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+        // フォーム既定の再読み込みを止め、結果メッセージを画面内で扱います。
         e.preventDefault();
         setError(null);
 
+        // 必須の店舗名が空なら API を呼ばずに止めます。
         const trimmedShopName = shopName.trim();
         if (!trimmedShopName) {
             setError("店舗名を入力してください。");
@@ -34,6 +41,7 @@ export default function AdminOnboardingPageClient({ email }: Props) {
         setLoading(true);
 
         try {
+            // Clerk ログイン後の初回店舗作成 API を呼びます。
             const response = await fetch("/api/admin/onboarding", {
                 method: "POST",
                 headers: {
@@ -53,6 +61,7 @@ export default function AdminOnboardingPageClient({ email }: Props) {
                 return;
             }
 
+            // 正常完了したら管理画面トップへ進めます。
             router.push("/admin/menus");
             router.refresh();
         } catch (err) {

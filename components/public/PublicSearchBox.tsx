@@ -1,27 +1,27 @@
 "use client";
 
+// このコンポーネントは公開画面共通の検索ボックスです。
+// URL クエリ (?q=...) を更新し、その結果を Server Component 側の絞り込みに反映させます。
+// Client Component なのは、入力イベントと router.replace を使うためです。
+
 // components/public/PublicSearchBox.tsx
-// URLクエリ (?q=...) を更新する検索ボックス
-// - ページのパスに応じて placeholder を自動切替
-// - 入力 → router.replace でURL更新 → Server側がsearchParams.qで絞り込み
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Props = {
-    // これが渡されたらそれを優先。渡されない場合は自動切替。
+    // これが渡されたらそれを優先し、未指定なら現在のページに応じて自動決定します。
     placeholder?: string;
 };
 
 function autoPlaceholder(pathname: string): string {
-    // 1) /shops（店舗一覧）
+    // /shops は店舗一覧なので「店舗を検索」にします。
     if (pathname === "/shops") return "店舗を検索";
 
-    // 2) /shops/[shopId]（店舗詳細）や /shops/[shopId]/...（メニュー詳細）
-    //    → 店の中のコンテンツを探すニュアンスにする
+    // 店舗詳細配下では、店内のメニューを探すニュアンスに切り替えます。
     if (pathname.startsWith("/shops/")) return "この店舗のメニューを検索";
 
-    // 3) その他
+    // それ以外は汎用の文言にします。
     return "検索";
 }
 
@@ -30,25 +30,25 @@ export default function PublicSearchBox({ placeholder }: Props) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // 1) URLに入っている q を初期値として取り出す
+    // 現在の URL に入っている q を初期値として取り出します。
     const initialQ = useMemo(() => {
         return searchParams.get("q") ?? "";
     }, [searchParams]);
 
-    // 2) 入力欄の状態（state：画面の状態を保存する仕組み）
+    // 入力欄の内容そのものを state として持ちます。
     const [q, setQ] = useState(initialQ);
 
-    // 3) URL側のqが変わったとき、入力欄も同期する
+    // 戻る / 進む などで URL の q が変わった時も入力欄を同期します。
     useEffect(() => {
         setQ(initialQ);
     }, [initialQ]);
 
-    // 4) プレースホルダーを決める（props優先→なければ自動）
+    // placeholder は props 優先、無ければ現在パスから自動決定します。
     const resolvedPlaceholder = useMemo(() => {
         return placeholder ?? autoPlaceholder(pathname);
     }, [placeholder, pathname]);
 
-    // 5) 入力変更イベント
+    // 入力のたびに URL の q を更新し、Server Component 側の検索結果も変わるようにします。
     const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const next = e.target.value;
         setQ(next);
@@ -62,7 +62,7 @@ export default function PublicSearchBox({ placeholder }: Props) {
         router.replace(queryString ? `${pathname}?${queryString}` : pathname);
     };
 
-    // 6) クリア
+    // クリア時は入力欄だけでなく URL からも q を消します。
     const onClear = () => {
         setQ("");
         const sp = new URLSearchParams(searchParams.toString());

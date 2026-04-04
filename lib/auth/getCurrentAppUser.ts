@@ -1,3 +1,7 @@
+// このファイルは Clerk のログイン情報から、アプリ内 User を解決する helper です。
+// 管理画面や API から呼ばれ、clerkUserId と既存 User テーブルを橋渡しします。
+// 段階移行中なので、既存 email ユーザーへ clerkUserId を後付けする処理もここで担当します。
+
 import { Prisma } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
@@ -6,6 +10,8 @@ import { normalizeEmail } from "@/lib/email";
 function extractPrimaryEmail(
     clerkUser: Awaited<ReturnType<typeof currentUser>>,
 ): string | null {
+    // Clerk では複数メールを持てるため、
+    // まず primary を優先し、無ければ先頭メールを使います。
     if (!clerkUser) {
         return null;
     }
@@ -20,6 +26,7 @@ function extractPrimaryEmail(
 }
 
 async function findExistingAppUser(clerkUserId: string) {
+    // Clerk 連携済みユーザーは clerkUserId だけで見つかります。
     return prisma.user.findUnique({
         where: { clerkUserId: clerkUserId },
         include: { shop: true },
@@ -27,6 +34,8 @@ async function findExistingAppUser(clerkUserId: string) {
 }
 
 async function attachClerkIdToLegacyUser(clerkUserId: string, email: string) {
+    // 旧認証ユーザーが同じ email を持っていれば、そのレコードへ Clerk ID をひも付けます。
+    // これにより既存 Shop や Menu を別ユーザーとして作り直さずに済みます。
     const legacyUser = await prisma.user.findUnique({
         where: { email },
         include: { shop: true },
@@ -47,6 +56,7 @@ async function attachClerkIdToLegacyUser(clerkUserId: string, email: string) {
 }
 
 async function createAppUser(clerkUserId: string, email: string | null) {
+    // 旧ユーザーとつながらなかった場合のみ、新しい User を作ります。
     return prisma.user.create({
         data: {
             clerkUserId,
@@ -62,6 +72,7 @@ async function createAppUser(clerkUserId: string, email: string | null) {
 // 3. 見つからなければ新規作成
 // という順で処理し、既存の Shop 紐付きを壊さないようにする。
 export async function getCurrentAppUser() {
+    // auth() は Clerk 側の認証状態を返します。
     const { userId } = await auth();
 
     if (!userId) {
@@ -73,6 +84,7 @@ export async function getCurrentAppUser() {
         return byClerkId;
     }
 
+    // まだ DB にアプリ内 User が無い場合だけ Clerk のプロフィール本体を読みます。
     const clerkUser = await currentUser();
     if (!clerkUser) {
         return null;
@@ -82,6 +94,7 @@ export async function getCurrentAppUser() {
 
     try {
         if (email) {
+            // 同じ email の旧ユーザーがいれば、そのレコードへ Clerk ID を後付けします。
             const linkedLegacyUser = await attachClerkIdToLegacyUser(
                 userId,
                 email,
@@ -94,8 +107,8 @@ export async function getCurrentAppUser() {
 
         return await createAppUser(userId, email);
     } catch (error) {
-        // 初回ログインが重なった時の race condition 向け。
-        // すでに別リクエストで作られていたら再取得する。
+        // 初回ログインが同時に走ると、一意制約にぶつかることがあります。
+        // その場合は「誰かが先に作った」前提で DB を取り直します。
         if (
             error instanceof Prisma.PrismaClientKnownRequestError &&
             error.code === "P2002"

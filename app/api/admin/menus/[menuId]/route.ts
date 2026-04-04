@@ -1,3 +1,7 @@
+// このファイルは 1 件のメニューに対する取得・更新・削除 API です。
+// /api/admin/menus/[menuId] の GET / PUT / DELETE をまとめています。
+// 毎回 shopId で絞り込み、「自分の店舗のメニューだけ触れる」ことを保証します。
+
 // app/api/admin/menus/[menuId]/route.ts
 
 import { NextResponse } from "next/server";
@@ -11,7 +15,8 @@ import {
 } from "@/app/api/admin/_utils";
 import { type AllergenStatus } from "@/lib/allergens";
 
-// 更新ボディ（★shopIdは受け取らない！）
+// 更新用の request body です。
+// shopId はクライアントから受け取らず、必ず session 側の shopId を使います。
 type UpdateMenuBody = {
     name?: string;
     description?: string | null;
@@ -30,11 +35,11 @@ type UpdateMenuBody = {
 
 export async function GET(req: Request, context: Context) {
     try {
-        // 1) セッション確認 + shopId 取得
+        // 認証された管理者か確認し、権限判定に使う shopId を取ります。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
 
-        // 2) menuId 取得
+        // 動的ルートの menuId を取得します。
         const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
@@ -43,7 +48,7 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
-        // 3) DBから取得（このshopのmenuだけ許可）
+        // shopId を条件に入れ、他店舗の menuId を直接叩かれても取得できないようにします。
         const menu = await prisma.menuItem.findFirst({
             where: { id: menuId, shopId: auth.shopId },
             select: {
@@ -75,7 +80,7 @@ export async function GET(req: Request, context: Context) {
             },
         });
 
-        // 4) 無ければ404（他店のIDでも同じ扱い）
+        // 他店舗のデータ存在有無を推測されにくいよう、単純に 404 として返します。
         if (!menu) {
             return NextResponse.json(
                 { error: "menu not found" },
@@ -83,7 +88,7 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
-        // 5) 返却用の形に整形
+        // DB の relation 形のままだと扱いにくいので、画面向けの配列へ整形します。
         const allergens = menu.allergenLinks
             .map((link) => ({
                 slug: link.allergen.slug,
@@ -118,7 +123,8 @@ export async function GET(req: Request, context: Context) {
 
 export async function PUT(req: Request, context: Context) {
     try {
-        // 1) セッション確認 + shopId 取得
+        // PUT は既存メニューの保存です。
+        // まず本人の店舗かどうか判定するため、認証と shopId 確認を行います。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
 
@@ -131,7 +137,7 @@ export async function PUT(req: Request, context: Context) {
             );
         }
 
-        // 3) body 取得（壊れてたら400）
+        // request body が JSON として壊れていたら早めに 400 を返します。
         const body = await readJson<UpdateMenuBody>(req);
         if (!body) {
             return NextResponse.json(
@@ -140,7 +146,7 @@ export async function PUT(req: Request, context: Context) {
             );
         }
 
-        // 4) この店のメニューか確認（他店なら404）
+        // 対象メニューが自分の店舗に属しているか確認します。
         const existing = await prisma.menuItem.findFirst({
             where: { id: menuId, shopId: auth.shopId },
             select: { id: true },
@@ -152,7 +158,7 @@ export async function PUT(req: Request, context: Context) {
             );
         }
 
-        // 5) メニュー本体を更新（undefinedは更新しない）
+        // undefined を渡した項目は更新しないので、部分更新に使えます。
         const updatedMenu = await prisma.menuItem.update({
             where: { id: menuId },
             data: {
@@ -177,18 +183,18 @@ export async function PUT(req: Request, context: Context) {
             },
         });
 
-        // 6) アレルゲン状態更新（送ってきたslugだけ）
+        // アレルゲンは menu 本体とは別テーブルなので、後続で更新します。
         const map = body.allergenStatusBySlug ?? {};
         const slugs = Object.keys(map);
 
         if (slugs.length > 0) {
-            // 7) slug -> allergenId
+            // 画面が扱う slug を、DB の外部キーである allergenId に変換します。
             const allergens = await prisma.allergen.findMany({
                 where: { slug: { in: slugs } },
                 select: { id: true, slug: true },
             });
 
-            // 8) 存在しないslugが混ざってたら400（黙殺しない）
+            // 未知の slug を黙って無視すると入力ミスが埋もれるので 400 にします。
             const found = new Set(allergens.map((a) => a.slug));
             const missing = slugs.filter((s) => !found.has(s));
             if (missing.length > 0) {
@@ -198,7 +204,8 @@ export async function PUT(req: Request, context: Context) {
                 );
             }
 
-            // 9) upsertをtransactionでまとめる（途中失敗で中途半端防止）
+            // upsert で「既存なら更新、なければ作成」をまとめて行います。
+            // transaction にするのは、途中失敗で一部だけ保存されるのを防ぐためです。
             const ops = allergens.map((a) =>
                 prisma.menuItemAllergen.upsert({
                     where: {
@@ -227,7 +234,7 @@ export async function PUT(req: Request, context: Context) {
 
 export async function DELETE(req: Request, context: Context) {
     try {
-        // 1) セッション確認 + shopId 取得
+        // DELETE でも shopId を確認し、自店舗メニュー以外は削除できないようにします。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
 
@@ -252,12 +259,12 @@ export async function DELETE(req: Request, context: Context) {
             );
         }
 
-        // 4) FK制約対策：中間テーブルを先に削除
+        // 中間テーブルが残っていると外部キー制約で本体を消せないため、先に削除します。
         await prisma.menuItemAllergen.deleteMany({
             where: { menuItemId: menuId },
         });
 
-        // 5) 本体削除
+        // その後で menu 本体を削除します。
         await prisma.menuItem.delete({
             where: { id: menuId },
         });

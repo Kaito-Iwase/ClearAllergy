@@ -1,3 +1,7 @@
+// このファイルは管理画面 API の入力値を整える helper 集です。
+// request.json() で受け取った unknown を、そのまま DB に入れないために使います。
+// 文字列の trim や価格の数値判定を共通化し、各 API で同じルールを保ちます。
+
 const PRISMA_INT_MAX = 2147483647;
 
 export function toTrimmedNullableString(value: unknown): string | null {
@@ -28,6 +32,8 @@ export function toBooleanOrDefault(
 export function parsePriceYen(
     value: unknown,
 ): { ok: true; value: number | null } | { ok: false; message: string } {
+    // 価格は空欄を許しつつ、入る時は「0以上の整数」に限定します。
+    // Prisma の Int 上限も超えないようここで先に弾きます。
     if (value === undefined || value === null || value === "") {
         return { ok: true, value: null };
     }

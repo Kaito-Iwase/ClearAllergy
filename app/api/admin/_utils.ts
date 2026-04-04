@@ -1,15 +1,20 @@
+// このファイルは管理画面 API で共通利用する helper 集です。
+// 認証確認、shopId の取り出し、JSON 読み取り、500 エラー整形をまとめています。
+// 各 route.ts から使い回し、同じ認可ルールとレスポンス形式を保ちます。
+
 // app/api/admin/_utils.ts
 
 import { NextResponse } from "next/server";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 
-// 1) JSONの読み取り（壊れてても落ちない）
+// request.json() は壊れた JSON で例外を投げるので、
+// 各 API で try/catch を増やしすぎないよう helper にしています。
 export async function readJson<T>(req: Request): Promise<T | null> {
-    // req.json() が例外を投げることがあるので catch する
     return req.json().catch(() => null);
 }
 
-// 2) ログイン確認 + shopId取得（毎回書くのをやめる）
+// 管理画面 API 共通の認証チェックです。
+// shopId まで確認するのは「自分の店舗のデータだけ更新できる」ようにするためです。
 export async function requireShopId() {
     const context = await getCurrentAdminContext();
 
@@ -37,12 +42,13 @@ export async function requireShopId() {
     };
 }
 
-// 3) URLから menuId を取る（paramsが揺れても壊れない）
+// Next.js の params はバージョンや呼ばれ方で Promise のことがあるため両対応にしています。
 export type Context = {
     params?: { menuId?: string } | Promise<{ menuId?: string }>;
 };
 
 function getMenuIdFromUrl(req: Request) {
+    // params が取れない環境でも動くよう、URL 末尾から menuId を抜く保険です。
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
     return parts[parts.length - 1];
@@ -56,7 +62,7 @@ export async function getMenuId(
     return p?.menuId ?? getMenuIdFromUrl(req);
 }
 
-// 4) 500の返し方を統一（開発中だけ message を出す）
+// 開発中は原因を追いやすくしつつ、本番では内部情報を出しすぎないよう分けています。
 export function internalError(e: unknown) {
     console.error(e);
     if (process.env.NODE_ENV !== "production") {

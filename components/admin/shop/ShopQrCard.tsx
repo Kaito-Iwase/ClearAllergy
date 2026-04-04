@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは店舗公開ページ用の QR コード表示カードです。
+// 店舗編集画面から呼ばれ、公開 URL の生成・コピー・QR 表示をまとめて担当します。
+// Client Component なのは、window / clipboard / QR 表示まわりをブラウザ側で扱うためです。
+
 import Link from "next/link";
 import React from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -10,14 +14,13 @@ type ShopQrCardProps = {
 };
 
 export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
-    // 1) ブラウザで見えている現在のURLの元（例: http://localhost:3000）を保持する状態
+    // state（画面の状態）として、公開 URL とコピー結果メッセージを持ちます。
     const [origin, setOrigin] = React.useState("");
 
     // 2) コピー成功メッセージ表示用の状態
     const [copiedMessage, setCopiedMessage] = React.useState("");
 
-    // 3) 初回表示時に、環境変数 NEXT_PUBLIC_APP_URL を優先し、
-    //    無ければブラウザの window.location.origin を使う
+    // 本番 URL が環境変数にあればそれを優先し、無ければ今のブラウザ origin を使います。
     React.useEffect(() => {
         const envBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
 
@@ -31,11 +34,10 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
         }
     }, []);
 
-    // 4) 店舗の公開URLを作る
-    //    origin がまだ空の間は空文字にして、無理に不正URLを作らない
+    // origin が決まってから店舗公開 URL を組み立てます。
     const publicShopUrl = origin ? `${origin}/shops/${shopId}` : "";
 
-    // 5) URLコピー処理
+    // 共有しやすいよう、まずはクリップボードへコピーする導線を用意します。
     async function handleCopyUrl() {
         if (!publicShopUrl) {
             setCopiedMessage("公開URLをまだ作成できていません。");
@@ -50,7 +52,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
         }
     }
 
-    // 6) メッセージは数秒で消す
+    // 補助メッセージは数秒で自動的に消し、画面に残り続けないようにします。
     React.useEffect(() => {
         if (!copiedMessage) {
             return;

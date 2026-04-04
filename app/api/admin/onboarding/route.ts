@@ -1,3 +1,7 @@
+// このファイルは Clerk ログイン後の初回店舗作成 API です。
+// Google ログインなどで appUser はあるが Shop がまだ無い時に使われます。
+// 1ユーザー1店舗の前提を守るため、既存 Shop がある場合は新規作成しません。
+
 import { NextResponse } from "next/server";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
 import { prisma } from "@/lib/db";
@@ -8,6 +12,7 @@ type OnboardingBody = {
 
 export async function POST(req: Request) {
     try {
+        // まず Clerk 由来の appUser を解決します。
         const appUser = await getCurrentAppUser();
 
         if (!appUser) {
@@ -17,6 +22,7 @@ export async function POST(req: Request) {
             );
         }
 
+        // 既に店舗があるなら重複作成せず、その情報を返します。
         if (appUser.shop) {
             return NextResponse.json(
                 {
@@ -30,6 +36,7 @@ export async function POST(req: Request) {
             );
         }
 
+        // 初回セットアップでは店舗名だけ受け取り、最小構成で Shop を作ります。
         const body = (await req.json().catch(() => null)) as OnboardingBody | null;
         const shopName =
             typeof body?.shopName === "string" ? body.shopName.trim() : "";
@@ -41,6 +48,7 @@ export async function POST(req: Request) {
             );
         }
 
+        // userId に appUser.id を使い、今ログイン中のアプリユーザーへ店舗をひも付けます。
         const shop = await prisma.shop.create({
             data: {
                 userId: appUser.id,

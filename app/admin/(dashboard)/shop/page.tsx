@@ -1,12 +1,18 @@
+// このページは店舗情報編集画面です。
+// ログイン中の店舗だけを取得し、公開画面に出る情報を編集する Client Component へ渡します。
+// Server Component なので、店舗存在チェックと初期データ取得を先に行えます。
+
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 import ShopEditClient from "@/components/admin/shop/ShopEditClient";
 
 export default async function AdminShopPage() {
+    // 認証されていない人や、店舗未作成の人をここで弾きます。
     const adminContext = await requireCurrentAdminContextOrRedirect();
     const shopId = adminContext.shop.id;
 
+    // 画面に必要な項目だけ select し、不要な列は持ってこないようにします。
     const shop = await prisma.shop.findUnique({
         where: { id: shopId },
         select: {
@@ -29,6 +35,7 @@ export default async function AdminShopPage() {
         },
     });
 
+    // 店舗レコードが無い状態なら、初回登録へ戻します。
     if (!shop) {
         redirect("/admin/register");
     }

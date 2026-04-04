@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは公開画面の「あなた向けアレルゲン設定」です。
+// localStorage に選択結果を保存し、メニュー一覧や詳細の警告表示と連動します。
+// ログイン不要で使えるようにしているため、端末ごとの設定として扱います。
+
 import React from "react";
 import {
     clearUserAllergenPreferences,
@@ -18,12 +22,14 @@ export default function UserAllergenPreferenceClient({
 }: {
     allergens: Allergen[];
 }) {
+    // 選択中項目、読み込み完了、メッセージ、開閉状態を state で持ちます。
     const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
     const [loaded, setLoaded] = React.useState(false);
     const [message, setMessage] = React.useState("");
     const [isOpen, setIsOpen] = React.useState(false);
 
     React.useEffect(() => {
+        // 初回表示時に localStorage から保存済み設定を読み込みます。
         const stored = loadUserAllergenPreferences();
         setSelectedSlugs(stored.selectedSlugs);
         setLoaded(true);
@@ -33,6 +39,7 @@ export default function UserAllergenPreferenceClient({
     }, []);
 
     function toggleSlug(slug: string) {
+        // 同じボタンを押すと追加 / 解除が切り替わるシンプルな UI です。
         setSelectedSlugs((prev) => {
             if (prev.includes(slug)) {
                 return prev.filter((value) => value !== slug);
@@ -42,6 +49,7 @@ export default function UserAllergenPreferenceClient({
     }
 
     function showMessage(text: string) {
+        // 保存完了などの短いメッセージを一定時間だけ表示します。
         setMessage(text);
 
         window.setTimeout(() => {
@@ -50,22 +58,26 @@ export default function UserAllergenPreferenceClient({
     }
 
     function notifyUpdated() {
+        // 一覧や詳細の警告 UI に「設定が変わった」と知らせます。
         window.dispatchEvent(new CustomEvent(USER_ALLERGENS_UPDATED_EVENT));
     }
 
     function onSave() {
+        // 現在の選択状態を localStorage に保存します。
         saveUserAllergenPreferences({ selectedSlugs });
         notifyUpdated();
         showMessage("この端末に設定を保存しました。");
     }
 
     function onClear() {
+        // 端末内の保存設定を削除し、画面の選択状態も空に戻します。
         clearUserAllergenPreferences();
         setSelectedSlugs([]);
         notifyUpdated();
         showMessage("保存済み設定を削除しました。");
     }
 
+    // localStorage はクライアントでしか読めないため、読み込み完了までは何も出しません。
     if (!loaded) {
         return null;
     }
