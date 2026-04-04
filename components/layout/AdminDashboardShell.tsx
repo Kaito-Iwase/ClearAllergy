@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import AdminLogoutButton from "@/components/admin/common/AdminLogoutButton";
+import BrandLogo from "@/components/layout/BrandLogo";
 
 export default function AdminDashboardShell({
     children,
@@ -17,15 +18,8 @@ export default function AdminDashboardShell({
             {/* PC では左サイドバーを固定表示し、主要な管理導線をまとめます。 */}
             <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-gray-100 bg-surface-light lg:sticky lg:top-0 lg:flex">
                 <div className="p-6">
-                    <Link href="/" className="flex items-center gap-3">
-                        <div className="size-8 text-primary">
-                            <span className="material-symbols-outlined text-4xl">
-                                health_and_safety
-                            </span>
-                        </div>
-                        <h1 className="text-xl font-bold tracking-tight">
-                            ClearAllergy
-                        </h1>
+                    <Link href="/" className="flex items-center">
+                        <BrandLogo priority />
                     </Link>
                 </div>
 
@@ -70,14 +64,8 @@ export default function AdminDashboardShell({
             <main className="flex h-screen flex-1 flex-col overflow-y-auto bg-background-light">
                 {/* スマホではサイドバーを出さず、ヘッダーに最小限の操作だけ置きます。 */}
                 <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-surface-light p-4 lg:hidden">
-                    <Link
-                        href="/"
-                        className="flex items-center gap-2 text-lg font-bold text-primary"
-                    >
-                        <span className="material-symbols-outlined">
-                            health_and_safety
-                        </span>
-                        ClearAllergy
+                    <Link href="/" className="flex items-center">
+                        <BrandLogo variant="compact" priority />
                     </Link>
                     <div className="flex items-center gap-2">
                         <UserButton />

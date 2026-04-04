@@ -9,6 +9,7 @@ import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
 import { signIn } from "next-auth/react";
 import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton";
+import BrandLogo from "@/components/layout/BrandLogo";
 import { normalizeEmail } from "@/lib/email";
 
 type AdminLoginPageClientProps = {
@@ -83,16 +84,9 @@ export default function AdminLoginPageClient({
             <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#e5e7eb] dark:border-white/10 bg-surface-light dark:bg-surface-dark px-6 lg:px-10 py-4 sticky top-0 z-50">
                 <Link
                     href="/"
-                    className="flex items-center gap-3 text-text-main dark:text-white"
+                    className="flex items-center text-text-main dark:text-white"
                 >
-                    <div className="size-8 text-primary">
-                        <span className="material-symbols-outlined text-3xl">
-                            local_florist
-                        </span>
-                    </div>
-                    <h2 className="text-text-main dark:text-white text-xl font-bold leading-tight tracking-[-0.015em]">
-                        ClearAllergy
-                    </h2>
+                    <BrandLogo priority />
                 </Link>
 
                 <div className="flex items-center gap-4">

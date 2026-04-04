@@ -8,6 +8,7 @@ import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import BrandLogo from "@/components/layout/BrandLogo";
 
 type Props = {
     email: string | null;
@@ -78,10 +79,8 @@ export default function AdminOnboardingPageClient({ email }: Props) {
         <div className="bg-background-light text-text-main min-h-screen flex flex-col font-display antialiased selection:bg-primary/30">
             <header className="flex items-center justify-between border-b border-[#e5e7eb] bg-surface-light px-6 py-4 lg:px-10">
                 <div>
-                    <Link href="/" className="inline-block">
-                        <h1 className="text-xl font-bold tracking-tight">
-                            ClearAllergy
-                        </h1>
+                    <Link href="/" className="inline-flex items-center">
+                        <BrandLogo priority />
                     </Link>
                     <p className="mt-1 text-sm text-text-sub">
                         Clerk ログイン後の初回セットアップ
