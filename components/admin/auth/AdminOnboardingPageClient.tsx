@@ -4,6 +4,7 @@
 // app/admin/(auth)/register/page.tsx から呼ばれる Client Component で、
 // Shop がまだ無い appUser に対して最小限の店舗情報だけ作成します。
 
+import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -62,8 +63,8 @@ export default function AdminOnboardingPageClient({ email }: Props) {
                 return;
             }
 
-            // 正常完了したら管理画面トップへ進めます。
-            router.push("/admin/menus");
+            // 初回作成直後は、続けて店舗情報を追記しやすいよう店舗情報画面へ進めます。
+            router.push("/admin/shop");
             router.refresh();
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -86,6 +87,24 @@ export default function AdminOnboardingPageClient({ email }: Props) {
                         Clerk ログイン後の初回セットアップ
                     </p>
                 </div>
+
+                <div className="flex items-center gap-3">
+                    <Link
+                        href="/"
+                        className="inline-flex items-center justify-center rounded-lg border border-[#dbe6db] bg-white px-4 py-2 text-sm font-bold text-neutral-900 transition hover:bg-neutral-50"
+                    >
+                        トップへ戻る
+                    </Link>
+
+                    <SignOutButton redirectUrl="/admin/login">
+                        <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-lg bg-black px-4 py-2 text-sm font-bold text-white transition hover:bg-black/85"
+                        >
+                            別のアカウントでやり直す
+                        </button>
+                    </SignOutButton>
+                </div>
             </header>
 
             <main className="flex flex-1 items-center justify-center p-4 py-12 lg:py-20">
@@ -102,6 +121,16 @@ export default function AdminOnboardingPageClient({ email }: Props) {
                                 ログイン中のメール:
                                 {" "}
                                 {email ?? "Clerk のメールアドレス未設定"}
+                            </p>
+                        </div>
+
+                        <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+                            <p className="font-bold">
+                                ログイン後にこの画面が出る理由
+                            </p>
+                            <p className="mt-1 leading-6">
+                                この Clerk アカウントにはまだ店舗情報が無いため、
+                                管理画面へ入る前に最初の 1 店舗を作成する流れになっています。
                             </p>
                         </div>
 
@@ -148,9 +177,17 @@ export default function AdminOnboardingPageClient({ email }: Props) {
                     </div>
 
                     <div className="border-t border-[#e5e7eb] bg-background-light p-4 text-center">
-                        <p className="text-xs text-text-sub">
-                            1 ユーザー 1 店舗の前提はそのまま維持されます。
-                        </p>
+                        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+                            <p className="text-xs text-text-sub">
+                                1 ユーザー 1 店舗の前提はそのまま維持されます。
+                            </p>
+                            <Link
+                                href="/admin/login"
+                                className="text-xs font-bold text-neutral-700 underline underline-offset-2"
+                            >
+                                ログイン画面に戻る
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </main>

@@ -105,7 +105,7 @@ export default function AdminRegisterPageClient() {
             }
 
             // 9) 成功したら管理画面へ
-            window.location.href = "/admin/menus";
+            window.location.href = "/admin/shop";
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             setError(`登録中にエラーが発生しました: ${msg}`);

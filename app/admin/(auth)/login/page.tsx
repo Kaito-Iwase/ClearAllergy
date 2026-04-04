@@ -16,8 +16,18 @@ export default async function AdminLoginPage() {
     }
 
     if (!context.shop) {
+        // Clerk でログイン済みだが店舗未作成の人は、
+        // いきなり register へ飛ばすのではなく、理由を説明した上で次の行き先を選べるようにします。
+        if (context.authProvider === "clerk") {
+            return (
+                <AdminLoginPageClient
+                    pendingSetupEmail={context.appUser.email}
+                />
+            );
+        }
+
         redirect("/admin/register");
     }
 
-    redirect("/admin/menus");
+    redirect("/admin/shop");
 }

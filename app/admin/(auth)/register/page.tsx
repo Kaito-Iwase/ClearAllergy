@@ -20,7 +20,7 @@ export default async function AdminRegisterPage() {
     const context = await getCurrentAdminContext();
 
     if (context?.shop) {
-        redirect("/admin/menus");
+        redirect("/admin/shop");
     }
 
     return <AdminRegisterPageClient />;
