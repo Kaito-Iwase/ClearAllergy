@@ -1,3 +1,7 @@
+// このコンポーネントは管理画面共通の「新規メニュー作成」ボタンです。
+// 一覧画面や編集画面から同じ見た目で使えるよう、className も一緒に切り出しています。
+// ロジックは持たず、/admin/menus/new への導線だけを担当します。
+
 import Link from "next/link";
 
 export const createMenuButtonClassName =

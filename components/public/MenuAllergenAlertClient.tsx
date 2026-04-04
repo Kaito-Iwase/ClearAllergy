@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントはメニュー詳細上部の「あなた向け警告」表示です。
+// localStorage に保存された選択アレルゲンと、現在のメニュー状態を突き合わせます。
+// 個人設定が無い時は UI 自体を出さないようにして、公開情報の邪魔をしない構成です。
+
 import React from "react";
 import { type AllergenStatus } from "@/lib/allergens";
 import {
@@ -19,6 +23,7 @@ export default function MenuAllergenAlertClient({
     allergens: Allergen[];
     statusBySlug: Record<string, AllergenStatus>;
 }) {
+    // 端末に保存された選択アレルゲンを画面状態として持ちます。
     const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
     const [loaded, setLoaded] = React.useState(false);
 
@@ -29,6 +34,7 @@ export default function MenuAllergenAlertClient({
             setLoaded(true);
         }
 
+        // 保存直後や別タブ変更でも警告が追従するようにイベント監視します。
         syncPreferences();
 
         window.addEventListener("storage", syncPreferences);
@@ -48,18 +54,21 @@ export default function MenuAllergenAlertClient({
         };
     }, []);
 
+    // slug から日本語名へ変換しやすいよう Map にします。
     const allergenNameBySlug = React.useMemo(() => {
         return new Map(
             allergens.map((allergen) => [allergen.slug, allergen.nameJa]),
         );
     }, [allergens]);
 
+    // 選択中のアレルゲンのうち、実際に「含む」ものだけを抜き出します。
     const containsMatched = React.useMemo(() => {
         return selectedSlugs.filter(
             (slug) => statusBySlug[slug] === "CONTAINS",
         );
     }, [selectedSlugs, statusBySlug]);
 
+    // 「含む可能性があります」も別扱いで集計します。
     const mayContainMatched = React.useMemo(() => {
         return selectedSlugs.filter(
             (slug) => statusBySlug[slug] === "MAY_CONTAIN",
@@ -78,8 +87,7 @@ export default function MenuAllergenAlertClient({
         return null;
     }
 
-    // ここが重要：
-    // 何も選択されていないなら、警告UI自体を出さない
+    // 設定未選択なら、個人向け警告 UI 自体を出しません。
     if (selectedSlugs.length === 0) {
         return null;
     }

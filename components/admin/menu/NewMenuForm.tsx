@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは新規メニュー作成フォームです。
+// app/admin/(dashboard)/menus/new/page.tsx からアレルゲンマスタを受け取り、
+// 入力値の state 管理、画像アップロード、作成 API 呼び出しまでを担当します。
+
 import React from "react";
 import { useRouter } from "next/navigation";
 import { type AllergenStatus } from "@/lib/allergens";
@@ -22,6 +26,7 @@ type UploadResponse = {
 
 export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     const router = useRouter();
+    // フォーム全体の入力値と UI 状態を state で持ちます。
     const [name, setName] = React.useState("");
     const [description, setDescription] = React.useState("");
     const [priceYenInput, setPriceYenInput] = React.useState("");
@@ -44,6 +49,7 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     const [error, setError] = React.useState<string | null>(null);
 
     React.useEffect(() => {
+        // 画像プレビュー用に作った Object URL は不要になったら解放します。
         return () => {
             if (localPreviewUrl) {
                 URL.revokeObjectURL(localPreviewUrl);
@@ -52,11 +58,13 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     }, [localPreviewUrl]);
 
     function normalizeOptionalText(value: string): string | null {
+        // 空欄を null に寄せ、DB で「未入力」として扱いやすくします。
         const trimmed = value.trim();
         return trimmed === "" ? null : trimmed;
     }
 
     function buildPriceYen(): number | null {
+        // price の入力は文字列で来るので、保存前に数値ルールを確認します。
         const trimmed = priceYenInput.trim();
         if (trimmed === "") {
             return null;
@@ -80,10 +88,12 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     }
 
     function setOne(slug: string, status: AllergenStatus) {
+        // 1 品目ずつ状態を切り替えられるよう、slug をキーにして保持します。
         setStatusBySlug((prev) => ({ ...prev, [slug]: status }));
     }
 
     function onSelectImage(e: React.ChangeEvent<HTMLInputElement>) {
+        // 選んだ画像をアップロード前にローカルプレビューできるようにします。
         const file = e.target.files?.[0];
         if (!file) {
             return;
@@ -105,6 +115,7 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     }
 
     async function uploadSelectedImage(): Promise<string | null> {
+        // 画像未選択なら URL 入力欄の値だけを使います。
         if (!selectedFile) {
             return normalizeOptionalText(imageUrl);
         }
@@ -115,6 +126,7 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
             const formData = new FormData();
             formData.append("file", selectedFile);
 
+            // 画像保存は専用 API に任せ、戻ってきた公開 URL をメニュー保存へ使います。
             const res = await fetch("/api/admin/upload-menu-image", {
                 method: "POST",
                 body: formData,
@@ -138,9 +150,11 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     }
 
     const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        // フォーム既定の再読み込みを止め、処理結果を画面内で扱います。
         e.preventDefault();
         setError(null);
 
+        // メニュー名だけは必須なので、空欄ならここで止めます。
         const trimmed = name.trim();
         if (!trimmed) {
             setError("名前は必須です。");
@@ -150,6 +164,7 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
         setIsSubmitting(true);
 
         try {
+            // 先に画像をアップロードし、取得した URL を body に入れてから作成 API を呼びます。
             const priceYen = buildPriceYen();
             const uploadedImageUrl = await uploadSelectedImage();
 
@@ -165,6 +180,7 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                 allergenStatusBySlug: statusBySlug,
             };
 
+            // メニュー作成そのものは API に任せ、保存ルールをサーバー側へ寄せます。
             const res = await fetch("/api/admin/menus", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -191,6 +207,7 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                 return;
             }
 
+            // 作成成功後は、そのメニューの編集画面へそのまま移動します。
             router.push(`/admin/menus/${data.id}/edit`);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);

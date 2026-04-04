@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは、選択中アレルゲンのうち「含まない」項目だけを小さく見せる部品です。
+// メニュー詳細ページで、安心材料を短く伝える補助 UI として使います。
+// localStorage の設定がある時だけ意味を持つため、読み込み後に判定します。
+
 import React from "react";
 import { type AllergenStatus } from "@/lib/allergens";
 import {
@@ -19,6 +23,7 @@ export default function SelectedFreeAllergenCardsClient({
     allergens: Allergen[];
     statusBySlug: Record<string, AllergenStatus>;
 }) {
+    // 端末に保存された選択アレルゲンを画面状態として持ちます。
     const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
     const [loaded, setLoaded] = React.useState(false);
 
@@ -29,6 +34,7 @@ export default function SelectedFreeAllergenCardsClient({
             setLoaded(true);
         }
 
+        // 保存イベントや別タブ変更にも追従できるようにします。
         syncPreferences();
 
         window.addEventListener("storage", syncPreferences);
@@ -52,13 +58,13 @@ export default function SelectedFreeAllergenCardsClient({
         return null;
     }
 
-    // 1) 選択済みアレルゲンのうち、この商品で FREE のものだけ拾う
+    // 選択済みアレルゲンのうち、この商品で FREE のものだけ拾います。
     const selectedFreeAllergens = allergens
         .filter((allergen) => selectedSlugs.includes(allergen.slug))
         .filter((allergen) => statusBySlug[allergen.slug] === "FREE")
         .slice(0, 3);
 
-    // 2) 足りない分はダミーで埋める
+    // カード数をそろえて見た目を安定させるため、足りない分はダミーで埋めます。
     const fillerCount = Math.max(0, 3 - selectedFreeAllergens.length);
 
     return (

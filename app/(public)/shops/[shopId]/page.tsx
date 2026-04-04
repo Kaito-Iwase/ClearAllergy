@@ -1,11 +1,8 @@
+// このページは公開側の店舗詳細画面です。
+// 店舗情報と、その店舗の公開メニュー一覧をまとめて表示します。
+// Server Component で DB 取得を行い、localStorage を使う部分だけ Client Component へ切り出しています。
+
 // app/(public)/shops/[shopId]/page.tsx
-// 公開側：店舗詳細（layout側がヘッダーを持つので、ここではヘッダーを出さない）
-// - 公開メニュー：?q=... で検索（name/description/category）
-// - 公開メニュー一覧は Client Component に切り出し、localStorage の設定を反映
-// - 「あなた向けのアレルゲン設定」は右カラムの店舗情報カードの下に配置
-// - 「公開メニューを見る」は最初の公開メニュー詳細へ遷移
-// - N+1回避：Allergenマスタ1回 + 店舗/メニュー/links 1回
-// - coverImageUrl があればヒーロー背景に表示、なければ既存グラデーション表示
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -19,6 +16,7 @@ type Params = { shopId: string };
 type SearchParams = { q?: string };
 
 function buildMenuWhere(q: string) {
+    // 検索語が空なら公開メニュー全件、入っていれば名前・説明・カテゴリで絞り込みます。
     if (q === "") {
         return {
             isPublished: true,
@@ -57,15 +55,18 @@ export default async function PublicShopDetailPage({
     params: Params | Promise<Params>;
     searchParams?: SearchParams | Promise<SearchParams>;
 }) {
+    // 動的ルートの shopId を取得し、無ければ 404 とします。
     const { shopId } = await params;
     if (!shopId) {
         notFound();
     }
 
+    // クエリ検索は文字列の前後空白を除いてから使います。
     const resolvedSearchParams = (await searchParams) ?? {};
     const qRaw = resolvedSearchParams.q ?? "";
     const q = qRaw.trim();
 
+    // アレルゲンマスタは一覧カードや設定 UI の両方で使うため、先に 1 回だけ取得します。
     const allergenMaster = await prisma.allergen.findMany({
         select: { slug: true, nameJa: true, sortOrder: true },
         orderBy: { sortOrder: "asc" },
@@ -73,6 +74,7 @@ export default async function PublicShopDetailPage({
 
     const menuWhere = buildMenuWhere(q);
 
+    // 店舗本体と公開メニューを一緒に取り、N+1 を避けます。
     const shop = await prisma.shop.findUnique({
         where: { id: shopId },
         select: {
@@ -108,6 +110,7 @@ export default async function PublicShopDetailPage({
         notFound();
     }
 
+    // Server Component で取った Date や relation を、Client Component が扱いやすい形へ変換します。
     const menusForClient = shop.menus.map((menu) => ({
         id: menu.id,
         name: menu.name,
@@ -123,6 +126,7 @@ export default async function PublicShopDetailPage({
         })),
     }));
 
+    // 右カラムの設定 UI には、slug と日本語名だけ渡せば十分です。
     const allergensForClient = allergenMaster.map((allergen) => ({
         slug: allergen.slug,
         nameJa: allergen.nameJa,
@@ -131,6 +135,7 @@ export default async function PublicShopDetailPage({
     const firstPublishedMenuId = shop.menus[0]?.id ?? null;
     const publishedMenuCount = shop.menus.length;
 
+    // カバー画像があればそれを使い、無ければ既存のグラデーションで見た目を保ちます。
     const heroStyle = shop.coverImageUrl
         ? {
               backgroundImage: `url("${shop.coverImageUrl}")`,

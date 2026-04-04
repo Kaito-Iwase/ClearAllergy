@@ -1,3 +1,7 @@
+// このコンポーネントはトップページ全体の公開 UI です。
+// app/page.tsx などから呼ばれ、サービス紹介と店舗一覧 / 管理画面への導線をまとめて表示します。
+// featuredShop があれば、実データを使ったメニュー例カードもここで描画します。
+
 import Link from "next/link";
 import { formatPriceYen } from "@/lib/formatters";
 
@@ -136,6 +140,7 @@ export default function HomePageView({
                                     <div className="mt-5 space-y-3">
                                         {featuredShop ? (
                                             featuredShop.menus.map((menu) => {
+                                                // トップの例カードでは、メニュー全体の状態を 3 段階のバッジに簡略化して見せます。
                                                 const hasContains =
                                                     menu.allergenLinks.some(
                                                         (link) =>

@@ -1,9 +1,8 @@
+// このページは公開側のメニュー詳細画面です。
+// 1 件のメニューについて、価格・原材料・アレルゲン 28 品目をまとめて表示します。
+// Server Component で DB 取得を行い、localStorage を使う個人向け警告だけ Client Component に 맡せます。
+
 // app/(public)/shops/[shopId]/menus/[menuId]/page.tsx
-// 公開側：メニュー詳細
-// - 28品目を常に表示（未登録は「含まない」として扱う）
-// - localStorage の一般ユーザー設定に応じて「あなた向け警告」を表示
-// - 特定原材料8品目の含有状況を明記して表示
-// - ヘッダーは layout 側を使うので、このページでは出さない
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -27,17 +26,20 @@ export default async function PublicMenuDetailPage({
 }: {
     params: Params | Promise<Params>;
 }) {
+    // どの店舗のどのメニューかを、動的ルートの 2 つの ID で決めます。
     const { shopId, menuId } = await params;
 
     if (!shopId || !menuId) {
         notFound();
     }
 
+    // 未登録品目も画面に出したいので、まず 28 品目マスタを全件取得します。
     const allergenMaster = await prisma.allergen.findMany({
         select: { slug: true, nameJa: true, sortOrder: true },
         orderBy: { sortOrder: "asc" },
     });
 
+    // 公開中のメニューだけを対象にし、非公開データは見せません。
     const menu = await prisma.menuItem.findFirst({
         where: { id: menuId, shopId, isPublished: true },
         select: {
@@ -66,11 +68,13 @@ export default async function PublicMenuDetailPage({
         notFound();
     }
 
+    // 保存済みリンクを slug -> status の形へ変えておくと、後続の表示整形が楽になります。
     const linkStatusBySlug = new Map<string, AllergenStatus>();
     for (const link of menu.allergenLinks) {
         linkStatusBySlug.set(link.allergen.slug, link.status as AllergenStatus);
     }
 
+    // マスタ 28 品目を基準に rows を作ることで、未登録項目も FREE として常に表示できます。
     const rows = allergenMaster.map((a) => {
         const status = linkStatusBySlug.get(a.slug) ?? "FREE";
         return {
@@ -80,6 +84,7 @@ export default async function PublicMenuDetailPage({
         };
     });
 
+    // 特定原材料 8 品目は、上部の大きな注意ボックスでまとめて見せます。
     const specifiedIngredientNotice = buildSpecifiedIngredientNotice({ rows });
 
     const priceText = formatPriceYen(menu.priceYen);
@@ -91,11 +96,13 @@ export default async function PublicMenuDetailPage({
                   "linear-gradient(135deg, rgba(19,236,19,0.25), rgba(0,0,0,0.05))",
           };
 
+    // Client Component に渡すため、必要最小限の形へ整えます。
     const allergensForClient = allergenMaster.map((allergen) => ({
         slug: allergen.slug,
         nameJa: allergen.nameJa,
     }));
 
+    // localStorage の個人設定と突き合わせるため、slug をキーにした状態表も作ります。
     const statusBySlugForClient = createStatusBySlug(
         allergenMaster,
         menu.allergenLinks,

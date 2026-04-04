@@ -1,30 +1,31 @@
+// このファイルは公開側のメニュー詳細取得 API です。
+// /api/menus/[menuId] の GET だけを担当し、公開中メニューのみ返します。
+// 公開画面から読まれるため、非公開メニューは存在していても 404 扱いにします。
+
 // app/api/menus/[menuId]/route.ts
-// GET /api/menus/:menuId
-// paramsが取れない環境でも、URLからmenuIdを確実に抜き出して動かす「保険付き」実装。
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 type Context = {
-    // Next.jsのバージョン/環境で params の形が揺れるので両対応
+    // Next.js のバージョン差で params が Promise のこともあるため両対応にしています。
     params?: { menuId?: string } | Promise<{ menuId?: string }>;
 };
 
 export async function GET(req: Request, context: Context) {
     try {
-        // 1) まずはcontext.paramsから取る（取れればそれが最優先）
+        // まずは動的ルートの params から menuId を取ります。
         const paramsObj = context.params ? await context.params : undefined;
         let menuId = paramsObj?.menuId;
 
-        // 2) 取れなかったらURLから抜く（これが最終保険）
-        // 例: http://localhost:3000/api/menus/abc123 なら末尾が menuId
+        // 一部環境で params が入らない時に備え、URL 末尾からも取得できるようにします。
         if (!menuId) {
             const url = new URL(req.url);
             const parts = url.pathname.split("/").filter(Boolean);
             menuId = parts[parts.length - 1];
         }
 
-        // 3) それでも空なら400
+        // menuId が決まらなければリクエスト不正です。
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },
@@ -32,7 +33,7 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
-        // 4) DBから取得。非公開メニューは未存在と同じ 404 扱いにする
+        // 公開 API なので isPublished: true を条件に入れます。
         const menu = await prisma.menuItem.findFirst({
             where: {
                 id: menuId,
@@ -74,6 +75,7 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
+        // 公開画面でそのまま描画しやすいように、アレルゲン配列を整えて返します。
         const allergens = menu.allergenLinks
             .map((link) => ({
                 slug: link.allergen.slug,

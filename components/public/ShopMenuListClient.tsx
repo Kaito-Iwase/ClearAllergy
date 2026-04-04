@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは店舗詳細画面の公開メニュー一覧です。
+// localStorage に保存された「避けたいアレルゲン設定」を読み、
+// 通常表示と個人向け表示を切り替えてカード一覧を描画します。
+
 import React from "react";
 import { useRouter } from "next/navigation";
 import { type AllergenStatus } from "@/lib/allergens";
@@ -58,6 +62,7 @@ function buildOverallSummary(args: {
     containsCount: number;
     mayCount: number;
 } {
+    // ユーザー設定を考慮しない、メニュー全体のサマリーです。
     const { links, nameJaBySlug, rankBySlug } = args;
 
     const containsSlugs: string[] = [];
@@ -121,6 +126,7 @@ function buildPersonalizedSummary(args: {
     containsCount: number;
     mayCount: number;
 } {
+    // 端末に保存された選択アレルゲンだけに絞った個人向けサマリーです。
     const { links, selectedSlugs, nameJaBySlug, rankBySlug } = args;
 
     const selectedSet = new Set(selectedSlugs);
@@ -195,6 +201,7 @@ export default function ShopMenuListClient({
 }) {
     const router = useRouter();
 
+    // 端末に保存されたアレルゲン設定を読み込み、画面に反映します。
     const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
     const [loaded, setLoaded] = React.useState(false);
 
@@ -205,6 +212,7 @@ export default function ShopMenuListClient({
             setLoaded(true);
         }
 
+        // 初回読み込みだけでなく、別タブ変更や保存イベントにも追従します。
         syncPreferences();
 
         window.addEventListener("storage", syncPreferences);
@@ -224,6 +232,7 @@ export default function ShopMenuListClient({
         };
     }, []);
 
+    // slug から日本語名や並び順をすぐ引けるよう、Map にしておきます。
     const nameJaBySlug = React.useMemo(() => {
         return new Map(
             allergenMaster.map((allergen) => [allergen.slug, allergen.nameJa]),
@@ -239,6 +248,7 @@ export default function ShopMenuListClient({
     const hasPreference = loaded && selectedSlugs.length > 0;
 
     function goToMenu(menuId: string) {
+        // カード全体を押した時にメニュー詳細へ移動します。
         router.push(`/shops/${shopId}/menus/${menuId}`);
     }
 

@@ -1,5 +1,9 @@
 "use client";
 
+// このコンポーネントは既存メニューの編集フォームです。
+// Server Component から受け取った初期値を state に展開し、保存と画像アップロードを担当します。
+// menuId を使って「どのメニューを更新するか」を API に伝えます。
+
 import React from "react";
 import { useRouter } from "next/navigation";
 import { type AllergenStatus } from "@/lib/allergens";
@@ -38,6 +42,7 @@ export default function MenuEditClient(props: {
 }) {
     const router = useRouter();
 
+    // props は Server Component で取得した初期データです。
     const {
         menuId,
         initialName,
@@ -52,6 +57,7 @@ export default function MenuEditClient(props: {
         initialStatusBySlug,
     } = props;
 
+    // 入力欄の値、保存中表示、画像プレビューなどを state として持ちます。
     const [name, setName] = React.useState(initialName);
     const [description, setDescription] = React.useState(
         initialDescription ?? "",
@@ -83,6 +89,7 @@ export default function MenuEditClient(props: {
     const [saved, setSaved] = React.useState(false);
 
     React.useEffect(() => {
+        // 作成した Object URL は不要になったら解放し、メモリリークを防ぎます。
         return () => {
             if (localPreviewUrl) {
                 URL.revokeObjectURL(localPreviewUrl);
@@ -91,10 +98,12 @@ export default function MenuEditClient(props: {
     }, [localPreviewUrl]);
 
     function setOne(slug: string, status: AllergenStatus) {
+        // 28 品目のどれをどう更新したかを、slug ごとの状態として保持します。
         setStatusBySlug((prev) => ({ ...prev, [slug]: status }));
     }
 
     function buildPriceYen(): number | null {
+        // 入力欄は文字列なので、保存前に数値へ変換してルールを確認します。
         const trimmed = priceYenInput.trim();
 
         if (trimmed === "") {
@@ -119,11 +128,13 @@ export default function MenuEditClient(props: {
     }
 
     function normalizeOptionalText(value: string): string | null {
+        // 空文字を null に寄せ、未入力項目を分かりやすく扱います。
         const trimmed = value.trim();
         return trimmed === "" ? null : trimmed;
     }
 
     function onSelectImage(e: React.ChangeEvent<HTMLInputElement>) {
+        // 保存前に画像を確認できるよう、ローカルプレビューを作ります。
         const file = e.target.files?.[0];
         if (!file) {
             return;
@@ -145,6 +156,7 @@ export default function MenuEditClient(props: {
     }
 
     async function uploadSelectedImage(): Promise<string | null> {
+        // 新しい画像が選ばれていない場合は、既存 URL をそのまま使います。
         if (!selectedFile) {
             return normalizeOptionalText(imageUrl);
         }
@@ -155,6 +167,7 @@ export default function MenuEditClient(props: {
             const formData = new FormData();
             formData.append("file", selectedFile);
 
+            // 画像アップロード API から返ってきた URL を、そのままメニュー更新に使います。
             const res = await fetch("/api/admin/upload-menu-image", {
                 method: "POST",
                 body: formData,
@@ -178,16 +191,19 @@ export default function MenuEditClient(props: {
     }
 
     async function onSave() {
+        // 保存開始時に、エラー表示と保存済み表示を一度リセットします。
         setSaving(true);
         setError(null);
         setSaved(false);
 
         try {
+            // 必須項目チェックは API 側にもあるが、画面側でも早めに知らせます。
             const trimmedName = name.trim();
             if (!trimmedName) {
                 throw new Error("メニュー名は必須です。");
             }
 
+            // 画像アップロードが必要なら先に終わらせ、その URL を body に含めます。
             const priceYen = buildPriceYen();
             const uploadedImageUrl = await uploadSelectedImage();
 
@@ -203,6 +219,7 @@ export default function MenuEditClient(props: {
                 allergenStatusBySlug: statusBySlug,
             };
 
+            // 保存処理そのものは API に任せ、DB 更新ルールをサーバー側に集約します。
             const res = await fetch(`/api/admin/menus/${menuId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -214,6 +231,7 @@ export default function MenuEditClient(props: {
                 throw new Error(`保存に失敗: ${res.status} ${text}`);
             }
 
+            // 保存後は server 側のデータを再取得し、最新表示へそろえます。
             setSaved(true);
             setSelectedFile(null);
             router.refresh();
@@ -226,11 +244,13 @@ export default function MenuEditClient(props: {
     }
 
     async function handleCreateMenu() {
+        // 編集中でも「次の新規メニューを作る」導線を置き、入力作業を続けやすくします。
         setCreating(true);
         setError(null);
         setSaved(false);
 
         try {
+            // 空 body で POST すると、サーバー側が下書きを作ってくれます。
             const res = await fetch("/api/admin/menus", {
                 method: "POST",
                 headers: {

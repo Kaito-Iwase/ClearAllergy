@@ -1,5 +1,8 @@
+// このページは公開側の店舗一覧画面です。
+// 公開メニューを 1 件以上持つ店舗だけを表示し、必要なら検索語でも絞り込みます。
+// Server Component なので、検索条件に応じた DB 取得を直接ここで行います。
+
 // app/(public)/shops/page.tsx
-// 公開側：店舗一覧（layout側がヘッダーを持つので、ここではヘッダーを出さない）
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -14,14 +17,14 @@ export default async function PublicShopListPage({
 }: {
     searchParams?: SearchParams | Promise<SearchParams>;
 }) {
-    // 1) searchParams は Promise のことがあるので await してから使う
+    // App Router では searchParams が Promise のこともあるため await してから使います。
     const resolvedSearchParams = (await searchParams) ?? {};
 
-    // 2) URLクエリから検索語を取り出す
+    // URL クエリ ?q=... から検索語を取り出します。
     const qRaw = resolvedSearchParams.q ?? "";
     const q = qRaw.trim();
 
-    // 3) 検索条件を作る（qが空なら undefined にして全件）
+    // 検索語が空なら全件、入っていれば店舗名や説明文で絞り込みます。
     const where = {
         menus: {
             some: {
@@ -48,7 +51,7 @@ export default async function PublicShopListPage({
               }),
     };
 
-    // 4) 店舗一覧を取得
+    // 公開メニューを持つ店舗だけを取得し、カード表示に必要な項目へ絞ります。
     const shops = await prisma.shop.findMany({
         where,
         orderBy: { updatedAt: "desc" },
@@ -78,7 +81,7 @@ export default async function PublicShopListPage({
         },
     });
 
-    // 5) 表示用メッセージ
+    // 検索中かどうかで、見出しメッセージを出し分けます。
     const resultText = q !== "" ? `検索: ${q}（${shops.length}件）` : null;
 
     const emptyText =

@@ -1,21 +1,25 @@
 "use client";
 
+// このコンポーネントは店舗ページ URL の共有ボタンです。
+// 管理画面と公開画面の両方で使え、共有 API があればそれを使い、無ければコピーへフォールバックします。
+// Client Component なのは、window / navigator.share / clipboard を使うためです。
+
 import React from "react";
 
 export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
-    // 1) 初回は server/client で同じ値にする
+    // 初回は server / client で同じ描画にしたいので、URL は null から始めます。
     const [shopUrl, setShopUrl] = React.useState<string | null>(null);
 
     // 2) 共有メッセージ
     const [message, setMessage] = React.useState("");
 
-    // 3) マウント後にだけブラウザの origin を使ってURLを作る
+    // ブラウザでしか origin が取れないため、マウント後に公開 URL を組み立てます。
     React.useEffect(() => {
         const origin = window.location.origin;
         setShopUrl(`${origin}/shops/${shopId}`);
     }, [shopId]);
 
-    // 4) 一時メッセージを消す
+    // 成功メッセージは短時間だけ表示します。
     function showMessage(text: string) {
         setMessage(text);
 
@@ -24,14 +28,14 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
         }, 2500);
     }
 
-    // 5) ボタンを押したときの処理
+    // 共有 API が使える端末ではそれを優先し、無ければコピーに切り替えます。
     async function onClick() {
         if (!shopUrl) {
             return;
         }
 
         try {
-            // 5-1) 共有APIが使える端末なら共有UIを開く
+            // スマホなどで navigator.share が使えれば、ネイティブ共有 UI を開きます。
             if (navigator.share) {
                 await navigator.share({
                     title: "ClearAllergy 店舗ページ",
@@ -41,16 +45,16 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
                 return;
             }
 
-            // 5-2) 共有APIが使えない場合はクリップボードへコピー
+            // 共有 API が無い環境では、URL をコピーして共有しやすくします。
             await navigator.clipboard.writeText(shopUrl);
             showMessage("店舗URLをコピーしました。");
         } catch (error) {
-            // 5-3) ユーザーキャンセル時は何もしない
+            // 共有ダイアログのキャンセルはエラー扱いせず静かに終えます。
             if (error instanceof DOMException && error.name === "AbortError") {
                 return;
             }
 
-            // 5-4) フォールバック：prompt で見せる
+            // 最後の手段として URL を見せ、手動コピーできるようにします。
             window.prompt("このURLをコピーしてください", shopUrl);
         }
     }

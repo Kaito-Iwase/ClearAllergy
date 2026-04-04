@@ -1,11 +1,17 @@
+// このページは新規メニュー作成画面です。
+// 必要なアレルゲンマスタを先に取得し、入力フォームに渡します。
+// Server Component なので、初期表示に必要な DB データ取得をここで行います。
+
 import Link from "next/link";
 import NewMenuForm from "@/components/admin/menu/NewMenuForm";
 import { prisma } from "@/lib/db";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 
 export default async function AdminMenuNewPage() {
+    // 新規作成も管理画面の操作なので、先に認証確認だけしておきます。
     await requireCurrentAdminContextOrRedirect();
 
+    // アレルゲンの選択肢は全メニューで共通なので、マスタをまとめて読みます。
     const allergens = await prisma.allergen.findMany({
         orderBy: { sortOrder: "asc" },
         select: {
