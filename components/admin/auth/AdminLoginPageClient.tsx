@@ -6,11 +6,18 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { SignOutButton } from "@clerk/nextjs";
 import { signIn } from "next-auth/react";
 import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton";
 import { normalizeEmail } from "@/lib/email";
 
-export default function AdminLoginPageClient() {
+type AdminLoginPageClientProps = {
+    pendingSetupEmail?: string | null;
+};
+
+export default function AdminLoginPageClient({
+    pendingSetupEmail,
+}: AdminLoginPageClientProps) {
     // state（画面の状態）として、入力欄の見た目や内容を保持します。
     const [showPassword, setShowPassword] = useState(false);
 
@@ -58,8 +65,8 @@ export default function AdminLoginPageClient() {
                 return;
             }
 
-            // 認証成功後は管理画面トップへ進めます。
-            window.location.href = "/admin/menus";
+            // 認証成功後は、まず店舗情報画面を開いて確認しやすくします。
+            window.location.href = "/admin/shop";
         } catch (err) {
             // 11) 例外が起きたとき（ネットワークなど）
             const msg = err instanceof Error ? err.message : String(err);
@@ -114,6 +121,42 @@ export default function AdminLoginPageClient() {
                                 管理画面へようこそ。メールアドレスとパスワードを入力してください。
                             </p>
                         </div>
+
+                        {pendingSetupEmail ? (
+                            <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-900">
+                                <p className="font-bold">
+                                    Google ログイン済みですが、店舗作成がまだ完了していません
+                                </p>
+                                <p className="mt-2 leading-6">
+                                    このアカウント
+                                    {" "}
+                                    <span className="font-semibold">
+                                        {pendingSetupEmail}
+                                    </span>
+                                    {" "}
+                                    では、最初の店舗情報をまだ作成していないため、
+                                    管理画面へ入る前に初回セットアップが必要です。
+                                </p>
+
+                                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                    <Link
+                                        href="/admin/register"
+                                        className="inline-flex items-center justify-center rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-bold text-black transition hover:bg-[#0db80d]"
+                                    >
+                                        初回セットアップへ進む
+                                    </Link>
+
+                                    <SignOutButton redirectUrl="/admin/login">
+                                        <button
+                                            type="button"
+                                            className="inline-flex items-center justify-center rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-bold text-green-900 transition hover:bg-green-100"
+                                        >
+                                            別のアカウントでログインし直す
+                                        </button>
+                                    </SignOutButton>
+                                </div>
+                            </div>
+                        ) : null}
 
                         <div className="mb-5">
                             {/* Clerk の既定画面は使わず、この UI の中から Google 認証だけ開始します。 */}

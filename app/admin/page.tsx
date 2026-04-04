@@ -8,7 +8,7 @@ import { getCurrentAdminContext } from "@/lib/admin-auth";
 // /admin の入口。
 // Clerk ログイン済みなら DB の状態を見て、
 // まだ店舗未作成なら /admin/register、
-// 既に店舗があるなら /admin/menus へ送る。
+// 既に店舗があるなら、最初は店舗情報ページへ送ります。
 export default async function AdminIndexPage() {
     // 管理者の認証状態と店舗情報をまとめて取得します。
     const context = await getCurrentAdminContext();
@@ -21,5 +21,5 @@ export default async function AdminIndexPage() {
         redirect("/admin/register");
     }
 
-    redirect("/admin/menus");
+    redirect("/admin/shop");
 }
