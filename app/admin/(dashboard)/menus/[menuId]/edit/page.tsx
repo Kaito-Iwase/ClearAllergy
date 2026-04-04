@@ -6,14 +6,15 @@ import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createStatusBySlug } from "@/lib/allergens";
-import { requireSessionShopIdOrRedirect } from "@/lib/admin-auth";
+import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 
 type PageProps = {
     params: Promise<{ menuId: string }> | { menuId: string };
 };
 
 export default async function AdminMenuEditPage({ params }: PageProps) {
-    const shopId = await requireSessionShopIdOrRedirect();
+    const adminContext = await requireCurrentAdminContextOrRedirect();
+    const shopId = adminContext.shop.id;
 
     // 2) menuId
     const { menuId } = await params;

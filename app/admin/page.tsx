@@ -1,12 +1,15 @@
 import { redirect } from "next/navigation";
-import AdminLoginPageClient from "@/components/admin/auth/AdminLoginPageClient";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 
-export default async function AdminLoginPage() {
+// /admin の入口。
+// Clerk ログイン済みなら DB の状態を見て、
+// まだ店舗未作成なら /admin/register、
+// 既に店舗があるなら /admin/menus へ送る。
+export default async function AdminIndexPage() {
     const context = await getCurrentAdminContext();
 
     if (!context) {
-        return <AdminLoginPageClient />;
+        redirect("/admin/login");
     }
 
     if (!context.shop) {

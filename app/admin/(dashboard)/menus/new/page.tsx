@@ -1,8 +1,11 @@
 import Link from "next/link";
 import NewMenuForm from "@/components/admin/menu/NewMenuForm";
 import { prisma } from "@/lib/db";
+import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 
 export default async function AdminMenuNewPage() {
+    await requireCurrentAdminContextOrRedirect();
+
     const allergens = await prisma.allergen.findMany({
         orderBy: { sortOrder: "asc" },
         select: {

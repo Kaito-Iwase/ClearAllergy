@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton";
 import { normalizeEmail } from "@/lib/email";
 
 export default function AdminLoginPageClient() {
@@ -107,6 +108,26 @@ export default function AdminLoginPageClient() {
                             <p className="text-text-sub dark:text-gray-400 text-sm font-normal leading-normal">
                                 管理画面へようこそ。メールアドレスとパスワードを入力してください。
                             </p>
+                        </div>
+
+                        <div className="mb-5">
+                            <AdminGoogleAuthButton
+                                label="Google でログイン"
+                                onError={(message) =>
+                                    setError(message || null)
+                                }
+                            />
+                            <p className="mt-2 text-center text-xs text-text-sub dark:text-gray-500">
+                                Google アカウントでログインした場合は、Clerk 経由で管理画面に入れます。
+                            </p>
+                        </div>
+
+                        <div className="mb-5 flex items-center gap-3">
+                            <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
+                            <span className="text-xs font-medium uppercase tracking-[0.2em] text-text-sub dark:text-gray-500">
+                                または
+                            </span>
+                            <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
                         </div>
 
                         {error && (

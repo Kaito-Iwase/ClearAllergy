@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton";
 import { normalizeEmail } from "@/lib/email";
 
 export default function AdminRegisterPageClient() {
@@ -150,6 +151,26 @@ export default function AdminRegisterPageClient() {
                             <p className="text-text-sub dark:text-gray-400 text-sm font-normal leading-normal">
                                 店舗名・メールアドレス・パスワードを入力して、管理画面を使い始めてください。
                             </p>
+                        </div>
+
+                        <div className="mb-5">
+                            <AdminGoogleAuthButton
+                                label="Google で新規登録"
+                                onError={(message) =>
+                                    setError(message || null)
+                                }
+                            />
+                            <p className="mt-2 text-center text-xs text-text-sub dark:text-gray-500">
+                                Google アカウントを使う場合は、認証後に店舗情報の初期設定へ進みます。
+                            </p>
+                        </div>
+
+                        <div className="mb-5 flex items-center gap-3">
+                            <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
+                            <span className="text-xs font-medium uppercase tracking-[0.2em] text-text-sub dark:text-gray-500">
+                                または
+                            </span>
+                            <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
                         </div>
 
                         {error && (

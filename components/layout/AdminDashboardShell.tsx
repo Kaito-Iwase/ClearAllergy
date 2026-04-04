@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
 import AdminLogoutButton from "@/components/admin/common/AdminLogoutButton";
 
 export default function AdminDashboardShell({
@@ -52,6 +53,9 @@ export default function AdminDashboardShell({
                 </div>
 
                 <div className="mt-auto border-t border-gray-100 p-6">
+                    <div className="mb-4 flex justify-center">
+                        <UserButton />
+                    </div>
                     <AdminLogoutButton />
                 </div>
             </aside>
@@ -67,6 +71,12 @@ export default function AdminDashboardShell({
                         </span>
                         ClearAllergy
                     </Link>
+                    <div className="flex items-center gap-2">
+                        <UserButton />
+                        <div className="min-w-[108px]">
+                            <AdminLogoutButton />
+                        </div>
+                    </div>
                 </header>
 
                 <div className="mx-auto flex w-full max-w-6xl flex-1 p-4 md:p-8">
