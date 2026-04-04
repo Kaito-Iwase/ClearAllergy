@@ -3,12 +3,13 @@
 // 役割：ログイン確認→DBから一覧取得→Clientに渡す
 
 import { prisma } from "@/lib/db";
-import { requireSessionShopIdOrRedirect } from "@/lib/admin-auth";
+import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 import MenuListPageClient from "@/components/admin/menu/MenuListPageClient";
 import CreateMenuButton from "@/components/admin/menu/CreateMenuButton";
 
 export default async function AdminMenusPage() {
-    const shopId = await requireSessionShopIdOrRedirect();
+    const adminContext = await requireCurrentAdminContextOrRedirect();
+    const shopId = adminContext.shop.id;
 
     // 3) DBから直接一覧取得（APIを挟まない：あなたの方針を維持）
     const menus = await prisma.menuItem.findMany({

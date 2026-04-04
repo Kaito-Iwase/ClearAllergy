@@ -1,7 +1,7 @@
 // app/api/admin/_utils.ts
 
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin-auth";
+import { getCurrentAdminContext } from "@/lib/admin-auth";
 
 // 1) JSONの読み取り（壊れてても落ちない）
 export async function readJson<T>(req: Request): Promise<T | null> {
@@ -11,27 +11,30 @@ export async function readJson<T>(req: Request): Promise<T | null> {
 
 // 2) ログイン確認 + shopId取得（毎回書くのをやめる）
 export async function requireShopId() {
-    const session = await getAdminSession();
+    const context = await getCurrentAdminContext();
 
-    if (!session) {
+    if (!context) {
         return {
             ok: false as const,
             res: NextResponse.json({ error: "unauthorized" }, { status: 401 }),
         };
     }
 
-    const shopId = session.user?.shopId;
-    if (!shopId) {
+    if (!context.shop) {
         return {
             ok: false as const,
             res: NextResponse.json(
-                { error: "unauthorized: shopId missing in session" },
-                { status: 401 },
+                { error: "shop setup required" },
+                { status: 403 },
             ),
         };
     }
 
-    return { ok: true as const, shopId };
+    return {
+        ok: true as const,
+        shopId: context.shop.id,
+        appUser: context.appUser,
+    };
 }
 
 // 3) URLから menuId を取る（paramsが揺れても壊れない）

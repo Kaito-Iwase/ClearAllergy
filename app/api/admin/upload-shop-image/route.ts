@@ -1,15 +1,11 @@
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
-import { getSessionShopId } from "@/lib/admin-auth";
+import { requireShopId } from "@/app/api/admin/_utils";
 
 export async function POST(req: Request) {
-    const shopId = await getSessionShopId();
-
-    if (!shopId) {
-        return NextResponse.json(
-            { error: "認証が必要です。" },
-            { status: 401 },
-        );
+    const auth = await requireShopId();
+    if (!auth.ok) {
+        return auth.res;
     }
 
     const formData = await req.formData();
@@ -30,7 +26,7 @@ export async function POST(req: Request) {
     }
 
     const ext = file.name.split(".").pop() || "jpg";
-    const path = `shops/${shopId}/cover-${Date.now()}.${ext}`;
+    const path = `shops/${auth.shopId}/cover-${Date.now()}.${ext}`;
 
     const blob = await put(path, file, {
         access: "public",

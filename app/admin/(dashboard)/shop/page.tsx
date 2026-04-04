@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { requireSessionShopIdOrRedirect } from "@/lib/admin-auth";
+import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 import ShopEditClient from "@/components/admin/shop/ShopEditClient";
 
 export default async function AdminShopPage() {
-    const shopId = await requireSessionShopIdOrRedirect();
+    const adminContext = await requireCurrentAdminContextOrRedirect();
+    const shopId = adminContext.shop.id;
 
     const shop = await prisma.shop.findUnique({
         where: { id: shopId },
@@ -29,7 +30,7 @@ export default async function AdminShopPage() {
     });
 
     if (!shop) {
-        redirect("/admin/login");
+        redirect("/admin/register");
     }
 
     return (
