@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 import ShopMenuListClient from "@/components/public/ShopMenuListClient";
 import UserAllergenPreferenceClient from "@/components/public/UserAllergenPreferenceClient";
-import { formatDateTimeJa } from "@/lib/formatters";
+import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
 
 type Params = { shopId: string };
 type SearchParams = { q?: string };
@@ -83,6 +83,7 @@ export default async function PublicShopDetailPage({
             description: true,
             address: true,
             hours: true,
+            averageBudgetYen: true,
             coverImageUrl: true,
             updatedAt: true,
             menus: {
@@ -134,6 +135,10 @@ export default async function PublicShopDetailPage({
 
     const firstPublishedMenuId = shop.menus[0]?.id ?? null;
     const publishedMenuCount = shop.menus.length;
+    const averageBudgetLabel =
+        typeof shop.averageBudgetYen === "number"
+            ? `${formatPriceYenLabel(shop.averageBudgetYen)}前後`
+            : "未設定";
 
     // カバー画像があればそれを使い、無ければ既存のグラデーションで見た目を保ちます。
     const heroStyle = shop.coverImageUrl
@@ -216,6 +221,9 @@ export default async function PublicShopDetailPage({
                                     公開メニュー {publishedMenuCount}件
                                 </span>
                                 <span className="rounded-full bg-gray-100 px-2 py-1">
+                                    平均予算 {averageBudgetLabel}
+                                </span>
+                                <span className="rounded-full bg-gray-100 px-2 py-1">
                                     アレルゲン28品目を表示
                                 </span>
                                 <span className="rounded-full bg-gray-100 px-2 py-1">
@@ -261,6 +269,20 @@ export default async function PublicShopDetailPage({
                                         </p>
                                         <p className="text-gray-600">
                                             {shop.hours || "未設定"}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-2">
+                                    <span className="mt-0.5 text-gray-500">
+                                        💴
+                                    </span>
+                                    <div>
+                                        <p className="font-semibold">
+                                            平均予算
+                                        </p>
+                                        <p className="text-gray-600">
+                                            {averageBudgetLabel}
                                         </p>
                                     </div>
                                 </div>

@@ -8,7 +8,7 @@ import Link from "next/link";
 import React from "react";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 import ShopQrCard from "@/components/admin/shop/ShopQrCard";
-import { formatDateTimeJa } from "@/lib/formatters";
+import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
 
 type ShopViewModel = {
     id: string;
@@ -16,6 +16,7 @@ type ShopViewModel = {
     description: string | null;
     address: string | null;
     hours: string | null;
+    averageBudgetYen: number | null;
     coverImageUrl: string | null;
     updatedAt: string;
     publishedMenuCount: number;
@@ -33,6 +34,9 @@ export default function ShopEditClient({
     );
     const [address, setAddress] = React.useState(initialShop.address ?? "");
     const [hours, setHours] = React.useState(initialShop.hours ?? "");
+    const [averageBudgetYen, setAverageBudgetYen] = React.useState(
+        initialShop.averageBudgetYen?.toString() ?? "",
+    );
     const [coverImageUrl, setCoverImageUrl] = React.useState(
         initialShop.coverImageUrl ?? "",
     );
@@ -151,6 +155,7 @@ export default function ShopEditClient({
                     description: description.trim(),
                     address: address.trim(),
                     hours: hours.trim(),
+                    averageBudgetYen: averageBudgetYen.trim(),
                     coverImageUrl: uploadedCoverImageUrl,
                 }),
             });
@@ -159,6 +164,7 @@ export default function ShopEditClient({
                 error?: string;
                 shop?: {
                     updatedAt: string;
+                    averageBudgetYen?: number | null;
                     coverImageUrl?: string | null;
                 };
             } | null;
@@ -173,6 +179,12 @@ export default function ShopEditClient({
 
             if (data?.shop?.coverImageUrl !== undefined) {
                 setCoverImageUrl(data.shop.coverImageUrl ?? "");
+            }
+
+            if (data?.shop?.averageBudgetYen !== undefined) {
+                setAverageBudgetYen(
+                    data.shop.averageBudgetYen?.toString() ?? "",
+                );
             }
 
             if (data?.shop?.updatedAt) {
@@ -192,6 +204,10 @@ export default function ShopEditClient({
 
     // プレビュー領域では「ローカルプレビュー > 入力済み URL > 空」の順に表示します。
     const previewImageUrl = localPreviewUrl || coverImageUrl.trim() || "";
+    const averageBudgetLabel =
+        averageBudgetYen.trim() === ""
+            ? "未設定"
+            : formatPriceYenLabel(Number(averageBudgetYen));
 
     return (
         <div className="space-y-6">
@@ -252,6 +268,20 @@ export default function ShopEditClient({
                                     </p>
                                     <p className="mt-1 whitespace-pre-wrap">
                                         {hours.trim() || "未設定"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-amber-500">
+                                    💴
+                                </span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        平均予算
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {averageBudgetLabel}
                                     </p>
                                 </div>
                             </div>
@@ -373,6 +403,31 @@ export default function ShopEditClient({
 
                         <div>
                             <label
+                                htmlFor="shop-average-budget"
+                                className="mb-2 block text-sm font-bold text-gray-900"
+                            >
+                                平均予算（円）
+                            </label>
+                            <input
+                                id="shop-average-budget"
+                                type="number"
+                                min={0}
+                                step={1}
+                                inputMode="numeric"
+                                value={averageBudgetYen}
+                                onChange={(e) =>
+                                    setAverageBudgetYen(e.target.value)
+                                }
+                                placeholder="例：1200"
+                                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                            />
+                            <p className="mt-2 text-xs text-gray-500">
+                                店舗全体の目安金額を入れると、公開一覧で価格感が伝わりやすくなります。
+                            </p>
+                        </div>
+
+                        <div>
+                            <label
                                 htmlFor="shop-cover-image-file"
                                 className="mb-2 block text-sm font-bold text-gray-900"
                             >
@@ -477,6 +532,15 @@ export default function ShopEditClient({
                     </h3>
 
                     <div className="mt-5 space-y-4 text-sm text-gray-700">
+                        <div className="rounded-2xl bg-gray-50 p-4">
+                            <p className="font-bold text-gray-900">
+                                平均予算
+                            </p>
+                            <p className="mt-1">
+                                ランチ中心のお店なら目安の価格帯を入れておくと、初見の人にも選びやすくなります。
+                            </p>
+                        </div>
+
                         <div className="rounded-2xl bg-gray-50 p-4">
                             <p className="font-bold text-gray-900">店舗画像</p>
                             <p className="mt-1">

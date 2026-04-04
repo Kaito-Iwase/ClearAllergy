@@ -75,3 +75,61 @@ export function parsePriceYen(
 
     return { ok: true, value: parsed };
 }
+
+export function parseAverageBudgetYen(
+    value: unknown,
+): { ok: true; value: number | null } | { ok: false; message: string } {
+    // 平均予算も価格と同じく、空欄を許しつつ 0 以上の整数だけ受け付けます。
+    if (value === undefined || value === null || value === "") {
+        return { ok: true, value: null };
+    }
+
+    let parsed: number;
+
+    if (typeof value === "number") {
+        parsed = value;
+    } else if (typeof value === "string") {
+        const trimmed = value.trim();
+
+        if (trimmed === "") {
+            return { ok: true, value: null };
+        }
+
+        parsed = Number(trimmed);
+    } else {
+        return {
+            ok: false,
+            message: "平均予算は数値で入力してください。",
+        };
+    }
+
+    if (!Number.isFinite(parsed) || Number.isNaN(parsed)) {
+        return {
+            ok: false,
+            message: "平均予算は数値で入力してください。",
+        };
+    }
+
+    if (!Number.isInteger(parsed)) {
+        return {
+            ok: false,
+            message: "平均予算は整数で入力してください。",
+        };
+    }
+
+    if (parsed < 0) {
+        return {
+            ok: false,
+            message: "平均予算は0以上で入力してください。",
+        };
+    }
+
+    if (parsed > PRISMA_INT_MAX) {
+        return {
+            ok: false,
+            message: `平均予算が大きすぎます。${PRISMA_INT_MAX}円以下で入力してください。`,
+        };
+    }
+
+    return { ok: true, value: parsed };
+}

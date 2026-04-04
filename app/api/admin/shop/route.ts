@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/app/api/admin/_utils";
 import {
+    parseAverageBudgetYen,
     toRequiredTrimmedString,
     toTrimmedNullableString,
 } from "@/lib/admin-validators";
@@ -15,6 +16,7 @@ type ShopUpdateBody = {
     description?: unknown;
     address?: unknown;
     hours?: unknown;
+    averageBudgetYen?: unknown;
     coverImageUrl?: unknown;
 };
 
@@ -34,6 +36,7 @@ export async function GET() {
                 description: true,
                 address: true,
                 hours: true,
+                averageBudgetYen: true,
                 coverImageUrl: true,
                 updatedAt: true,
             },
@@ -82,7 +85,15 @@ export async function PUT(req: Request) {
         const description = toTrimmedNullableString(body.description);
         const address = toTrimmedNullableString(body.address);
         const hours = toTrimmedNullableString(body.hours);
+        const averageBudgetResult = parseAverageBudgetYen(body.averageBudgetYen);
         const coverImageUrl = toTrimmedNullableString(body.coverImageUrl);
+
+        if (!averageBudgetResult.ok) {
+            return NextResponse.json(
+                { error: averageBudgetResult.message },
+                { status: 400 },
+            );
+        }
 
         // where に auth.shopId を使うことで、必ず本人の店舗だけ更新します。
         const shop = await prisma.shop.update({
@@ -92,6 +103,7 @@ export async function PUT(req: Request) {
                 description,
                 address,
                 hours,
+                averageBudgetYen: averageBudgetResult.value,
                 coverImageUrl,
             },
             select: {
@@ -100,6 +112,7 @@ export async function PUT(req: Request) {
                 description: true,
                 address: true,
                 hours: true,
+                averageBudgetYen: true,
                 coverImageUrl: true,
                 updatedAt: true,
             },
