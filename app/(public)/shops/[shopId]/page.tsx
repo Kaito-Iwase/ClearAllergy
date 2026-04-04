@@ -208,7 +208,7 @@ export default async function PublicShopDetailPage({
                 </section>
 
                 <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="order-1 lg:col-span-2">
+                    <div className="order-1 flex flex-col gap-6 lg:col-span-2">
                         <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
                             <h2 className="text-base font-extrabold">
                                 お店の説明
@@ -231,15 +231,13 @@ export default async function PublicShopDetailPage({
                                 </span>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="order-2 lg:col-start-3 lg:row-start-2">
-                        <UserAllergenPreferenceClient
-                            allergens={allergensForClient}
-                        />
-                    </div>
+                        <div className="lg:hidden">
+                            <UserAllergenPreferenceClient
+                                allergens={allergensForClient}
+                            />
+                        </div>
 
-                    <div className="order-3 lg:col-span-2 lg:row-start-2">
                         <ShopMenuListClient
                             shopId={shop.id}
                             menus={menusForClient}
@@ -250,7 +248,7 @@ export default async function PublicShopDetailPage({
 
                     <aside
                         id="shop-info"
-                        className="order-4 flex flex-col gap-6 lg:col-start-3 lg:row-start-1"
+                        className="order-3 flex flex-col gap-6"
                     >
                         <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
                             <h2 className="text-base font-extrabold">
@@ -318,6 +316,12 @@ export default async function PublicShopDetailPage({
                             <p className="mt-3 text-xs text-gray-500">
                                 ※QR表示は次で追加できます
                             </p>
+                        </div>
+
+                        <div className="hidden lg:block">
+                            <UserAllergenPreferenceClient
+                                allergens={allergensForClient}
+                            />
                         </div>
                     </aside>
                 </section>

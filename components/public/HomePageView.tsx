@@ -2,7 +2,9 @@
 // app/page.tsx などから呼ばれ、サービス紹介と店舗一覧 / 管理画面への導線をまとめて表示します。
 // featuredShop があれば、実データを使ったメニュー例カードもここで描画します。
 
+import Image from "next/image";
 import Link from "next/link";
+import BrandLogo from "@/components/layout/BrandLogo";
 import { formatPriceYen } from "@/lib/formatters";
 
 type FeaturedMenu = {
@@ -33,13 +35,8 @@ export default function HomePageView({
         <main className="min-h-screen bg-[#f6f8f6] text-[#111811]">
             <header className="sticky top-0 z-50 border-b border-gray-200 bg-white px-4 py-3 shadow-sm md:px-10">
                 <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
-                    <Link href="/" className="flex items-center gap-2">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-[#13ec13]/10">
-                            <span className="text-[#13ec13]">🛡️</span>
-                        </div>
-                        <span className="text-xl font-bold tracking-tight">
-                            ClearAllergy
-                        </span>
+                    <Link href="/" className="flex items-center">
+                        <BrandLogo priority />
                     </Link>
 
                     <nav className="flex items-center gap-4">
@@ -123,18 +120,27 @@ export default function HomePageView({
                             <div className="absolute inset-0 bg-gradient-to-tr from-[#13ec13]/25 to-transparent" />
                             <div className="absolute inset-0 grid place-items-center p-8">
                                 <div className="w-full max-w-sm rounded-2xl bg-white/80 p-6 backdrop-blur">
-                                    <div className="flex items-center gap-3">
-                                        <div className="grid size-10 place-items-center rounded-xl bg-[#13ec13]/15">
-                                            🛡️
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <Image
+                                                src="/images/clearallergy-mark.svg"
+                                                alt=""
+                                                width={32}
+                                                height={32}
+                                                className="size-8 object-contain"
+                                            />
+                                            <div>
+                                                <p className="text-[15px] font-extrabold tracking-[-0.03em] text-neutral-900">
+                                                    ClearAllergy
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-neutral-900">
-                                                ClearAllergy
-                                            </p>
-                                            <p className="text-xs text-neutral-600">
-                                                Allergen info preview
-                                            </p>
-                                        </div>
+
+                                        <p className="text-right text-xs leading-5 text-neutral-500">
+                                            Allergen info
+                                            <br />
+                                            preview
+                                        </p>
                                     </div>
 
                                     <div className="mt-5 space-y-3">

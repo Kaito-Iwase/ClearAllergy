@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import BrandLogo from "@/components/layout/BrandLogo";
 import PublicSearchBox from "@/components/public/PublicSearchBox";
 
 export default function PublicHeader() {
@@ -7,13 +8,8 @@ export default function PublicHeader() {
         <header className="sticky top-0 z-50 border-b border-gray-200 bg-white px-4 py-3 shadow-sm md:px-10">
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-8">
-                    <Link href="/" className="flex items-center gap-2">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-[#13ec13]/10">
-                            <span className="text-[#13ec13]">🛡️</span>
-                        </div>
-                        <h2 className="text-xl font-bold tracking-tight">
-                            ClearAllergy
-                        </h2>
+                    <Link href="/" className="flex items-center">
+                        <BrandLogo priority />
                     </Link>
 
                     <nav className="hidden items-center gap-9 md:flex">

@@ -1,0 +1,15 @@
+<svg width="960" height="240" viewBox="0 0 960 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <mask id="clearallergy-logo-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256">
+      <rect width="256" height="256" fill="white"/>
+      <circle cx="106" cy="128" r="54" fill="black"/>
+      <rect x="146" y="34" width="96" height="188" fill="black"/>
+    </mask>
+  </defs>
+  <g transform="translate(18 0)">
+    <circle cx="106" cy="120" r="92" fill="#18C964" mask="url(#clearallergy-logo-cut)"/>
+    <path d="M97 127L117 147L158 101" stroke="#18C964" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="168" cy="90" r="11" fill="#18C964"/>
+  </g>
+  <text x="250" y="148" fill="#162033" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="88" font-weight="800" letter-spacing="-3">ClearAllergy</text>
+</svg>

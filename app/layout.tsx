@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
     title: "ClearAllergy",
     description: "Allergy-friendly menu viewer",
+    icons: {
+        icon: "/images/clearallergy-mark-small.svg",
+        shortcut: "/images/clearallergy-mark-small.svg",
+        apple: "/images/clearallergy-mark-small.svg",
+    },
 };
 
 export default function RootLayout({

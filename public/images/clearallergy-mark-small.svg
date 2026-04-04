@@ -1,0 +1,12 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <mask id="clearallergy-c-cut-small" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256">
+      <rect width="256" height="256" fill="white"/>
+      <circle cx="108" cy="128" r="48" fill="black"/>
+      <rect x="146" y="42" width="92" height="172" fill="black"/>
+    </mask>
+  </defs>
+  <circle cx="108" cy="128" r="94" fill="#18C964" mask="url(#clearallergy-c-cut-small)"/>
+  <path d="M99 136L120 157L160 112" stroke="#18C964" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="166" cy="102" r="9" fill="#18C964"/>
+</svg>
