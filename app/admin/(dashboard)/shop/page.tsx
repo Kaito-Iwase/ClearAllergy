@@ -21,6 +21,7 @@ export default async function AdminShopPage() {
             description: true,
             address: true,
             hours: true,
+            averageBudgetYen: true,
             coverImageUrl: true,
             updatedAt: true,
             _count: {
@@ -58,6 +59,7 @@ export default async function AdminShopPage() {
                     description: shop.description,
                     address: shop.address,
                     hours: shop.hours,
+                    averageBudgetYen: shop.averageBudgetYen,
                     coverImageUrl: shop.coverImageUrl,
                     updatedAt: shop.updatedAt.toISOString(),
                     publishedMenuCount: shop._count.menus,
