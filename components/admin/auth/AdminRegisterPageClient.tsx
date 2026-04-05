@@ -11,7 +11,17 @@ import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton
 import BrandLogo from "@/components/layout/BrandLogo";
 import { normalizeEmail } from "@/lib/email";
 
-export default function AdminRegisterPageClient() {
+export default function AdminRegisterPageClient({
+    canRegister,
+    registrationMode,
+    lockMessage,
+    inviteToken,
+}: {
+    canRegister: boolean;
+    registrationMode: "disabled" | "invite_only" | "open";
+    lockMessage: string | null;
+    inviteToken: string | null;
+}) {
     // state（画面の状態）として、入力値と UI 表示状態を保持します。
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
@@ -32,6 +42,11 @@ export default function AdminRegisterPageClient() {
         e.preventDefault();
 
         setError(null);
+
+        if (!canRegister) {
+            setError(lockMessage ?? "現在は登録できません。");
+            return;
+        }
 
         // API を呼ぶ前に、画面側で分かりやすい入力エラーを先に出します。
         if (!shopName.trim()) {
@@ -71,6 +86,7 @@ export default function AdminRegisterPageClient() {
                     shopName,
                     email: normalizedEmail,
                     password,
+                    inviteToken,
                 }),
             });
 
@@ -153,32 +169,44 @@ export default function AdminRegisterPageClient() {
                             </p>
                         </div>
 
-                        <div className="mb-5">
-                            {/* Google 登録は Clerk を使うが、画面自体は既存 UI を維持します。 */}
-                            <AdminGoogleAuthButton
-                                label="Google で新規登録"
-                                onError={(message) =>
-                                    setError(message || null)
-                                }
-                            />
-                            <p className="mt-2 text-center text-xs text-text-sub dark:text-gray-500">
-                                Google アカウントを使う場合は、認証後に店舗情報の初期設定へ進みます。
-                            </p>
-                        </div>
+                        {registrationMode === "open" ? (
+                            <>
+                                <div className="mb-5">
+                                    <AdminGoogleAuthButton
+                                        label="Google で新規登録"
+                                        onError={(message) =>
+                                            setError(message || null)
+                                        }
+                                    />
+                                    <p className="mt-2 text-center text-xs text-text-sub dark:text-gray-500">
+                                        Google アカウントを使う場合は、認証後に店舗情報の初期設定へ進みます。
+                                    </p>
+                                    <p className="mt-2 text-center text-xs font-semibold text-amber-700">
+                                        公開登録モードでは BOT 登録やスパム店舗作成の危険があります。
+                                    </p>
+                                </div>
 
-                        <div className="mb-5 flex items-center gap-3">
-                            <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
-                            <span className="text-xs font-medium uppercase tracking-[0.2em] text-text-sub dark:text-gray-500">
-                                または
-                            </span>
-                            <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
-                        </div>
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
+                                    <span className="text-xs font-medium uppercase tracking-[0.2em] text-text-sub dark:text-gray-500">
+                                        または
+                                    </span>
+                                    <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
+                                </div>
+                            </>
+                        ) : null}
 
                         {error && (
                             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                                 {error}
                             </div>
                         )}
+
+                        {!canRegister && lockMessage ? (
+                            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                {lockMessage}
+                            </div>
+                        ) : null}
 
                         <form
                             className="flex flex-col gap-5"
@@ -326,10 +354,14 @@ export default function AdminRegisterPageClient() {
                                 <button
                                     className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
                                     type="submit"
-                                    disabled={loading}
+                                    disabled={loading || !canRegister}
                                 >
                                     <span className="truncate">
-                                        {loading ? "登録中..." : "新規登録"}
+                                        {!canRegister
+                                            ? "現在は登録できません"
+                                            : loading
+                                              ? "登録中..."
+                                              : "新規登録"}
                                     </span>
                                 </button>
 

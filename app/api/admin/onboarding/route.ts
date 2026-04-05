@@ -5,9 +5,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
 import { prisma } from "@/lib/db";
+import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 
 type OnboardingBody = {
     shopName?: unknown;
+    inviteToken?: unknown;
 };
 
 export async function POST(req: Request) {
@@ -38,6 +40,18 @@ export async function POST(req: Request) {
 
         // 初回セットアップでは店舗名だけ受け取り、最小構成で Shop を作ります。
         const body = (await req.json().catch(() => null)) as OnboardingBody | null;
+        const registrationGuard = getAdminRegistrationGuard({
+            inviteToken:
+                typeof body?.inviteToken === "string" ? body.inviteToken : null,
+        });
+
+        if (!registrationGuard.allowed) {
+            return NextResponse.json(
+                { message: registrationGuard.message },
+                { status: 403 },
+            );
+        }
+
         const shopName =
             typeof body?.shopName === "string" ? body.shopName.trim() : "";
 
@@ -67,13 +81,10 @@ export async function POST(req: Request) {
             },
             { status: 201 },
         );
-    } catch (error) {
-        const message =
-            error instanceof Error ? error.message : "不明なエラーです。";
-
+    } catch {
         return NextResponse.json(
             {
-                message: `店舗の初期設定中にサーバーエラーが発生しました: ${message}`,
+                message: "店舗の初期設定中にサーバーエラーが発生しました。",
             },
             { status: 500 },
         );
