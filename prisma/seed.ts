@@ -79,6 +79,20 @@ type DemoMenuSeed = {
     allergenStatusBySlug: Record<string, AllergenStatus>;
 };
 
+function buildPublishedSeedStatusMap(
+    allergens: AllergenSeed[],
+    partialStatusBySlug: Record<string, AllergenStatus>,
+) {
+    const completeStatusBySlug: Record<string, AllergenStatus> = {};
+
+    for (const allergen of allergens) {
+        completeStatusBySlug[allergen.slug] =
+            partialStatusBySlug[allergen.slug] ?? "FREE";
+    }
+
+    return completeStatusBySlug;
+}
+
 const DEMO_MENUS: DemoMenuSeed[] = [
     {
         name: "米粉パンケーキ",
@@ -88,8 +102,7 @@ const DEMO_MENUS: DemoMenuSeed[] = [
         priceYen: 980,
         ingredients:
             "米粉、豆乳、砂糖、菜種油、ベーキングパウダー、いちごソース",
-        precaution:
-            "同一厨房で小麦・卵・乳を含むメニューを調理しています。",
+        precaution: "同一厨房で小麦・卵・乳を含むメニューを調理しています。",
         allergenStatusBySlug: {
             soybean: "CONTAINS",
             apple: "MAY_CONTAIN",
@@ -117,8 +130,7 @@ const DEMO_MENUS: DemoMenuSeed[] = [
             "人気の定食メニュー。価格・原材料・アレルゲンの見え方を確認するデモ用サンプルです。",
         category: "メイン",
         priceYen: 1420,
-        ingredients:
-            "鶏肉、しょうゆ、みりん、砂糖、ごはん、温野菜、卵黄ソース",
+        ingredients: "鶏肉、しょうゆ、みりん、砂糖、ごはん、温野菜、卵黄ソース",
         precaution: "同一厨房で乳・小麦・ごまを使用しています。",
         allergenStatusBySlug: {
             chicken: "CONTAINS",
@@ -246,10 +258,9 @@ async function seedDemoShop() {
             where: { menuItemId: savedMenu.id },
         });
 
-        const statuses = Object.entries(menu.allergenStatusBySlug);
-        if (statuses.length === 0) {
-            continue;
-        }
+        const statuses = Object.entries(
+            buildPublishedSeedStatusMap(ALLERGENS, menu.allergenStatusBySlug),
+        );
 
         await prisma.menuItemAllergen.createMany({
             data: statuses.map(([slug, status]) => {
@@ -266,17 +277,11 @@ async function seedDemoShop() {
             }),
         });
     }
-
-    console.log("Demo account");
-    console.log(`  email: ${DEMO_USER_EMAIL}`);
-    console.log(`  password: ${DEMO_USER_PASSWORD}`);
-    console.log(`  shopId: ${shop.id}`);
 }
 
 async function main() {
     await seedAllergenMaster();
     await seedDemoShop();
-    console.log(`Seeded allergens: ${ALLERGENS.length}`);
 }
 
 main()

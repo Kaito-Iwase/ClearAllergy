@@ -12,10 +12,10 @@ import MenuAllergenAlertClient from "@/components/public/MenuAllergenAlertClient
 import SelectedFreeAllergenCardsClient from "@/components/public/SelectedFreeAllergenCardsClient";
 import {
     buildSpecifiedIngredientNotice,
+    buildAllergenRows,
     createStatusBySlug,
     statusBadgeClass,
     statusLabelJa,
-    type AllergenStatus,
 } from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYen } from "@/lib/formatters";
 
@@ -68,21 +68,8 @@ export default async function PublicMenuDetailPage({
         notFound();
     }
 
-    // 保存済みリンクを slug -> status の形へ変えておくと、後続の表示整形が楽になります。
-    const linkStatusBySlug = new Map<string, AllergenStatus>();
-    for (const link of menu.allergenLinks) {
-        linkStatusBySlug.set(link.allergen.slug, link.status as AllergenStatus);
-    }
-
-    // マスタ 28 品目を基準に rows を作ることで、未登録項目も UNKNOWN として常に表示できます。
-    const rows = allergenMaster.map((a) => {
-        const status = linkStatusBySlug.get(a.slug) ?? "UNKNOWN";
-        return {
-            slug: a.slug,
-            nameJa: a.nameJa,
-            status,
-        };
-    });
+    // マスタ 28 品目を基準に rows を作り、未登録項目も UNKNOWN として常に表示します。
+    const rows = buildAllergenRows(allergenMaster, menu.allergenLinks);
 
     // 特定原材料 8 品目は、上部の大きな注意ボックスでまとめて見せます。
     const specifiedIngredientNotice = buildSpecifiedIngredientNotice({ rows });
@@ -156,6 +143,13 @@ export default async function PublicMenuDetailPage({
                     >
                         判定結果：{specifiedIngredientNotice.resultText}
                     </p>
+                    {specifiedIngredientNotice.unknownText ? (
+                        <p
+                            className={`mt-2 text-sm ${specifiedIngredientNotice.textClass}`}
+                        >
+                            {specifiedIngredientNotice.unknownText}
+                        </p>
+                    ) : null}
                 </div>
 
                 <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-2 lg:gap-12">

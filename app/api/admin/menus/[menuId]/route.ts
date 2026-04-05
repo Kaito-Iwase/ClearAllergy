@@ -14,6 +14,7 @@ import {
     requireShopId,
 } from "@/app/api/admin/_utils";
 import {
+    buildAllergenRows,
     createStatusBySlug,
     getMenuPublishValidationErrors,
     validateAllergenStatusMap,
@@ -76,9 +77,6 @@ export async function GET(req: Request, context: Context) {
                         allergen: {
                             select: {
                                 slug: true,
-                                nameJa: true,
-                                nameEn: true,
-                                sortOrder: true,
                             },
                         },
                     },
@@ -94,16 +92,18 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
-        // DB の relation 形のままだと扱いにくいので、画面向けの配列へ整形します。
-        const allergens = menu.allergenLinks
-            .map((link) => ({
-                slug: link.allergen.slug,
-                nameJa: link.allergen.nameJa,
-                nameEn: link.allergen.nameEn,
-                sortOrder: link.allergen.sortOrder,
-                status: link.status,
-            }))
-            .sort((a, b) => a.sortOrder - b.sortOrder);
+        const allergenMaster = await prisma.allergen.findMany({
+            orderBy: { sortOrder: "asc" },
+            select: {
+                slug: true,
+                nameJa: true,
+                nameEn: true,
+                sortOrder: true,
+            },
+        });
+
+        // 管理 API でも 28 品目を欠損なく返し、画面や外部クライアントの解釈差をなくします。
+        const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
 
         return NextResponse.json({
             menu: {

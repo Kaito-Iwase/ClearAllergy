@@ -62,7 +62,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
     }
 
     // 未登録アレルゲンも含めて 28 品目を常に表示したいので、
-    // まず FREE で埋めてから既存の保存状態で上書きします。
+    // まず UNKNOWN で埋めてから既存の保存状態で上書きします。
     const initialStatusBySlug = createStatusBySlug(allergens, menu.allergenLinks);
 
     return (
