@@ -159,6 +159,8 @@ export async function PUT(req: Request) {
             );
         }
         if (!coverImageUrlResult.ok) {
+            // 店舗画像も外部 URL の自由入力は許可せず、
+            // 自前アップロード由来の URL だけ保存できるようにします。
             await writeAdminAuditLog({
                 req,
                 actorUserId: auditActorUserId,

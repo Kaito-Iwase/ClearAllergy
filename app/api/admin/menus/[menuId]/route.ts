@@ -301,6 +301,8 @@ export async function PUT(req: Request, context: Context) {
             allergens,
             existing.allergenLinks,
         );
+        // 更新 API は「来た項目だけ差し替える」ので、
+        // 既存状態を土台にしてから入力分だけ上書きします。
         for (const allergen of allergens) {
             const incomingStatus = incomingAllergenMap[allergen.slug];
             if (incomingStatus) {
@@ -309,6 +311,8 @@ export async function PUT(req: Request, context: Context) {
         }
 
         if (nextIsPublished) {
+            // 編集保存でも公開条件は毎回サーバーで確認します。
+            // これにより、既存の不完全データを公開へ切り替える抜け道を防ぎます。
             const publishErrors = getMenuPublishValidationErrors({
                 name: nextName,
                 ingredients: nextIngredients,

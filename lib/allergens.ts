@@ -68,6 +68,8 @@ export function buildAllergenRows(
     allergens: AllergenWithNamesLike[],
     links: AllergenLinkLike[],
 ) {
+    // API や画面で 28 品目を毎回同じ順・同じ件数で扱えるよう、
+    // マスタ基準で配列を組み直します。
     const statusBySlug = createStatusBySlug(allergens, links);
 
     return allergens.map((allergen, index) => ({
@@ -104,6 +106,8 @@ export function validateAllergenStatusMap(
 ):
     | { ok: true; value: Record<string, AllergenStatus> }
     | { ok: false; message: string } {
+    // API 直打ち対策として、runtime でも map の形を検証します。
+    // TypeScript の型だけでは外部入力を守れないため、この確認が必要です。
     if (value === undefined) {
         return { ok: true, value: {} };
     }
@@ -154,6 +158,8 @@ export function getMenuPublishValidationErrors(args: {
     allergens: Array<{ slug: string; nameJa: string }>;
     statusBySlug: Record<string, AllergenStatus>;
 }) {
+    // この関数は「公開してよいメニューか」をサーバー側で判定します。
+    // 画面側の必須表示だけに頼ると、API 直打ちや将来の UI 崩れで簡単に抜けるためです。
     const errors: string[] = [];
 
     if (args.name.trim() === "") {
@@ -174,6 +180,8 @@ export function getMenuPublishValidationErrors(args: {
     });
 
     if (unknownAllergens.length > 0) {
+        // ここで UNKNOWN を止めるのは、
+        // 未設定のまま公開されると利用者が安全性を誤解する危険があるためです。
         errors.push(
             `公開するにはアレルゲン28品目を確定してください。未設定: ${unknownAllergens.join("・")}`,
         );

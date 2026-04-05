@@ -131,6 +131,7 @@ export default function MenuAllergenAlertClient({
                 </h3>
 
                 <p className="mt-3 text-sm font-medium text-gray-900/90">
+                    {/* 未設定だけでも利用者にとっては重要情報なので、独立した注意として表示します。 */}
                     この商品は、あなたが選択したアレルゲンの一部がまだ未設定です。
                     公開表示だけで判断せず、必要に応じて店舗へ確認してください。
                 </p>
@@ -154,6 +155,8 @@ export default function MenuAllergenAlertClient({
                 </p>
                 {unknownNames.length > 0 ? (
                     <p className="mt-2 text-sm font-medium text-red-900/90">
+                        {/* 危険表示の時でも UNKNOWN を落とさず併記し、
+                            「含む項目だけ見て他は安全」と誤読されるのを防ぎます。 */}
                         未設定：{unknownNames.join("・")}。未設定項目は店舗へ確認してください。
                     </p>
                 ) : null}

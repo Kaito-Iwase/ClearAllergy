@@ -1,5 +1,7 @@
 export type AdminRegistrationMode = "disabled" | "invite_only" | "open";
 
+// この関数は、環境変数から現在の登録モードを読み取ります。
+// 想定外の値が来た時は安全側で "disabled" に倒します。
 export function getAdminRegistrationMode(): AdminRegistrationMode {
     const raw = process.env.ADMIN_REGISTRATION_MODE?.trim().toLowerCase();
 
@@ -10,6 +12,8 @@ export function getAdminRegistrationMode(): AdminRegistrationMode {
     return "disabled";
 }
 
+// 招待制モードでは、環境変数のトークンと一致した時だけ通します。
+// ここを通さないと、URL を知っているだけで登録できてしまうため重要です。
 export function isAdminRegistrationInviteValid(inviteToken: string | null) {
     const expected = process.env.ADMIN_REGISTRATION_INVITE_TOKEN?.trim();
 
@@ -20,6 +24,8 @@ export function isAdminRegistrationInviteValid(inviteToken: string | null) {
     return inviteToken === expected;
 }
 
+// 登録画面と登録 API の両方で同じ判定を使うための共通ガードです。
+// 画面だけ閉じても API が開いていると意味がないので、必ずサーバー側でも使います。
 export function getAdminRegistrationGuard(args: {
     inviteToken: string | null;
 }) {
@@ -56,4 +62,3 @@ export function getAdminRegistrationGuard(args: {
         message: "現在、店舗アカウントの自己登録は停止しています。",
     } as const;
 }
-

@@ -165,6 +165,8 @@ export async function POST(req: Request) {
         }
 
         if (isPublished) {
+            // 公開時だけは、サーバー側で必須条件を必ず再確認します。
+            // UI が壊れても API 直打ちでも、この壁を越えない限り公開できません。
             const publishErrors = getMenuPublishValidationErrors({
                 name,
                 ingredients,

@@ -19,6 +19,9 @@ const extensionByMimeType: Record<(typeof ALLOWED_IMAGE_MIME_TYPES)[number], str
         "image/avif": "avif",
     };
 
+// この関数は、アップロードされたファイルが「許可した画像か」を確認します。
+// 危険な形式や大きすぎるファイルをここで弾くことで、
+// ストレージ濫用や想定外の表示崩れを防ぎます。
 export function validateImageFile(file: File) {
     if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.type as never)) {
         return {
@@ -41,6 +44,8 @@ export function validateImageFile(file: File) {
     };
 }
 
+// Blob 側の失敗はそのまま利用者へ返さず、分かりやすい JSON エラーへ変換します。
+// 内部エラーの詳細をむやみに出さないための安全策でもあります。
 export function buildUploadJsonError(error: unknown) {
     if (
         typeof error === "object" &&
@@ -65,6 +70,8 @@ export function buildUploadJsonError(error: unknown) {
     };
 }
 
+// 実際の保存処理はこの関数にまとめます。
+// API ごとに put() の呼び方がばらけると、保存設定の差分が事故の元になるためです。
 export async function uploadImageToBlob(args: {
     file: File;
     pathname: string;

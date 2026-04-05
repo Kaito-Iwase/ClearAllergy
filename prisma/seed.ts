@@ -79,6 +79,8 @@ type DemoMenuSeed = {
     allergenStatusBySlug: Record<string, AllergenStatus>;
 };
 
+// 公開デモメニューは 28 品目を必ず持つ形にそろえます。
+// seed に欠損データがあると、開発中に「これで正しい」と誤解しやすいためです。
 function buildPublishedSeedStatusMap(
     allergens: AllergenSeed[],
     partialStatusBySlug: Record<string, AllergenStatus>,
@@ -173,6 +175,7 @@ async function seedAllergenMaster() {
 }
 
 async function seedDemoShop() {
+    // デモユーザーでも平文保存はせず、本番と同じくハッシュ化して保存します。
     const passwordHash = await bcrypt.hash(DEMO_USER_PASSWORD, 10);
 
     const user = await prisma.user.upsert({
@@ -258,6 +261,8 @@ async function seedDemoShop() {
             where: { menuItemId: savedMenu.id },
         });
 
+        // ここで 28 品目を全部作っておくことで、
+        // 公開 API や画面が「欠損なし前提」で安全に確認できます。
         const statuses = Object.entries(
             buildPublishedSeedStatusMap(ALLERGENS, menu.allergenStatusBySlug),
         );

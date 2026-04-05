@@ -86,6 +86,10 @@ export async function GET(req: Request, context: Context) {
 
         // 28 品目を基準に正規化し、欠損しているリンクも UNKNOWN として返します。
         const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
+        const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
+            kind: "menu",
+            shopId: menu.shopId,
+        });
 
         return NextResponse.json({
             menu: {
@@ -97,16 +101,9 @@ export async function GET(req: Request, context: Context) {
                 category: menu.category,
                 ingredients: menu.ingredients,
                 precaution: menu.precaution,
-                imageUrl:
-                    validateStoredImageUrl(menu.imageUrl, {
-                        kind: "menu",
-                        shopId: menu.shopId,
-                    }).ok
-                        ? validateStoredImageUrl(menu.imageUrl, {
-                              kind: "menu",
-                              shopId: menu.shopId,
-                          }).value
-                        : null,
+                // 公開 API でも保存済み URL をそのまま信用せず、
+                // 表示してよい画像 URL だけ返します。
+                imageUrl: safeImageUrl.ok ? safeImageUrl.value : null,
                 isPublished: menu.isPublished,
                 createdAt: menu.createdAt,
                 updatedAt: menu.updatedAt,

@@ -17,6 +17,9 @@ const store =
     globalStore.__clearAllergyRateLimitStore ??
     (globalStore.__clearAllergyRateLimitStore = new Map<string, RateLimitEntry>());
 
+// この関数は、短時間の連続リクエストを抑える簡易レート制限です。
+// いまはメモリ上の Map を使う最小構成なので、単一インスタンスでは有効ですが、
+// 複数台構成では共有されません。本番を大きくするなら Redis などへ移す前提です。
 export function consumeRateLimit(args: {
     key: string;
     limit: number;
@@ -61,4 +64,3 @@ export function consumeRateLimit(args: {
         ),
     };
 }
-

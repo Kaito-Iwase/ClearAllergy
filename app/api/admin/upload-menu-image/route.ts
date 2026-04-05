@@ -46,6 +46,7 @@ export async function POST(req: Request) {
 
         const validation = validateImageFile(file);
         if (!validation.ok) {
+            // MIME やサイズが条件を満たさない時は、ここで保存処理へ進ませません。
             await writeAdminAuditLog({
                 req,
                 actorUserId,
