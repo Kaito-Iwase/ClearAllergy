@@ -117,6 +117,8 @@ function buildOverallSummary(args: {
     }
     if (parts.length === 0 && unknownNames.length > 0) {
         parts.push(`${unknownNames.slice(0, 3).join("・")}（未設定）`);
+    } else if (unknownNames.length > 0) {
+        parts.push(`未設定 ${unknownNames.length}件`);
     }
 
     return {
@@ -191,6 +193,8 @@ function buildPersonalizedSummary(args: {
     }
     if (parts.length === 0 && unknownNames.length > 0) {
         parts.push(`${unknownNames.slice(0, 3).join("・")}（未設定）`);
+    } else if (unknownNames.length > 0) {
+        parts.push(`未設定 ${unknownNames.length}件`);
     }
 
     return {

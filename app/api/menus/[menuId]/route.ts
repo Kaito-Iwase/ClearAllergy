@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { buildAllergenRows } from "@/lib/allergens";
 
 type Context = {
     // Next.js のバージョン差で params が Promise のこともあるため両対応にしています。
@@ -58,9 +59,6 @@ export async function GET(req: Request, context: Context) {
                         allergen: {
                             select: {
                                 slug: true,
-                                nameJa: true,
-                                nameEn: true,
-                                sortOrder: true,
                             },
                         },
                     },
@@ -75,16 +73,18 @@ export async function GET(req: Request, context: Context) {
             );
         }
 
-        // 公開画面でそのまま描画しやすいように、アレルゲン配列を整えて返します。
-        const allergens = menu.allergenLinks
-            .map((link) => ({
-                slug: link.allergen.slug,
-                nameJa: link.allergen.nameJa,
-                nameEn: link.allergen.nameEn,
-                sortOrder: link.allergen.sortOrder,
-                status: link.status,
-            }))
-            .sort((a, b) => a.sortOrder - b.sortOrder);
+        const allergenMaster = await prisma.allergen.findMany({
+            orderBy: { sortOrder: "asc" },
+            select: {
+                slug: true,
+                nameJa: true,
+                nameEn: true,
+                sortOrder: true,
+            },
+        });
+
+        // 28 品目を基準に正規化し、欠損しているリンクも UNKNOWN として返します。
+        const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
 
         return NextResponse.json({
             menu: {

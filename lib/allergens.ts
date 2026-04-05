@@ -38,6 +38,13 @@ type AllergenLinkLike = {
     };
 };
 
+type AllergenWithNamesLike = {
+    slug: string;
+    nameJa: string;
+    nameEn?: string | null;
+    sortOrder?: number | null;
+};
+
 export function createStatusBySlug(
     allergens: AllergenLike[],
     links: AllergenLinkLike[],
@@ -55,6 +62,21 @@ export function createStatusBySlug(
     }
 
     return statusBySlug;
+}
+
+export function buildAllergenRows(
+    allergens: AllergenWithNamesLike[],
+    links: AllergenLinkLike[],
+) {
+    const statusBySlug = createStatusBySlug(allergens, links);
+
+    return allergens.map((allergen, index) => ({
+        slug: allergen.slug,
+        nameJa: allergen.nameJa,
+        nameEn: allergen.nameEn ?? null,
+        sortOrder: allergen.sortOrder ?? index + 1,
+        status: statusBySlug[allergen.slug] ?? "UNKNOWN",
+    }));
 }
 
 export function statusLabelJa(status: AllergenStatus): string {
@@ -179,12 +201,18 @@ export function buildSpecifiedIngredientNotice(args: {
 
     const containsNames = containsRows.map((row) => row.nameJa);
     const mayContainNames = mayContainRows.map((row) => row.nameJa);
+    const unknownNames = specifiedRows
+        .filter((row) => row.status === "UNKNOWN")
+        .map((row) => row.nameJa);
+    const unknownText =
+        unknownNames.length > 0 ? `未設定: ${unknownNames.join("・")}` : null;
 
     if (containsNames.length > 0) {
         return {
             kind: "danger" as const,
             title: "特定原材料を含みます",
             resultText: containsNames.join("・"),
+            unknownText,
             desc: SPECIFIED_INGREDIENT_LABEL,
             boxClass: "border border-red-200 bg-red-50",
             titleClass: "text-red-700",
@@ -197,6 +225,7 @@ export function buildSpecifiedIngredientNotice(args: {
             kind: "caution" as const,
             title: "特定原材料を含む可能性があります",
             resultText: mayContainNames.join("・"),
+            unknownText,
             desc: SPECIFIED_INGREDIENT_LABEL,
             boxClass: "border border-yellow-200 bg-yellow-50",
             titleClass: "text-yellow-800",
@@ -204,14 +233,12 @@ export function buildSpecifiedIngredientNotice(args: {
         };
     }
 
-    if (specifiedRows.some((row) => row.status === "UNKNOWN")) {
+    if (unknownNames.length > 0) {
         return {
             kind: "unknown" as const,
             title: "特定原材料に未設定項目があります",
-            resultText: specifiedRows
-                .filter((row) => row.status === "UNKNOWN")
-                .map((row) => row.nameJa)
-                .join("・"),
+            resultText: unknownNames.join("・"),
+            unknownText,
             desc: SPECIFIED_INGREDIENT_LABEL,
             boxClass: "border border-gray-200 bg-gray-50",
             titleClass: "text-gray-800",
@@ -223,6 +250,7 @@ export function buildSpecifiedIngredientNotice(args: {
         kind: "safe" as const,
         title: "特定原材料は含まれていません",
         resultText: "該当なし",
+        unknownText,
         desc: SPECIFIED_INGREDIENT_LABEL,
         boxClass: "border border-green-200 bg-green-50",
         titleClass: "text-green-800",

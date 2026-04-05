@@ -152,6 +152,11 @@ export default function MenuAllergenAlertClient({
                     この商品は、あなたが選択したアレルゲンと一致しています。
                     必ず店舗の表示・注意事項も確認してください。
                 </p>
+                {unknownNames.length > 0 ? (
+                    <p className="mt-2 text-sm font-medium text-red-900/90">
+                        未設定：{unknownNames.join("・")}。未設定項目は店舗へ確認してください。
+                    </p>
+                ) : null}
             </div>
         );
     }
@@ -166,6 +171,11 @@ export default function MenuAllergenAlertClient({
                 この商品は、あなたが選択したアレルゲンについて
                 「可能性あり」として登録されています。必要に応じて店舗へ確認してください。
             </p>
+            {unknownNames.length > 0 ? (
+                <p className="mt-2 text-sm font-medium text-yellow-900/90">
+                    未設定：{unknownNames.join("・")}。未設定項目は店舗へ確認してください。
+                </p>
+            ) : null}
         </div>
     );
 }
