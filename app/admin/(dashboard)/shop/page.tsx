@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 import ShopEditClient from "@/components/admin/shop/ShopEditClient";
+import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
 
 export default async function AdminShopPage() {
     // 認証されていない人や、店舗未作成の人をここで弾きます。
@@ -60,7 +61,10 @@ export default async function AdminShopPage() {
                     address: shop.address,
                     hours: shop.hours,
                     averageBudgetYen: shop.averageBudgetYen,
-                    coverImageUrl: shop.coverImageUrl,
+                    coverImageUrl: sanitizeStoredImageUrl(shop.coverImageUrl, {
+                        kind: "shop",
+                        shopId,
+                    }),
                     updatedAt: shop.updatedAt.toISOString(),
                     publishedMenuCount: shop._count.menus,
                 }}

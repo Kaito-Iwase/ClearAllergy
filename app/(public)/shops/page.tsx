@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDateTimeJa } from "@/lib/formatters";
+import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
 
 type SearchParams = {
     q?: string;
@@ -152,8 +153,19 @@ export default async function PublicShopListPage({
                             shop.menus[0]?.priceYen,
                         );
                         const hasCoverImage =
-                            typeof shop.coverImageUrl === "string" &&
-                            shop.coverImageUrl.trim() !== "";
+                            Boolean(
+                                sanitizeStoredImageUrl(shop.coverImageUrl, {
+                                    kind: "shop",
+                                    shopId: shop.id,
+                                }),
+                            );
+                        const safeCoverImageUrl = sanitizeStoredImageUrl(
+                            shop.coverImageUrl,
+                            {
+                                kind: "shop",
+                                shopId: shop.id,
+                            },
+                        );
 
                         if (hasCoverImage) {
                             return (
@@ -165,7 +177,7 @@ export default async function PublicShopListPage({
                                     <div
                                         className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
                                         style={{
-                                            backgroundImage: `url(${shop.coverImageUrl})`,
+                                            backgroundImage: `url(${safeCoverImageUrl})`,
                                         }}
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/20" />

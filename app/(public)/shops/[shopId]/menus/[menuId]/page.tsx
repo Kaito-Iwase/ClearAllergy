@@ -18,6 +18,7 @@ import {
     statusLabelJa,
 } from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYen } from "@/lib/formatters";
+import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
 
 type Params = { shopId: string; menuId: string };
 
@@ -76,8 +77,13 @@ export default async function PublicMenuDetailPage({
 
     const priceText = formatPriceYen(menu.priceYen);
 
-    const imageStyle = menu.imageUrl
-        ? { backgroundImage: `url("${menu.imageUrl}")` }
+    const safeImageUrl = sanitizeStoredImageUrl(menu.imageUrl, {
+        kind: "menu",
+        shopId,
+    });
+
+    const imageStyle = safeImageUrl
+        ? { backgroundImage: `url("${safeImageUrl}")` }
         : {
               backgroundImage:
                   "linear-gradient(135deg, rgba(19,236,19,0.25), rgba(0,0,0,0.05))",

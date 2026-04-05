@@ -16,6 +16,8 @@ import {
     getMenuPublishValidationErrors,
     validateAllergenStatusMap,
 } from "@/lib/allergens";
+import { writeAdminAuditLog } from "@/lib/audit-log";
+import { validateStoredImageUrl } from "@/lib/image-url-policy";
 
 // request.json() の結果は unknown に近いので、まず期待する形を宣言しておきます。
 type MenuCreateBody = {
@@ -55,7 +57,19 @@ export async function GET() {
             },
         });
 
-        return NextResponse.json({ menus });
+        return NextResponse.json({
+            menus: menus.map((menu) => {
+                const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
+                    kind: "menu",
+                    shopId: auth.shopId,
+                });
+
+                return {
+                    ...menu,
+                    imageUrl: safeImageUrl.ok ? safeImageUrl.value : null,
+                };
+            }),
+        });
     } catch (e) {
         return internalError(e);
     }
@@ -64,11 +78,15 @@ export async function GET() {
 // POST は新規メニュー作成です。
 // 編集画面にすぐ遷移できるよう、最小情報でも下書きを作れるようにしています。
 export async function POST(req: Request) {
+    let auditActorUserId: string | null = null;
+    let auditShopId: string | null = null;
     try {
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
         }
+        auditActorUserId = auth.appUser.id;
+        auditShopId = auth.shopId;
 
         const body = await readJson<MenuCreateBody>(req);
 
@@ -89,6 +107,26 @@ export async function POST(req: Request) {
         const ingredients = toTrimmedNullableString(body?.ingredients);
         const precaution = toTrimmedNullableString(body?.precaution);
         const imageUrl = toTrimmedNullableString(body?.imageUrl);
+        const imageUrlResult = validateStoredImageUrl(imageUrl, {
+            kind: "menu",
+            shopId: auth.shopId,
+        });
+        if (!imageUrlResult.ok) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "menu_create",
+                targetType: "menu",
+                targetId: null,
+                success: false,
+                metadata: { reason: imageUrlResult.message, imageUrlProvided: true },
+            });
+            return NextResponse.json(
+                { error: imageUrlResult.message },
+                { status: 400 },
+            );
+        }
         // 新規作成直後は誤公開を防ぐため、既定は非公開です。
         const isPublished = toBooleanOrDefault(body?.isPublished, false);
         const allergenMapResult = validateAllergenStatusMap(
@@ -136,6 +174,16 @@ export async function POST(req: Request) {
             });
 
             if (publishErrors.length > 0) {
+                await writeAdminAuditLog({
+                    req,
+                    actorUserId: auditActorUserId,
+                    actorShopId: auditShopId,
+                    action: "menu_create",
+                    targetType: "menu",
+                    targetId: null,
+                    success: false,
+                    metadata: { reason: publishErrors.join(" "), isPublished },
+                });
                 return NextResponse.json(
                     { error: publishErrors.join(" ") },
                     { status: 400 },
@@ -156,7 +204,7 @@ export async function POST(req: Request) {
                     ingredients,
                     precaution,
                     isPublished,
-                    imageUrl,
+                    imageUrl: imageUrlResult.value,
                 },
                 select: {
                     id: true,
@@ -175,8 +223,34 @@ export async function POST(req: Request) {
             return menu;
         });
 
+        await writeAdminAuditLog({
+            req,
+            actorUserId: auditActorUserId,
+            actorShopId: auditShopId,
+            action: "menu_create",
+            targetType: "menu",
+            targetId: created.id,
+            success: true,
+            metadata: {
+                isPublished,
+                hasImage: Boolean(imageUrlResult.value),
+            },
+        });
+
         return NextResponse.json({ id: created.id }, { status: 201 });
     } catch (e) {
+        if (auditShopId) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "menu_create",
+                targetType: "menu",
+                targetId: null,
+                success: false,
+                metadata: { reason: "internal_error" },
+            });
+        }
         return internalError(e);
     }
 }

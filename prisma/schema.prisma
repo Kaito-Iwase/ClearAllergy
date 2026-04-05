@@ -24,7 +24,8 @@ model User {
   updatedAt    DateTime @updatedAt
 
   // 1ユーザーにつき 1 店舗だけ持てる前提なので 1:1 関係です。
-  shop Shop?
+  shop      Shop?
+  auditLogs AuditLog[]
 }
 
 // 店舗の公開情報です。
@@ -102,6 +103,27 @@ model MenuItemAllergen {
   @@id([menuItemId, allergenId])
   @@index([allergenId])
   @@index([menuItemId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  actorShopId String?
+  action      String
+  targetType  String
+  targetId    String?
+  success     Boolean
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([actorShopId])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
+  @@index([createdAt])
 }
 
 // 公開画面で見せるアレルゲン状態の三択です。

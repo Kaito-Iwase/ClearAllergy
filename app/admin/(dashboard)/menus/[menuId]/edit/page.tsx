@@ -10,6 +10,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createStatusBySlug } from "@/lib/allergens";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
+import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
 
 type PageProps = {
     params: Promise<{ menuId: string }> | { menuId: string };
@@ -93,7 +94,10 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                         initialCategory={menu.category}
                         initialIngredients={menu.ingredients}
                         initialPrecaution={menu.precaution}
-                        initialImageUrl={menu.imageUrl}
+                        initialImageUrl={sanitizeStoredImageUrl(menu.imageUrl, {
+                            kind: "menu",
+                            shopId,
+                        })}
                         initialIsPublished={menu.isPublished}
                         allergens={allergens}
                         initialStatusBySlug={initialStatusBySlug}
