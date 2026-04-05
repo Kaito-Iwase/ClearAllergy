@@ -31,6 +31,8 @@ export const authOptions: NextAuthOptions = {
                 if (!email || !password) return null;
 
                 const ip = getIpFromHeaders(req?.headers ?? {});
+                // 総当たり対策として、ログイン試行回数を送信元 IP 単位で制限します。
+                // ここは最小構成なので、将来は共有ストア化も検討が必要です。
                 const rateLimit = consumeRateLimit({
                     key: `login:${ip}`,
                     limit: 10,

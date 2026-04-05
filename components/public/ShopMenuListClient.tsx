@@ -67,6 +67,8 @@ function buildOverallSummary(args: {
     mayCount: number;
     unknownCount: number;
 } {
+    // この関数は、そのメニュー全体としての見え方を 1 行にまとめます。
+    // UNKNOWN をここで落とさず残すのは、未設定なのに安全と誤解されるのを防ぐためです。
     const { statusBySlug, nameJaBySlug, rankBySlug } = args;
 
     const containsSlugs: string[] = [];
@@ -142,6 +144,8 @@ function buildPersonalizedSummary(args: {
     mayCount: number;
     unknownCount: number;
 } {
+    // こちらは、利用者が自分で選んだアレルゲンだけを見た要約です。
+    // 全体表示と同じく UNKNOWN を数えないと、重要な未確認項目が消えてしまいます。
     const { statusBySlug, selectedSlugs, nameJaBySlug, rankBySlug } = args;
 
     const containsSlugs: string[] = [];
@@ -336,6 +340,7 @@ export default function ShopMenuListClient({
                                         </h3>
 
                                         <p className="mt-1 text-xs font-semibold text-gray-600">
+                                            {/* 件数表示でも UNKNOWN を明示し、要約本文と意味がずれないようにします。 */}
                                             含む {activeSummary.containsCount}{" "}
                                             件 ・ 含む可能性があります{" "}
                                             {activeSummary.mayCount} 件

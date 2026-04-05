@@ -20,6 +20,8 @@ type RegisterRequestBody = {
 export async function POST(req: Request) {
     try {
         const ip = getIpFromHeaders(req.headers);
+        // 最低限の IP 単位制限です。
+        // 本番で BOT 登録や短時間の連続試行を減らすために入れています。
         const rateLimit = consumeRateLimit({
             key: `register:${ip}`,
             limit: 5,
@@ -46,6 +48,8 @@ export async function POST(req: Request) {
         const inviteToken =
             req.headers.get("x-admin-invite-token") ??
             (typeof body?.inviteToken === "string" ? body.inviteToken : null);
+        // 登録画面が見えていても、最終判断は必ず API 側で行います。
+        // ここが無いと API 直打ちで登録されてしまいます。
         const registrationGuard = getAdminRegistrationGuard({ inviteToken });
 
         if (!registrationGuard.allowed) {

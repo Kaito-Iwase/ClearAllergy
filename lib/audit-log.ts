@@ -14,6 +14,9 @@ type AdminAuditAction =
 
 type AdminAuditTargetType = "menu" | "shop" | "image_upload";
 
+// この関数は、管理画面の重要操作を監査ログへ残します。
+// 「誰が・何を・いつ・成功したか」を追えるようにして、
+// 公開事故や不正操作が起きた時に後から確認できるようにします。
 export async function writeAdminAuditLog(args: {
     req: Request;
     actorUserId: string | null;
@@ -37,6 +40,8 @@ export async function writeAdminAuditLog(args: {
             return;
         }
 
+        // 監査ログ書き込みの失敗で本来の更新処理まで止めないように、
+        // ログ処理は補助扱いにしています。
         await auditLogDelegate.create({
             data: {
                 actorUserId: args.actorUserId,

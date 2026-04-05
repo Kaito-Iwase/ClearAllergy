@@ -125,6 +125,8 @@ export default async function PublicShopDetailPage({
     });
 
     if (!shop) {
+        // 公開メニューが 1 件も無い店舗は、公開準備中として 404 にします。
+        // これにより、店舗情報だけ先に外部へ見えてしまう状態を防ぎます。
         notFound();
     }
 
