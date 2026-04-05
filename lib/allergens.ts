@@ -3,6 +3,7 @@
 // UI ごとに判定ロジックがずれないよう、なるべくここへ集めています。
 
 export const ALLERGEN_STATUS_VALUES = [
+    "UNKNOWN",
     "CONTAINS",
     "FREE",
     "MAY_CONTAIN",
@@ -41,12 +42,12 @@ export function createStatusBySlug(
     allergens: AllergenLike[],
     links: AllergenLinkLike[],
 ): Record<string, AllergenStatus> {
-    // まず全品目を FREE で埋めてから、DB に保存されている実データで上書きします。
+    // まず全品目を UNKNOWN で埋めてから、DB に保存されている実データで上書きします。
     // こうしておくと、未登録のアレルゲンも画面で必ず表示できます。
     const statusBySlug: Record<string, AllergenStatus> = {};
 
     for (const allergen of allergens) {
-        statusBySlug[allergen.slug] = "FREE";
+        statusBySlug[allergen.slug] = "UNKNOWN";
     }
 
     for (const link of links) {
@@ -59,6 +60,7 @@ export function createStatusBySlug(
 export function statusLabelJa(status: AllergenStatus): string {
     if (status === "CONTAINS") return "含む";
     if (status === "MAY_CONTAIN") return "含む可能性があります";
+    if (status === "UNKNOWN") return "未設定";
     return "含まない";
 }
 
@@ -69,7 +71,93 @@ export function statusBadgeClass(status: AllergenStatus): string {
     if (status === "MAY_CONTAIN") {
         return "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-200";
     }
+    if (status === "UNKNOWN") {
+        return "bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200";
+    }
     return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+}
+
+export function validateAllergenStatusMap(
+    value: unknown,
+):
+    | { ok: true; value: Record<string, AllergenStatus> }
+    | { ok: false; message: string } {
+    if (value === undefined) {
+        return { ok: true, value: {} };
+    }
+
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return {
+            ok: false,
+            message: "allergenStatusBySlug must be an object",
+        };
+    }
+
+    const entries = Object.entries(value as Record<string, unknown>);
+    const statusMap: Record<string, AllergenStatus> = {};
+
+    for (const [slug, status] of entries) {
+        if (
+            typeof status !== "string" ||
+            !ALLERGEN_STATUS_VALUES.includes(status as AllergenStatus)
+        ) {
+            return {
+                ok: false,
+                message: `invalid allergen status: ${slug}`,
+            };
+        }
+
+        statusMap[slug] = status as AllergenStatus;
+    }
+
+    return { ok: true, value: statusMap };
+}
+
+export function getUnknownAllergenNames(args: {
+    allergens: Array<{ slug: string; nameJa: string }>;
+    statusBySlug: Record<string, AllergenStatus>;
+}) {
+    return args.allergens
+        .filter(
+            (allergen) =>
+                (args.statusBySlug[allergen.slug] ?? "UNKNOWN") === "UNKNOWN",
+        )
+        .map((allergen) => allergen.nameJa);
+}
+
+export function getMenuPublishValidationErrors(args: {
+    name: string;
+    ingredients: string | null;
+    precaution: string | null;
+    allergens: Array<{ slug: string; nameJa: string }>;
+    statusBySlug: Record<string, AllergenStatus>;
+}) {
+    const errors: string[] = [];
+
+    if (args.name.trim() === "") {
+        errors.push("公開するにはメニュー名が必要です。");
+    }
+
+    if (!args.ingredients) {
+        errors.push("公開するには原材料名の入力が必要です。");
+    }
+
+    if (!args.precaution) {
+        errors.push("公開するには注意書きの入力が必要です。");
+    }
+
+    const unknownAllergens = getUnknownAllergenNames({
+        allergens: args.allergens,
+        statusBySlug: args.statusBySlug,
+    });
+
+    if (unknownAllergens.length > 0) {
+        errors.push(
+            `公開するにはアレルゲン28品目を確定してください。未設定: ${unknownAllergens.join("・")}`,
+        );
+    }
+
+    return errors;
 }
 
 export function buildSpecifiedIngredientNotice(args: {
@@ -113,6 +201,21 @@ export function buildSpecifiedIngredientNotice(args: {
             boxClass: "border border-yellow-200 bg-yellow-50",
             titleClass: "text-yellow-800",
             textClass: "text-yellow-900/90",
+        };
+    }
+
+    if (specifiedRows.some((row) => row.status === "UNKNOWN")) {
+        return {
+            kind: "unknown" as const,
+            title: "特定原材料に未設定項目があります",
+            resultText: specifiedRows
+                .filter((row) => row.status === "UNKNOWN")
+                .map((row) => row.nameJa)
+                .join("・"),
+            desc: SPECIFIED_INGREDIENT_LABEL,
+            boxClass: "border border-gray-200 bg-gray-50",
+            titleClass: "text-gray-800",
+            textClass: "text-gray-900/90",
         };
     }
 

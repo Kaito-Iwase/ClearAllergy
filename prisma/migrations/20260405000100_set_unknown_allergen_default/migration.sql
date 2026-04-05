@@ -1,0 +1,2 @@
+ALTER TABLE "MenuItemAllergen"
+ALTER COLUMN "status" SET DEFAULT 'UNKNOWN';

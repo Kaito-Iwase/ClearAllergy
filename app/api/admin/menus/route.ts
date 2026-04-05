@@ -12,8 +12,9 @@ import {
     toTrimmedNullableString,
 } from "@/lib/admin-validators";
 import {
-    ALLERGEN_STATUS_VALUES,
-    type AllergenStatus,
+    createStatusBySlug,
+    getMenuPublishValidationErrors,
+    validateAllergenStatusMap,
 } from "@/lib/allergens";
 
 // request.json() の結果は unknown に近いので、まず期待する形を宣言しておきます。
@@ -88,61 +89,55 @@ export async function POST(req: Request) {
         const ingredients = toTrimmedNullableString(body?.ingredients);
         const precaution = toTrimmedNullableString(body?.precaution);
         const imageUrl = toTrimmedNullableString(body?.imageUrl);
-        const allergenStatusBySlug = body?.allergenStatusBySlug;
-
         // 新規作成直後は誤公開を防ぐため、既定は非公開です。
         const isPublished = toBooleanOrDefault(body?.isPublished, false);
-        let allergenMap: Record<string, AllergenStatus> = {};
+        const allergenMapResult = validateAllergenStatusMap(
+            body?.allergenStatusBySlug,
+        );
+        if (!allergenMapResult.ok) {
+            return NextResponse.json(
+                { error: allergenMapResult.message },
+                { status: 400 },
+            );
+        }
+        const allergenMap = allergenMapResult.value;
 
-        if (allergenStatusBySlug !== undefined) {
-            // アレルゲン状態は { slug: status } の連想配列だけを受け付けます。
-            if (
-                typeof allergenStatusBySlug !== "object" ||
-                allergenStatusBySlug === null ||
-                Array.isArray(allergenStatusBySlug)
-            ) {
-                return NextResponse.json(
-                    { error: "allergenStatusBySlug must be an object" },
-                    { status: 400 },
-                );
-            }
+        const allergens = await prisma.allergen.findMany({
+            orderBy: { sortOrder: "asc" },
+            select: { id: true, slug: true, nameJa: true },
+        });
 
-            allergenMap = Object.fromEntries(
-                Object.entries(
-                    allergenStatusBySlug as Record<string, unknown>,
-                ).map(([slug, status]) => {
-                    if (
-                        typeof status !== "string" ||
-                        !ALLERGEN_STATUS_VALUES.includes(
-                            status as AllergenStatus,
-                        )
-                    ) {
-                        throw new Error(`invalid allergen status: ${slug}`);
-                    }
+        // 送られてきた slug が本当にマスタに存在するか確認します。
+        const found = new Set(allergens.map((allergen) => allergen.slug));
+        const missing = Object.keys(allergenMap).filter((slug) => !found.has(slug));
 
-                    return [slug, status as AllergenStatus];
-                }),
+        if (missing.length > 0) {
+            return NextResponse.json(
+                { error: "unknown allergen slug(s)", missing },
+                { status: 400 },
             );
         }
 
-        // 送られてきた slug が本当にマスタに存在するか確認します。
-        // 存在しない値を黙って通すと、入力ミスに気付きにくくなるためです。
-        const slugs = Object.keys(allergenMap);
-        const allergens =
-            slugs.length > 0
-                ? await prisma.allergen.findMany({
-                      where: { slug: { in: slugs } },
-                      select: { id: true, slug: true },
-                  })
-                : [];
+        const completeAllergenMap = createStatusBySlug(allergens, []);
+        for (const allergen of allergens) {
+            const incomingStatus = allergenMap[allergen.slug];
+            if (incomingStatus) {
+                completeAllergenMap[allergen.slug] = incomingStatus;
+            }
+        }
 
-        if (slugs.length > 0) {
-            const found = new Set(allergens.map((allergen) => allergen.slug));
-            const missing = slugs.filter((slug) => !found.has(slug));
+        if (isPublished) {
+            const publishErrors = getMenuPublishValidationErrors({
+                name,
+                ingredients,
+                precaution,
+                allergens,
+                statusBySlug: completeAllergenMap,
+            });
 
-            if (missing.length > 0) {
+            if (publishErrors.length > 0) {
                 return NextResponse.json(
-                    { error: "unknown allergen slug(s)", missing },
+                    { error: publishErrors.join(" ") },
                     { status: 400 },
                 );
             }
@@ -168,28 +163,20 @@ export async function POST(req: Request) {
                 },
             });
 
-            if (allergens.length > 0) {
-                await tx.menuItemAllergen.createMany({
-                    data: allergens.map((allergen) => ({
-                        menuItemId: menu.id,
-                        allergenId: allergen.id,
-                        status: allergenMap[allergen.slug] ?? "FREE",
-                    })),
-                });
-            }
+            await tx.menuItemAllergen.createMany({
+                data: allergens.map((allergen) => ({
+                    menuItemId: menu.id,
+                    allergenId: allergen.id,
+                    status:
+                        (completeAllergenMap[allergen.slug] ?? "UNKNOWN") as never,
+                })),
+            });
 
             return menu;
         });
 
         return NextResponse.json({ id: created.id }, { status: 201 });
     } catch (e) {
-        if (
-            e instanceof Error &&
-            e.message.startsWith("invalid allergen status:")
-        ) {
-            // バリデーション系の失敗は 400 として返します。
-            return NextResponse.json({ error: e.message }, { status: 400 });
-        }
         return internalError(e);
     }
 }

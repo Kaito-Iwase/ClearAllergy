@@ -13,24 +13,30 @@ import {
     readJson,
     requireShopId,
 } from "@/app/api/admin/_utils";
-import { type AllergenStatus } from "@/lib/allergens";
+import {
+    createStatusBySlug,
+    getMenuPublishValidationErrors,
+    validateAllergenStatusMap,
+} from "@/lib/allergens";
+import {
+    parsePriceYen,
+    toBooleanOrDefault,
+    toRequiredTrimmedString,
+    toTrimmedNullableString,
+} from "@/lib/admin-validators";
 
 // 更新用の request body です。
 // shopId はクライアントから受け取らず、必ず session 側の shopId を使います。
 type UpdateMenuBody = {
-    name?: string;
-    description?: string | null;
-    priceYen?: number | null;
-    category?: string | null;
-    ingredients?: string | null;
-    precaution?: string | null;
-    isPublished?: boolean;
-
-    // ★追加：画像URL（まずはこれで十分）
-    imageUrl?: string | null;
-
-    // 例：{ egg: "CONTAINS", milk: "FREE" }
-    allergenStatusBySlug?: Record<string, AllergenStatus>;
+    name?: unknown;
+    description?: unknown;
+    priceYen?: unknown;
+    category?: unknown;
+    ingredients?: unknown;
+    precaution?: unknown;
+    isPublished?: unknown;
+    imageUrl?: unknown;
+    allergenStatusBySlug?: unknown;
 };
 
 export async function GET(req: Request, context: Context) {
@@ -149,7 +155,25 @@ export async function PUT(req: Request, context: Context) {
         // 対象メニューが自分の店舗に属しているか確認します。
         const existing = await prisma.menuItem.findFirst({
             where: { id: menuId, shopId: auth.shopId },
-            select: { id: true },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                priceYen: true,
+                category: true,
+                ingredients: true,
+                precaution: true,
+                imageUrl: true,
+                isPublished: true,
+                allergenLinks: {
+                    select: {
+                        status: true,
+                        allergen: {
+                            select: { slug: true },
+                        },
+                    },
+                },
+            },
         });
         if (!existing) {
             return NextResponse.json(
@@ -158,73 +182,145 @@ export async function PUT(req: Request, context: Context) {
             );
         }
 
-        // undefined を渡した項目は更新しないので、部分更新に使えます。
-        const updatedMenu = await prisma.menuItem.update({
-            where: { id: menuId },
-            data: {
-                name: body.name ?? undefined,
-                description: body.description ?? undefined,
-                priceYen: body.priceYen ?? undefined,
-                category: body.category ?? undefined,
-                ingredients: body.ingredients ?? undefined,
-                precaution: body.precaution ?? undefined,
-                isPublished: body.isPublished ?? undefined,
+        const priceResult = parsePriceYen(
+            body.priceYen === undefined ? existing.priceYen : body.priceYen,
+        );
+        if (!priceResult.ok) {
+            return NextResponse.json(
+                { error: priceResult.message },
+                { status: 400 },
+            );
+        }
 
-                // ★追加：imageUrlを更新できるようにした
-                imageUrl: body.imageUrl ?? undefined,
-            },
-            select: {
-                id: true,
-                shopId: true,
-                name: true,
-                isPublished: true,
-                imageUrl: true,
-                updatedAt: true,
-            },
+        const allergens = await prisma.allergen.findMany({
+            orderBy: { sortOrder: "asc" },
+            select: { id: true, slug: true, nameJa: true },
         });
 
-        // アレルゲンは menu 本体とは別テーブルなので、後続で更新します。
-        const map = body.allergenStatusBySlug ?? {};
-        const slugs = Object.keys(map);
+        const allergenMapResult = validateAllergenStatusMap(
+            body.allergenStatusBySlug,
+        );
+        if (!allergenMapResult.ok) {
+            return NextResponse.json(
+                { error: allergenMapResult.message },
+                { status: 400 },
+            );
+        }
 
-        if (slugs.length > 0) {
-            // 画面が扱う slug を、DB の外部キーである allergenId に変換します。
-            const allergens = await prisma.allergen.findMany({
-                where: { slug: { in: slugs } },
-                select: { id: true, slug: true },
+        const incomingAllergenMap = allergenMapResult.value;
+        const found = new Set(allergens.map((allergen) => allergen.slug));
+        const missing = Object.keys(incomingAllergenMap).filter(
+            (slug) => !found.has(slug),
+        );
+        if (missing.length > 0) {
+            return NextResponse.json(
+                { error: "unknown allergen slug(s)", missing },
+                { status: 400 },
+            );
+        }
+
+        const nextName =
+            body.name === undefined
+                ? existing.name
+                : toRequiredTrimmedString(body.name);
+        if (!nextName) {
+            return NextResponse.json(
+                { error: "bad request: name is required" },
+                { status: 400 },
+            );
+        }
+
+        const nextDescription =
+            body.description === undefined
+                ? existing.description
+                : toTrimmedNullableString(body.description);
+        const nextCategory =
+            body.category === undefined
+                ? existing.category
+                : toTrimmedNullableString(body.category);
+        const nextIngredients =
+            body.ingredients === undefined
+                ? existing.ingredients
+                : toTrimmedNullableString(body.ingredients);
+        const nextPrecaution =
+            body.precaution === undefined
+                ? existing.precaution
+                : toTrimmedNullableString(body.precaution);
+        const nextImageUrl =
+            body.imageUrl === undefined
+                ? existing.imageUrl
+                : toTrimmedNullableString(body.imageUrl);
+        const nextIsPublished =
+            body.isPublished === undefined
+                ? existing.isPublished
+                : toBooleanOrDefault(body.isPublished, existing.isPublished);
+
+        const nextStatusBySlug = createStatusBySlug(
+            allergens,
+            existing.allergenLinks,
+        );
+        for (const allergen of allergens) {
+            const incomingStatus = incomingAllergenMap[allergen.slug];
+            if (incomingStatus) {
+                nextStatusBySlug[allergen.slug] = incomingStatus;
+            }
+        }
+
+        if (nextIsPublished) {
+            const publishErrors = getMenuPublishValidationErrors({
+                name: nextName,
+                ingredients: nextIngredients,
+                precaution: nextPrecaution,
+                allergens,
+                statusBySlug: nextStatusBySlug,
             });
 
-            // 未知の slug を黙って無視すると入力ミスが埋もれるので 400 にします。
-            const found = new Set(allergens.map((a) => a.slug));
-            const missing = slugs.filter((s) => !found.has(s));
-            if (missing.length > 0) {
+            if (publishErrors.length > 0) {
                 return NextResponse.json(
-                    { error: "unknown allergen slug(s)", missing },
+                    { error: publishErrors.join(" ") },
                     { status: 400 },
                 );
             }
-
-            // upsert で「既存なら更新、なければ作成」をまとめて行います。
-            // transaction にするのは、途中失敗で一部だけ保存されるのを防ぐためです。
-            const ops = allergens.map((a) =>
-                prisma.menuItemAllergen.upsert({
-                    where: {
-                        menuItemId_allergenId: {
-                            menuItemId: menuId,
-                            allergenId: a.id,
-                        },
-                    },
-                    update: { status: map[a.slug] ?? "FREE" },
-                    create: {
-                        menuItemId: menuId,
-                        allergenId: a.id,
-                        status: map[a.slug] ?? "FREE",
-                    },
-                }),
-            );
-
-            await prisma.$transaction(ops);
         }
+
+        const updatedMenu = await prisma.$transaction(async (tx) => {
+            const updated = await tx.menuItem.update({
+                where: { id: menuId },
+                data: {
+                    name: nextName,
+                    description: nextDescription,
+                    priceYen: priceResult.value,
+                    category: nextCategory,
+                    ingredients: nextIngredients,
+                    precaution: nextPrecaution,
+                    isPublished: nextIsPublished,
+                    imageUrl: nextImageUrl,
+                },
+                select: {
+                    id: true,
+                    shopId: true,
+                    name: true,
+                    isPublished: true,
+                    imageUrl: true,
+                    updatedAt: true,
+                },
+            });
+
+            await tx.menuItemAllergen.deleteMany({
+                where: { menuItemId: menuId },
+            });
+
+            await tx.menuItemAllergen.createMany({
+                data: allergens.map((allergen) => ({
+                    menuItemId: menuId,
+                    allergenId: allergen.id,
+                    status:
+                        (nextStatusBySlug[allergen.slug] ?? "UNKNOWN") as never,
+                })),
+            });
+
+            return updated;
+        });
 
         return NextResponse.json({ menu: updatedMenu });
     } catch (e) {

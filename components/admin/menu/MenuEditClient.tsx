@@ -465,13 +465,13 @@ export default function MenuEditClient(props: {
             <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <div className="font-bold text-gray-900">アレルゲン28品目</div>
                 <p className="mt-1 text-sm text-gray-600">
-                    各品目について「含む / 含まない /
+                    各品目について「未設定 / 含む / 含まない /
                     含む可能性があります」を選択してください。
                 </p>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     {allergens.map((a) => {
-                        const current = statusBySlug[a.slug] ?? "FREE";
+                        const current = statusBySlug[a.slug] ?? "UNKNOWN";
 
                         return (
                             <div
@@ -488,6 +488,18 @@ export default function MenuEditClient(props: {
                                 </div>
 
                                 <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setOne(a.slug, "UNKNOWN")}
+                                        className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                                            current === "UNKNOWN"
+                                                ? "bg-gray-700 text-white"
+                                                : "bg-gray-100 text-gray-700"
+                                        }`}
+                                    >
+                                        未設定
+                                    </button>
+
                                     <button
                                         type="button"
                                         onClick={() =>

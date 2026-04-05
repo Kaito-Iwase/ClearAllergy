@@ -42,7 +42,9 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     const [statusBySlug, setStatusBySlug] = React.useState<
         Record<string, AllergenStatus>
     >(() =>
-        Object.fromEntries(allergens.map((allergen) => [allergen.slug, "FREE"])),
+        Object.fromEntries(
+            allergens.map((allergen) => [allergen.slug, "UNKNOWN"]),
+        ),
     );
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [uploading, setUploading] = React.useState(false);
@@ -396,12 +398,13 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
             <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <div className="font-bold text-gray-900">アレルゲン28品目</div>
                 <p className="mt-1 text-sm text-gray-600">
-                    各品目について「含む / 含まない / 含む可能性があります」を選択してください。
+                    各品目について「未設定 / 含む / 含まない / 含む可能性があります」を選択してください。
                 </p>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     {allergens.map((allergen) => {
-                        const current = statusBySlug[allergen.slug] ?? "FREE";
+                        const current =
+                            statusBySlug[allergen.slug] ?? "UNKNOWN";
 
                         return (
                             <div
@@ -418,6 +421,20 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                                 </div>
 
                                 <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setOne(allergen.slug, "UNKNOWN")
+                                        }
+                                        className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                                            current === "UNKNOWN"
+                                                ? "bg-gray-700 text-white"
+                                                : "bg-gray-100 text-gray-700"
+                                        }`}
+                                    >
+                                        未設定
+                                    </button>
+
                                     <button
                                         type="button"
                                         onClick={() =>
