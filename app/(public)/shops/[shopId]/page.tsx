@@ -11,6 +11,7 @@ import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 import ShopMenuListClient from "@/components/public/ShopMenuListClient";
 import UserAllergenPreferenceClient from "@/components/public/UserAllergenPreferenceClient";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
+import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
 
 type Params = { shopId: string };
 type SearchParams = { q?: string };
@@ -75,8 +76,15 @@ export default async function PublicShopDetailPage({
     const menuWhere = buildMenuWhere(q);
 
     // 店舗本体と公開メニューを一緒に取り、N+1 を避けます。
-    const shop = await prisma.shop.findUnique({
-        where: { id: shopId },
+    const shop = await prisma.shop.findFirst({
+        where: {
+            id: shopId,
+            menus: {
+                some: {
+                    isPublished: true,
+                },
+            },
+        },
         select: {
             id: true,
             name: true,
@@ -86,6 +94,15 @@ export default async function PublicShopDetailPage({
             averageBudgetYen: true,
             coverImageUrl: true,
             updatedAt: true,
+            _count: {
+                select: {
+                    menus: {
+                        where: {
+                            isPublished: true,
+                        },
+                    },
+                },
+            },
             menus: {
                 where: menuWhere,
                 orderBy: { updatedAt: "desc" },
@@ -111,6 +128,15 @@ export default async function PublicShopDetailPage({
         notFound();
     }
 
+    const firstPublishedMenu = await prisma.menuItem.findFirst({
+        where: {
+            shopId,
+            isPublished: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true },
+    });
+
     // Server Component で取った Date や relation を、Client Component が扱いやすい形へ変換します。
     const menusForClient = shop.menus.map((menu) => ({
         id: menu.id,
@@ -133,17 +159,22 @@ export default async function PublicShopDetailPage({
         nameJa: allergen.nameJa,
     }));
 
-    const firstPublishedMenuId = shop.menus[0]?.id ?? null;
-    const publishedMenuCount = shop.menus.length;
+    const firstPublishedMenuId =
+        shop.menus[0]?.id ?? firstPublishedMenu?.id ?? null;
+    const publishedMenuCount = shop._count.menus;
     const averageBudgetLabel =
         typeof shop.averageBudgetYen === "number"
             ? `${formatPriceYenLabel(shop.averageBudgetYen)}前後`
             : "未設定";
 
     // カバー画像があればそれを使い、無ければ既存のグラデーションで見た目を保ちます。
-    const heroStyle = shop.coverImageUrl
+    const safeCoverImageUrl = sanitizeStoredImageUrl(shop.coverImageUrl, {
+        kind: "shop",
+        shopId,
+    });
+    const heroStyle = safeCoverImageUrl
         ? {
-              backgroundImage: `url("${shop.coverImageUrl}")`,
+              backgroundImage: `url("${safeCoverImageUrl}")`,
           }
         : {
               backgroundImage:

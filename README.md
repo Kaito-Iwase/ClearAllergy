@@ -104,6 +104,7 @@ Copy-Item .env.example .env
 | `ADMIN_REGISTRATION_INVITE_TOKEN` | 条件付き必須 | `invite_only` のときに使う招待トークン |
 | `NEXT_PUBLIC_APP_URL` | 任意 | 管理画面の QR コード生成時に使う公開 URL のベース。未設定時は現在のブラウザ origin を使う |
 | `BLOB_READ_WRITE_TOKEN` | 任意 | 店舗画像 / メニュー画像のアップロードを有効にする Vercel Blob トークン |
+| `ALLOWED_IMAGE_URL_PREFIXES` | 推奨 | DB に保存してよい画像URLの prefix 一覧。独自配信URLを使う場合に設定 |
 
 最小構成でローカル起動する場合は `DATABASE_URL`、`DIRECT_URL`、`NEXTAUTH_SECRET` が必須です。画像アップロードまで確認する場合は `BLOB_READ_WRITE_TOKEN` も設定してください。
 
@@ -118,6 +119,7 @@ ADMIN_REGISTRATION_MODE="disabled"
 ADMIN_REGISTRATION_INVITE_TOKEN=""
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 BLOB_READ_WRITE_TOKEN=""
+ALLOWED_IMAGE_URL_PREFIXES=""
 ```
 
 ### 4. DB スキーマを適用
@@ -171,4 +173,5 @@ npm run dev
 - 本番では少なくとも `DATABASE_URL`、`DIRECT_URL`、`NEXTAUTH_SECRET`、`NEXTAUTH_URL` を適切な値に置き換えてください。
 - 独自ドメインや固定URLで QR を配布するなら `NEXT_PUBLIC_APP_URL` を本番 URL に合わせて設定してください。
 - 画像アップロードを使う場合は `BLOB_READ_WRITE_TOKEN` が必要です。未設定のままだとアップロード API は失敗します。対応形式は JPEG / PNG / WebP / GIF / AVIF、上限は 5MB です。
+- 画像URLは保存時に許可prefix / Blob 由来ホスト / 想定 path を検証します。既存の外部URLデータは今後の保存で弾かれ、公開画面では非表示になります。
 - 公開側の個人アレルゲン設定は `localStorage` 保存です。端末間同期はされません。

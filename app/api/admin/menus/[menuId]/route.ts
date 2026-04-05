@@ -25,6 +25,8 @@ import {
     toRequiredTrimmedString,
     toTrimmedNullableString,
 } from "@/lib/admin-validators";
+import { writeAdminAuditLog } from "@/lib/audit-log";
+import { validateStoredImageUrl } from "@/lib/image-url-policy";
 
 // 更新用の request body です。
 // shopId はクライアントから受け取らず、必ず session 側の shopId を使います。
@@ -104,6 +106,10 @@ export async function GET(req: Request, context: Context) {
 
         // 管理 API でも 28 品目を欠損なく返し、画面や外部クライアントの解釈差をなくします。
         const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
+        const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
+            kind: "menu",
+            shopId: auth.shopId,
+        });
 
         return NextResponse.json({
             menu: {
@@ -115,7 +121,7 @@ export async function GET(req: Request, context: Context) {
                 category: menu.category,
                 ingredients: menu.ingredients,
                 precaution: menu.precaution,
-                imageUrl: menu.imageUrl,
+                imageUrl: safeImageUrl.ok ? safeImageUrl.value : null,
                 isPublished: menu.isPublished,
                 createdAt: menu.createdAt,
                 updatedAt: menu.updatedAt,
@@ -128,11 +134,20 @@ export async function GET(req: Request, context: Context) {
 }
 
 export async function PUT(req: Request, context: Context) {
+    let auditActorUserId: string | null = null;
+    let auditShopId: string | null = null;
+    let auditTargetId: string | null = null;
+    let auditAction:
+        | "menu_update"
+        | "menu_publish"
+        | "menu_unpublish" = "menu_update";
     try {
         // PUT は既存メニューの保存です。
         // まず本人の店舗かどうか判定するため、認証と shopId 確認を行います。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
+        auditActorUserId = auth.appUser.id;
+        auditShopId = auth.shopId;
 
         // 2) menuId 取得
         const menuId = await getMenuId(req, context);
@@ -191,6 +206,7 @@ export async function PUT(req: Request, context: Context) {
                 { status: 400 },
             );
         }
+        auditTargetId = menuId;
 
         const allergens = await prisma.allergen.findMany({
             orderBy: { sortOrder: "asc" },
@@ -250,10 +266,36 @@ export async function PUT(req: Request, context: Context) {
             body.imageUrl === undefined
                 ? existing.imageUrl
                 : toTrimmedNullableString(body.imageUrl);
+        const imageUrlResult = validateStoredImageUrl(nextImageUrl, {
+            kind: "menu",
+            shopId: auth.shopId,
+        });
+        if (!imageUrlResult.ok) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: auditAction,
+                targetType: "menu",
+                targetId: auditTargetId,
+                success: false,
+                metadata: { reason: imageUrlResult.message, imageUrlProvided: true },
+            });
+            return NextResponse.json(
+                { error: imageUrlResult.message },
+                { status: 400 },
+            );
+        }
         const nextIsPublished =
             body.isPublished === undefined
                 ? existing.isPublished
                 : toBooleanOrDefault(body.isPublished, existing.isPublished);
+        auditAction =
+            existing.isPublished !== nextIsPublished
+                ? nextIsPublished
+                    ? "menu_publish"
+                    : "menu_unpublish"
+                : "menu_update";
 
         const nextStatusBySlug = createStatusBySlug(
             allergens,
@@ -276,6 +318,16 @@ export async function PUT(req: Request, context: Context) {
             });
 
             if (publishErrors.length > 0) {
+                await writeAdminAuditLog({
+                    req,
+                    actorUserId: auditActorUserId,
+                    actorShopId: auditShopId,
+                    action: auditAction,
+                    targetType: "menu",
+                    targetId: auditTargetId,
+                    success: false,
+                    metadata: { reason: publishErrors.join(" ") },
+                });
                 return NextResponse.json(
                     { error: publishErrors.join(" ") },
                     { status: 400 },
@@ -294,7 +346,7 @@ export async function PUT(req: Request, context: Context) {
                     ingredients: nextIngredients,
                     precaution: nextPrecaution,
                     isPublished: nextIsPublished,
-                    imageUrl: nextImageUrl,
+                    imageUrl: imageUrlResult.value,
                 },
                 select: {
                     id: true,
@@ -322,17 +374,49 @@ export async function PUT(req: Request, context: Context) {
             return updated;
         });
 
+        await writeAdminAuditLog({
+            req,
+            actorUserId: auditActorUserId,
+            actorShopId: auditShopId,
+            action: auditAction,
+            targetType: "menu",
+            targetId: updatedMenu.id,
+            success: true,
+            metadata: {
+                wasPublished: existing.isPublished,
+                isPublished: nextIsPublished,
+                imageChanged: existing.imageUrl !== imageUrlResult.value,
+            },
+        });
+
         return NextResponse.json({ menu: updatedMenu });
     } catch (e) {
+        if (auditShopId) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: auditAction,
+                targetType: "menu",
+                targetId: auditTargetId,
+                success: false,
+                metadata: { reason: "internal_error" },
+            });
+        }
         return internalError(e);
     }
 }
 
 export async function DELETE(req: Request, context: Context) {
+    let auditActorUserId: string | null = null;
+    let auditShopId: string | null = null;
+    let auditTargetId: string | null = null;
     try {
         // DELETE でも shopId を確認し、自店舗メニュー以外は削除できないようにします。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
+        auditActorUserId = auth.appUser.id;
+        auditShopId = auth.shopId;
 
         // 2) menuId 取得
         const menuId = await getMenuId(req, context);
@@ -342,6 +426,7 @@ export async function DELETE(req: Request, context: Context) {
                 { status: 400 },
             );
         }
+        auditTargetId = menuId;
 
         // 3) この店のメニューか確認（他店なら404）
         const existing = await prisma.menuItem.findFirst({
@@ -365,8 +450,30 @@ export async function DELETE(req: Request, context: Context) {
             where: { id: menuId },
         });
 
+        await writeAdminAuditLog({
+            req,
+            actorUserId: auditActorUserId,
+            actorShopId: auditShopId,
+            action: "menu_delete",
+            targetType: "menu",
+            targetId: auditTargetId,
+            success: true,
+        });
+
         return NextResponse.json({ ok: true });
     } catch (e) {
+        if (auditShopId) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "menu_delete",
+                targetType: "menu",
+                targetId: auditTargetId,
+                success: false,
+                metadata: { reason: "internal_error" },
+            });
+        }
         return internalError(e);
     }
 }

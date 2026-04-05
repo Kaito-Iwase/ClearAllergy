@@ -10,6 +10,8 @@ import {
     toRequiredTrimmedString,
     toTrimmedNullableString,
 } from "@/lib/admin-validators";
+import { validateStoredImageUrl } from "@/lib/image-url-policy";
+import { writeAdminAuditLog } from "@/lib/audit-log";
 
 type ShopUpdateBody = {
     name?: unknown;
@@ -49,19 +51,38 @@ export async function GET() {
             );
         }
 
-        return NextResponse.json({ shop });
+        const sanitizedCoverImageUrl = validateStoredImageUrl(
+            shop.coverImageUrl,
+            {
+                kind: "shop",
+                shopId: auth.shopId,
+            },
+        );
+
+        return NextResponse.json({
+            shop: {
+                ...shop,
+                coverImageUrl: sanitizedCoverImageUrl.ok
+                    ? sanitizedCoverImageUrl.value
+                    : null,
+            },
+        });
     } catch (e) {
         return internalError(e);
     }
 }
 
 export async function PUT(req: Request) {
+    let auditActorUserId: string | null = null;
+    let auditShopId: string | null = null;
     try {
         // PUT は編集フォームから送られた店舗情報の保存です。
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
         }
+        auditActorUserId = auth.appUser.id;
+        auditShopId = auth.shopId;
 
         // JSON が壊れている場合は 400 を返し、DB 更新まで進ませません。
         const body = await readJson<ShopUpdateBody>(req);
@@ -72,9 +93,38 @@ export async function PUT(req: Request) {
             );
         }
 
+        const existing = await prisma.shop.findUnique({
+            where: { id: auth.shopId },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                address: true,
+                hours: true,
+                averageBudgetYen: true,
+                coverImageUrl: true,
+            },
+        });
+        if (!existing) {
+            return NextResponse.json(
+                { error: "shop not found" },
+                { status: 404 },
+            );
+        }
+
         // 店舗名は必須なので、空文字や空白だけはここで弾きます。
         const name = toRequiredTrimmedString(body.name);
         if (!name) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "shop_update",
+                targetType: "shop",
+                targetId: auth.shopId,
+                success: false,
+                metadata: { reason: "bad request: name is required" },
+            });
             return NextResponse.json(
                 { error: "bad request: name is required" },
                 { status: 400 },
@@ -87,10 +137,40 @@ export async function PUT(req: Request) {
         const hours = toTrimmedNullableString(body.hours);
         const averageBudgetResult = parseAverageBudgetYen(body.averageBudgetYen);
         const coverImageUrl = toTrimmedNullableString(body.coverImageUrl);
+        const coverImageUrlResult = validateStoredImageUrl(coverImageUrl, {
+            kind: "shop",
+            shopId: auth.shopId,
+        });
 
         if (!averageBudgetResult.ok) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "shop_update",
+                targetType: "shop",
+                targetId: auth.shopId,
+                success: false,
+                metadata: { reason: averageBudgetResult.message },
+            });
             return NextResponse.json(
                 { error: averageBudgetResult.message },
+                { status: 400 },
+            );
+        }
+        if (!coverImageUrlResult.ok) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "shop_update",
+                targetType: "shop",
+                targetId: auth.shopId,
+                success: false,
+                metadata: { reason: coverImageUrlResult.message },
+            });
+            return NextResponse.json(
+                { error: coverImageUrlResult.message },
                 { status: 400 },
             );
         }
@@ -104,7 +184,7 @@ export async function PUT(req: Request) {
                 address,
                 hours,
                 averageBudgetYen: averageBudgetResult.value,
-                coverImageUrl,
+                coverImageUrl: coverImageUrlResult.value,
             },
             select: {
                 id: true,
@@ -118,8 +198,44 @@ export async function PUT(req: Request) {
             },
         });
 
+        await writeAdminAuditLog({
+            req,
+            actorUserId: auditActorUserId,
+            actorShopId: auditShopId,
+            action: "shop_update",
+            targetType: "shop",
+            targetId: shop.id,
+            success: true,
+            metadata: {
+                changedFields: [
+                    existing.name !== name ? "name" : null,
+                    existing.description !== description ? "description" : null,
+                    existing.address !== address ? "address" : null,
+                    existing.hours !== hours ? "hours" : null,
+                    existing.averageBudgetYen !== averageBudgetResult.value
+                        ? "averageBudgetYen"
+                        : null,
+                    existing.coverImageUrl !== coverImageUrlResult.value
+                        ? "coverImageUrl"
+                        : null,
+                ].filter(Boolean),
+            },
+        });
+
         return NextResponse.json({ shop });
     } catch (e) {
+        if (auditShopId) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "shop_update",
+                targetType: "shop",
+                targetId: auditShopId,
+                success: false,
+                metadata: { reason: "internal_error" },
+            });
+        }
         return internalError(e);
     }
 }

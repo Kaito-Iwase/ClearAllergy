@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { buildAllergenRows } from "@/lib/allergens";
+import { validateStoredImageUrl } from "@/lib/image-url-policy";
 
 type Context = {
     // Next.js のバージョン差で params が Promise のこともあるため両対応にしています。
@@ -96,7 +97,16 @@ export async function GET(req: Request, context: Context) {
                 category: menu.category,
                 ingredients: menu.ingredients,
                 precaution: menu.precaution,
-                imageUrl: menu.imageUrl,
+                imageUrl:
+                    validateStoredImageUrl(menu.imageUrl, {
+                        kind: "menu",
+                        shopId: menu.shopId,
+                    }).ok
+                        ? validateStoredImageUrl(menu.imageUrl, {
+                              kind: "menu",
+                              shopId: menu.shopId,
+                          }).value
+                        : null,
                 isPublished: menu.isPublished,
                 createdAt: menu.createdAt,
                 updatedAt: menu.updatedAt,
