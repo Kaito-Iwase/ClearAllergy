@@ -9,6 +9,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // アプリ内の利用者です。
@@ -90,7 +91,7 @@ model Allergen {
 model MenuItemAllergen {
   menuItemId String
   allergenId String
-  status     AllergenStatus @default(FREE)
+  status     AllergenStatus @default(UNKNOWN)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
@@ -105,6 +106,7 @@ model MenuItemAllergen {
 
 // 公開画面で見せるアレルゲン状態の三択です。
 enum AllergenStatus {
+  UNKNOWN
   CONTAINS
   FREE
   MAY_CONTAIN

@@ -171,7 +171,7 @@ export default function HomePageView({
                                                     ? "含む"
                                                     : hasMayContain
                                                       ? "可能性"
-                                                      : "含まない";
+                                                      : "詳細確認";
 
                                                 return (
                                                     <div

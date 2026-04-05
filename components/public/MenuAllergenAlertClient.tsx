@@ -75,11 +75,21 @@ export default function MenuAllergenAlertClient({
         );
     }, [selectedSlugs, statusBySlug]);
 
+    const unknownMatched = React.useMemo(() => {
+        return selectedSlugs.filter(
+            (slug) => (statusBySlug[slug] ?? "UNKNOWN") === "UNKNOWN",
+        );
+    }, [selectedSlugs, statusBySlug]);
+
     const containsNames = containsMatched
         .map((slug) => allergenNameBySlug.get(slug))
         .filter((value): value is string => Boolean(value));
 
     const mayContainNames = mayContainMatched
+        .map((slug) => allergenNameBySlug.get(slug))
+        .filter((value): value is string => Boolean(value));
+
+    const unknownNames = unknownMatched
         .map((slug) => allergenNameBySlug.get(slug))
         .filter((value): value is string => Boolean(value));
 
@@ -92,7 +102,11 @@ export default function MenuAllergenAlertClient({
         return null;
     }
 
-    if (containsNames.length === 0 && mayContainNames.length === 0) {
+    if (
+        containsNames.length === 0 &&
+        mayContainNames.length === 0 &&
+        unknownNames.length === 0
+    ) {
         return (
             <div className="rounded-xl border border-green-200 bg-green-50 p-6 shadow-sm">
                 <h3 className="text-lg font-bold text-green-800">
@@ -101,6 +115,24 @@ export default function MenuAllergenAlertClient({
                 <p className="mt-2 text-sm text-green-800/90">
                     この端末で選んだアレルゲンについて、現在の登録上は 「含む /
                     可能性あり」は見つかりません。
+                </p>
+            </div>
+        );
+    }
+
+    if (unknownNames.length > 0 && containsNames.length === 0) {
+        return (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 shadow-sm">
+                <h3 className="text-xl font-extrabold text-gray-800 md:text-2xl">
+                    あなた向け注意：{unknownNames.join("・")} は未設定です
+                    {mayContainNames.length > 0
+                        ? `（他：${mayContainNames.join("・")} は可能性あり）`
+                        : ""}
+                </h3>
+
+                <p className="mt-3 text-sm font-medium text-gray-900/90">
+                    この商品は、あなたが選択したアレルゲンの一部がまだ未設定です。
+                    公開表示だけで判断せず、必要に応じて店舗へ確認してください。
                 </p>
             </div>
         );

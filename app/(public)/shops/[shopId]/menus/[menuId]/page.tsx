@@ -74,9 +74,9 @@ export default async function PublicMenuDetailPage({
         linkStatusBySlug.set(link.allergen.slug, link.status as AllergenStatus);
     }
 
-    // マスタ 28 品目を基準に rows を作ることで、未登録項目も FREE として常に表示できます。
+    // マスタ 28 品目を基準に rows を作ることで、未登録項目も UNKNOWN として常に表示できます。
     const rows = allergenMaster.map((a) => {
-        const status = linkStatusBySlug.get(a.slug) ?? "FREE";
+        const status = linkStatusBySlug.get(a.slug) ?? "UNKNOWN";
         return {
             slug: a.slug,
             nameJa: a.nameJa,
