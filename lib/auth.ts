@@ -7,6 +7,8 @@ import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import { normalizeEmail } from "@/lib/email";
 import bcrypt from "bcrypt";
+import { consumeRateLimit } from "@/lib/rate-limit";
+import { getIpFromHeaders } from "@/lib/request-ip";
 
 export const authOptions: NextAuthOptions = {
     // DB に session テーブルを持たず、JWT の中にログイン情報を載せる方式です。
@@ -20,13 +22,24 @@ export const authOptions: NextAuthOptions = {
                 password: { label: "Password", type: "password" },
             },
 
-            async authorize(credentials) {
+            async authorize(credentials, req) {
                 // まず入力値を整えます。
                 // email は大小文字や余分な空白の揺れを減らすため正規化します。
                 const email = normalizeEmail(credentials?.email);
                 const password = credentials?.password;
 
                 if (!email || !password) return null;
+
+                const ip = getIpFromHeaders(req?.headers ?? {});
+                const rateLimit = consumeRateLimit({
+                    key: `login:${ip}`,
+                    limit: 10,
+                    windowMs: 10 * 60 * 1000,
+                });
+
+                if (!rateLimit.allowed) {
+                    return null;
+                }
 
                 // 認証対象のユーザーを DB から探します。
                 // 旧認証では email を一意キーとして扱っています。

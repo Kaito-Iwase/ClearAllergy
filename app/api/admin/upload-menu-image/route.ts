@@ -3,10 +3,12 @@
 // 店舗画像と同様に shopId で認可し、他店舗の保存先を使えないようにします。
 
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
-import { requireShopId, internalError } from "@/app/api/admin/_utils";
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+import { requireShopId } from "@/app/api/admin/_utils";
+import {
+    buildUploadJsonError,
+    uploadImageToBlob,
+    validateImageFile,
+} from "@/lib/upload-images";
 
 export async function POST(req: Request) {
     try {
@@ -27,29 +29,20 @@ export async function POST(req: Request) {
             );
         }
 
-        // Vercel Blob に公開画像として保存できるよう、画像 MIME のみ許可します。
-        if (!file.type.startsWith("image/")) {
+        const validation = validateImageFile(file);
+        if (!validation.ok) {
             return NextResponse.json(
-                { error: "画像ファイルのみアップロードできます。" },
-                { status: 400 },
-            );
-        }
-
-        // 大きすぎるファイルはアップロード前に弾き、体験とコストの両方を守ります。
-        if (file.size > MAX_FILE_SIZE) {
-            return NextResponse.json(
-                { error: "画像サイズは5MB以下にしてください。" },
+                { error: validation.message },
                 { status: 400 },
             );
         }
 
         // パスに shopId と時刻を含め、他店舗との混在や名前衝突を避けます。
-        const safeFileName = file.name.replace(/\s+/g, "-");
-        const pathname = `menu-images/${auth.shopId}/${Date.now()}-${safeFileName}`;
+        const pathname = `menu-images/${auth.shopId}/${Date.now()}.${validation.extension}`;
 
-        const blob = await put(pathname, file, {
-            access: "public",
-            addRandomSuffix: true,
+        const blob = await uploadImageToBlob({
+            file,
+            pathname,
         });
 
         return NextResponse.json({
@@ -57,6 +50,10 @@ export async function POST(req: Request) {
             pathname: blob.pathname,
         });
     } catch (e) {
-        return internalError(e);
+        const uploadError = buildUploadJsonError(e);
+        return NextResponse.json(
+            { error: uploadError.error },
+            { status: uploadError.status },
+        );
     }
 }

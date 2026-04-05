@@ -12,6 +12,9 @@ import BrandLogo from "@/components/layout/BrandLogo";
 
 type Props = {
     email: string | null;
+    canRegister: boolean;
+    lockMessage: string | null;
+    inviteToken: string | null;
 };
 
 type OnboardingResponse = {
@@ -22,7 +25,12 @@ type OnboardingResponse = {
     };
 };
 
-export default function AdminOnboardingPageClient({ email }: Props) {
+export default function AdminOnboardingPageClient({
+    email,
+    canRegister,
+    lockMessage,
+    inviteToken,
+}: Props) {
     // 入力値、エラー、送信中状態を画面側で持ちます。
     const router = useRouter();
     const [shopName, setShopName] = useState("");
@@ -33,6 +41,11 @@ export default function AdminOnboardingPageClient({ email }: Props) {
         // フォーム既定の再読み込みを止め、結果メッセージを画面内で扱います。
         e.preventDefault();
         setError(null);
+
+        if (!canRegister) {
+            setError(lockMessage ?? "現在は登録できません。");
+            return;
+        }
 
         // 必須の店舗名が空なら API を呼ばずに止めます。
         const trimmedShopName = shopName.trim();
@@ -52,6 +65,7 @@ export default function AdminOnboardingPageClient({ email }: Props) {
                 },
                 body: JSON.stringify({
                     shopName: trimmedShopName,
+                    inviteToken,
                 }),
             });
 
@@ -139,6 +153,12 @@ export default function AdminOnboardingPageClient({ email }: Props) {
                             </div>
                         ) : null}
 
+                        {!canRegister && lockMessage ? (
+                            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                {lockMessage}
+                            </div>
+                        ) : null}
+
                         <form className="flex flex-col gap-5" onSubmit={onSubmit}>
                             <div className="flex flex-col gap-2">
                                 <label
@@ -164,11 +184,15 @@ export default function AdminOnboardingPageClient({ email }: Props) {
                             <div className="mt-2">
                                 <button
                                     type="submit"
-                                    disabled={loading}
+                                    disabled={loading || !canRegister}
                                     className="flex h-12 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-primary px-4 text-base font-bold leading-normal tracking-[0.015em] text-black transition-colors hover:bg-primary-dark disabled:opacity-60"
                                 >
                                     <span className="truncate">
-                                        {loading ? "作成中..." : "店舗を作成して管理画面へ進む"}
+                                        {!canRegister
+                                            ? "現在は登録できません"
+                                            : loading
+                                              ? "作成中..."
+                                              : "店舗を作成して管理画面へ進む"}
                                     </span>
                                 </button>
                             </div>

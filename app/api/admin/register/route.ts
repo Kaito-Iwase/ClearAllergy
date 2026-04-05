@@ -6,17 +6,56 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/db";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
+import { consumeRateLimit } from "@/lib/rate-limit";
+import { getIpFromHeaders } from "@/lib/request-ip";
+import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 
 type RegisterRequestBody = {
     shopName?: string;
     email?: string;
     password?: string;
+    inviteToken?: string;
 };
 
 export async function POST(req: Request) {
     try {
+        const ip = getIpFromHeaders(req.headers);
+        const rateLimit = consumeRateLimit({
+            key: `register:${ip}`,
+            limit: 5,
+            windowMs: 15 * 60 * 1000,
+        });
+
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                {
+                    message:
+                        "登録試行が多すぎます。しばらく待ってから再度お試しください。",
+                },
+                {
+                    status: 429,
+                    headers: {
+                        "Retry-After": String(rateLimit.retryAfterSeconds),
+                    },
+                },
+            );
+        }
+
         // POST body からフォーム値を受け取ります。
         const body = (await req.json()) as RegisterRequestBody;
+        const inviteToken =
+            req.headers.get("x-admin-invite-token") ??
+            (typeof body?.inviteToken === "string" ? body.inviteToken : null);
+        const registrationGuard = getAdminRegistrationGuard({ inviteToken });
+
+        if (!registrationGuard.allowed) {
+            return NextResponse.json(
+                {
+                    message: registrationGuard.message,
+                },
+                { status: 403 },
+            );
+        }
 
         // 先に文字列を整形しておくと、以後のバリデーションを単純にできます。
         const shopName = body.shopName?.trim() ?? "";
@@ -102,14 +141,10 @@ export async function POST(req: Request) {
             },
             { status: 201 },
         );
-    } catch (error) {
-        // 予期しない失敗は 500 として返し、画面側でまとめて表示できるようにします。
-        const message =
-            error instanceof Error ? error.message : "不明なエラーです。";
-
+    } catch {
         return NextResponse.json(
             {
-                message: `新規登録中にサーバーエラーが発生しました: ${message}`,
+                message: "新規登録中にサーバーエラーが発生しました。",
             },
             { status: 500 },
         );

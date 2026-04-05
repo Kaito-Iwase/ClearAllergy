@@ -97,19 +97,25 @@ Copy-Item .env.example .env
 | 変数名 | 必須 | 用途 |
 | --- | --- | --- |
 | `DATABASE_URL` | 必須 | Prisma / PostgreSQL 接続先 |
+| `DIRECT_URL` | 必須 | Prisma Migrate 用の直接接続先 |
 | `NEXTAUTH_SECRET` | 必須 | NextAuth のセッション署名用シークレット |
 | `NEXTAUTH_URL` | 推奨 | NextAuth が参照するアプリのベース URL。ローカルでは `http://localhost:3000` |
+| `ADMIN_REGISTRATION_MODE` | 推奨 | 管理者自己登録のモード。`disabled` / `invite_only` / `open` |
+| `ADMIN_REGISTRATION_INVITE_TOKEN` | 条件付き必須 | `invite_only` のときに使う招待トークン |
 | `NEXT_PUBLIC_APP_URL` | 任意 | 管理画面の QR コード生成時に使う公開 URL のベース。未設定時は現在のブラウザ origin を使う |
 | `BLOB_READ_WRITE_TOKEN` | 任意 | 店舗画像 / メニュー画像のアップロードを有効にする Vercel Blob トークン |
 
-最小構成でローカル起動する場合は `DATABASE_URL` と `NEXTAUTH_SECRET` が必須です。画像アップロードまで確認する場合は `BLOB_READ_WRITE_TOKEN` も設定してください。
+最小構成でローカル起動する場合は `DATABASE_URL`、`DIRECT_URL`、`NEXTAUTH_SECRET` が必須です。画像アップロードまで確認する場合は `BLOB_READ_WRITE_TOKEN` も設定してください。
 
 `.env.example` の初期値:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/clearallergy"
+DIRECT_URL="postgresql://USER:PASSWORD@localhost:5432/clearallergy"
 NEXTAUTH_SECRET="replace-with-a-long-random-string"
 NEXTAUTH_URL="http://localhost:3000"
+ADMIN_REGISTRATION_MODE="disabled"
+ADMIN_REGISTRATION_INVITE_TOKEN=""
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 BLOB_READ_WRITE_TOKEN=""
 ```
@@ -118,6 +124,7 @@ BLOB_READ_WRITE_TOKEN=""
 
 ```bash
 npx prisma migrate dev
+npx prisma generate
 ```
 
 ### 5. デモデータを投入
@@ -154,13 +161,14 @@ npm run dev
 4. 公開側で個人アレルゲン設定を変更し、再読み込み後も `localStorage` 由来の表示が維持されることを確認する
 5. `/admin/login` からデモアカウントでログインし、`/admin/menus` と `/admin/shop` が表示できることを確認する
 6. `/admin/menus/new` からメニューを作成し、作成後に編集画面へ遷移することを確認する
-7. `BLOB_READ_WRITE_TOKEN` を設定した場合は、店舗画像とメニュー画像のアップロードが成功することを確認する
+7. `BLOB_READ_WRITE_TOKEN` を設定した場合は、JPEG / PNG / WebP / GIF / AVIF の5MB以下画像だけがアップロード成功することを確認する
 
 ## 公開前の注意
 
-- `admin/register` は現状公開されているため、誰でも店舗アカウントを作成できます。公開運用で自己登録を許可しない場合は制限が必要です。
+- `ADMIN_REGISTRATION_MODE=open` は誰でも店舗アカウント登録を試せるため、本番では `disabled` か `invite_only` を推奨します。
+- `invite_only` を使う場合は `ADMIN_REGISTRATION_INVITE_TOKEN` を必ず設定し、配布方法も管理してください。
 - `npm run seed` のデモアカウントとデモデータは開発確認用です。本番 DB には投入しないでください。
-- 本番では少なくとも `DATABASE_URL`、`NEXTAUTH_SECRET`、`NEXTAUTH_URL` を適切な値に置き換えてください。
+- 本番では少なくとも `DATABASE_URL`、`DIRECT_URL`、`NEXTAUTH_SECRET`、`NEXTAUTH_URL` を適切な値に置き換えてください。
 - 独自ドメインや固定URLで QR を配布するなら `NEXT_PUBLIC_APP_URL` を本番 URL に合わせて設定してください。
-- 画像アップロードを使う場合は `BLOB_READ_WRITE_TOKEN` が必要です。未設定のままだとアップロード API は失敗します。
+- 画像アップロードを使う場合は `BLOB_READ_WRITE_TOKEN` が必要です。未設定のままだとアップロード API は失敗します。対応形式は JPEG / PNG / WebP / GIF / AVIF、上限は 5MB です。
 - 公開側の個人アレルゲン設定は `localStorage` 保存です。端末間同期はされません。
