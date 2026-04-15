@@ -1,6 +1,9 @@
+import { loadEnvConfig } from "@next/env";
 import { prisma } from "../lib/db";
 import { normalizeEmail } from "../lib/email";
-import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminServer";
+import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminCore";
+
+loadEnvConfig(process.cwd());
 
 async function main() {
     const requestedEmail = normalizeEmail(process.argv[2]);

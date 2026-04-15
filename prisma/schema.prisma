@@ -1,136 +1,85 @@
-// この schema は ClearAllergy の業務データ全体を定義します。
-// Prisma がこの定義をもとに SQL と TypeScript の型を生成します。
-// 認証用 User、1店舗1アカウントの Shop、公開メニュー、アレルゲン情報をここで管理します。
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-// アプリ内の利用者です。
-// 認証の正本は Clerk なので clerkUserId が主軸です。
-// passwordHash は既存ユーザーを Clerk へ移行するための一時保管で、ランタイム認証には使いません。
-// ここで持つのは「認証に近い情報」で、店舗そのものの情報は Shop 側に分けています。
 model User {
   id           String   @id @default(cuid())
-  clerkUserId  String?  @unique
   email        String?  @unique
   passwordHash String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  // 1ユーザーにつき 1 店舗だけ持てる前提なので 1:1 関係です。
-  shop      Shop?
-  auditLogs AuditLog[]
+  clerkUserId  String?  @unique
+  shop         Shop?
 }
 
-// 店舗の公開情報です。
-// 住所や営業時間のように、来店前にユーザーへ見せたい情報をここに持たせます。
 model Shop {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  name          String
-  description   String?  // 店の説明（任意）
-  address       String?  // 住所（任意）
-  hours         String?  // 営業時間（任意）
-  averageBudgetYen Int?  // 店舗全体の平均予算（任意）
-  coverImageUrl String?  // 店舗カバー画像URL
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // userId を外部キーとして User と結び付けます。
-  // User が消えた時に店舗も消えるよう onDelete: Cascade にしています。
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  menus MenuItem[]
+  id               String     @id @default(cuid())
+  userId           String     @unique
+  name             String
+  description      String?
+  address          String?
+  hours            String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  coverImageUrl    String?
+  averageBudgetYen Int?
+  menus            MenuItem[]
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// 店舗ごとのメニューです。
-// 1 店舗に複数メニューがあるので Shop とは 1:N 関係です。
 model MenuItem {
   id            String             @id @default(cuid())
   shopId        String
   name          String
-  description   String?            // 商品説明（任意）
-  priceYen      Int?               // 価格（任意）
-  category      String?            // 自由入力カテゴリ
-  ingredients   String?            // 原材料
-  precaution    String?            // 注意書き
-  imageUrl      String?            // 画像URL（Blob等に保存したURL）
+  description   String?
+  priceYen      Int?
+  category      String?
+  ingredients   String?
+  precaution    String?
+  imageUrl      String?
   isPublished   Boolean            @default(false)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
-
-  // menu と allergen は多対多なので、直接はつながず中間テーブルを介します。
   shop          Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
   allergenLinks MenuItemAllergen[]
 
-  // 店舗別メニュー一覧を取りやすくするための索引です。
   @@index([shopId])
 }
 
-// アレルゲンのマスタです。
-// 表示名や並び順など、全メニューで共通に使う基準データを置いています。
 model Allergen {
-  id        String   @id @default(cuid())
-  slug      String   @unique
+  id        String             @id @default(cuid())
+  slug      String             @unique
   nameJa    String
   nameEn    String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  sortOrder Int                @default(0)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
   menuLinks MenuItemAllergen[]
 }
 
-// メニューとアレルゲンを結ぶ中間テーブルです。
-// 「卵を含む」「乳は含まない」のように、組み合わせごとの状態をここで持ちます。
-// 多対多を表現したいので、中間テーブルが必要になります。
 model MenuItemAllergen {
   menuItemId String
   allergenId String
   status     AllergenStatus @default(UNKNOWN)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
+  allergen   Allergen       @relation(fields: [allergenId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 
-  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  allergen Allergen @relation(fields: [allergenId], references: [id], onDelete: Cascade)
-
-  // 同じメニューと同じアレルゲンの組み合わせは 1 回だけ登録できるよう複合主キーにします。
   @@id([menuItemId, allergenId])
   @@index([allergenId])
   @@index([menuItemId])
 }
 
-model AuditLog {
-  id          String   @id @default(cuid())
-  actorUserId String?
-  actorShopId String?
-  action      String
-  targetType  String
-  targetId    String?
-  success     Boolean
-  ipAddress   String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
-
-  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
-
-  @@index([actorUserId])
-  @@index([actorShopId])
-  @@index([targetType, targetId])
-  @@index([action, createdAt])
-  @@index([createdAt])
-}
-
-// 公開画面で見せるアレルゲン状態の三択です。
 enum AllergenStatus {
-  UNKNOWN
   CONTAINS
   FREE
   MAY_CONTAIN
+  UNKNOWN
 }

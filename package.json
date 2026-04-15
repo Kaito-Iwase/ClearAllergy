@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
+    "auth:create:test-user": "tsx scripts/create-test-user.ts",
     "auth:migrate:clerk": "tsx scripts/migrate-users-to-clerk.ts",
     "repair:published-menus": "tsx prisma/repair-published-menus.ts"
   },

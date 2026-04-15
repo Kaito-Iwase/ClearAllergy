@@ -167,6 +167,14 @@ npm run auth:migrate:clerk
 
 デモログインも Clerk に移行済みです。`npm run seed` のあとに `npm run auth:migrate:clerk` を実行すると、今までと同じメールアドレス / パスワードで `/admin/login` から入れます。
 
+既存のテスト管理者を既知のパスワードで作り直したい時は、次も使えます。
+
+```bash
+npm run auth:create:test-user -- test@test.com Passw0rd!
+```
+
+このコマンドは local DB の `passwordHash` と Clerk 側パスワードを同じ値に揃えます。
+
 ### 7. 開発サーバーを起動
 
 ```bash
