@@ -13,7 +13,8 @@ datasource db {
 }
 
 // アプリ内の利用者です。
-// Clerk 移行中のため clerkUserId は任意、旧認証の passwordHash も一時的に残しています。
+// 認証の正本は Clerk なので clerkUserId が主軸です。
+// passwordHash は既存ユーザーを Clerk へ移行するための一時保管で、ランタイム認証には使いません。
 // ここで持つのは「認証に近い情報」で、店舗そのものの情報は Shop 側に分けています。
 model User {
   id           String   @id @default(cuid())

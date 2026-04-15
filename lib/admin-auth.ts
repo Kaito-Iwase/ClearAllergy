@@ -1,12 +1,9 @@
 // このファイルは管理画面用の認証入口です。
-// Clerk と旧 NextAuth の両方を受け付け、段階移行中でも同じ helper で扱えるようにします。
+// 現在は Clerk を唯一の認証基盤として扱い、
 // Server Component や API から「今の管理者」と「その店舗」を取得する時に使います。
 
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
-import { prisma } from "@/lib/db";
-import { authOptions } from "@/lib/auth";
 
 type AdminSessionLike = {
     user: {
@@ -48,7 +45,7 @@ type AdminContext = {
         createdAt: Date;
         updatedAt: Date;
     } | null;
-    authProvider: "clerk" | "legacy";
+    authProvider: "clerk";
 };
 
 // 既存のコードが session.user.shopId 前提で書かれているため、
@@ -71,39 +68,18 @@ export async function getAdminSession(): Promise<AdminSessionLike | null> {
 }
 
 // 管理画面で必要な「アプリ内 User」と「紐づく Shop」をまとめて返します。
-// まず Clerk を試し、未ログインなら旧 NextAuth セッションへフォールバックします。
+// 認証は Clerk セッションだけを正本にし、local DB は clerkUserId で引き直します。
 export async function getCurrentAdminContext(): Promise<AdminContext | null> {
     const clerkAppUser = await getCurrentAppUser();
 
-    if (clerkAppUser) {
-        return {
-            appUser: clerkAppUser,
-            shop: clerkAppUser.shop ?? null,
-            authProvider: "clerk",
-        };
-    }
-
-    const legacySession = await getServerSession(authOptions);
-    const legacyUserId = legacySession?.user?.userId;
-
-    if (!legacyUserId) {
-        return null;
-    }
-
-    // 旧認証では session に userId だけがあるので、ここで DB の User / Shop を引き直します。
-    const legacyAppUser = await prisma.user.findUnique({
-        where: { id: legacyUserId },
-        include: { shop: true },
-    });
-
-    if (!legacyAppUser) {
+    if (!clerkAppUser) {
         return null;
     }
 
     return {
-        appUser: legacyAppUser,
-        shop: legacyAppUser.shop ?? null,
-        authProvider: "legacy",
+        appUser: clerkAppUser,
+        shop: clerkAppUser.shop ?? null,
+        authProvider: "clerk",
     };
 }
 

@@ -30,6 +30,28 @@ export default function AdminGoogleAuthButton({
         onError?.("");
 
         try {
+            const precheckResponse = await fetch("/api/admin/auth/sso", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    provider: "google",
+                    stage: "start",
+                }),
+            });
+
+            if (!precheckResponse.ok) {
+                const data = (await precheckResponse
+                    .json()
+                    .catch(() => null)) as { message?: string } | null;
+                onError?.(
+                    data?.message ??
+                        "Google ログインを開始できませんでした。時間をおいて再度お試しください。",
+                );
+                return;
+            }
+
             // 既定 UI ではなく、直接 Google の SSO フローを開始します。
             await signIn.sso({
                 strategy: "oauth_google",
@@ -39,6 +61,18 @@ export default function AdminGoogleAuthButton({
         } catch (error) {
             const fallbackMessage =
                 "Google ログインの開始に失敗しました。時間をおいて再度お試しください。";
+
+            await fetch("/api/admin/auth/sso", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    provider: "google",
+                    stage: "failure",
+                    reason: "client_exception",
+                }),
+            }).catch(() => null);
 
             // Clerk 独自のエラー構造があれば、なるべくそのまま利用者へ返します。
             if (

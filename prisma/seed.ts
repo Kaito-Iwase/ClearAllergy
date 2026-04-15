@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import { PrismaClient, type AllergenStatus } from "@prisma/client";
+import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminServer";
 
 const prisma = new PrismaClient();
 
@@ -185,7 +186,13 @@ async function seedDemoShop() {
             email: DEMO_USER_EMAIL,
             passwordHash,
         },
-        select: { id: true },
+        select: {
+            id: true,
+            email: true,
+            clerkUserId: true,
+            passwordHash: true,
+            createdAt: true,
+        },
     });
 
     const shop = await prisma.shop.upsert({
@@ -281,6 +288,22 @@ async function seedDemoShop() {
                 };
             }),
         });
+    }
+
+    if (process.env.CLERK_SECRET_KEY) {
+        try {
+            const synced = await syncLegacyUserToClerk(user);
+            console.log("Seed demo user synced to Clerk:", synced);
+        } catch (error) {
+            console.warn(
+                "Demo user was created locally, but Clerk sync failed. Run `npm run auth:migrate:clerk demo@clearallergy.local` after fixing Clerk connectivity.",
+            );
+            console.warn(error);
+        }
+    } else {
+        console.log(
+            "CLERK_SECRET_KEY is not set, so demo user was only created locally. Run `npm run auth:migrate:clerk demo@clearallergy.local` after configuring Clerk.",
+        );
     }
 }
 

@@ -26,6 +26,7 @@ import {
     toTrimmedNullableString,
 } from "@/lib/admin-validators";
 import { writeAdminAuditLog } from "@/lib/audit-log";
+import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
 
 // 更新用の request body です。
@@ -142,6 +143,11 @@ export async function PUT(req: Request, context: Context) {
         | "menu_publish"
         | "menu_unpublish" = "menu_update";
     try {
+        const originError = enforceSameOriginAdminMutation(req);
+        if (originError) {
+            return originError;
+        }
+
         // PUT は既存メニューの保存です。
         // まず本人の店舗かどうか判定するため、認証と shopId 確認を行います。
         const auth = await requireShopId();
@@ -416,6 +422,11 @@ export async function DELETE(req: Request, context: Context) {
     let auditShopId: string | null = null;
     let auditTargetId: string | null = null;
     try {
+        const originError = enforceSameOriginAdminMutation(req);
+        if (originError) {
+            return originError;
+        }
+
         // DELETE でも shopId を確認し、自店舗メニュー以外は削除できないようにします。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;

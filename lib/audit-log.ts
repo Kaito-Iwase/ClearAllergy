@@ -3,6 +3,16 @@ import { prisma } from "@/lib/db";
 import { getIpFromHeaders } from "@/lib/request-ip";
 
 type AdminAuditAction =
+    | "auth_login_success"
+    | "auth_login_failure"
+    | "auth_google_login_start"
+    | "auth_google_login_success"
+    | "auth_google_login_failure"
+    | "auth_register_attempt"
+    | "auth_register_success"
+    | "auth_register_failure"
+    | "auth_onboarding_success"
+    | "auth_onboarding_failure"
     | "menu_create"
     | "menu_update"
     | "menu_publish"
@@ -12,7 +22,7 @@ type AdminAuditAction =
     | "menu_image_upload"
     | "shop_image_upload";
 
-type AdminAuditTargetType = "menu" | "shop" | "image_upload";
+type AdminAuditTargetType = "auth" | "menu" | "shop" | "image_upload";
 
 // この関数は、管理画面の重要操作を監査ログへ残します。
 // 「誰が・何を・いつ・成功したか」を追えるようにして、

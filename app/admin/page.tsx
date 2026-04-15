@@ -3,6 +3,7 @@
 // Server Component なので、認証確認をサーバー側で先に行えます。
 
 import { redirect } from "next/navigation";
+import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 
 // /admin の入口。
@@ -14,6 +15,12 @@ export default async function AdminIndexPage() {
     const context = await getCurrentAdminContext();
 
     if (!context) {
+        const clerkIdentity = await getCurrentClerkIdentity();
+
+        if (clerkIdentity) {
+            redirect("/admin/register");
+        }
+
         redirect("/admin/login");
     }
 

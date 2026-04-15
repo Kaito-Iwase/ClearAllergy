@@ -4,29 +4,40 @@
 
 import { redirect } from "next/navigation";
 import AdminLoginPageClient from "@/components/admin/auth/AdminLoginPageClient";
+import { shouldShowAdminGoogleLogin } from "@/lib/auth/clerkAdmin";
+import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 
 export default async function AdminLoginPage() {
     // Server Component 側で先にログイン状態を確認しておくと、
     // すでにログイン済みの人へ不要なフォームを見せずに済みます。
     const context = await getCurrentAdminContext();
+    const showGoogleAuthButton = shouldShowAdminGoogleLogin();
 
     if (!context) {
-        return <AdminLoginPageClient />;
-    }
+        const clerkIdentity = await getCurrentClerkIdentity();
 
-    if (!context.shop) {
-        // Clerk でログイン済みだが店舗未作成の人は、
-        // いきなり register へ飛ばすのではなく、理由を説明した上で次の行き先を選べるようにします。
-        if (context.authProvider === "clerk") {
+        if (clerkIdentity) {
             return (
                 <AdminLoginPageClient
-                    pendingSetupEmail={context.appUser.email}
+                    showGoogleAuthButton={showGoogleAuthButton}
+                    pendingSetupEmail={clerkIdentity.email}
                 />
             );
         }
 
-        redirect("/admin/register");
+        return (
+            <AdminLoginPageClient showGoogleAuthButton={showGoogleAuthButton} />
+        );
+    }
+
+    if (!context.shop) {
+        return (
+            <AdminLoginPageClient
+                showGoogleAuthButton={showGoogleAuthButton}
+                pendingSetupEmail={context.appUser.email}
+            />
+        );
     }
 
     redirect("/admin/shop");

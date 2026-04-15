@@ -4,6 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { requireShopId } from "@/app/api/admin/_utils";
+import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import {
     buildUploadJsonError,
     uploadImageToBlob,
@@ -15,6 +16,11 @@ export async function POST(req: Request) {
     let actorUserId: string | null = null;
     let actorShopId: string | null = null;
     try {
+        const originError = enforceSameOriginAdminMutation(req);
+        if (originError) {
+            return originError;
+        }
+
         // アップロード権限は管理者の shopId にひも付けます。
         const auth = await requireShopId();
         if (!auth.ok) {
