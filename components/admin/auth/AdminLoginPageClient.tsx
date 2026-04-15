@@ -146,7 +146,7 @@ export default function AdminLoginPageClient({
             await signIn.reset();
 
             const passwordResult = await signIn.password({
-                identifier: normalizedEmail,
+                emailAddress: normalizedEmail,
                 password,
             });
 
@@ -185,7 +185,7 @@ export default function AdminLoginPageClient({
                 reason: "unexpected_status",
             });
             setError("ログインを完了できませんでした。時間をおいて再度お試しください。");
-        } catch (err) {
+        } catch {
             const normalizedEmail = normalizeEmail(email);
             if (normalizedEmail) {
                 await reportLoginResult({
@@ -195,10 +195,7 @@ export default function AdminLoginPageClient({
                 });
             }
             setError(
-                extractClerkErrorMessage(
-                    err,
-                    "ログイン中にエラーが発生しました。",
-                ),
+                "ログインに失敗しました。メールアドレスまたはパスワードを確認してください。",
             );
         } finally {
             setLoading(false);
@@ -546,6 +543,7 @@ export default function AdminLoginPageClient({
                     © 2026 ClearAllergy
                 </p>
             </footer>
+            <div id="clerk-captcha" />
         </div>
     );
 }

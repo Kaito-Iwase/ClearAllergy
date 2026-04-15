@@ -1,6 +1,9 @@
+import { loadEnvConfig } from "@next/env";
 import bcrypt from "bcrypt";
 import { PrismaClient, type AllergenStatus } from "@prisma/client";
-import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminServer";
+import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminCore";
+
+loadEnvConfig(process.cwd());
 
 const prisma = new PrismaClient();
 

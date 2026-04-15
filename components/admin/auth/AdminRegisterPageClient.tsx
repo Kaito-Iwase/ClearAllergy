@@ -57,7 +57,7 @@ export default function AdminRegisterPageClient({
         await signIn.reset();
 
         const signInResult = await signIn.password({
-            identifier: normalizedEmail,
+            emailAddress: normalizedEmail,
             password: rawPassword,
         });
 
@@ -422,6 +422,7 @@ export default function AdminRegisterPageClient({
                     © 2026 ClearAllergy
                 </p>
             </footer>
+            <div id="clerk-captcha" />
         </div>
     );
 }

@@ -1,12 +1,17 @@
 // scripts/create-test-user.ts
+import { loadEnvConfig } from "@next/env";
 import { prisma } from "../lib/db";
 import bcrypt from "bcrypt";
-import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminServer";
+import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminCore";
+
+loadEnvConfig(process.cwd());
 
 async function main() {
-    // ★好きな値にしてOK
-    const email = "test@shop.com";
-    const password = "Passw0rd!";
+    // 必要なら CLI 引数で上書きできます。
+    // 例: tsx scripts/create-test-user.ts test@test.com Passw0rd! "テスト店舗"
+    const email = process.argv[2]?.trim().toLowerCase() || "test@test.com";
+    const password = process.argv[3] || "Passw0rd!";
+    const shopName = process.argv[4] || "テスト店舗";
 
     // 1) パスワードをハッシュ化（bcrypt）
     const passwordHash = await bcrypt.hash(password, 10);
@@ -16,7 +21,7 @@ async function main() {
         where: { email },
         update: { passwordHash },
         create: { email, passwordHash },
-        select: { id: true, email: true, createdAt: true },
+        select: { id: true, clerkUserId: true, email: true, createdAt: true },
     });
 
     // 3) Shopを作成（User 1 : 1）
@@ -25,7 +30,7 @@ async function main() {
         update: {},
         create: {
             userId: user.id,
-            name: "テスト店舗",
+            name: shopName,
             description: "ログイン確認用",
         },
         select: { id: true, userId: true, name: true },
@@ -33,7 +38,7 @@ async function main() {
 
     const synced = await syncLegacyUserToClerk({
         id: user.id,
-        clerkUserId: null,
+        clerkUserId: user.clerkUserId,
         email: user.email,
         passwordHash,
         createdAt: user.createdAt,
