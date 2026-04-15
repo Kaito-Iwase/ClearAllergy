@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/app/api/admin/_utils";
+import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import {
     parseAverageBudgetYen,
     toRequiredTrimmedString,
@@ -76,6 +77,11 @@ export async function PUT(req: Request) {
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
     try {
+        const originError = enforceSameOriginAdminMutation(req);
+        if (originError) {
+            return originError;
+        }
+
         // PUT は編集フォームから送られた店舗情報の保存です。
         const auth = await requireShopId();
         if (!auth.ok) {

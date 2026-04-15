@@ -51,7 +51,7 @@ export default function AdminDashboardShell({
                     </nav>
                 </div>
 
-                {/* Clerk ログイン時は UserButton、旧認証時もログアウトボタンは共通で出します。 */}
+                {/* 管理画面認証は Clerk に一本化したため、アカウント表示とログアウトは Clerk 前提です。 */}
                 <div className="mt-auto border-t border-gray-100 p-6">
                     <div className="mb-4 flex justify-center">
                         <UserButton />

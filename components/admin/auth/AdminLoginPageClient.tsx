@@ -2,85 +2,299 @@
 
 // このコンポーネントは管理者ログイン画面の表示と送信処理を担当します。
 // app/admin/(auth)/login/page.tsx から呼ばれる Client Component で、
-// 旧メール+パスワード認証と Google ログイン導線を同じ画面にまとめています。
+// 既存のメール+パスワード UI のまま Clerk の custom auth flow を使います。
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { SignOutButton } from "@clerk/nextjs";
-import { signIn } from "next-auth/react";
+import { SignOutButton, useSignIn } from "@clerk/nextjs";
 import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton";
 import BrandLogo from "@/components/layout/BrandLogo";
 import { normalizeEmail } from "@/lib/email";
+import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
 
 type AdminLoginPageClientProps = {
+    showGoogleAuthButton?: boolean;
     pendingSetupEmail?: string | null;
 };
 
 export default function AdminLoginPageClient({
+    showGoogleAuthButton = false,
     pendingSetupEmail,
 }: AdminLoginPageClientProps) {
-    // state（画面の状態）として、入力欄の見た目や内容を保持します。
+    const { fetchStatus, signIn } = useSignIn();
     const [showPassword, setShowPassword] = useState(false);
-
-    // 2) フォーム入力値（メール/パスワード）
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-
-    // 3) 画面表示用の状態（エラー/送信中）
+    const [emailCode, setEmailCode] = useState("");
+    const [requiresEmailCode, setRequiresEmailCode] = useState(false);
+    const [notice, setNotice] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // フォーム送信時に NextAuth Credentials へログイン要求を送ります。
-    const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        // フォーム既定の再読み込みを止め、React 側で結果を制御します。
-        e.preventDefault();
+    async function reportLoginResult(args: {
+        email: string;
+        success: boolean;
+        reason?: string;
+    }) {
+        await fetch("/api/admin/auth/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                mode: "result",
+                email: args.email,
+                success: args.success,
+                reason: args.reason,
+            }),
+        }).catch(() => null);
+    }
 
-        // 6) 前回のエラーを消して送信開始
+    async function finalizeSignIn() {
+        if (!signIn) {
+            setError("認証の初期化がまだ完了していません。少し待ってから再度お試しください。");
+            return;
+        }
+
+        const finalizeResult = await signIn.finalize();
+
+        if (finalizeResult.error) {
+            setError(
+                extractClerkErrorMessage(
+                    finalizeResult.error,
+                    "Clerk セッションの確立に失敗しました。",
+                ),
+            );
+            return;
+        }
+
+        window.location.href = "/admin/shop";
+    }
+
+    async function startEmailCodeStep() {
+        if (!signIn) {
+            return;
+        }
+
+        const supportsEmailCode = signIn.supportedSecondFactors.some(
+            (factor) => factor.strategy === "email_code",
+        );
+
+        if (!supportsEmailCode) {
+            setError(
+                "追加認証が必要ですが、この画面では email code 以外の方式には未対応です。",
+            );
+            return;
+        }
+
+        const sendCodeResult = await signIn.mfa.sendEmailCode();
+
+        if (sendCodeResult.error) {
+            setError(
+                extractClerkErrorMessage(
+                    sendCodeResult.error,
+                    "確認コードの送信に失敗しました。",
+                ),
+            );
+            return;
+        }
+
+        setRequiresEmailCode(true);
+        setNotice("確認コードをメールで送信しました。届いたコードを入力してください。");
+    }
+
+    const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
         setError(null);
+        setNotice(null);
         setLoading(true);
 
         try {
-            // email は保存前の形式と揃えるため、ここでも正規化します。
-            const normalizedEmail = normalizeEmail(email);
-            setEmail(normalizedEmail);
-
-            // 7) NextAuthにログイン要求
-            // redirect:false にすると、成功/失敗を自分で制御できる
-            const res = await signIn("credentials", {
-                email: normalizedEmail,
-                password,
-                redirect: false,
-            });
-
-            // 8) res が null のこともあるので防御
-            if (!res) {
-                setError("ログイン処理で予期しないエラーが発生しました。");
+            if (!signIn) {
+                setError(
+                    "認証の初期化がまだ完了していません。少し待ってから再度お試しください。",
+                );
                 return;
             }
 
-            // 9) 認証失敗（authorizeがnullを返す等）
-            if (res.error) {
+            const normalizedEmail = normalizeEmail(email);
+            setEmail(normalizedEmail);
+
+            const precheckResponse = await fetch("/api/admin/auth/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    mode: "precheck",
+                    email: normalizedEmail,
+                    password,
+                }),
+            });
+
+            if (!precheckResponse.ok) {
+                const data = (await precheckResponse
+                    .json()
+                    .catch(() => null)) as { message?: string } | null;
+                setError(
+                    data?.message ??
+                        "ログイン前チェックに失敗しました。時間をおいて再度お試しください。",
+                );
+                return;
+            }
+
+            await signIn.reset();
+
+            const passwordResult = await signIn.password({
+                identifier: normalizedEmail,
+                password,
+            });
+
+            if (passwordResult.error) {
+                await reportLoginResult({
+                    email: normalizedEmail,
+                    success: false,
+                    reason: "password_rejected",
+                });
                 setError(
                     "ログインに失敗しました。メールアドレスまたはパスワードを確認してください。",
                 );
                 return;
             }
 
-            // 認証成功後は、まず店舗情報画面を開いて確認しやすくします。
-            window.location.href = "/admin/shop";
+            if (signIn.status === "complete") {
+                await reportLoginResult({
+                    email: normalizedEmail,
+                    success: true,
+                });
+                await finalizeSignIn();
+                return;
+            }
+
+            if (
+                signIn.status === "needs_second_factor" ||
+                signIn.status === "needs_client_trust"
+            ) {
+                await startEmailCodeStep();
+                return;
+            }
+
+            await reportLoginResult({
+                email: normalizedEmail,
+                success: false,
+                reason: "unexpected_status",
+            });
+            setError("ログインを完了できませんでした。時間をおいて再度お試しください。");
         } catch (err) {
-            // 11) 例外が起きたとき（ネットワークなど）
-            const msg = err instanceof Error ? err.message : String(err);
-            setError(`ログイン中にエラーが発生しました: ${msg}`);
+            const normalizedEmail = normalizeEmail(email);
+            if (normalizedEmail) {
+                await reportLoginResult({
+                    email: normalizedEmail,
+                    success: false,
+                    reason: "client_exception",
+                });
+            }
+            setError(
+                extractClerkErrorMessage(
+                    err,
+                    "ログイン中にエラーが発生しました。",
+                ),
+            );
         } finally {
-            // 12) 送信終了
             setLoading(false);
         }
     };
 
+    const onSubmitEmailCode = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setError(null);
+        setNotice(null);
+        setLoading(true);
+
+        try {
+            if (!signIn) {
+                setError(
+                    "認証の初期化がまだ完了していません。少し待ってから再度お試しください。",
+                );
+                return;
+            }
+
+            const code = emailCode.trim();
+
+            if (!code) {
+                setError("確認コードを入力してください。");
+                return;
+            }
+
+            const verifyResult = await signIn.mfa.verifyEmailCode({ code });
+
+            if (verifyResult.error) {
+                const normalizedEmail = normalizeEmail(email);
+                if (normalizedEmail) {
+                    await reportLoginResult({
+                        email: normalizedEmail,
+                        success: false,
+                        reason: "email_code_rejected",
+                    });
+                }
+                setError("確認コードの検証に失敗しました。");
+                return;
+            }
+
+            if (signIn.status !== "complete") {
+                const normalizedEmail = normalizeEmail(email);
+                if (normalizedEmail) {
+                    await reportLoginResult({
+                        email: normalizedEmail,
+                        success: false,
+                        reason: "email_code_incomplete",
+                    });
+                }
+                setError("追加認証を完了できませんでした。");
+                return;
+            }
+
+            const normalizedEmail = normalizeEmail(email);
+            if (normalizedEmail) {
+                await reportLoginResult({
+                    email: normalizedEmail,
+                    success: true,
+                });
+            }
+            await finalizeSignIn();
+        } catch (err) {
+            const normalizedEmail = normalizeEmail(email);
+            if (normalizedEmail) {
+                await reportLoginResult({
+                    email: normalizedEmail,
+                    success: false,
+                    reason: "email_code_exception",
+                });
+            }
+            setError(
+                extractClerkErrorMessage(
+                    err,
+                    "確認コード送信中にエラーが発生しました。",
+                ),
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    async function resetLoginFlow() {
+        setError(null);
+        setNotice(null);
+        setEmailCode("");
+        setRequiresEmailCode(false);
+
+        if (signIn) {
+            await signIn.reset();
+        }
+    }
+
     return (
         <div className="bg-background-light dark:bg-background-dark text-text-main min-h-screen flex flex-col font-display antialiased selection:bg-primary/30">
-            {/* Header */}
             <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#e5e7eb] dark:border-white/10 bg-surface-light dark:bg-surface-dark px-6 lg:px-10 py-4 sticky top-0 z-50">
                 <Link
                     href="/"
@@ -103,7 +317,6 @@ export default function AdminLoginPageClient({
                 </div>
             </header>
 
-            {/* Main */}
             <main className="flex-1 flex items-center justify-center p-4 py-12 lg:py-20">
                 <div className="w-full max-w-[480px] bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border border-[#e5e7eb] dark:border-white/5 overflow-hidden">
                     <div className="p-8 pb-6">
@@ -119,7 +332,7 @@ export default function AdminLoginPageClient({
                         {pendingSetupEmail ? (
                             <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-900">
                                 <p className="font-bold">
-                                    Google ログイン済みですが、店舗作成がまだ完了していません
+                                    ログイン済みですが、店舗作成がまだ完了していません
                                 </p>
                                 <p className="mt-2 leading-6">
                                     このアカウント
@@ -152,121 +365,172 @@ export default function AdminLoginPageClient({
                             </div>
                         ) : null}
 
-                        <div className="mb-5">
-                            {/* Clerk の既定画面は使わず、この UI の中から Google 認証だけ開始します。 */}
-                            <AdminGoogleAuthButton
-                                label="Google でログイン"
-                                onError={(message) =>
-                                    setError(message || null)
-                                }
-                            />
-                            <p className="mt-2 text-center text-xs text-text-sub dark:text-gray-500">
-                                Google アカウントでログインした場合は、Clerk 経由で管理画面に入れます。
-                            </p>
-                        </div>
+                        {showGoogleAuthButton ? (
+                            <>
+                                <div className="mb-5">
+                                    <AdminGoogleAuthButton
+                                        label="Google でログイン"
+                                        onError={(message) =>
+                                            setError(message || null)
+                                        }
+                                    />
+                                    <p className="mt-2 text-center text-xs text-text-sub dark:text-gray-500">
+                                        Google アカウントでログインした場合は、Clerk 経由で管理画面に入れます。
+                                    </p>
+                                </div>
 
-                        <div className="mb-5 flex items-center gap-3">
-                            <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
-                            <span className="text-xs font-medium uppercase tracking-[0.2em] text-text-sub dark:text-gray-500">
-                                または
-                            </span>
-                            <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
-                        </div>
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
+                                    <span className="text-xs font-medium uppercase tracking-[0.2em] text-text-sub dark:text-gray-500">
+                                        または
+                                    </span>
+                                    <div className="h-px flex-1 bg-[#e5e7eb] dark:bg-white/10" />
+                                </div>
+                            </>
+                        ) : null}
 
-                        {error && (
+                        {notice ? (
+                            <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                                {notice}
+                            </div>
+                        ) : null}
+
+                        {error ? (
                             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                                 {error}
                             </div>
-                        )}
+                        ) : null}
 
-                        <form
-                            className="flex flex-col gap-5"
-                            onSubmit={onSubmit}
-                        >
-                            <div className="flex flex-col gap-2">
-                                <label
-                                    className="text-text-main dark:text-white text-sm font-bold leading-normal"
-                                    htmlFor="email"
-                                >
-                                    メールアドレス
-                                </label>
-
-                                <div className="relative">
-                                    <input
-                                        className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbe6db] dark:border-white/20 bg-background-light dark:bg-black/20 focus:border-primary h-12 px-4 text-base font-normal leading-normal placeholder:text-text-sub/50 transition-all"
-                                        id="email"
-                                        name="email"
-                                        placeholder="manager@example.com"
-                                        autoCapitalize="none"
-                                        autoCorrect="off"
-                                        required
-                                        spellCheck={false}
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) =>
-                                            setEmail(
-                                                normalizeEmail(e.target.value),
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                                <div className="flex justify-between items-center">
+                        {requiresEmailCode ? (
+                            <form className="flex flex-col gap-5" onSubmit={onSubmitEmailCode}>
+                                <div className="flex flex-col gap-2">
                                     <label
                                         className="text-text-main dark:text-white text-sm font-bold leading-normal"
-                                        htmlFor="password"
+                                        htmlFor="emailCode"
                                     >
-                                        パスワード
+                                        メール確認コード
                                     </label>
+
+                                    <input
+                                        className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbe6db] dark:border-white/20 bg-background-light dark:bg-black/20 focus:border-primary h-12 px-4 text-base font-normal leading-normal placeholder:text-text-sub/50 transition-all"
+                                        id="emailCode"
+                                        name="emailCode"
+                                        placeholder="メールで届いたコードを入力"
+                                        required
+                                        type="text"
+                                        value={emailCode}
+                                        onChange={(e) => setEmailCode(e.target.value)}
+                                    />
                                 </div>
 
-                                <div className="relative flex w-full items-center">
-                                    <input
-                                        className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbe6db] dark:border-white/20 bg-background-light dark:bg-black/20 focus:border-primary h-12 px-4 pr-12 text-base font-normal leading-normal placeholder:text-text-sub/50 transition-all"
-                                        id="password"
-                                        name="password"
-                                        placeholder="パスワードを入力"
-                                        required
-                                        type={
-                                            showPassword ? "text" : "password"
-                                        }
-                                        value={password}
-                                        onChange={(e) =>
-                                            setPassword(e.target.value)
-                                        }
-                                    />
+                                <div className="flex flex-col gap-3 mt-2">
+                                    <button
+                                        className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
+                                        type="submit"
+                                        disabled={loading}
+                                    >
+                                        <span className="truncate">
+                                            {loading ? "確認中..." : "コードを確認してログイン"}
+                                        </span>
+                                    </button>
 
                                     <button
-                                        className="absolute right-0 top-0 h-full px-3 text-text-sub hover:text-text-main dark:text-gray-400 dark:hover:text-white transition-colors flex items-center justify-center"
                                         type="button"
-                                        onClick={() =>
-                                            setShowPassword((v) => !v)
-                                        }
-                                        aria-label="パスワード表示を切り替え"
+                                        onClick={() => void resetLoginFlow()}
+                                        className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 border border-[#dbe6db] text-base font-bold leading-normal tracking-[0.015em] transition-colors hover:bg-background-light disabled:opacity-60"
+                                        disabled={loading}
                                     >
-                                        <span className="material-symbols-outlined text-[20px]">
-                                            {showPassword
-                                                ? "visibility"
-                                                : "visibility_off"}
+                                        <span className="truncate">メールアドレス入力に戻る</span>
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <form className="flex flex-col gap-5" onSubmit={onSubmit}>
+                                <div className="flex flex-col gap-2">
+                                    <label
+                                        className="text-text-main dark:text-white text-sm font-bold leading-normal"
+                                        htmlFor="email"
+                                    >
+                                        メールアドレス
+                                    </label>
+
+                                    <div className="relative">
+                                        <input
+                                            className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbe6db] dark:border-white/20 bg-background-light dark:bg-black/20 focus:border-primary h-12 px-4 text-base font-normal leading-normal placeholder:text-text-sub/50 transition-all"
+                                            id="email"
+                                            name="email"
+                                            placeholder="manager@example.com"
+                                            autoCapitalize="none"
+                                            autoCorrect="off"
+                                            required
+                                            spellCheck={false}
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) =>
+                                                setEmail(
+                                                    normalizeEmail(e.target.value),
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex justify-between items-center">
+                                        <label
+                                            className="text-text-main dark:text-white text-sm font-bold leading-normal"
+                                            htmlFor="password"
+                                        >
+                                            パスワード
+                                        </label>
+                                    </div>
+
+                                    <div className="relative flex w-full items-center">
+                                        <input
+                                            className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbe6db] dark:border-white/20 bg-background-light dark:bg-black/20 focus:border-primary h-12 px-4 pr-12 text-base font-normal leading-normal placeholder:text-text-sub/50 transition-all"
+                                            id="password"
+                                            name="password"
+                                            placeholder="パスワードを入力"
+                                            required
+                                            type={showPassword ? "text" : "password"}
+                                            value={password}
+                                            onChange={(e) =>
+                                                setPassword(e.target.value)
+                                            }
+                                        />
+
+                                        <button
+                                            className="absolute right-0 top-0 h-full px-3 text-text-sub hover:text-text-main dark:text-gray-400 dark:hover:text-white transition-colors flex items-center justify-center"
+                                            type="button"
+                                            onClick={() =>
+                                                setShowPassword((v) => !v)
+                                            }
+                                            aria-label="パスワード表示を切り替え"
+                                        >
+                                            <span className="material-symbols-outlined text-[20px]">
+                                                {showPassword
+                                                    ? "visibility"
+                                                    : "visibility_off"}
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="mt-2">
+                                    <button
+                                        className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
+                                        type="submit"
+                                        disabled={
+                                            loading || fetchStatus === "fetching"
+                                        }
+                                    >
+                                        <span className="truncate">
+                                            {loading ? "ログイン中..." : "ログイン"}
                                         </span>
                                     </button>
                                 </div>
-                            </div>
-
-                            <div className="mt-2">
-                                <button
-                                    className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
-                                    type="submit"
-                                    disabled={loading}
-                                >
-                                    <span className="truncate">
-                                        {loading ? "ログイン中..." : "ログイン"}
-                                    </span>
-                                </button>
-                            </div>
-                        </form>
+                            </form>
+                        )}
                     </div>
 
                     <div className="bg-background-light dark:bg-black/20 p-4 text-center border-t border-[#e5e7eb] dark:border-white/5">

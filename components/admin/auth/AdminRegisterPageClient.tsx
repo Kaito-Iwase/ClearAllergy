@@ -1,54 +1,106 @@
 "use client";
 
-// このコンポーネントは旧認証向けの新規登録フォームです。
+// このコンポーネントは管理者向けの新規登録フォームです。
 // app/admin/(auth)/register/page.tsx から呼ばれる Client Component で、
-// 登録 API 呼び出しから自動ログインまでを 1 画面で行います。
+// 既存 UI のまま Clerk ベースの登録と自動ログインを行います。
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { useSignIn } from "@clerk/nextjs";
 import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton";
 import BrandLogo from "@/components/layout/BrandLogo";
 import { normalizeEmail } from "@/lib/email";
+import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
 
 export default function AdminRegisterPageClient({
+    showGoogleAuthButton,
     canRegister,
     registrationMode,
     lockMessage,
     inviteToken,
 }: {
+    showGoogleAuthButton: boolean;
     canRegister: boolean;
     registrationMode: "disabled" | "invite_only" | "open";
     lockMessage: string | null;
     inviteToken: string | null;
 }) {
-    // state（画面の状態）として、入力値と UI 表示状態を保持します。
+    const { fetchStatus, signIn } = useSignIn();
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-
-    // 2) 入力値
     const [shopName, setShopName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [passwordConfirm, setPasswordConfirm] = useState("");
-
-    // 3) 画面状態
+    const [notice, setNotice] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const registerDescription =
+        registrationMode === "invite_only"
+            ? "この画面は招待制です。招待リンクを受け取った店舗だけが登録できます。"
+            : "店舗名・メールアドレス・パスワードを入力して、管理画面を使い始めてください。";
+    const submitLabel = !canRegister
+        ? registrationMode === "invite_only"
+            ? "招待リンクが必要です"
+            : "現在は登録できません"
+        : loading
+          ? "登録中..."
+          : "新規登録";
 
-    // フォーム送信時に旧認証の登録 API を呼び、その後で自動ログインします。
+    async function autoSignIn(normalizedEmail: string, rawPassword: string) {
+        if (!signIn) {
+            throw new Error(
+                "登録は完了しましたが、認証の初期化がまだ完了していません。ログイン画面から再度お試しください。",
+            );
+        }
+
+        await signIn.reset();
+
+        const signInResult = await signIn.password({
+            identifier: normalizedEmail,
+            password: rawPassword,
+        });
+
+        if (signInResult.error) {
+            throw new Error(
+                extractClerkErrorMessage(
+                    signInResult.error,
+                    "登録は完了しましたが、自動ログインに失敗しました。ログイン画面から再度お試しください。",
+                ),
+            );
+        }
+
+        if (signIn.status === "complete") {
+            const finalizeResult = await signIn.finalize();
+
+            if (finalizeResult.error) {
+                throw new Error(
+                    extractClerkErrorMessage(
+                        finalizeResult.error,
+                        "登録は完了しましたが、Clerk セッションの確立に失敗しました。ログイン画面から再度お試しください。",
+                    ),
+                );
+            }
+
+            window.location.href = "/admin/shop";
+            return;
+        }
+
+        throw new Error(
+            "登録は完了しました。初回ログインで追加認証が必要なため、ログイン画面から続行してください。",
+        );
+    }
+
     const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        // フォーム既定の再読み込みを止めて、エラー表示を自前で制御します。
         e.preventDefault();
-
         setError(null);
+        setNotice(null);
 
         if (!canRegister) {
             setError(lockMessage ?? "現在は登録できません。");
             return;
         }
 
-        // API を呼ぶ前に、画面側で分かりやすい入力エラーを先に出します。
         if (!shopName.trim()) {
             setError("店舗名を入力してください。");
             return;
@@ -72,11 +124,9 @@ export default function AdminRegisterPageClient({
         setLoading(true);
 
         try {
-            // email の揺れを減らすため、送信前に正規化します。
             const normalizedEmail = normalizeEmail(email);
             setEmail(normalizedEmail);
 
-            // 登録そのものは API に任せ、DB 更新ロジックはサーバー側へ寄せます。
             const response = await fetch("/api/admin/register", {
                 method: "POST",
                 headers: {
@@ -90,42 +140,32 @@ export default function AdminRegisterPageClient({
                 }),
             });
 
-            const data = (await response.json()) as {
+            const data = (await response.json().catch(() => null)) as {
                 message?: string;
-            };
+            } | null;
 
-            // 7) API失敗時
             if (!response.ok) {
-                setError(data.message ?? "新規登録に失敗しました。");
+                setError(data?.message ?? "新規登録に失敗しました。");
                 return;
             }
 
-            // 登録直後に再入力させないため、そのまま自動ログインします。
-            const signInResult = await signIn("credentials", {
-                email: normalizedEmail,
-                password,
-                redirect: false,
-            });
-
-            if (!signInResult) {
-                setError(
-                    "登録は完了しましたが、自動ログイン結果を取得できませんでした。ログイン画面から再度お試しください。",
+            try {
+                await autoSignIn(normalizedEmail, password);
+            } catch (autoLoginError) {
+                setNotice(
+                    extractClerkErrorMessage(
+                        autoLoginError,
+                        "登録は完了しました。ログイン画面から続行してください。",
+                    ),
                 );
-                return;
             }
-
-            if (signInResult.error) {
-                setError(
-                    "登録は完了しましたが、自動ログインに失敗しました。ログイン画面から再度お試しください。",
-                );
-                return;
-            }
-
-            // 9) 成功したら管理画面へ
-            window.location.href = "/admin/shop";
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            setError(`登録中にエラーが発生しました: ${msg}`);
+            setError(
+                extractClerkErrorMessage(
+                    err,
+                    "登録中にエラーが発生しました。",
+                ),
+            );
         } finally {
             setLoading(false);
         }
@@ -133,7 +173,6 @@ export default function AdminRegisterPageClient({
 
     return (
         <div className="bg-background-light dark:bg-background-dark text-text-main min-h-screen flex flex-col font-display antialiased selection:bg-primary/30">
-            {/* Header */}
             <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#e5e7eb] dark:border-white/10 bg-surface-light dark:bg-surface-dark px-6 lg:px-10 py-4 sticky top-0 z-50">
                 <Link
                     href="/"
@@ -156,7 +195,6 @@ export default function AdminRegisterPageClient({
                 </div>
             </header>
 
-            {/* Main */}
             <main className="flex-1 flex items-center justify-center p-4 py-12 lg:py-20">
                 <div className="w-full max-w-[520px] bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border border-[#e5e7eb] dark:border-white/5 overflow-hidden">
                     <div className="p-8 pb-6">
@@ -165,11 +203,11 @@ export default function AdminRegisterPageClient({
                                 店舗アカウント新規登録
                             </h1>
                             <p className="text-text-sub dark:text-gray-400 text-sm font-normal leading-normal">
-                                店舗名・メールアドレス・パスワードを入力して、管理画面を使い始めてください。
+                                {registerDescription}
                             </p>
                         </div>
 
-                        {registrationMode === "open" ? (
+                        {showGoogleAuthButton ? (
                             <>
                                 <div className="mb-5">
                                     <AdminGoogleAuthButton
@@ -181,9 +219,11 @@ export default function AdminRegisterPageClient({
                                     <p className="mt-2 text-center text-xs text-text-sub dark:text-gray-500">
                                         Google アカウントを使う場合は、認証後に店舗情報の初期設定へ進みます。
                                     </p>
-                                    <p className="mt-2 text-center text-xs font-semibold text-amber-700">
-                                        公開登録モードでは BOT 登録やスパム店舗作成の危険があります。
-                                    </p>
+                                    {registrationMode === "open" ? (
+                                        <p className="mt-2 text-center text-xs font-semibold text-amber-700">
+                                            公開登録モードでは BOT 登録やスパム店舗作成の危険があります。
+                                        </p>
+                                    ) : null}
                                 </div>
 
                                 <div className="mb-5 flex items-center gap-3">
@@ -196,11 +236,17 @@ export default function AdminRegisterPageClient({
                             </>
                         ) : null}
 
-                        {error && (
+                        {notice ? (
+                            <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                                {notice}
+                            </div>
+                        ) : null}
+
+                        {error ? (
                             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                                 {error}
                             </div>
-                        )}
+                        ) : null}
 
                         {!canRegister && lockMessage ? (
                             <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -208,11 +254,7 @@ export default function AdminRegisterPageClient({
                             </div>
                         ) : null}
 
-                        <form
-                            className="flex flex-col gap-5"
-                            onSubmit={onSubmit}
-                        >
-                            {/* 店舗名 */}
+                        <form className="flex flex-col gap-5" onSubmit={onSubmit}>
                             <div className="flex flex-col gap-2">
                                 <label
                                     className="text-text-main dark:text-white text-sm font-bold leading-normal"
@@ -229,13 +271,10 @@ export default function AdminRegisterPageClient({
                                     required
                                     type="text"
                                     value={shopName}
-                                    onChange={(e) =>
-                                        setShopName(e.target.value)
-                                    }
+                                    onChange={(e) => setShopName(e.target.value)}
                                 />
                             </div>
 
-                            {/* メールアドレス */}
                             <div className="flex flex-col gap-2">
                                 <label
                                     className="text-text-main dark:text-white text-sm font-bold leading-normal"
@@ -263,7 +302,6 @@ export default function AdminRegisterPageClient({
                                 />
                             </div>
 
-                            {/* パスワード */}
                             <div className="flex flex-col gap-2">
                                 <label
                                     className="text-text-main dark:text-white text-sm font-bold leading-normal"
@@ -279,13 +317,9 @@ export default function AdminRegisterPageClient({
                                         name="password"
                                         placeholder="8文字以上で入力"
                                         required
-                                        type={
-                                            showPassword ? "text" : "password"
-                                        }
+                                        type={showPassword ? "text" : "password"}
                                         value={password}
-                                        onChange={(e) =>
-                                            setPassword(e.target.value)
-                                        }
+                                        onChange={(e) => setPassword(e.target.value)}
                                     />
 
                                     <button
@@ -305,7 +339,6 @@ export default function AdminRegisterPageClient({
                                 </div>
                             </div>
 
-                            {/* パスワード確認 */}
                             <div className="flex flex-col gap-2">
                                 <label
                                     className="text-text-main dark:text-white text-sm font-bold leading-normal"
@@ -349,19 +382,18 @@ export default function AdminRegisterPageClient({
                                 </div>
                             </div>
 
-                            {/* 送信 */}
                             <div className="flex flex-col gap-4 mt-2">
                                 <button
                                     className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
                                     type="submit"
-                                    disabled={loading || !canRegister}
+                                    disabled={
+                                        loading ||
+                                        !canRegister ||
+                                        fetchStatus === "fetching"
+                                    }
                                 >
                                     <span className="truncate">
-                                        {!canRegister
-                                            ? "現在は登録できません"
-                                            : loading
-                                              ? "登録中..."
-                                              : "新規登録"}
+                                        {submitLabel}
                                     </span>
                                 </button>
 
@@ -377,7 +409,6 @@ export default function AdminRegisterPageClient({
                         </form>
                     </div>
 
-                    {/* 下部 */}
                     <div className="bg-background-light dark:bg-black/20 p-4 text-center border-t border-[#e5e7eb] dark:border-white/5">
                         <p className="text-xs text-text-sub dark:text-gray-500">
                             登録後はこのアカウントで店舗メニューを管理できます。
@@ -386,7 +417,6 @@ export default function AdminRegisterPageClient({
                 </div>
             </main>
 
-            {/* Footer */}
             <footer className="py-6 text-center">
                 <p className="text-xs text-text-sub dark:text-gray-500 font-medium">
                     © 2026 ClearAllergy

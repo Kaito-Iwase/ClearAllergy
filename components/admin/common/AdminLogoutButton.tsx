@@ -1,16 +1,13 @@
 "use client";
 
 // このボタンは管理画面共通のログアウト処理です。
-// Clerk ログイン中か、旧 NextAuth ログイン中かを判定して、適切な signOut を呼び分けます。
-// Client Component なのは、クリックイベントと認証ライブラリの client API を使うためです。
+// 現在は Clerk セッションのみを閉じます。
+// Client Component なのは、クリックイベントと Clerk の client API を使うためです。
 
 import { useState } from "react";
-import { useAuth, useClerk } from "@clerk/nextjs";
-import { signOut as nextAuthSignOut } from "next-auth/react";
+import { useClerk } from "@clerk/nextjs";
 
 export default function AdminLogoutButton() {
-    // userId があれば Clerk ログイン中と判断できます。
-    const { userId } = useAuth();
     const clerk = useClerk();
     const [loading, setLoading] = useState(false);
 
@@ -23,17 +20,8 @@ export default function AdminLogoutButton() {
         setLoading(true);
 
         try {
-            // Clerk 側でログインしている時は Clerk の signOut を使います。
-            if (userId) {
-                await clerk.signOut({
-                    redirectUrl: "/",
-                });
-                return;
-            }
-
-            // それ以外は旧認証のセッションを閉じます。
-            await nextAuthSignOut({
-                callbackUrl: "/",
+            await clerk.signOut({
+                redirectUrl: "/",
             });
         } finally {
             setLoading(false);

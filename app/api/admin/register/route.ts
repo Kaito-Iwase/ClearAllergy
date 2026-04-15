@@ -1,14 +1,21 @@
-// このファイルは旧認証用の新規登録 API です。
-// /api/admin/register の POST を担当し、User と Shop を同時に作成します。
-// Clerk 段階移行中でも、既存のメール+パスワード登録を壊さないために残しています。
+// このファイルは管理画面の新規登録 API です。
+// /api/admin/register の POST を担当し、Clerk に認証用ユーザーを作成しつつ、
+// ローカル DB には clerkUserId と Shop だけを保存します。
 
 import { NextResponse } from "next/server";
-import bcrypt from "bcrypt";
 import { prisma } from "@/lib/db";
-import { isValidEmail, normalizeEmail } from "@/lib/email";
-import { consumeRateLimit } from "@/lib/rate-limit";
-import { getIpFromHeaders } from "@/lib/request-ip";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
+import { enforceSameOriginAdminMutation, consumeIpAndIdentifierRateLimit } from "@/lib/admin-api-security";
+import { adminRegisterSchema } from "@/lib/admin-auth-schemas";
+import { writeAdminAuditLog } from "@/lib/audit-log";
+import { getIpFromHeaders } from "@/lib/request-ip";
+import {
+    createClerkPasswordUser,
+    deleteClerkUser,
+    findClerkUserByEmail,
+    updateClerkExternalId,
+} from "@/lib/auth/clerkAdminServer";
+import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
 
 type RegisterRequestBody = {
     shopName?: string;
@@ -18,17 +25,73 @@ type RegisterRequestBody = {
 };
 
 export async function POST(req: Request) {
+    let createdClerkUserId: string | null = null;
+    let auditEmail: string | null = null;
+
     try {
+        const originError = enforceSameOriginAdminMutation(req);
+        if (originError) {
+            return originError;
+        }
+
         const ip = getIpFromHeaders(req.headers);
-        // 最低限の IP 単位制限です。
-        // 本番で BOT 登録や短時間の連続試行を減らすために入れています。
-        const rateLimit = consumeRateLimit({
-            key: `register:${ip}`,
-            limit: 5,
+
+        const body = (await req.json()) as RegisterRequestBody;
+        const parsed = adminRegisterSchema.safeParse({
+            shopName: body?.shopName,
+            email: body?.email,
+            password: body?.password,
+            inviteToken:
+                req.headers.get("x-admin-invite-token") ??
+                (typeof body?.inviteToken === "string" ? body.inviteToken : null),
+        });
+
+        if (!parsed.success) {
+            auditEmail =
+                typeof body?.email === "string" ? body.email.trim().toLowerCase() : null;
+            await writeAdminAuditLog({
+                req,
+                actorUserId: null,
+                actorShopId: null,
+                action: "auth_register_failure",
+                targetType: "auth",
+                targetId: null,
+                success: false,
+                metadata: {
+                    email: auditEmail,
+                    reason: "invalid_input",
+                },
+            });
+            return NextResponse.json(
+                { message: parsed.error.issues[0]?.message ?? "入力内容を確認してください。" },
+                { status: 400 },
+            );
+        }
+
+        auditEmail = parsed.data.email;
+        const rateLimit = consumeIpAndIdentifierRateLimit({
+            scope: "admin-register",
+            ip,
+            identifier: parsed.data.email,
+            ipLimit: 5,
+            identifierLimit: 3,
             windowMs: 15 * 60 * 1000,
         });
 
         if (!rateLimit.allowed) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: null,
+                actorShopId: null,
+                action: "auth_register_failure",
+                targetType: "auth",
+                targetId: null,
+                success: false,
+                metadata: {
+                    email: parsed.data.email,
+                    reason: "rate_limited",
+                },
+            });
             return NextResponse.json(
                 {
                     message:
@@ -43,16 +106,37 @@ export async function POST(req: Request) {
             );
         }
 
-        // POST body からフォーム値を受け取ります。
-        const body = (await req.json()) as RegisterRequestBody;
-        const inviteToken =
-            req.headers.get("x-admin-invite-token") ??
-            (typeof body?.inviteToken === "string" ? body.inviteToken : null);
-        // 登録画面が見えていても、最終判断は必ず API 側で行います。
-        // ここが無いと API 直打ちで登録されてしまいます。
+        await writeAdminAuditLog({
+            req,
+            actorUserId: null,
+            actorShopId: null,
+            action: "auth_register_attempt",
+            targetType: "auth",
+            targetId: null,
+            success: true,
+            metadata: {
+                email: parsed.data.email,
+                registrationMode: process.env.ADMIN_REGISTRATION_MODE ?? "disabled",
+            },
+        });
+
+        const inviteToken = parsed.data.inviteToken;
         const registrationGuard = getAdminRegistrationGuard({ inviteToken });
 
         if (!registrationGuard.allowed) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: null,
+                actorShopId: null,
+                action: "auth_register_failure",
+                targetType: "auth",
+                targetId: null,
+                success: false,
+                metadata: {
+                    email: parsed.data.email,
+                    reason: "registration_guard_denied",
+                },
+            });
             return NextResponse.json(
                 {
                     message: registrationGuard.message,
@@ -61,61 +145,67 @@ export async function POST(req: Request) {
             );
         }
 
-        // 先に文字列を整形しておくと、以後のバリデーションを単純にできます。
-        const shopName = body.shopName?.trim() ?? "";
-        const email = normalizeEmail(body.email);
-        const password = body.password ?? "";
+        const shopName = parsed.data.shopName;
+        const email = parsed.data.email;
+        const password = parsed.data.password;
 
-        // 必須項目と形式を順番にチェックし、分かりやすいメッセージで返します。
-        if (!shopName) {
-            return NextResponse.json(
-                { message: "店舗名は必須です。" },
-                { status: 400 },
-            );
-        }
-
-        if (!email) {
-            return NextResponse.json(
-                { message: "メールアドレスは必須です。" },
-                { status: 400 },
-            );
-        }
-
-        if (!isValidEmail(email)) {
-            return NextResponse.json(
-                { message: "メールアドレスの形式が正しくありません。" },
-                { status: 400 },
-            );
-        }
-
-        if (!password || password.length < 8) {
-            return NextResponse.json(
-                { message: "パスワードは8文字以上で入力してください。" },
-                { status: 400 },
-            );
-        }
-
-        // email が重複すると意図せず複数アカウントが作れるので、先に確認します。
         const existingUser = await prisma.user.findUnique({
             where: { email },
             select: { id: true },
         });
 
         if (existingUser) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: null,
+                actorShopId: null,
+                action: "auth_register_failure",
+                targetType: "auth",
+                targetId: existingUser.id,
+                success: false,
+                metadata: {
+                    email,
+                    reason: "email_already_registered_locally",
+                },
+            });
             return NextResponse.json(
                 { message: "このメールアドレスはすでに登録されています。" },
                 { status: 409 },
             );
         }
 
-        // パスワードは平文保存せず、ハッシュ化してから DB へ保存します。
-        const passwordHash = await bcrypt.hash(password, 10);
+        const existingClerkUser = await findClerkUserByEmail(email);
 
-        // User と Shop は 1:1 のため、User 作成時に nested create で店舗も一緒に作成します。
+        if (existingClerkUser) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: null,
+                actorShopId: null,
+                action: "auth_register_failure",
+                targetType: "auth",
+                targetId: null,
+                success: false,
+                metadata: {
+                    email,
+                    reason: "email_already_registered_in_clerk",
+                },
+            });
+            return NextResponse.json(
+                { message: "このメールアドレスはすでに登録されています。" },
+                { status: 409 },
+            );
+        }
+
+        const createdClerkUser = await createClerkPasswordUser({
+            email,
+            password,
+        });
+        createdClerkUserId = createdClerkUser.id;
+
         const createdUser = await prisma.user.create({
             data: {
                 email,
-                passwordHash,
+                clerkUserId: createdClerkUser.id,
                 shop: {
                     create: {
                         name: shopName,
@@ -134,21 +224,74 @@ export async function POST(req: Request) {
             },
         });
 
+        try {
+            await updateClerkExternalId({
+                clerkUserId: createdClerkUser.id,
+                appUserId: createdUser.id,
+            });
+        } catch (externalIdError) {
+            console.warn(
+                "Failed to attach Clerk externalId after admin registration.",
+                externalIdError,
+            );
+        }
+
+        await writeAdminAuditLog({
+            req,
+            actorUserId: createdUser.id,
+            actorShopId: createdUser.shop?.id ?? null,
+            action: "auth_register_success",
+            targetType: "auth",
+            targetId: createdUser.id,
+            success: true,
+            metadata: {
+                email: createdUser.email,
+                clerkUserId: createdClerkUser.id,
+                registrationMode: registrationGuard.mode,
+            },
+        });
+
         return NextResponse.json(
             {
                 message: "新規登録が完了しました。",
                 user: {
                     id: createdUser.id,
                     email: createdUser.email,
+                    clerkUserId: createdClerkUser.id,
                 },
                 shop: createdUser.shop,
             },
             { status: 201 },
         );
-    } catch {
+    } catch (error) {
+        await writeAdminAuditLog({
+            req,
+            actorUserId: null,
+            actorShopId: null,
+            action: "auth_register_failure",
+            targetType: "auth",
+            targetId: null,
+            success: false,
+            metadata: {
+                email: auditEmail,
+                reason: "internal_error",
+            },
+        });
+        if (createdClerkUserId) {
+            try {
+                await deleteClerkUser(createdClerkUserId);
+            } catch {
+                // ロールバック失敗はレスポンスを壊さないよう握りつぶし、
+                // 運用ログで確認できるよう上位のエラーだけ返します。
+            }
+        }
+
         return NextResponse.json(
             {
-                message: "新規登録中にサーバーエラーが発生しました。",
+                message: extractClerkErrorMessage(
+                    error,
+                    "新規登録中にサーバーエラーが発生しました。",
+                ),
             },
             { status: 500 },
         );

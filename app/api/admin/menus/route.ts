@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/app/api/admin/_utils";
+import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import {
     parsePriceYen,
     toBooleanOrDefault,
@@ -81,6 +82,11 @@ export async function POST(req: Request) {
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
     try {
+        const originError = enforceSameOriginAdminMutation(req);
+        if (originError) {
+            return originError;
+        }
+
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
