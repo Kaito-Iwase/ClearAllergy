@@ -9,7 +9,7 @@ import {
     provisionCurrentAppUserFromClerk,
 } from "@/lib/auth/getCurrentAppUser";
 import { isClerkAdminAuthEnabled } from "@/lib/auth/clerkAdmin";
-import { adminOnboardingSchema } from "@/lib/admin-auth-schemas";
+import { adminOnboardingSchema } from "@/lib/validators/admin-auth";
 import {
     consumeIpAndIdentifierRateLimit,
     enforceSameOriginAdminMutation,

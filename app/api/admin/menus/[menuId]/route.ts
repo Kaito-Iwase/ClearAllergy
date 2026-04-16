@@ -24,7 +24,7 @@ import {
     toBooleanOrDefault,
     toRequiredTrimmedString,
     toTrimmedNullableString,
-} from "@/lib/admin-validators";
+} from "@/lib/validators/admin-input";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";

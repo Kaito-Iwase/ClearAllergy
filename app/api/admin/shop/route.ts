@@ -10,7 +10,7 @@ import {
     parseAverageBudgetYen,
     toRequiredTrimmedString,
     toTrimmedNullableString,
-} from "@/lib/admin-validators";
+} from "@/lib/validators/admin-input";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 
