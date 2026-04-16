@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminGoogleSsoAuditSchema } from "@/lib/admin-auth-schemas";
+import { adminGoogleSsoAuditSchema } from "@/lib/validators/admin-auth";
 import {
     consumeIpAndIdentifierRateLimit,
     enforceSameOriginAdminMutation,

@@ -3,7 +3,7 @@ import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
 import {
     adminLoginAuditSchema,
     adminLoginPrecheckSchema,
-} from "@/lib/admin-auth-schemas";
+} from "@/lib/validators/admin-auth";
 import {
     consumeIpAndIdentifierRateLimit,
     enforceSameOriginAdminMutation,
