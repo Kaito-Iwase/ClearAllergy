@@ -36,9 +36,7 @@ export default async function AdminMenusPage() {
                             メニュー一覧
                         </h1>
                         <p className="mt-1 text-sm text-gray-600">
-                            新規作成は `/admin/menus/new` から始まり、作成後は
-                            `/admin/menus/[menuId]/edit`
-                            で28品目と価格をまとめて編集できます。
+                            新しいメニューを作成したあと、この画面から価格やアレルゲン28品目をまとめて編集できます。
                         </p>
                     </div>
 

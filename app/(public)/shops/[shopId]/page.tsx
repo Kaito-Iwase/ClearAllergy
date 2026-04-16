@@ -10,8 +10,10 @@ import { prisma } from "@/lib/db";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 import ShopMenuListClient from "@/components/public/ShopMenuListClient";
 import UserAllergenPreferenceClient from "@/components/public/UserAllergenPreferenceClient";
+import PublicDataUnavailable from "@/components/public/PublicDataUnavailable";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
+import { readPublicDataOrFallback } from "@/lib/public-db";
 
 type Params = { shopId: string };
 type SearchParams = { q?: string };
@@ -67,77 +69,108 @@ export default async function PublicShopDetailPage({
     const qRaw = resolvedSearchParams.q ?? "";
     const q = qRaw.trim();
 
-    // アレルゲンマスタは一覧カードや設定 UI の両方で使うため、先に 1 回だけ取得します。
-    const allergenMaster = await prisma.allergen.findMany({
-        select: { slug: true, nameJa: true, sortOrder: true },
-        orderBy: { sortOrder: "asc" },
-    });
-
     const menuWhere = buildMenuWhere(q);
 
-    // 店舗本体と公開メニューを一緒に取り、N+1 を避けます。
-    const shop = await prisma.shop.findFirst({
-        where: {
-            id: shopId,
-            menus: {
-                some: {
-                    isPublished: true,
-                },
-            },
-        },
-        select: {
-            id: true,
-            name: true,
-            description: true,
-            address: true,
-            hours: true,
-            averageBudgetYen: true,
-            coverImageUrl: true,
-            updatedAt: true,
-            _count: {
-                select: {
+    const {
+        data: publicShopData,
+        isDatabaseAvailable,
+    } = await readPublicDataOrFallback(
+        async () => {
+            // アレルゲンマスタは一覧カードや設定 UI の両方で使うため、先に 1 回だけ取得します。
+            const allergenMaster = await prisma.allergen.findMany({
+                select: { slug: true, nameJa: true, sortOrder: true },
+                orderBy: { sortOrder: "asc" },
+            });
+
+            // 店舗本体と公開メニューを一緒に取り、N+1 を避けます。
+            const shop = await prisma.shop.findFirst({
+                where: {
+                    id: shopId,
                     menus: {
-                        where: {
+                        some: {
                             isPublished: true,
                         },
                     },
                 },
-            },
-            menus: {
-                where: menuWhere,
-                orderBy: { updatedAt: "desc" },
                 select: {
                     id: true,
                     name: true,
                     description: true,
-                    priceYen: true,
-                    category: true,
+                    address: true,
+                    hours: true,
+                    averageBudgetYen: true,
+                    coverImageUrl: true,
                     updatedAt: true,
-                    allergenLinks: {
+                    _count: {
                         select: {
-                            status: true,
-                            allergen: { select: { slug: true } },
+                            menus: {
+                                where: {
+                                    isPublished: true,
+                                },
+                            },
+                        },
+                    },
+                    menus: {
+                        where: menuWhere,
+                        orderBy: { updatedAt: "desc" },
+                        select: {
+                            id: true,
+                            name: true,
+                            description: true,
+                            priceYen: true,
+                            category: true,
+                            updatedAt: true,
+                            allergenLinks: {
+                                select: {
+                                    status: true,
+                                    allergen: { select: { slug: true } },
+                                },
+                            },
                         },
                     },
                 },
-            },
+            });
+
+            const firstPublishedMenu = await prisma.menuItem.findFirst({
+                where: {
+                    shopId,
+                    isPublished: true,
+                },
+                orderBy: { updatedAt: "desc" },
+                select: { id: true },
+            });
+
+            return {
+                allergenMaster,
+                shop,
+                firstPublishedMenu,
+            };
         },
-    });
+        {
+            allergenMaster: [],
+            shop: null,
+            firstPublishedMenu: null,
+        },
+    );
+
+    if (!isDatabaseAvailable) {
+        return (
+            <PublicDataUnavailable
+                title="店舗情報を読み込めません"
+                description="現在データベースへ接続できないため、この店舗ページを表示できません。時間をおいて再度お試しください。"
+                backHref="/shops"
+                backLabel="店舗一覧へ戻る"
+            />
+        );
+    }
+
+    const { allergenMaster, shop, firstPublishedMenu } = publicShopData;
 
     if (!shop) {
         // 公開メニューが 1 件も無い店舗は、公開準備中として 404 にします。
         // これにより、店舗情報だけ先に外部へ見えてしまう状態を防ぎます。
         notFound();
     }
-
-    const firstPublishedMenu = await prisma.menuItem.findFirst({
-        where: {
-            shopId,
-            isPublished: true,
-        },
-        orderBy: { updatedAt: "desc" },
-        select: { id: true },
-    });
 
     // Server Component で取った Date や relation を、Client Component が扱いやすい形へ変換します。
     const menusForClient = shop.menus.map((menu) => ({

@@ -9,6 +9,7 @@ import {
     enforceSameOriginAdminMutation,
 } from "@/lib/admin-api-security";
 import { writeAdminAuditLog } from "@/lib/audit-log";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 import { getIpFromHeaders } from "@/lib/request-ip";
 
 type LoginAuditRequest =
@@ -137,7 +138,17 @@ export async function POST(req: Request) {
         });
 
         return new NextResponse(null, { status: 204 });
-    } catch {
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            return NextResponse.json(
+                {
+                    message:
+                        "現在データベースへ接続できないため、ログイン処理を完了できません。",
+                },
+                { status: 503 },
+            );
+        }
+
         return NextResponse.json(
             { message: "ログイン監査の記録に失敗しました。" },
             { status: 500 },

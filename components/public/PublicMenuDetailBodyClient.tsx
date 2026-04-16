@@ -1,0 +1,315 @@
+"use client";
+
+import Link from "next/link";
+import MenuAllergenAlertClient from "@/components/public/MenuAllergenAlertClient";
+import SelectedFreeAllergenCardsClient from "@/components/public/SelectedFreeAllergenCardsClient";
+import {
+    UserAllergenPreferencePanel,
+    type UserAllergenPreferenceAllergen,
+    useUserAllergenPreferenceState,
+} from "@/components/public/UserAllergenPreferenceClient";
+import {
+    statusBadgeClass,
+    statusLabelJa,
+    type AllergenStatus,
+} from "@/lib/allergens";
+
+type SpecifiedIngredientNotice = {
+    title: string;
+    desc: string;
+    resultText: string;
+    unknownText: string | null;
+    boxClass: string;
+    titleClass: string;
+    textClass: string;
+};
+
+type AllergenRow = {
+    slug: string;
+    nameJa: string;
+    status: AllergenStatus;
+};
+
+export default function PublicMenuDetailBodyClient(props: {
+    shopId: string;
+    shopName: string;
+    menuName: string;
+    description: string | null;
+    category: string | null;
+    priceText: string;
+    updatedAtText: string;
+    safeImageUrl: string | null;
+    ingredients: string | null;
+    precaution: string | null;
+    specifiedIngredientNotice: SpecifiedIngredientNotice;
+    allergensForClient: UserAllergenPreferenceAllergen[];
+    statusBySlugForClient: Record<string, AllergenStatus>;
+    rows: AllergenRow[];
+}) {
+    const {
+        shopId,
+        shopName,
+        menuName,
+        description,
+        category,
+        priceText,
+        updatedAtText,
+        safeImageUrl,
+        ingredients,
+        precaution,
+        specifiedIngredientNotice,
+        allergensForClient,
+        statusBySlugForClient,
+        rows,
+    } = props;
+
+    const preferenceState = useUserAllergenPreferenceState();
+
+    const imageStyle = safeImageUrl
+        ? { backgroundImage: `url("${safeImageUrl}")` }
+        : {
+              backgroundImage:
+                  "linear-gradient(135deg, rgba(19,236,19,0.25), rgba(0,0,0,0.05))",
+          };
+
+    const preferencePanel = (
+        <UserAllergenPreferencePanel
+            allergens={allergensForClient}
+            selectedSlugs={preferenceState.selectedSlugs}
+            loaded={preferenceState.loaded}
+            message={preferenceState.message}
+            isOpen={preferenceState.isOpen}
+            onToggleOpen={() => preferenceState.setIsOpen((prev) => !prev)}
+            onToggleSlug={preferenceState.toggleSlug}
+            onSave={preferenceState.onSave}
+            onClear={preferenceState.onClear}
+        />
+    );
+
+    return (
+        <>
+            <div className="lg:hidden">{preferencePanel}</div>
+
+            <MenuAllergenAlertClient
+                allergens={allergensForClient}
+                statusBySlug={statusBySlugForClient}
+            />
+
+            <div
+                className={`rounded-xl p-6 shadow-sm ${specifiedIngredientNotice.boxClass}`}
+            >
+                <h2
+                    className={`text-xl font-extrabold md:text-2xl ${specifiedIngredientNotice.titleClass}`}
+                >
+                    {specifiedIngredientNotice.title}
+                </h2>
+
+                <p
+                    className={`mt-2 text-sm font-medium ${specifiedIngredientNotice.textClass}`}
+                >
+                    {specifiedIngredientNotice.desc}
+                </p>
+
+                <p
+                    className={`mt-2 text-sm ${specifiedIngredientNotice.textClass}`}
+                >
+                    判定結果：{specifiedIngredientNotice.resultText}
+                </p>
+                {specifiedIngredientNotice.unknownText ? (
+                    <p
+                        className={`mt-2 text-sm ${specifiedIngredientNotice.textClass}`}
+                    >
+                        {specifiedIngredientNotice.unknownText}
+                    </p>
+                ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:items-start">
+                <div className="space-y-8 lg:col-span-2">
+                    <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-2 lg:gap-12">
+                        <div className="relative aspect-square overflow-hidden rounded-2xl bg-white p-8 shadow-sm">
+                            <div className="absolute right-4 top-4 z-10 flex gap-2">
+                                <button
+                                    type="button"
+                                    className="rounded-full bg-white/90 p-2 shadow-sm hover:text-[#13ec13]"
+                                >
+                                    ♡
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded-full bg-white/90 p-2 shadow-sm hover:text-[#13ec13]"
+                                >
+                                    ↗
+                                </button>
+                            </div>
+
+                            <div
+                                className="h-full w-full bg-contain bg-center bg-no-repeat transition-transform duration-300 hover:scale-105"
+                                style={imageStyle}
+                                aria-label={menuName}
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-6">
+                            <div>
+                                <p className="mb-2 text-sm font-semibold text-gray-500">
+                                    {shopName} の公開メニュー
+                                </p>
+                                <div className="mb-2 flex items-center gap-2">
+                                    {category ? (
+                                        <span className="rounded-full bg-[#13ec13]/20 px-2.5 py-0.5 text-xs font-bold text-green-800">
+                                            {category}
+                                        </span>
+                                    ) : (
+                                        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-700">
+                                            カテゴリ未設定
+                                        </span>
+                                    )}
+                                </div>
+
+                                <h2 className="mb-2 text-3xl font-extrabold">
+                                    {menuName}
+                                </h2>
+
+                                {description ? (
+                                    <p className="mb-4 text-lg text-gray-600">
+                                        {description}
+                                    </p>
+                                ) : (
+                                    <p className="mb-4 text-lg text-gray-500">
+                                        説明は未登録です。
+                                    </p>
+                                )}
+
+                                <div className="mb-6 flex items-baseline gap-2">
+                                    <span className="text-2xl font-extrabold">
+                                        {priceText}
+                                    </span>
+                                    <span className="text-sm text-gray-500">
+                                        （税込）
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p className="mb-3 text-sm font-bold text-gray-900">
+                                    選択中アレルゲンのうち含まない項目
+                                </p>
+                                <SelectedFreeAllergenCardsClient
+                                    allergens={allergensForClient}
+                                    statusBySlug={statusBySlugForClient}
+                                />
+                            </div>
+
+                            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                <Link
+                                    href={`/shops/${shopId}`}
+                                    className="flex-1 rounded-lg bg-[#13ec13] px-6 py-3 text-center font-bold text-black shadow-md transition hover:bg-[#0db80d] hover:shadow-lg"
+                                >
+                                    店舗詳細に戻る
+                                </Link>
+                                <Link
+                                    href={`/shops/${shopId}`}
+                                    className="flex-1 rounded-lg border-2 border-[#13ec13] bg-white px-6 py-3 text-center font-bold text-[#13ec13] transition hover:bg-[#13ec13]/5"
+                                >
+                                    他のメニューを見る
+                                </Link>
+                            </div>
+
+                            <p className="text-xs text-gray-500">
+                                更新： {updatedAtText}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                        <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                            <span className="text-[#13ec13]">🧺</span>
+                            <h3 className="text-xl font-bold">原材料名</h3>
+                        </div>
+
+                        {ingredients ? (
+                            <p className="text-base leading-relaxed text-gray-700">
+                                {ingredients}
+                            </p>
+                        ) : (
+                            <p className="text-base text-gray-500">
+                                原材料は未登録です。
+                            </p>
+                        )}
+
+                        {precaution ? (
+                            <div className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+                                ※ 注意事項：{precaution}
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                        <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                            <span className="text-[#13ec13]">🧾</span>
+                            <h3 className="text-xl font-bold">
+                                アレルゲン（28品目）
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            {rows.map((row) => (
+                                <div
+                                    key={row.slug}
+                                    className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50"
+                                >
+                                    <span className="text-sm font-medium text-gray-700">
+                                        {row.nameJa}
+                                    </span>
+                                    <span
+                                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusBadgeClass(
+                                            row.status,
+                                        )}`}
+                                        title={row.slug}
+                                    >
+                                        {statusLabelJa(row.status)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-6">
+                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                        <div className="mb-4 flex items-center gap-2">
+                            <span className="text-orange-500">ℹ️</span>
+                            <h3 className="text-lg font-bold">注意事項</h3>
+                        </div>
+
+                        <ul className="list-disc space-y-2 pl-4 text-sm text-gray-600">
+                            <li>体調や個人差により反応が異なる場合があります。</li>
+                            <li>
+                                コンタミネーションの可能性がある場合は店舗へ確認してください。
+                            </li>
+                            <li>
+                                表示内容は更新されることがあります。最終更新日時も確認してください。
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                        <h3 className="text-lg font-bold">店舗</h3>
+                        <p className="mt-2 text-sm text-gray-600">
+                            {shopName}
+                        </p>
+                        <Link
+                            href={`/shops/${shopId}`}
+                            className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-bold text-black hover:bg-[#0db80d]"
+                        >
+                            店舗詳細へ
+                        </Link>
+                    </div>
+
+                    <div className="hidden lg:block">{preferencePanel}</div>
+                </div>
+            </div>
+        </>
+    );
+}

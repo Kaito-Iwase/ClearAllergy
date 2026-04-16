@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 import { getIpFromHeaders } from "@/lib/request-ip";
 
 type AdminAuditAction =
@@ -65,6 +66,10 @@ export async function writeAdminAuditLog(args: {
             },
         });
     } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            return;
+        }
+
         console.error("audit log failed", error);
     }
 }

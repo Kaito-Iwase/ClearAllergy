@@ -1,9 +1,5 @@
 "use client";
 
-// このコンポーネントは公開画面の「あなた向けアレルゲン設定」です。
-// localStorage に選択結果を保存し、メニュー一覧や詳細の警告表示と連動します。
-// ログイン不要で使えるようにしているため、端末ごとの設定として扱います。
-
 import React from "react";
 import {
     clearUserAllergenPreferences,
@@ -12,34 +8,37 @@ import {
     USER_ALLERGENS_UPDATED_EVENT,
 } from "@/lib/public-allergen-preferences";
 
-type Allergen = {
+export type UserAllergenPreferenceAllergen = {
     slug: string;
     nameJa: string;
 };
 
-export default function UserAllergenPreferenceClient({
-    allergens,
-}: {
-    allergens: Allergen[];
-}) {
-    // 選択中項目、読み込み完了、メッセージ、開閉状態を state で持ちます。
+type UserAllergenPreferencePanelProps = {
+    allergens: UserAllergenPreferenceAllergen[];
+    selectedSlugs: string[];
+    loaded: boolean;
+    message: string;
+    isOpen: boolean;
+    onToggleOpen: () => void;
+    onToggleSlug: (slug: string) => void;
+    onSave: () => void;
+    onClear: () => void;
+    className?: string;
+};
+
+export function useUserAllergenPreferenceState() {
     const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
     const [loaded, setLoaded] = React.useState(false);
     const [message, setMessage] = React.useState("");
     const [isOpen, setIsOpen] = React.useState(false);
 
     React.useEffect(() => {
-        // 初回表示時に localStorage から保存済み設定を読み込みます。
         const stored = loadUserAllergenPreferences();
         setSelectedSlugs(stored.selectedSlugs);
         setLoaded(true);
-
-        // 保存済みがあるなら最初から少し分かりやすくしたい場合は true でもよい
-        // setIsOpen(stored.selectedSlugs.length > 0);
     }, []);
 
     function toggleSlug(slug: string) {
-        // 同じボタンを押すと追加 / 解除が切り替わるシンプルな UI です。
         setSelectedSlugs((prev) => {
             if (prev.includes(slug)) {
                 return prev.filter((value) => value !== slug);
@@ -49,7 +48,6 @@ export default function UserAllergenPreferenceClient({
     }
 
     function showMessage(text: string) {
-        // 保存完了などの短いメッセージを一定時間だけ表示します。
         setMessage(text);
 
         window.setTimeout(() => {
@@ -58,26 +56,46 @@ export default function UserAllergenPreferenceClient({
     }
 
     function notifyUpdated() {
-        // 一覧や詳細の警告 UI に「設定が変わった」と知らせます。
         window.dispatchEvent(new CustomEvent(USER_ALLERGENS_UPDATED_EVENT));
     }
 
     function onSave() {
-        // 現在の選択状態を localStorage に保存します。
         saveUserAllergenPreferences({ selectedSlugs });
         notifyUpdated();
         showMessage("この端末に設定を保存しました。");
     }
 
     function onClear() {
-        // 端末内の保存設定を削除し、画面の選択状態も空に戻します。
         clearUserAllergenPreferences();
         setSelectedSlugs([]);
         notifyUpdated();
         showMessage("保存済み設定を削除しました。");
     }
 
-    // localStorage はクライアントでしか読めないため、読み込み完了までは何も出しません。
+    return {
+        selectedSlugs,
+        loaded,
+        message,
+        isOpen,
+        setIsOpen,
+        toggleSlug,
+        onSave,
+        onClear,
+    };
+}
+
+export function UserAllergenPreferencePanel({
+    allergens,
+    selectedSlugs,
+    loaded,
+    message,
+    isOpen,
+    onToggleOpen,
+    onToggleSlug,
+    onSave,
+    onClear,
+    className,
+}: UserAllergenPreferencePanelProps) {
     if (!loaded) {
         return null;
     }
@@ -85,10 +103,14 @@ export default function UserAllergenPreferenceClient({
     const selectedCount = selectedSlugs.length;
 
     return (
-        <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <section
+            className={`rounded-2xl border border-gray-200 bg-white shadow-sm ${
+                className ?? ""
+            }`}
+        >
             <button
                 type="button"
-                onClick={() => setIsOpen((prev) => !prev)}
+                onClick={onToggleOpen}
                 className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
                 aria-expanded={isOpen}
             >
@@ -136,7 +158,7 @@ export default function UserAllergenPreferenceClient({
                                 <button
                                     key={allergen.slug}
                                     type="button"
-                                    onClick={() => toggleSlug(allergen.slug)}
+                                    onClick={() => onToggleSlug(allergen.slug)}
                                     className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                                         checked
                                             ? "bg-red-600 text-white"
@@ -179,5 +201,27 @@ export default function UserAllergenPreferenceClient({
                 </div>
             ) : null}
         </section>
+    );
+}
+
+export default function UserAllergenPreferenceClient({
+    allergens,
+}: {
+    allergens: UserAllergenPreferenceAllergen[];
+}) {
+    const state = useUserAllergenPreferenceState();
+
+    return (
+        <UserAllergenPreferencePanel
+            allergens={allergens}
+            selectedSlugs={state.selectedSlugs}
+            loaded={state.loaded}
+            message={state.message}
+            isOpen={state.isOpen}
+            onToggleOpen={() => state.setIsOpen((prev) => !prev)}
+            onToggleSlug={state.toggleSlug}
+            onSave={state.onSave}
+            onClear={state.onClear}
+        />
     );
 }

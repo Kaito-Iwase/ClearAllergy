@@ -4,6 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 import { enforceSameOriginAdminMutation, consumeIpAndIdentifierRateLimit } from "@/lib/admin-api-security";
 import { adminRegisterSchema } from "@/lib/admin-auth-schemas";
@@ -264,6 +265,24 @@ export async function POST(req: Request) {
             { status: 201 },
         );
     } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            if (createdClerkUserId) {
+                try {
+                    await deleteClerkUser(createdClerkUserId);
+                } catch {
+                    // DB 側だけ失敗した時も Clerk ユーザーはできるだけ巻き戻します。
+                }
+            }
+
+            return NextResponse.json(
+                {
+                    message:
+                        "現在データベースへ接続できないため、新規登録を完了できません。",
+                },
+                { status: 503 },
+            );
+        }
+
         await writeAdminAuditLog({
             req,
             actorUserId: null,

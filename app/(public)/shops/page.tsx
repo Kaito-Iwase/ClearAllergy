@@ -8,6 +8,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDateTimeJa } from "@/lib/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
+import { readPublicDataOrFallback } from "@/lib/public-db";
 
 type SearchParams = {
     q?: string;
@@ -53,42 +54,48 @@ export default async function PublicShopListPage({
     };
 
     // 公開メニューを持つ店舗だけを取得し、カード表示に必要な項目へ絞ります。
-    const shops = await prisma.shop.findMany({
-        where,
-        orderBy: { updatedAt: "desc" },
-        select: {
-            id: true,
-            name: true,
-            description: true,
-            address: true,
-            averageBudgetYen: true,
-            coverImageUrl: true,
-            updatedAt: true,
-            menus: {
-                where: { isPublished: true },
+    const { data: shops, isDatabaseAvailable } = await readPublicDataOrFallback(
+        () =>
+            prisma.shop.findMany({
+                where,
                 orderBy: { updatedAt: "desc" },
-                take: 1,
                 select: {
-                    priceYen: true,
-                },
-            },
-            _count: {
-                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    address: true,
+                    averageBudgetYen: true,
+                    coverImageUrl: true,
+                    updatedAt: true,
                     menus: {
-                        where: {
-                            isPublished: true,
+                        where: { isPublished: true },
+                        orderBy: { updatedAt: "desc" },
+                        take: 1,
+                        select: {
+                            priceYen: true,
+                        },
+                    },
+                    _count: {
+                        select: {
+                            menus: {
+                                where: {
+                                    isPublished: true,
+                                },
+                            },
                         },
                     },
                 },
-            },
-        },
-    });
+            }),
+        [],
+    );
 
     // 検索中かどうかで、見出しメッセージを出し分けます。
     const resultText = q !== "" ? `検索: ${q}（${shops.length}件）` : null;
 
     const emptyText =
-        q !== ""
+        !isDatabaseAvailable
+            ? "現在データベースに接続できないため、公開店舗を読み込めません。時間をおいて再度お試しください。"
+            : q !== ""
             ? "該当する店舗が見つかりませんでした。"
             : "公開中の店舗がありません。";
 
@@ -116,6 +123,11 @@ export default async function PublicShopListPage({
                 <p className="mt-3 text-sm leading-7 text-neutral-600">
                     各店舗ページでは公開メニュー一覧、各メニュー詳細ではアレルゲン28品目の状態を確認できます。未ログインでも閲覧できます。
                 </p>
+                {!isDatabaseAvailable ? (
+                    <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                        現在は公開データベースに接続できないため、店舗一覧を表示できません。
+                    </p>
+                ) : null}
             </section>
 
             <div className="mb-6 flex items-end justify-between gap-4">

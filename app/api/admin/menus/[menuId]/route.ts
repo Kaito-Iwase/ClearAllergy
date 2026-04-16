@@ -321,8 +321,6 @@ export async function PUT(req: Request, context: Context) {
             // これにより、既存の不完全データを公開へ切り替える抜け道を防ぎます。
             const publishErrors = getMenuPublishValidationErrors({
                 name: nextName,
-                ingredients: nextIngredients,
-                precaution: nextPrecaution,
                 allergens,
                 statusBySlug: nextStatusBySlug,
             });

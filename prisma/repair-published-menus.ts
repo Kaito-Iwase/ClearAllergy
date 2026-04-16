@@ -48,8 +48,6 @@ async function main() {
         const publishErrors = menu.isPublished
             ? getMenuPublishValidationErrors({
                   name: menu.name,
-                  ingredients: menu.ingredients,
-                  precaution: menu.precaution,
                   allergens,
                   statusBySlug,
               })

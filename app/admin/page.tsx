@@ -3,8 +3,10 @@
 // Server Component なので、認証確認をサーバー側で先に行えます。
 
 import { redirect } from "next/navigation";
+import AdminLoginPageClient from "@/components/admin/auth/AdminLoginPageClient";
 import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
 // /admin の入口。
 // Clerk ログイン済みなら DB の状態を見て、
@@ -12,7 +14,17 @@ import { getCurrentAdminContext } from "@/lib/admin-auth";
 // 既に店舗があるなら、最初は店舗情報ページへ送ります。
 export default async function AdminIndexPage() {
     // 管理者の認証状態と店舗情報をまとめて取得します。
-    const context = await getCurrentAdminContext();
+    let context = null;
+
+    try {
+        context = await getCurrentAdminContext();
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            return <AdminLoginPageClient databaseUnavailable />;
+        }
+
+        throw error;
+    }
 
     if (!context) {
         const clerkIdentity = await getCurrentClerkIdentity();

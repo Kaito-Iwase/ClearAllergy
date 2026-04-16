@@ -4,6 +4,7 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
 type AdminSessionLike = {
     user: {
@@ -90,7 +91,17 @@ export async function requireCurrentAdminContextOrRedirect(): Promise<{
 }> {
     // 管理画面で必須の認証ガードです。
     // 未ログインならログイン画面、店舗未作成なら登録画面へ送ります。
-    const context = await getCurrentAdminContext();
+    let context: AdminContext | null;
+
+    try {
+        context = await getCurrentAdminContext();
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            redirect("/admin/login?database=unavailable");
+        }
+
+        throw error;
+    }
 
     if (!context) {
         redirect("/admin/login");

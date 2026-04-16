@@ -8,6 +8,10 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { type AllergenStatus } from "@/lib/allergens";
 import { createMenuButtonClassName } from "@/components/admin/menu/CreateMenuButton";
+import {
+    getApiErrorMessage,
+    getThrownErrorMessage,
+} from "@/lib/api-error-message";
 
 type Allergen = {
     slug: string;
@@ -23,6 +27,11 @@ type UploadResponse = {
     pathname?: string;
     error?: string;
 };
+
+const CREATE_ERROR_MESSAGE =
+    "作成に失敗しました。時間をおいてもう一度お試しください。";
+const UPLOAD_ERROR_MESSAGE =
+    "画像のアップロードに失敗しました。時間をおいてもう一度お試しください。";
 
 export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     const router = useRouter();
@@ -134,14 +143,18 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                 body: formData,
             });
 
-            const data = (await res
-                .json()
-                .catch(() => null)) as UploadResponse | null;
-
-            if (!res.ok || !data?.url) {
+            if (!res.ok) {
                 throw new Error(
-                    data?.error ?? "画像アップロードに失敗しました。",
+                    await getApiErrorMessage(res, UPLOAD_ERROR_MESSAGE),
                 );
+            }
+
+            const data = (await res.json().catch(() => null)) as
+                | UploadResponse
+                | null;
+
+            if (!data?.url) {
+                throw new Error(UPLOAD_ERROR_MESSAGE);
             }
 
             setImageUrl(data.url);
@@ -189,31 +202,24 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                 body: JSON.stringify(body),
             });
 
-            const data = (await res
-                .json()
-                .catch(() => ({}))) as CreateMenuResponse;
-
             if (!res.ok) {
-                const msg =
-                    "error" in data
-                        ? data.error + (data.message ? `: ${data.message}` : "")
-                        : `作成に失敗しました（status: ${res.status}）`;
-                setError(msg);
+                setError(await getApiErrorMessage(res, CREATE_ERROR_MESSAGE));
                 return;
             }
 
-            if (!("id" in data)) {
-                setError(
-                    "作成は成功したはずですが、idが返ってきませんでした。",
-                );
+            const data = (await res.json().catch(() => null)) as
+                | CreateMenuResponse
+                | null;
+
+            if (!data || !("id" in data)) {
+                setError(CREATE_ERROR_MESSAGE);
                 return;
             }
 
             // 作成成功後は、そのメニューの編集画面へそのまま移動します。
             router.push(`/admin/menus/${data.id}/edit`);
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            setError(`予期せぬエラー: ${msg}`);
+            setError(getThrownErrorMessage(err, CREATE_ERROR_MESSAGE));
         } finally {
             setIsSubmitting(false);
         }
@@ -337,7 +343,7 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                         placeholder="例：小麦粉、卵、牛乳、砂糖、バター"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                        パッケージやレシピに基づく原材料名を入力します。
+                        未入力でも保存・公開できますが、できるだけ入力をおすすめします。
                     </p>
                 </div>
 
@@ -352,6 +358,9 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
                         placeholder="例：同一厨房でえび・かに・卵を扱っています。"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                        未入力でも保存・公開できますが、できるだけ入力をおすすめします。
+                    </p>
                 </div>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
