@@ -18,12 +18,14 @@ export default function AdminRegisterPageClient({
     registrationMode,
     lockMessage,
     inviteToken,
+    databaseUnavailable = false,
 }: {
     showGoogleAuthButton: boolean;
     canRegister: boolean;
     registrationMode: "disabled" | "invite_only" | "open";
     lockMessage: string | null;
     inviteToken: string | null;
+    databaseUnavailable?: boolean;
 }) {
     const { fetchStatus, signIn } = useSignIn();
     const [showPassword, setShowPassword] = useState(false);
@@ -95,6 +97,13 @@ export default function AdminRegisterPageClient({
         e.preventDefault();
         setError(null);
         setNotice(null);
+
+        if (databaseUnavailable) {
+            setError(
+                "現在データベースへ接続できないため、新規登録を開始できません。時間をおいて再度お試しください。",
+            );
+            return;
+        }
 
         if (!canRegister) {
             setError(lockMessage ?? "現在は登録できません。");
@@ -207,7 +216,13 @@ export default function AdminRegisterPageClient({
                             </p>
                         </div>
 
-                        {showGoogleAuthButton ? (
+                        {databaseUnavailable ? (
+                            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+                                現在データベースへ接続できないため、店舗アカウント登録を一時停止しています。時間をおいて再度お試しください。
+                            </div>
+                        ) : null}
+
+                        {showGoogleAuthButton && !databaseUnavailable ? (
                             <>
                                 <div className="mb-5">
                                     <AdminGoogleAuthButton
@@ -271,6 +286,7 @@ export default function AdminRegisterPageClient({
                                     required
                                     type="text"
                                     value={shopName}
+                                    disabled={databaseUnavailable || loading}
                                     onChange={(e) => setShopName(e.target.value)}
                                 />
                             </div>
@@ -294,6 +310,7 @@ export default function AdminRegisterPageClient({
                                     spellCheck={false}
                                     type="email"
                                     value={email}
+                                    disabled={databaseUnavailable || loading}
                                     onChange={(e) =>
                                         setEmail(
                                             normalizeEmail(e.target.value),
@@ -319,6 +336,7 @@ export default function AdminRegisterPageClient({
                                         required
                                         type={showPassword ? "text" : "password"}
                                         value={password}
+                                        disabled={databaseUnavailable || loading}
                                         onChange={(e) => setPassword(e.target.value)}
                                     />
 
@@ -329,6 +347,7 @@ export default function AdminRegisterPageClient({
                                             setShowPassword((v) => !v)
                                         }
                                         aria-label="パスワード表示を切り替え"
+                                        disabled={databaseUnavailable || loading}
                                     >
                                         <span className="material-symbols-outlined text-[20px]">
                                             {showPassword
@@ -360,6 +379,7 @@ export default function AdminRegisterPageClient({
                                                 : "password"
                                         }
                                         value={passwordConfirm}
+                                        disabled={databaseUnavailable || loading}
                                         onChange={(e) =>
                                             setPasswordConfirm(e.target.value)
                                         }
@@ -372,6 +392,7 @@ export default function AdminRegisterPageClient({
                                             setShowPasswordConfirm((v) => !v)
                                         }
                                         aria-label="確認用パスワード表示を切り替え"
+                                        disabled={databaseUnavailable || loading}
                                     >
                                         <span className="material-symbols-outlined text-[20px]">
                                             {showPasswordConfirm
@@ -387,6 +408,7 @@ export default function AdminRegisterPageClient({
                                     className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
                                     type="submit"
                                     disabled={
+                                        databaseUnavailable ||
                                         loading ||
                                         !canRegister ||
                                         fetchStatus === "fetching"

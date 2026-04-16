@@ -153,8 +153,6 @@ export function getUnknownAllergenNames(args: {
 
 export function getMenuPublishValidationErrors(args: {
     name: string;
-    ingredients: string | null;
-    precaution: string | null;
     allergens: Array<{ slug: string; nameJa: string }>;
     statusBySlug: Record<string, AllergenStatus>;
 }) {
@@ -164,14 +162,6 @@ export function getMenuPublishValidationErrors(args: {
 
     if (args.name.trim() === "") {
         errors.push("公開するにはメニュー名が必要です。");
-    }
-
-    if (!args.ingredients) {
-        errors.push("公開するには原材料名の入力が必要です。");
-    }
-
-    if (!args.precaution) {
-        errors.push("公開するには注意書きの入力が必要です。");
     }
 
     const unknownAllergens = getUnknownAllergenNames({

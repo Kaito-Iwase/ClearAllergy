@@ -16,6 +16,7 @@ import {
 } from "@/lib/admin-api-security";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { prisma } from "@/lib/db";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 import { getIpFromHeaders } from "@/lib/request-ip";
 
@@ -208,7 +209,17 @@ export async function POST(req: Request) {
             },
             { status: 201 },
         );
-    } catch {
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            return NextResponse.json(
+                {
+                    message:
+                        "現在データベースへ接続できないため、店舗の初期設定を完了できません。",
+                },
+                { status: 503 },
+            );
+        }
+
         const clerkIdentity = await getCurrentClerkIdentity().catch(() => null);
         await writeAdminAuditLog({
             req,

@@ -7,12 +7,46 @@ import AdminLoginPageClient from "@/components/admin/auth/AdminLoginPageClient";
 import { shouldShowAdminGoogleLogin } from "@/lib/auth/clerkAdmin";
 import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
-export default async function AdminLoginPage() {
+export default async function AdminLoginPage({
+    searchParams,
+}: {
+    searchParams?:
+        | Promise<{ database?: string }>
+        | { database?: string };
+}) {
     // Server Component 側で先にログイン状態を確認しておくと、
     // すでにログイン済みの人へ不要なフォームを見せずに済みます。
-    const context = await getCurrentAdminContext();
+    const resolvedSearchParams = (await searchParams) ?? {};
     const showGoogleAuthButton = shouldShowAdminGoogleLogin();
+    const databaseUnavailableFromQuery =
+        resolvedSearchParams.database === "unavailable";
+    let context = null;
+
+    if (!databaseUnavailableFromQuery) {
+        try {
+            context = await getCurrentAdminContext();
+        } catch (error) {
+            if (isDatabaseUnavailableError(error)) {
+                return (
+                    <AdminLoginPageClient
+                        showGoogleAuthButton={false}
+                        databaseUnavailable
+                    />
+                );
+            }
+
+            throw error;
+        }
+    } else {
+        return (
+            <AdminLoginPageClient
+                showGoogleAuthButton={false}
+                databaseUnavailable
+            />
+        );
+    }
 
     if (!context) {
         const clerkIdentity = await getCurrentClerkIdentity();

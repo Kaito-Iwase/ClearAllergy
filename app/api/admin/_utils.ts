@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
 // request.json() は壊れた JSON で例外を投げるので、
 // 各 API で try/catch を増やしすぎないよう helper にしています。
@@ -16,7 +17,27 @@ export async function readJson<T>(req: Request): Promise<T | null> {
 // 管理画面 API 共通の認証チェックです。
 // shopId まで確認するのは「自分の店舗のデータだけ更新できる」ようにするためです。
 export async function requireShopId() {
-    const context = await getCurrentAdminContext();
+    let context = null;
+
+    try {
+        context = await getCurrentAdminContext();
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            return {
+                ok: false as const,
+                res: NextResponse.json(
+                    {
+                        error: "database unavailable",
+                        message:
+                            "現在データベースへ接続できないため、管理APIを処理できません。",
+                    },
+                    { status: 503 },
+                ),
+            };
+        }
+
+        throw error;
+    }
 
     if (!context) {
         return {

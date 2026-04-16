@@ -12,6 +12,7 @@ import {
 import { shouldShowAdminGoogleRegister } from "@/lib/auth/clerkAdmin";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
 export default async function AdminRegisterPage({
     searchParams,
@@ -27,10 +28,29 @@ export default async function AdminRegisterPage({
     const showGoogleAuthButton = shouldShowAdminGoogleRegister({
         canRegister: registrationGuard.allowed,
     });
+    let appUser = null;
+    let clerkIdentity = null;
 
     // Clerk ログイン済みでまだ Shop が無い場合だけ、初回セットアップ画面を出します。
-    const appUser = await getCurrentAppUser();
-    const clerkIdentity = await getCurrentClerkIdentity();
+    try {
+        appUser = await getCurrentAppUser();
+        clerkIdentity = await getCurrentClerkIdentity();
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            return (
+                <AdminRegisterPageClient
+                    showGoogleAuthButton={false}
+                    canRegister={registrationGuard.allowed}
+                    registrationMode={registrationGuard.mode}
+                    lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
+                    inviteToken={inviteToken}
+                    databaseUnavailable
+                />
+            );
+        }
+
+        throw error;
+    }
 
     if (appUser && !appUser.shop) {
         return (
@@ -55,7 +75,26 @@ export default async function AdminRegisterPage({
     }
 
     // 管理者状態を確認し、店舗がある人は管理画面へ戻します。
-    const context = await getCurrentAdminContext();
+    let context = null;
+
+    try {
+        context = await getCurrentAdminContext();
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            return (
+                <AdminRegisterPageClient
+                    showGoogleAuthButton={false}
+                    canRegister={registrationGuard.allowed}
+                    registrationMode={registrationGuard.mode}
+                    lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
+                    inviteToken={inviteToken}
+                    databaseUnavailable
+                />
+            );
+        }
+
+        throw error;
+    }
 
     if (context?.shop) {
         redirect("/admin/shop");

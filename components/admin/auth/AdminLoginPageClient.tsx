@@ -15,11 +15,13 @@ import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
 type AdminLoginPageClientProps = {
     showGoogleAuthButton?: boolean;
     pendingSetupEmail?: string | null;
+    databaseUnavailable?: boolean;
 };
 
 export default function AdminLoginPageClient({
     showGoogleAuthButton = false,
     pendingSetupEmail,
+    databaseUnavailable = false,
 }: AdminLoginPageClientProps) {
     const { fetchStatus, signIn } = useSignIn();
     const [showPassword, setShowPassword] = useState(false);
@@ -110,6 +112,13 @@ export default function AdminLoginPageClient({
         setLoading(true);
 
         try {
+            if (databaseUnavailable) {
+                setError(
+                    "現在データベースへ接続できないため、ログインを開始できません。時間をおいて再度お試しください。",
+                );
+                return;
+            }
+
             if (!signIn) {
                 setError(
                     "認証の初期化がまだ完了していません。少し待ってから再度お試しください。",
@@ -362,7 +371,13 @@ export default function AdminLoginPageClient({
                             </div>
                         ) : null}
 
-                        {showGoogleAuthButton ? (
+                        {databaseUnavailable ? (
+                            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+                                現在データベースへ接続できないため、管理者ログインを一時停止しています。時間をおいて再度お試しください。
+                            </div>
+                        ) : null}
+
+                        {showGoogleAuthButton && !databaseUnavailable ? (
                             <>
                                 <div className="mb-5">
                                     <AdminGoogleAuthButton
@@ -416,6 +431,7 @@ export default function AdminLoginPageClient({
                                         required
                                         type="text"
                                         value={emailCode}
+                                        disabled={databaseUnavailable || loading}
                                         onChange={(e) => setEmailCode(e.target.value)}
                                     />
                                 </div>
@@ -424,7 +440,7 @@ export default function AdminLoginPageClient({
                                     <button
                                         className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
                                         type="submit"
-                                        disabled={loading}
+                                        disabled={databaseUnavailable || loading}
                                     >
                                         <span className="truncate">
                                             {loading ? "確認中..." : "コードを確認してログイン"}
@@ -435,7 +451,7 @@ export default function AdminLoginPageClient({
                                         type="button"
                                         onClick={() => void resetLoginFlow()}
                                         className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 border border-[#dbe6db] text-base font-bold leading-normal tracking-[0.015em] transition-colors hover:bg-background-light disabled:opacity-60"
-                                        disabled={loading}
+                                        disabled={databaseUnavailable || loading}
                                     >
                                         <span className="truncate">メールアドレス入力に戻る</span>
                                     </button>
@@ -463,6 +479,7 @@ export default function AdminLoginPageClient({
                                             spellCheck={false}
                                             type="email"
                                             value={email}
+                                            disabled={databaseUnavailable || loading}
                                             onChange={(e) =>
                                                 setEmail(
                                                     normalizeEmail(e.target.value),
@@ -491,6 +508,7 @@ export default function AdminLoginPageClient({
                                             required
                                             type={showPassword ? "text" : "password"}
                                             value={password}
+                                            disabled={databaseUnavailable || loading}
                                             onChange={(e) =>
                                                 setPassword(e.target.value)
                                             }
@@ -503,6 +521,7 @@ export default function AdminLoginPageClient({
                                                 setShowPassword((v) => !v)
                                             }
                                             aria-label="パスワード表示を切り替え"
+                                            disabled={databaseUnavailable || loading}
                                         >
                                             <span className="material-symbols-outlined text-[20px]">
                                                 {showPassword
@@ -518,7 +537,9 @@ export default function AdminLoginPageClient({
                                         className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary hover:bg-primary-dark text-black text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-sm disabled:opacity-60"
                                         type="submit"
                                         disabled={
-                                            loading || fetchStatus === "fetching"
+                                            databaseUnavailable ||
+                                            loading ||
+                                            fetchStatus === "fetching"
                                         }
                                     >
                                         <span className="truncate">

@@ -28,8 +28,10 @@ type FeaturedShop = {
 
 export default function HomePageView({
     featuredShop,
+    isDatabaseAvailable,
 }: {
     featuredShop: FeaturedShop;
+    isDatabaseAvailable: boolean;
 }) {
     return (
         <main className="min-h-screen bg-[#f6f8f6] text-[#111811]">
@@ -111,6 +113,12 @@ export default function HomePageView({
                                             Clear Cafe Demo と Cafe Hibi
                                         </span>
                                         を公開しています。
+                                    </p>
+                                ) : null}
+                                {!isDatabaseAvailable ? (
+                                    <p className="mt-2 leading-6 text-amber-800">
+                                        現在は公開データの読み込みに失敗しているため、
+                                        画面はサンプル表示に切り替えています。
                                     </p>
                                 ) : null}
                             </div>

@@ -6,6 +6,10 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api-error-message";
+
+const DELETE_ERROR_MESSAGE =
+    "削除に失敗しました。時間をおいてもう一度お試しください。";
 
 type MenuRow = {
     id: string;
@@ -50,12 +54,7 @@ export default function MenuListPageClient({
         });
 
         if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            setError(
-                `削除に失敗しました（status: ${res.status}）: ${JSON.stringify(
-                    data,
-                )}`,
-            );
+            setError(await getApiErrorMessage(res, DELETE_ERROR_MESSAGE));
             return;
         }
 

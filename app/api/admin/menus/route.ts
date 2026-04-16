@@ -175,8 +175,6 @@ export async function POST(req: Request) {
             // UI が壊れても API 直打ちでも、この壁を越えない限り公開できません。
             const publishErrors = getMenuPublishValidationErrors({
                 name,
-                ingredients,
-                precaution,
                 allergens,
                 statusBySlug: completeAllergenMap,
             });
