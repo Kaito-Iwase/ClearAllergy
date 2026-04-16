@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 import { enforceSameOriginAdminMutation, consumeIpAndIdentifierRateLimit } from "@/lib/admin-api-security";
-import { adminRegisterSchema } from "@/lib/admin-auth-schemas";
+import { adminRegisterSchema } from "@/lib/validators/admin-auth";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { getIpFromHeaders } from "@/lib/request-ip";
 import {

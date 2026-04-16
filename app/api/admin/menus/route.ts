@@ -11,7 +11,7 @@ import {
     toBooleanOrDefault,
     toRequiredTrimmedString,
     toTrimmedNullableString,
-} from "@/lib/admin-validators";
+} from "@/lib/validators/admin-input";
 import {
     createStatusBySlug,
     getMenuPublishValidationErrors,
