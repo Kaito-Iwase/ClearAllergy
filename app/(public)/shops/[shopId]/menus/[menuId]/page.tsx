@@ -77,6 +77,7 @@ export default async function PublicMenuDetailPage({
             allergenMaster: [],
             menu: null,
         },
+        { context: `public-menu-detail:${shopId}:${menuId}` },
     );
 
     if (!isDatabaseAvailable) {

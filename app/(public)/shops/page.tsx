@@ -87,6 +87,7 @@ export default async function PublicShopListPage({
                 },
             }),
         [],
+        { context: "public-shops:list" },
     );
 
     // 検索中かどうかで、見出しメッセージを出し分けます。

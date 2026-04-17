@@ -7,7 +7,13 @@ import AdminLoginPageClient from "@/components/admin/auth/AdminLoginPageClient";
 import { shouldShowAdminGoogleLogin } from "@/lib/auth/clerkAdmin";
 import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
-import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import {
+    isDatabaseUnavailableError,
+    logDatabaseUnavailableError,
+} from "@/lib/db-errors";
+
+const DATABASE_UNAVAILABLE_REASON =
+    "Clerk のログイン画面自体は表示できますが、ログイン状態判定と user 取得に必要なデータベース読取が失敗しています。Clerk 警告が出ていても、この画面では DB 接続失敗が主因です。";
 
 export default async function AdminLoginPage({
     searchParams,
@@ -29,10 +35,20 @@ export default async function AdminLoginPage({
             context = await getCurrentAdminContext();
         } catch (error) {
             if (isDatabaseUnavailableError(error)) {
+                logDatabaseUnavailableError(
+                    {
+                        scope: "page:admin-login",
+                        operation: "getCurrentAdminContext",
+                        visibility: "admin",
+                    },
+                    error,
+                );
+
                 return (
                     <AdminLoginPageClient
                         showGoogleAuthButton={false}
                         databaseUnavailable
+                        databaseUnavailableReason={DATABASE_UNAVAILABLE_REASON}
                     />
                 );
             }
@@ -44,6 +60,7 @@ export default async function AdminLoginPage({
             <AdminLoginPageClient
                 showGoogleAuthButton={false}
                 databaseUnavailable
+                databaseUnavailableReason={DATABASE_UNAVAILABLE_REASON}
             />
         );
     }

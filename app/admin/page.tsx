@@ -8,6 +8,9 @@ import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
+const DATABASE_UNAVAILABLE_REASON =
+    "Clerk セッションの有無ではなく、管理者ユーザーと店舗状態の照会に必要なデータベース接続が失敗しています。";
+
 // /admin の入口。
 // Clerk ログイン済みなら DB の状態を見て、
 // まだ店舗未作成なら /admin/register、
@@ -20,7 +23,12 @@ export default async function AdminIndexPage() {
         context = await getCurrentAdminContext();
     } catch (error) {
         if (isDatabaseUnavailableError(error)) {
-            return <AdminLoginPageClient databaseUnavailable />;
+            return (
+                <AdminLoginPageClient
+                    databaseUnavailable
+                    databaseUnavailableReason={DATABASE_UNAVAILABLE_REASON}
+                />
+            );
         }
 
         throw error;
