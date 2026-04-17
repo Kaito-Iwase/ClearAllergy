@@ -151,6 +151,7 @@ export default async function PublicShopDetailPage({
             shop: null,
             firstPublishedMenu: null,
         },
+        { context: `public-shop-detail:${shopId}` },
     );
 
     if (!isDatabaseAvailable) {

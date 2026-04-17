@@ -55,6 +55,7 @@ export default async function HomePage() {
                     },
                 }),
             null,
+            { context: "home:featured-shop" },
         );
 
     return (

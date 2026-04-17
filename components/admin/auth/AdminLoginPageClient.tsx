@@ -16,12 +16,14 @@ type AdminLoginPageClientProps = {
     showGoogleAuthButton?: boolean;
     pendingSetupEmail?: string | null;
     databaseUnavailable?: boolean;
+    databaseUnavailableReason?: string | null;
 };
 
 export default function AdminLoginPageClient({
     showGoogleAuthButton = false,
     pendingSetupEmail,
     databaseUnavailable = false,
+    databaseUnavailableReason = null,
 }: AdminLoginPageClientProps) {
     const { fetchStatus, signIn } = useSignIn();
     const [showPassword, setShowPassword] = useState(false);
@@ -373,7 +375,13 @@ export default function AdminLoginPageClient({
 
                         {databaseUnavailable ? (
                             <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-                                現在データベースへ接続できないため、管理者ログインを一時停止しています。時間をおいて再度お試しください。
+                                <p className="font-bold">
+                                    現在データベースへ接続できないため、管理者ログインを一時停止しています。
+                                </p>
+                                <p className="mt-2 leading-6">
+                                    {databaseUnavailableReason ??
+                                        "認証フォームではなく、管理者ユーザーと店舗状態の読取に必要なデータベース接続で失敗しています。時間をおいて再度お試しください。"}
+                                </p>
                             </div>
                         ) : null}
 
