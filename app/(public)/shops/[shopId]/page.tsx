@@ -86,6 +86,7 @@ export default async function PublicShopDetailPage({
             const shop = await prisma.shop.findFirst({
                 where: {
                     id: shopId,
+                    isActive: true,
                     menus: {
                         some: {
                             isPublished: true,
@@ -134,6 +135,9 @@ export default async function PublicShopDetailPage({
             const firstPublishedMenu = await prisma.menuItem.findFirst({
                 where: {
                     shopId,
+                    shop: {
+                        isActive: true,
+                    },
                     isPublished: true,
                 },
                 orderBy: { updatedAt: "desc" },

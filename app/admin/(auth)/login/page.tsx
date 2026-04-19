@@ -7,6 +7,7 @@ import AdminLoginPageClient from "@/components/admin/auth/AdminLoginPageClient";
 import { shouldShowAdminGoogleLogin } from "@/lib/auth/clerkAdmin";
 import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
+import { getCurrentPlatformAdmin } from "@/lib/admin-platform-auth";
 import {
     isDatabaseUnavailableError,
     logDatabaseUnavailableError,
@@ -31,6 +32,11 @@ export default async function AdminLoginPage({
     let context = null;
 
     if (!databaseUnavailableFromQuery) {
+        const platformAdmin = await getCurrentPlatformAdmin();
+        if (platformAdmin) {
+            redirect("/admin/invitations");
+        }
+
         try {
             context = await getCurrentAdminContext();
         } catch (error) {

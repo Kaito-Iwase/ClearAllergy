@@ -68,6 +68,34 @@ export async function createClerkPasswordUser(params: {
     });
 }
 
+export async function createClerkApplicationInvitation(params: {
+    email: string;
+    expiresInDays?: number;
+    redirectUrl?: string;
+    publicMetadata?: Record<string, unknown>;
+}) {
+    const normalizedEmail = normalizeEmail(params.email);
+
+    if (!normalizedEmail) {
+        throw new Error("Clerk invitation requires a valid email address.");
+    }
+
+    const client = getClerkAdminClient();
+    return client.invitations.createInvitation({
+        emailAddress: normalizedEmail,
+        expiresInDays: params.expiresInDays,
+        notify: true,
+        ignoreExisting: false,
+        redirectUrl: params.redirectUrl,
+        publicMetadata: params.publicMetadata,
+    });
+}
+
+export async function revokeClerkApplicationInvitation(invitationId: string) {
+    const client = getClerkAdminClient();
+    await client.invitations.revokeInvitation(invitationId);
+}
+
 export async function deleteClerkUser(userId: string) {
     const client = getClerkAdminClient();
     await client.users.deleteUser(userId);
@@ -78,12 +106,22 @@ async function linkLocalUserToClerk(params: {
     clerkUser: ClerkUser;
     email: string | null;
 }) {
-    await prisma.user.update({
-        where: { id: params.appUserId },
-        data: {
-            clerkUserId: params.clerkUser.id,
-            email: params.email,
-        },
+    await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+            where: { id: params.appUserId },
+            data: {
+                clerkUserId: params.clerkUser.id,
+                email: params.email,
+            },
+        });
+
+        await tx.shop.updateMany({
+            where: { userId: params.appUserId },
+            data: {
+                ownerClerkUserId: params.clerkUser.id,
+                isActive: true,
+            },
+        });
     });
 }
 

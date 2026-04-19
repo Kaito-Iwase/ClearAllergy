@@ -45,7 +45,14 @@ export default async function PublicMenuDetailPage({
 
             // 公開中のメニューだけを対象にし、非公開データは見せません。
             const menu = await prisma.menuItem.findFirst({
-                where: { id: menuId, shopId, isPublished: true },
+                where: {
+                    id: menuId,
+                    shopId,
+                    isPublished: true,
+                    shop: {
+                        isActive: true,
+                    },
+                },
                 select: {
                     id: true,
                     name: true,

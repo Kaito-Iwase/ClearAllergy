@@ -28,6 +28,7 @@ export default async function PublicShopListPage({
 
     // 検索語が空なら全件、入っていれば店舗名や説明文で絞り込みます。
     const where = {
+        isActive: true,
         menus: {
             some: {
                 isPublished: true,
