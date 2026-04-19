@@ -71,7 +71,6 @@ export default function PublicMenuDetailBodyClient(props: {
               backgroundImage:
                   "linear-gradient(135deg, rgba(19,236,19,0.25), rgba(0,0,0,0.05))",
           };
-
     const preferencePanel = (
         <UserAllergenPreferencePanel
             allergens={allergensForClient}
@@ -126,7 +125,7 @@ export default function PublicMenuDetailBodyClient(props: {
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:items-start">
                 <div className="space-y-8 lg:col-span-2">
-                    <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-2 lg:gap-12">
+                    <div className="grid grid-cols-1 items-start gap-x-8 gap-y-6 md:grid-cols-2 lg:gap-x-12">
                         <div className="relative aspect-square overflow-hidden rounded-2xl bg-white p-8 shadow-sm">
                             <div className="absolute right-4 top-4 z-10 flex gap-2">
                                 <button
@@ -191,34 +190,25 @@ export default function PublicMenuDetailBodyClient(props: {
                                 </div>
                             </div>
 
-                            <div>
-                                <p className="mb-3 text-sm font-bold text-gray-900">
-                                    選択中アレルゲンのうち含まない項目
+                            <div className="space-y-3">
+                                <Link
+                                    href={`/shops/${shopId}`}
+                                    className="block w-full rounded-lg bg-[#13ec13] px-6 py-3 text-center font-bold text-black shadow-md transition hover:bg-[#0db80d] hover:shadow-lg"
+                                >
+                                    店舗ページで他のメニューを見る
+                                </Link>
+
+                                <p className="text-xs text-gray-500">
+                                    更新： {updatedAtText}
                                 </p>
-                                <SelectedFreeAllergenCardsClient
-                                    allergens={allergensForClient}
-                                    statusBySlug={statusBySlugForClient}
-                                />
                             </div>
+                        </div>
 
-                            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                                <Link
-                                    href={`/shops/${shopId}`}
-                                    className="flex-1 rounded-lg bg-[#13ec13] px-6 py-3 text-center font-bold text-black shadow-md transition hover:bg-[#0db80d] hover:shadow-lg"
-                                >
-                                    店舗詳細に戻る
-                                </Link>
-                                <Link
-                                    href={`/shops/${shopId}`}
-                                    className="flex-1 rounded-lg border-2 border-[#13ec13] bg-white px-6 py-3 text-center font-bold text-[#13ec13] transition hover:bg-[#13ec13]/5"
-                                >
-                                    他のメニューを見る
-                                </Link>
-                            </div>
-
-                            <p className="text-xs text-gray-500">
-                                更新： {updatedAtText}
-                            </p>
+                        <div className="md:col-span-2">
+                            <SelectedFreeAllergenCardsClient
+                                allergens={allergensForClient}
+                                statusBySlug={statusBySlugForClient}
+                            />
                         </div>
                     </div>
 

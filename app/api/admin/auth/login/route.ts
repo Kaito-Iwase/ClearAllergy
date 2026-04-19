@@ -9,7 +9,11 @@ import {
     enforceSameOriginAdminMutation,
 } from "@/lib/admin-api-security";
 import { writeAdminAuditLog } from "@/lib/audit-log";
-import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import {
+    getDatabaseConnectionDiagnostics,
+    isDatabaseUnavailableError,
+    logDatabaseUnavailableError,
+} from "@/lib/db-errors";
 import { getIpFromHeaders } from "@/lib/request-ip";
 
 type LoginAuditRequest =
@@ -140,10 +144,21 @@ export async function POST(req: Request) {
         return new NextResponse(null, { status: 204 });
     } catch (error) {
         if (isDatabaseUnavailableError(error)) {
+            logDatabaseUnavailableError(
+                {
+                    scope: "api:admin-auth-login",
+                    operation: "POST",
+                    visibility: "admin",
+                },
+                error,
+            );
+
             return NextResponse.json(
                 {
+                    error: "database_unavailable",
                     message:
-                        "現在データベースへ接続できないため、ログイン処理を完了できません。",
+                        "現在データベースへ接続できないため、ログイン前チェックまたは監査記録を完了できません。",
+                    diagnosis: getDatabaseConnectionDiagnostics().diagnosis,
                 },
                 { status: 503 },
             );
