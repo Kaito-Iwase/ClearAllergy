@@ -9,3 +9,39 @@
 body {
     font-family: "Manrope", "Noto Sans JP", sans-serif;
 }
+
+@media print {
+    body.printing-shop-qr * {
+        visibility: hidden !important;
+    }
+
+    body.printing-shop-qr .qr-print-area,
+    body.printing-shop-qr .qr-print-area * {
+        visibility: visible !important;
+    }
+
+    body.printing-shop-qr {
+        background: #ffffff !important;
+    }
+
+    body.printing-shop-qr .qr-print-area {
+        position: absolute !important;
+        left: 50% !important;
+        top: 32px !important;
+        width: auto !important;
+        max-width: 92vw !important;
+        transform: translateX(-50%) !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        color: #111827 !important;
+    }
+
+    body.printing-shop-qr .qr-print-header {
+        margin-bottom: 12px !important;
+    }
+
+    body.printing-shop-qr .qr-print-url {
+        margin-top: 12px !important;
+        max-width: 92vw !important;
+    }
+}

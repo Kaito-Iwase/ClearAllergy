@@ -1,11 +1,13 @@
 "use client";
 
-// このコンポーネントは、選択中アレルゲンのうち「含まない」項目だけを小さく見せる部品です。
-// メニュー詳細ページで、安心材料を短く伝える補助 UI として使います。
+// このコンポーネントは、選択中アレルゲンの確認結果を補助カードとして見せる部品です。
 // localStorage の設定がある時だけ意味を持つため、読み込み後に判定します。
 
 import React from "react";
-import { type AllergenStatus } from "@/lib/allergens";
+import {
+    SPECIFIED_INGREDIENT_SLUGS,
+    type AllergenStatus,
+} from "@/lib/allergens";
 import {
     loadUserAllergenPreferences,
     USER_ALLERGENS_UPDATED_EVENT,
@@ -15,6 +17,34 @@ type Allergen = {
     slug: string;
     nameJa: string;
 };
+
+function AllergenInfoCard({
+    title,
+    description,
+    children,
+}: {
+    title: string;
+    description?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <section className="w-full rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="md:max-w-[260px] md:shrink-0">
+                    <h3 className="text-sm font-extrabold text-gray-900">
+                        {title}
+                    </h3>
+                    {description ? (
+                        <p className="mt-1 text-xs font-medium leading-relaxed text-gray-500">
+                            {description}
+                        </p>
+                    ) : null}
+                </div>
+                <div className="md:flex-1">{children}</div>
+            </div>
+        </section>
+    );
+}
 
 export default function SelectedFreeAllergenCardsClient({
     allergens,
@@ -58,38 +88,100 @@ export default function SelectedFreeAllergenCardsClient({
         return null;
     }
 
+    if (selectedSlugs.length === 0) {
+        const specifiedRiskAllergens = allergens
+            .filter((allergen) =>
+                SPECIFIED_INGREDIENT_SLUGS.includes(
+                    allergen.slug as (typeof SPECIFIED_INGREDIENT_SLUGS)[number],
+                ),
+            )
+            .map((allergen) => ({
+                ...allergen,
+                status: statusBySlug[allergen.slug] ?? "UNKNOWN",
+            }))
+            .filter(
+                (allergen) =>
+                    allergen.status === "CONTAINS" ||
+                    allergen.status === "MAY_CONTAIN",
+            );
+
+        if (specifiedRiskAllergens.length === 0) {
+            return (
+                <AllergenInfoCard
+                    title="特定原材料の注意項目"
+                    description="個人設定が未選択のため、特定原材料を表示しています。"
+                >
+                    <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 md:text-right">
+                        特定原材料で「含む」「含む可能性あり」はありません。
+                    </p>
+                </AllergenInfoCard>
+            );
+        }
+
+        return (
+            <AllergenInfoCard
+                title="特定原材料の注意項目"
+                description="個人設定が未選択のため、特定原材料を表示しています。"
+            >
+                <div className="flex flex-wrap gap-2 md:justify-end">
+                    {specifiedRiskAllergens.map((allergen) => (
+                        <span
+                            key={allergen.slug}
+                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${
+                                allergen.status === "CONTAINS"
+                                    ? "border-red-200 bg-red-50 text-red-800"
+                                    : "border-amber-200 bg-amber-50 text-amber-900"
+                            }`}
+                        >
+                            {allergen.nameJa}
+                            <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-extrabold leading-none">
+                                {allergen.status === "CONTAINS"
+                                    ? "含む"
+                                    : "可能性あり"}
+                            </span>
+                        </span>
+                    ))}
+                </div>
+            </AllergenInfoCard>
+        );
+    }
+
     // 選択済みアレルゲンのうち、この商品で FREE のものだけ拾います。
     const selectedFreeAllergens = allergens
         .filter((allergen) => selectedSlugs.includes(allergen.slug))
-        .filter((allergen) => statusBySlug[allergen.slug] === "FREE")
-        .slice(0, 3);
+        .filter((allergen) => statusBySlug[allergen.slug] === "FREE");
 
-    // カード数をそろえて見た目を安定させるため、足りない分はダミーで埋めます。
-    const fillerCount = Math.max(0, 3 - selectedFreeAllergens.length);
+    if (selectedFreeAllergens.length === 0) {
+        return (
+            <AllergenInfoCard
+                title="選択中アレルゲンのうち含まない項目"
+                description="選択中の項目から、このメニューで含まないものを表示しています。"
+            >
+                <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-bold text-gray-600 md:text-right">
+                    選択中アレルゲンのうち「含まない」項目はありません。
+                </p>
+            </AllergenInfoCard>
+        );
+    }
 
     return (
-        <div className="grid grid-cols-3 gap-3">
-            {selectedFreeAllergens.map((allergen) => (
-                <div
-                    key={allergen.slug}
-                    className="flex flex-col items-center justify-center rounded-lg border border-green-100 bg-emerald-50 p-3"
-                >
-                    <div className="mb-1 text-emerald-700">✔</div>
-                    <div className="text-center text-sm font-bold text-emerald-700">
-                        {allergen.nameJa} 含まない
-                    </div>
-                </div>
-            ))}
-
-            {Array.from({ length: fillerCount }).map((_, i) => (
-                <div
-                    key={`filler-${i}`}
-                    className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-3"
-                >
-                    <div className="mb-1 text-gray-400">—</div>
-                    <div className="text-sm font-bold text-gray-500">—</div>
-                </div>
-            ))}
-        </div>
+        <AllergenInfoCard
+            title="選択中アレルゲンのうち含まない項目"
+            description="選択中の項目から、このメニューで含まないものを表示しています。"
+        >
+            <div className="flex flex-wrap gap-2 md:justify-end">
+                {selectedFreeAllergens.map((allergen) => (
+                    <span
+                        key={allergen.slug}
+                        className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800"
+                    >
+                        {allergen.nameJa}
+                        <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-extrabold leading-none">
+                            含まない
+                        </span>
+                    </span>
+                ))}
+            </div>
+        </AllergenInfoCard>
     );
 }

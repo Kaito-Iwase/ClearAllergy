@@ -1,4 +1,7 @@
-import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import {
+    isDatabaseUnavailableError,
+    logDatabaseUnavailableError,
+} from "@/lib/db-errors";
 
 type PublicQueryResult<T> = {
     data: T;
@@ -8,6 +11,9 @@ type PublicQueryResult<T> = {
 export async function readPublicDataOrFallback<T>(
     loader: () => Promise<T>,
     fallback: T,
+    options?: {
+        context?: string;
+    },
 ): Promise<PublicQueryResult<T>> {
     try {
         return {
@@ -19,8 +25,13 @@ export async function readPublicDataOrFallback<T>(
             throw error;
         }
 
-        console.warn(
-            "Public page fallback: database is unavailable, returning safe fallback.",
+        logDatabaseUnavailableError(
+            {
+                scope: "public-db-fallback",
+                operation: options?.context ?? "readPublicDataOrFallback",
+                visibility: "public",
+            },
+            error,
         );
 
         return {

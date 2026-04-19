@@ -5,6 +5,10 @@
 
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
+import {
+    isDatabaseUnavailableError,
+    logDatabaseUnavailableError,
+} from "@/lib/db-errors";
 import { normalizeEmail } from "@/lib/email";
 
 function extractPrimaryEmail(
@@ -27,21 +31,58 @@ function extractPrimaryEmail(
 
 async function findExistingAppUser(clerkUserId: string) {
     // Clerk 連携済みユーザーは clerkUserId だけで見つかります。
-    return prisma.user.findUnique({
-        where: { clerkUserId: clerkUserId },
-        include: { shop: true },
-    });
+    try {
+        return await prisma.user.findUnique({
+            where: { clerkUserId: clerkUserId },
+            include: { shop: true },
+        });
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            logDatabaseUnavailableError(
+                {
+                    scope: "auth:getCurrentAppUser",
+                    operation: "prisma.user.findUnique",
+                    visibility: "admin",
+                    details: {
+                        clerkUserIdPresent: clerkUserId.length > 0,
+                    },
+                },
+                error,
+            );
+        }
+
+        throw error;
+    }
 }
 
 async function createAppUser(clerkUserId: string, email: string | null) {
     // Clerk ログイン済みだがローカル User がまだ無い場合にだけ、新しい User を作ります。
-    return prisma.user.create({
-        data: {
-            clerkUserId,
-            email,
-        },
-        include: { shop: true },
-    });
+    try {
+        return await prisma.user.create({
+            data: {
+                clerkUserId,
+                email,
+            },
+            include: { shop: true },
+        });
+    } catch (error) {
+        if (isDatabaseUnavailableError(error)) {
+            logDatabaseUnavailableError(
+                {
+                    scope: "auth:provisionCurrentAppUserFromClerk",
+                    operation: "prisma.user.create",
+                    visibility: "admin",
+                    details: {
+                        clerkUserIdPresent: clerkUserId.length > 0,
+                        emailPresent: Boolean(email),
+                    },
+                },
+                error,
+            );
+        }
+
+        throw error;
+    }
 }
 
 export async function getCurrentClerkIdentity() {
