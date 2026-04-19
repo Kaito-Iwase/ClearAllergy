@@ -255,10 +255,10 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                             className={createMenuButtonClassName}
                         >
                             {isSubmitting
-                                ? "作成中..."
+                                ? "登録中..."
                                 : uploading
                                   ? "画像アップロード中..."
-                                  : "＋ 作成して編集へ"}
+                                  : "メニューを登録する"}
                         </button>
 
                         <button
@@ -270,6 +270,10 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                         </button>
                     </div>
                 </div>
+
+                <p className="mt-3 text-xs text-gray-500">
+                    登録後、このメニューの編集画面へ移動します。
+                </p>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
