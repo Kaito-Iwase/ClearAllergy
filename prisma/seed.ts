@@ -202,6 +202,8 @@ async function seedDemoShop() {
         where: { userId: user.id },
         update: {
             name: "Clear Cafe Demo",
+            ownerClerkUserId: user.clerkUserId,
+            isActive: true,
             description:
                 "公開ページの見え方を確認できるデモ店舗です。メニューごとの価格とアレルゲン情報を事前に確認できます。",
             address: "東京都渋谷区デモ1-2-3",
@@ -210,6 +212,8 @@ async function seedDemoShop() {
         },
         create: {
             userId: user.id,
+            ownerClerkUserId: user.clerkUserId,
+            isActive: true,
             name: "Clear Cafe Demo",
             description:
                 "公開ページの見え方を確認できるデモ店舗です。メニューごとの価格とアレルゲン情報を事前に確認できます。",

@@ -4,7 +4,7 @@
 
 import { redirect } from "next/navigation";
 import AdminRegisterPageClient from "@/components/admin/auth/AdminRegisterPageClient";
-import AdminOnboardingPageClient from "@/components/admin/auth/AdminOnboardingPageClient";
+import AdminInvitationAcceptPageClient from "@/components/admin/auth/AdminInvitationAcceptPageClient";
 import {
     getCurrentAppUser,
     getCurrentClerkIdentity,
@@ -52,28 +52,6 @@ export default async function AdminRegisterPage({
         throw error;
     }
 
-    if (appUser && !appUser.shop) {
-        return (
-            <AdminOnboardingPageClient
-                email={appUser.email}
-                canRegister={registrationGuard.allowed}
-                lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
-                inviteToken={inviteToken}
-            />
-        );
-    }
-
-    if (clerkIdentity && !appUser) {
-        return (
-            <AdminOnboardingPageClient
-                email={clerkIdentity.email}
-                canRegister={registrationGuard.allowed}
-                lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
-                inviteToken={inviteToken}
-            />
-        );
-    }
-
     // 管理者状態を確認し、店舗がある人は管理画面へ戻します。
     let context = null;
 
@@ -98,6 +76,14 @@ export default async function AdminRegisterPage({
 
     if (context?.shop) {
         redirect("/admin/shop");
+    }
+
+    if (appUser && !context?.shop) {
+        return <AdminInvitationAcceptPageClient email={appUser.email} />;
+    }
+
+    if (clerkIdentity && !appUser) {
+        return <AdminInvitationAcceptPageClient email={clerkIdentity.email} />;
     }
 
     return (

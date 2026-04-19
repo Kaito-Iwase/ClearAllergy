@@ -19,18 +19,41 @@ model User {
 }
 
 model Shop {
-  id               String     @id @default(cuid())
-  userId           String     @unique
+  id               String        @id @default(cuid())
+  userId           String?       @unique
+  ownerClerkUserId String?       @unique
   name             String
   description      String?
   address          String?
   hours            String?
+  isActive         Boolean       @default(false)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   coverImageUrl    String?
   averageBudgetYen Int?
+  adminInvites     AdminInvite[]
   menus            MenuItem[]
-  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model AdminInvite {
+  id                     String       @id @default(cuid())
+  email                  String
+  shopId                 String
+  status                 InviteStatus @default(pending)
+  clerkInvitationId      String?      @unique
+  expiresAt              DateTime?
+  invitedByClerkUserId   String
+  acceptedByClerkUserId  String?
+  acceptedAt             DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  shop                   Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([email, status])
+  @@index([shopId, status])
+  @@index([status])
 }
 
 model MenuItem {
@@ -82,4 +105,12 @@ enum AllergenStatus {
   FREE
   MAY_CONTAIN
   UNKNOWN
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  revoked
+  expired
+  failed
 }
