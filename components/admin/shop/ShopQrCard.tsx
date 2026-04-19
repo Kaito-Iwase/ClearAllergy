@@ -13,11 +13,22 @@ type ShopQrCardProps = {
     shopName: string;
 };
 
+const QR_SIZE_OPTIONS = [
+    { label: "小さめ", sizeMm: 45, desc: "ショップカード向け" },
+    { label: "標準", sizeMm: 60, desc: "卓上POP向け" },
+    { label: "大きめ", sizeMm: 80, desc: "店頭掲示向け" },
+] as const;
+
+function formatQrSize(sizeMm: number) {
+    return `約${(sizeMm / 10).toFixed(1)}cm`;
+}
+
 export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
     // state（画面の状態）として、公開 URL とコピー結果メッセージを持ちます。
     const [origin, setOrigin] = React.useState("");
+    const [qrSizeMm, setQrSizeMm] = React.useState(60);
 
-    // 2) コピー成功メッセージ表示用の状態
+    // コピー・印刷の結果メッセージ表示用の状態
     const [copiedMessage, setCopiedMessage] = React.useState("");
 
     // 本番 URL が環境変数にあればそれを優先し、無ければ今のブラウザ origin を使います。
@@ -36,6 +47,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
 
     // origin が決まってから店舗公開 URL を組み立てます。
     const publicShopUrl = origin ? `${origin}/shops/${shopId}` : "";
+    const qrSizePx = Math.round(qrSizeMm * 3.78);
 
     // 共有しやすいよう、まずはクリップボードへコピーする導線を用意します。
     async function handleCopyUrl() {
@@ -50,6 +62,25 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
         } catch {
             setCopiedMessage("コピーに失敗しました。");
         }
+    }
+
+    function handlePrintQr() {
+        if (!publicShopUrl) {
+            setCopiedMessage("公開URLをまだ作成できていません。");
+            return;
+        }
+
+        document.body.classList.add("printing-shop-qr");
+
+        const cleanup = () => {
+            document.body.classList.remove("printing-shop-qr");
+            window.removeEventListener("afterprint", cleanup);
+            window.clearTimeout(cleanupTimer);
+        };
+
+        window.addEventListener("afterprint", cleanup);
+        const cleanupTimer = window.setTimeout(cleanup, 30000);
+        window.requestAnimationFrame(() => window.print());
     }
 
     // 補助メッセージは数秒で自動的に消し、画面に残り続けないようにします。
@@ -72,47 +103,99 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
             <div className="flex flex-col gap-4">
                 <div>
                     <h3 className="text-2xl font-extrabold text-gray-900">
-                        店舗QRコード
+                        店舗QRコード印刷
                     </h3>
                     <p className="mt-2 text-sm text-gray-600">
-                        店頭POPやメニュー表に掲載すると、お客様がこの店舗の公開ページをスマホですぐ開けます。
+                        QRコードの大きさを選んで、店頭POPやメニュー表にそのまま印刷できます。
                     </p>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="rounded-2xl bg-white p-4 shadow-sm">
-                            {publicShopUrl ? (
-                                <QRCodeSVG
-                                    value={publicShopUrl}
-                                    size={220}
-                                    marginSize={4}
-                                    level="M"
-                                    includeMargin={false}
-                                />
-                            ) : (
-                                <div className="flex h-[220px] w-[220px] items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white text-center text-sm text-gray-500">
-                                    公開URLを準備中です
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="text-center">
+                <div className="grid gap-5 rounded-2xl border border-gray-200 bg-gray-50 p-5 lg:grid-cols-[1fr_280px]">
+                    <div className="flex flex-col gap-4">
+                        <div className="rounded-lg border border-green-100 bg-white p-4">
                             <p className="text-sm font-bold text-gray-900">
-                                {shopName || "店舗名未設定"}
+                                印刷サイズ
                             </p>
-                            <p className="mt-2 break-all text-xs text-gray-600">
-                                {publicShopUrl ||
-                                    "公開URLを生成できていません。"}
+                            <p className="mt-1 text-sm text-gray-600">
+                                用途に合わせて変更できます。印刷ボタンを押すと、選んだ大きさでQRだけ印刷します。
+                            </p>
+
+                            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                                {QR_SIZE_OPTIONS.map((option) => {
+                                    const selected = qrSizeMm === option.sizeMm;
+
+                                    return (
+                                        <button
+                                            key={option.sizeMm}
+                                            type="button"
+                                            onClick={() =>
+                                                setQrSizeMm(option.sizeMm)
+                                            }
+                                            className={`rounded-lg border px-3 py-3 text-left transition ${
+                                                selected
+                                                    ? "border-[#0f4c2f] bg-[#ecf7ef] text-[#0f4c2f]"
+                                                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                                            }`}
+                                        >
+                                            <span className="block text-sm font-bold">
+                                                {option.label}
+                                            </span>
+                                            <span className="mt-1 block text-xs">
+                                                {formatQrSize(option.sizeMm)} / {option.desc}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <label
+                                htmlFor="qr-size"
+                                className="mt-4 block text-xs font-bold text-gray-700"
+                            >
+                                細かく調整: {formatQrSize(qrSizeMm)}
+                            </label>
+                            <input
+                                id="qr-size"
+                                type="range"
+                                min={35}
+                                max={90}
+                                step={5}
+                                value={qrSizeMm}
+                                onChange={(event) =>
+                                    setQrSizeMm(Number(event.target.value))
+                                }
+                                className="mt-2 w-full accent-[#0f4c2f]"
+                            />
+                        </div>
+
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                            <p className="font-bold">印刷前の確認</p>
+                            <p className="mt-1 leading-6">
+                                印刷画面では、店舗名・QRコード・公開URLだけを表示します。用紙設定はブラウザの印刷画面で選べます。
                             </p>
                         </div>
 
-                        <div className="flex flex-wrap justify-center gap-3">
+                        <div className="flex flex-wrap gap-3">
+                            <button
+                                type="button"
+                                onClick={handlePrintQr}
+                                disabled={!publicShopUrl}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f4c2f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#0b3d25] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">
+                                    print
+                                </span>
+                                QRを印刷
+                            </button>
+
                             <button
                                 type="button"
                                 onClick={handleCopyUrl}
-                                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 transition hover:bg-gray-100"
+                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 transition hover:bg-gray-100"
                             >
+                                <span className="material-symbols-outlined text-[20px]">
+                                    content_copy
+                                </span>
                                 URLをコピー
                             </button>
 
@@ -121,26 +204,63 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                     href={publicShopUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-bold text-white transition hover:bg-black/80"
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 transition hover:bg-gray-100"
                                 >
+                                    <span className="material-symbols-outlined text-[20px]">
+                                        open_in_new
+                                    </span>
                                     公開ページを開く
                                 </Link>
-                            ) : (
-                                <button
-                                    type="button"
-                                    disabled
-                                    className="inline-flex items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-bold text-white opacity-50"
-                                >
-                                    公開ページを開く
-                                </button>
-                            )}
+                            ) : null}
                         </div>
 
                         {copiedMessage ? (
-                            <p className="text-sm text-green-700">
+                            <p className="text-sm font-medium text-green-700">
                                 {copiedMessage}
                             </p>
                         ) : null}
+                    </div>
+
+                    <div className="qr-print-area flex flex-col items-center gap-4 rounded-lg bg-white p-5 text-center shadow-sm">
+                        <div className="qr-print-header">
+                            <p className="text-xs font-bold text-[#0f4c2f]">
+                                ClearAllergy
+                            </p>
+                            <p className="mt-1 text-base font-extrabold text-gray-900">
+                                {shopName || "店舗名未設定"}
+                            </p>
+                        </div>
+
+                        <div className="rounded-lg bg-white p-4 ring-1 ring-gray-100">
+                            {publicShopUrl ? (
+                                <QRCodeSVG
+                                    value={publicShopUrl}
+                                    size={qrSizePx}
+                                    style={{
+                                        height: `${qrSizeMm}mm`,
+                                        maxWidth: "100%",
+                                        width: `${qrSizeMm}mm`,
+                                    }}
+                                    marginSize={4}
+                                    level="M"
+                                    includeMargin={false}
+                                />
+                            ) : (
+                                <div
+                                    className="flex items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white text-center text-sm text-gray-500"
+                                    style={{
+                                        height: `${qrSizeMm}mm`,
+                                        width: `${qrSizeMm}mm`,
+                                    }}
+                                >
+                                    公開URLを準備中です
+                                </div>
+                            )}
+                        </div>
+
+                        <p className="qr-print-url max-w-full break-all text-xs text-gray-600">
+                            {publicShopUrl || "公開URLを生成できていません。"}
+                        </p>
                     </div>
                 </div>
 
