@@ -5,10 +5,16 @@
 // app/(public)/shops/page.tsx
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { prisma } from "@/lib/db";
 import { formatDateTimeJa } from "@/lib/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
 import { readPublicDataOrFallback } from "@/lib/public-db";
+import {
+    parseMenuImageFit,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/menu-image-display";
 
 type SearchParams = {
     q?: string;
@@ -67,6 +73,10 @@ export default async function PublicShopListPage({
                     address: true,
                     averageBudgetYen: true,
                     coverImageUrl: true,
+                    coverImageFit: true,
+                    coverImageZoom: true,
+                    coverImagePositionX: true,
+                    coverImagePositionY: true,
                     updatedAt: true,
                     menus: {
                         where: { isPublished: true },
@@ -180,6 +190,22 @@ export default async function PublicShopListPage({
                                 shopId: shop.id,
                             },
                         );
+                        const coverImageStyle: CSSProperties = {
+                            objectFit: parseMenuImageFit(shop.coverImageFit),
+                            objectPosition: `${parseMenuImagePositionPercent(
+                                shop.coverImagePositionX,
+                            )}% ${parseMenuImagePositionPercent(
+                                shop.coverImagePositionY,
+                            )}%`,
+                            transform: `scale(${
+                                parseMenuImageZoom(shop.coverImageZoom) / 100
+                            })`,
+                            transformOrigin: `${parseMenuImagePositionPercent(
+                                shop.coverImagePositionX,
+                            )}% ${parseMenuImagePositionPercent(
+                                shop.coverImagePositionY,
+                            )}%`,
+                        };
 
                         if (hasCoverImage) {
                             return (
@@ -188,12 +214,14 @@ export default async function PublicShopListPage({
                                     href={`/shops/${shop.id}`}
                                     className="group relative min-h-[320px] overflow-hidden rounded-[28px] border border-neutral-200 bg-neutral-900 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                                 >
-                                    <div
-                                        className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
-                                        style={{
-                                            backgroundImage: `url(${safeCoverImageUrl})`,
-                                        }}
-                                    />
+                                    <div className="absolute inset-0 transition duration-500 group-hover:scale-105">
+                                        <img
+                                            src={safeCoverImageUrl ?? ""}
+                                            alt=""
+                                            className="h-full w-full"
+                                            style={coverImageStyle}
+                                        />
+                                    </div>
                                     <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/20" />
                                     <div className="relative flex h-full flex-col justify-between p-5 text-white sm:p-6">
                                         <div className="flex items-start justify-between gap-3">

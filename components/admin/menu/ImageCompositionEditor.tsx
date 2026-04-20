@@ -14,7 +14,7 @@ import {
     type MenuImagePosition,
 } from "@/lib/menu-image-display";
 
-type CompositionValues = {
+export type CompositionValues = {
     imageFrame: MenuImageFrame;
     imageFit: MenuImageFit;
     imagePosition: MenuImagePosition;
@@ -24,6 +24,7 @@ type CompositionValues = {
 };
 
 type PreviewMode = "list" | "detail";
+type SubjectKind = "menu" | "shop";
 
 type PointerPoint = {
     x: number;
@@ -63,7 +64,7 @@ const PREVIEW_OPTIONS: Array<{ value: PreviewMode; label: string }> = [
     { value: "detail", label: "詳細ページ" },
 ];
 
-const COMPOSITION_PRESETS: Array<{
+const MENU_COMPOSITION_PRESETS: Array<{
     id: string;
     title: string;
     description: string;
@@ -110,6 +111,53 @@ const COMPOSITION_PRESETS: Array<{
     },
 ];
 
+const SHOP_COMPOSITION_PRESETS: Array<{
+    id: string;
+    title: string;
+    description: string;
+    values: CompositionValues;
+}> = [
+    {
+        id: "shop-hero",
+        title: "店内を大きく見せる",
+        description: "空間の雰囲気を強く出したい時",
+        values: {
+            imageFrame: "wide",
+            imageFit: "cover",
+            imagePosition: "center",
+            imageZoom: 120,
+            imagePositionX: 50,
+            imagePositionY: 50,
+        },
+    },
+    {
+        id: "shop-balanced",
+        title: "バランスよく見せる",
+        description: "店舗名の文字も読みやすくしたい時",
+        values: {
+            imageFrame: "wide",
+            imageFit: "cover",
+            imagePosition: "center",
+            imageZoom: 105,
+            imagePositionX: 50,
+            imagePositionY: 50,
+        },
+    },
+    {
+        id: "shop-full",
+        title: "全体をきれいに収める",
+        description: "入口や席まで広く見せたい時",
+        values: {
+            imageFrame: "wide",
+            imageFit: "contain",
+            imagePosition: "center",
+            imageZoom: 100,
+            imagePositionX: 50,
+            imagePositionY: 50,
+        },
+    },
+];
+
 function clampPercent(value: number) {
     return Math.min(100, Math.max(0, Math.round(value)));
 }
@@ -134,15 +182,20 @@ function isDirty(current: CompositionValues, initial: CompositionValues) {
     );
 }
 
-function getCompositionSummary(values: CompositionValues) {
+function getCompositionSummary(values: CompositionValues, subjectKind: SubjectKind) {
     const parts: string[] = [];
+    const subject = subjectKind === "shop" ? "写真" : "料理";
 
     if (values.imageFit === "contain") {
-        parts.push("器や背景まで含めて表示しています");
+        parts.push(
+            subjectKind === "shop"
+                ? "店舗写真の全体を表示しています"
+                : "器や背景まで含めて表示しています",
+        );
     } else if (values.imageZoom >= 130) {
-        parts.push("料理が大きく見える設定です");
+        parts.push(`${subject}が大きく見える設定です`);
     } else {
-        parts.push("料理と余白のバランスを取った設定です");
+        parts.push(`${subject}と余白のバランスを取った設定です`);
     }
 
     if (values.imagePositionY <= 30) {
@@ -165,7 +218,8 @@ function ImagePreview({
     imageAlt,
     values,
     compareOriginal,
-    menuName,
+    subjectName,
+    subjectKind,
     previewMode,
     onPointerDown,
     onPointerMove,
@@ -177,7 +231,8 @@ function ImagePreview({
     imageAlt: string;
     values: CompositionValues;
     compareOriginal: boolean;
-    menuName: string;
+    subjectName: string;
+    subjectKind: SubjectKind;
     previewMode: PreviewMode;
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
     onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -203,16 +258,16 @@ function ImagePreview({
     };
 
     const frameClass =
-        values.imageFrame === "wide" ? "aspect-[4/3]" : "aspect-square";
+        values.imageFrame === "wide" ? "aspect-[16/10]" : "aspect-square";
 
     const viewport = (
         <div
-            className={`group relative overflow-hidden rounded-xl bg-neutral-100 ${frameClass} touch-none select-none`}
+            className={`group relative overflow-hidden rounded-xl bg-neutral-100 ${frameClass} touch-none select-none overscroll-contain`}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
-            onWheel={onWheel}
+            onWheelCapture={onWheel}
             onDoubleClick={onDoubleClick}
             role="application"
             aria-label="画像をドラッグして表示位置を調整"
@@ -245,13 +300,20 @@ function ImagePreview({
                     {viewport}
                     <div>
                         <p className="text-xs font-bold text-green-700">
-                            詳細ページ風
+                            {subjectKind === "shop"
+                                ? "店舗ページ風"
+                                : "詳細ページ風"}
                         </p>
                         <p className="mt-2 text-xl font-extrabold text-gray-950">
-                            {menuName || "メニュー名"}
+                            {subjectName ||
+                                (subjectKind === "shop"
+                                    ? "店舗名"
+                                    : "メニュー名")}
                         </p>
                         <p className="mt-3 text-sm leading-6 text-gray-600">
-                            公開メニュー詳細で、写真と説明が並んだ時の見え方です。
+                            {subjectKind === "shop"
+                                ? "公開店舗ページで、カバー写真と店舗情報が並んだ時の見え方です。"
+                                : "公開メニュー詳細で、写真と説明が並んだ時の見え方です。"}
                         </p>
                     </div>
                 </div>
@@ -259,15 +321,23 @@ function ImagePreview({
         );
     }
 
+    const listPreviewMaxWidth =
+        subjectKind === "shop" ? "max-w-md" : "max-w-sm";
+
     return (
-        <div className="mx-auto max-w-sm rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div
+            className={`mx-auto ${listPreviewMaxWidth} rounded-2xl border border-gray-200 bg-white p-3 shadow-sm`}
+        >
             {viewport}
             <div className="p-2">
                 <p className="mt-2 line-clamp-2 text-base font-extrabold text-gray-950">
-                    {menuName || "メニュー名"}
+                    {subjectName ||
+                        (subjectKind === "shop" ? "店舗名" : "メニュー名")}
                 </p>
                 <p className="mt-1 text-xs font-semibold text-gray-500">
-                    一覧カード風プレビュー
+                    {subjectKind === "shop"
+                        ? "店舗一覧カード風プレビュー"
+                        : "一覧カード風プレビュー"}
                 </p>
             </div>
         </div>
@@ -277,14 +347,18 @@ function ImagePreview({
 export default function ImageCompositionEditor({
     imageSrc,
     imageAlt,
-    menuName,
+    subjectName,
+    subjectKind = "menu",
+    surface = "card",
     values,
     initialValues,
     onChange,
 }: {
     imageSrc: string;
     imageAlt: string;
-    menuName: string;
+    subjectName: string;
+    subjectKind?: SubjectKind;
+    surface?: "card" | "plain";
     values: CompositionValues;
     initialValues?: CompositionValues;
     onChange: (next: Partial<CompositionValues>) => void;
@@ -311,7 +385,11 @@ export default function ImageCompositionEditor({
         imagePositionY: DEFAULT_MENU_IMAGE_POSITION_Y,
     };
     const changed = isDirty(values, baseline);
-    const summary = getCompositionSummary(values);
+    const summary = getCompositionSummary(values, subjectKind);
+    const presets =
+        subjectKind === "shop"
+            ? SHOP_COMPOSITION_PRESETS
+            : MENU_COMPOSITION_PRESETS;
 
     function updatePosition(nextX: number, nextY: number) {
         const x = clampPercent(nextX);
@@ -421,17 +499,19 @@ export default function ImageCompositionEditor({
     }
 
     function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
-        if (!event.ctrlKey && Math.abs(event.deltaY) < Math.abs(event.deltaX)) {
-            return;
-        }
-
         event.preventDefault();
+        event.stopPropagation();
         const nextZoom = values.imageZoom + (event.deltaY < 0 ? 5 : -5);
         onChange({ imageZoom: clampZoom(nextZoom) });
     }
 
+    const surfaceClass =
+        surface === "plain"
+            ? "mt-4"
+            : "mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm";
+
     return (
-        <section className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <section className={surfaceClass}>
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
                 <div className="order-1">
                     <div className="mb-3">
@@ -450,7 +530,8 @@ export default function ImageCompositionEditor({
                         imageAlt={imageAlt}
                         values={values}
                         compareOriginal={compareOriginal}
-                        menuName={menuName}
+                        subjectName={subjectName}
+                        subjectKind={subjectKind}
                         previewMode={previewMode}
                         onPointerDown={handlePointerDown}
                         onPointerMove={handlePointerMove}
@@ -479,7 +560,7 @@ export default function ImageCompositionEditor({
                             おすすめ構図
                         </p>
                         <div className="mt-2 grid gap-2">
-                            {COMPOSITION_PRESETS.map((preset) => (
+                            {presets.map((preset) => (
                                 <button
                                     key={preset.id}
                                     type="button"

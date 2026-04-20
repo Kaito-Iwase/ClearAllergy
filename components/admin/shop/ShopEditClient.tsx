@@ -8,7 +8,19 @@ import Link from "next/link";
 import React from "react";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 import ShopQrCard from "@/components/admin/shop/ShopQrCard";
+import ImageCompositionEditor from "@/components/admin/menu/ImageCompositionEditor";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
+import {
+    DEFAULT_SHOP_COVER_IMAGE_FIT,
+    DEFAULT_SHOP_COVER_IMAGE_FRAME,
+    DEFAULT_SHOP_COVER_IMAGE_POSITION,
+    DEFAULT_SHOP_COVER_IMAGE_POSITION_X,
+    DEFAULT_SHOP_COVER_IMAGE_POSITION_Y,
+    DEFAULT_SHOP_COVER_IMAGE_ZOOM,
+    type MenuImageFit,
+    type MenuImageFrame,
+    type MenuImagePosition,
+} from "@/lib/menu-image-display";
 
 type ShopViewModel = {
     id: string;
@@ -16,29 +28,135 @@ type ShopViewModel = {
     description: string | null;
     address: string | null;
     hours: string | null;
+    regularHoliday: string | null;
+    phoneNumber: string | null;
+    note: string | null;
     averageBudgetYen: number | null;
     coverImageUrl: string | null;
+    coverImageFrame: MenuImageFrame;
+    coverImageFit: MenuImageFit;
+    coverImagePosition: MenuImagePosition;
+    coverImageZoom: number;
+    coverImagePositionX: number;
+    coverImagePositionY: number;
     updatedAt: string;
     publishedMenuCount: number;
 };
+
+type BusinessHoursMode = "single" | "weekdayHoliday";
+
+type BusinessHoursFormState = {
+    mode: BusinessHoursMode;
+    single: string;
+    weekday: string;
+    holiday: string;
+};
+
+function parseBusinessHoursText(rawHours: string | null): BusinessHoursFormState {
+    const text = rawHours?.trim() ?? "";
+    const weekdayMatch = text.match(/(?:^|\n)\s*平日\s*[:：]?\s*([^\n]+)/);
+    const holidayMatch = text.match(
+        /(?:^|\n)\s*(?:土日祝|土日|休日)\s*[:：]?\s*([^\n]+)/,
+    );
+
+    if (weekdayMatch || holidayMatch) {
+        return {
+            mode: "weekdayHoliday",
+            single: text,
+            weekday: weekdayMatch?.[1]?.trim() ?? "",
+            holiday: holidayMatch?.[1]?.trim() ?? "",
+        };
+    }
+
+    return {
+        mode: "single",
+        single: text,
+        weekday: "",
+        holiday: "",
+    };
+}
+
+function buildBusinessHoursText({
+    mode,
+    single,
+    weekday,
+    holiday,
+}: BusinessHoursFormState) {
+    if (mode === "single") {
+        return single.trim();
+    }
+
+    return [
+        weekday.trim() ? `平日 ${weekday.trim()}` : null,
+        holiday.trim() ? `土日祝 ${holiday.trim()}` : null,
+    ]
+        .filter(Boolean)
+        .join("\n");
+}
 
 export default function ShopEditClient({
     initialShop,
 }: {
     initialShop: ShopViewModel;
 }) {
+    const initialBusinessHours = React.useMemo(
+        () => parseBusinessHoursText(initialShop.hours),
+        [initialShop.hours],
+    );
+
     // フォーム入力値と UI 状態を state として持ちます。
     const [name, setName] = React.useState(initialShop.name);
     const [description, setDescription] = React.useState(
         initialShop.description ?? "",
     );
     const [address, setAddress] = React.useState(initialShop.address ?? "");
-    const [hours, setHours] = React.useState(initialShop.hours ?? "");
+    const [hoursMode, setHoursMode] = React.useState<BusinessHoursMode>(
+        initialBusinessHours.mode,
+    );
+    const [hoursSingle, setHoursSingle] = React.useState(
+        initialBusinessHours.single,
+    );
+    const [hoursWeekday, setHoursWeekday] = React.useState(
+        initialBusinessHours.weekday,
+    );
+    const [hoursHoliday, setHoursHoliday] = React.useState(
+        initialBusinessHours.holiday,
+    );
+    const [regularHoliday, setRegularHoliday] = React.useState(
+        initialShop.regularHoliday ?? "",
+    );
+    const [phoneNumber, setPhoneNumber] = React.useState(
+        initialShop.phoneNumber ?? "",
+    );
+    const [note, setNote] = React.useState(initialShop.note ?? "");
     const [averageBudgetYen, setAverageBudgetYen] = React.useState(
         initialShop.averageBudgetYen?.toString() ?? "",
     );
     const [coverImageUrl, setCoverImageUrl] = React.useState(
         initialShop.coverImageUrl ?? "",
+    );
+    const [coverImageFrame, setCoverImageFrame] =
+        React.useState<MenuImageFrame>(
+            initialShop.coverImageFrame ?? DEFAULT_SHOP_COVER_IMAGE_FRAME,
+        );
+    const [coverImageFit, setCoverImageFit] = React.useState<MenuImageFit>(
+        initialShop.coverImageFit ?? DEFAULT_SHOP_COVER_IMAGE_FIT,
+    );
+    const [coverImagePosition, setCoverImagePosition] =
+        React.useState<MenuImagePosition>(
+            initialShop.coverImagePosition ??
+                DEFAULT_SHOP_COVER_IMAGE_POSITION,
+        );
+    const [coverImageZoom, setCoverImageZoom] = React.useState(
+        initialShop.coverImageZoom ?? DEFAULT_SHOP_COVER_IMAGE_ZOOM,
+    );
+    const [coverImagePositionX, setCoverImagePositionX] = React.useState(
+        initialShop.coverImagePositionX ??
+            DEFAULT_SHOP_COVER_IMAGE_POSITION_X,
+    );
+    const [coverImagePositionY, setCoverImagePositionY] = React.useState(
+        initialShop.coverImagePositionY ??
+            DEFAULT_SHOP_COVER_IMAGE_POSITION_Y,
     );
 
     const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -124,10 +242,58 @@ export default function ShopEditClient({
         }
     }
 
-    async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-        // フォーム既定の再読み込みを止め、画面内で成功・失敗を表示します。
-        e.preventDefault();
+    function handleCoverCompositionChange(next: Partial<{
+        imageFrame: MenuImageFrame;
+        imageFit: MenuImageFit;
+        imagePosition: MenuImagePosition;
+        imageZoom: number;
+        imagePositionX: number;
+        imagePositionY: number;
+    }>) {
+        if (next.imageFrame) setCoverImageFrame(next.imageFrame);
+        if (next.imageFit) setCoverImageFit(next.imageFit);
+        if (next.imagePosition) setCoverImagePosition(next.imagePosition);
+        if (typeof next.imageZoom === "number") {
+            setCoverImageZoom(next.imageZoom);
+        }
+        if (typeof next.imagePositionX === "number") {
+            setCoverImagePositionX(next.imagePositionX);
+        }
+        if (typeof next.imagePositionY === "number") {
+            setCoverImagePositionY(next.imagePositionY);
+        }
+    }
 
+    function changeBusinessHoursMode(nextMode: BusinessHoursMode) {
+        if (nextMode === hoursMode) {
+            return;
+        }
+
+        if (
+            nextMode === "weekdayHoliday" &&
+            !hoursWeekday.trim() &&
+            !hoursHoliday.trim() &&
+            hoursSingle.trim()
+        ) {
+            setHoursWeekday(hoursSingle.trim());
+            setHoursHoliday(hoursSingle.trim());
+        }
+
+        if (nextMode === "single" && !hoursSingle.trim()) {
+            setHoursSingle(
+                buildBusinessHoursText({
+                    mode: "weekdayHoliday",
+                    single: hoursSingle,
+                    weekday: hoursWeekday,
+                    holiday: hoursHoliday,
+                }),
+            );
+        }
+
+        setHoursMode(nextMode);
+    }
+
+    async function saveShop() {
         setError(null);
         setSavedMessage("");
 
@@ -154,9 +320,23 @@ export default function ShopEditClient({
                     name: trimmedName,
                     description: description.trim(),
                     address: address.trim(),
-                    hours: hours.trim(),
+                    hours: buildBusinessHoursText({
+                        mode: hoursMode,
+                        single: hoursSingle,
+                        weekday: hoursWeekday,
+                        holiday: hoursHoliday,
+                    }),
+                    regularHoliday: regularHoliday.trim(),
+                    phoneNumber: phoneNumber.trim(),
+                    note: note.trim(),
                     averageBudgetYen: averageBudgetYen.trim(),
                     coverImageUrl: uploadedCoverImageUrl,
+                    coverImageFrame,
+                    coverImageFit,
+                    coverImagePosition,
+                    coverImageZoom,
+                    coverImagePositionX,
+                    coverImagePositionY,
                 }),
             });
 
@@ -164,8 +344,18 @@ export default function ShopEditClient({
                 error?: string;
                 shop?: {
                     updatedAt: string;
+                    hours?: string | null;
+                    regularHoliday?: string | null;
+                    phoneNumber?: string | null;
+                    note?: string | null;
                     averageBudgetYen?: number | null;
                     coverImageUrl?: string | null;
+                    coverImageFrame?: MenuImageFrame;
+                    coverImageFit?: MenuImageFit;
+                    coverImagePosition?: MenuImagePosition;
+                    coverImageZoom?: number;
+                    coverImagePositionX?: number;
+                    coverImagePositionY?: number;
                 };
             } | null;
 
@@ -179,6 +369,43 @@ export default function ShopEditClient({
 
             if (data?.shop?.coverImageUrl !== undefined) {
                 setCoverImageUrl(data.shop.coverImageUrl ?? "");
+            }
+            if (data?.shop?.hours !== undefined) {
+                const savedHours = data.shop.hours ?? "";
+                if (hoursMode === "single") {
+                    setHoursSingle(savedHours);
+                } else {
+                    const parsedHours = parseBusinessHoursText(savedHours);
+                    setHoursWeekday(parsedHours.weekday);
+                    setHoursHoliday(parsedHours.holiday);
+                }
+            }
+            if (data?.shop?.regularHoliday !== undefined) {
+                setRegularHoliday(data.shop.regularHoliday ?? "");
+            }
+            if (data?.shop?.phoneNumber !== undefined) {
+                setPhoneNumber(data.shop.phoneNumber ?? "");
+            }
+            if (data?.shop?.note !== undefined) {
+                setNote(data.shop.note ?? "");
+            }
+            if (data?.shop?.coverImageFrame) {
+                setCoverImageFrame(data.shop.coverImageFrame);
+            }
+            if (data?.shop?.coverImageFit) {
+                setCoverImageFit(data.shop.coverImageFit);
+            }
+            if (data?.shop?.coverImagePosition) {
+                setCoverImagePosition(data.shop.coverImagePosition);
+            }
+            if (typeof data?.shop?.coverImageZoom === "number") {
+                setCoverImageZoom(data.shop.coverImageZoom);
+            }
+            if (typeof data?.shop?.coverImagePositionX === "number") {
+                setCoverImagePositionX(data.shop.coverImagePositionX);
+            }
+            if (typeof data?.shop?.coverImagePositionY === "number") {
+                setCoverImagePositionY(data.shop.coverImagePositionY);
             }
 
             if (data?.shop?.averageBudgetYen !== undefined) {
@@ -194,6 +421,10 @@ export default function ShopEditClient({
             }
 
             setSelectedFile(null);
+            if (localPreviewUrl) {
+                URL.revokeObjectURL(localPreviewUrl);
+                setLocalPreviewUrl(null);
+            }
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             setError(`保存中にエラーが発生しました: ${msg}`);
@@ -202,8 +433,26 @@ export default function ShopEditClient({
         }
     }
 
+    async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+        // フォーム既定の再読み込みを止め、画面内で成功・失敗を表示します。
+        e.preventDefault();
+        await saveShop();
+    }
+
     // プレビュー領域では「ローカルプレビュー > 入力済み URL > 空」の順に表示します。
     const previewImageUrl = localPreviewUrl || coverImageUrl.trim() || "";
+    const coverImageStyle: React.CSSProperties = {
+        objectFit: coverImageFit,
+        objectPosition: `${coverImagePositionX}% ${coverImagePositionY}%`,
+        transform: `scale(${coverImageZoom / 100})`,
+        transformOrigin: `${coverImagePositionX}% ${coverImagePositionY}%`,
+    };
+    const businessHoursText = buildBusinessHoursText({
+        mode: hoursMode,
+        single: hoursSingle,
+        weekday: hoursWeekday,
+        holiday: hoursHoliday,
+    });
     const averageBudgetLabel =
         averageBudgetYen.trim() === ""
             ? "未設定"
@@ -215,11 +464,11 @@ export default function ShopEditClient({
                 <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
                     <div className="relative min-h-[360px] overflow-hidden bg-gradient-to-r from-green-200 via-green-100 to-gray-50 p-8 md:p-10">
                         {previewImageUrl ? (
-                            <div
-                                className="absolute inset-0 bg-cover bg-center"
-                                style={{
-                                    backgroundImage: `url("${previewImageUrl}")`,
-                                }}
+                            <img
+                                src={previewImageUrl}
+                                alt=""
+                                className="absolute inset-0 h-full w-full"
+                                style={coverImageStyle}
                             />
                         ) : null}
 
@@ -267,10 +516,50 @@ export default function ShopEditClient({
                                         営業時間
                                     </p>
                                     <p className="mt-1 whitespace-pre-wrap">
-                                        {hours.trim() || "未設定"}
+                                        {businessHoursText || "未設定"}
                                     </p>
                                 </div>
                             </div>
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-gray-500">休</span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        定休日
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {regularHoliday.trim() || "未設定"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-gray-500">TEL</span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        電話番号
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {phoneNumber.trim() || "未設定"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {note.trim() ? (
+                                <div className="flex items-start gap-3">
+                                    <span className="mt-0.5 text-gray-500">
+                                        ※
+                                    </span>
+                                    <div>
+                                        <p className="font-bold text-gray-900">
+                                            備考
+                                        </p>
+                                        <p className="mt-1 whitespace-pre-wrap">
+                                            {note.trim()}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : null}
 
                             <div className="flex items-start gap-3">
                                 <span className="mt-0.5 text-amber-500">
@@ -325,6 +614,76 @@ export default function ShopEditClient({
                 shopName={name.trim() || initialShop.name}
             />
 
+            {previewImageUrl ? (
+                <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 className="text-2xl font-extrabold text-gray-900">
+                                店舗画像の見え方調整
+                            </h3>
+                            <p className="mt-1 text-sm leading-6 text-gray-600">
+                                公開店舗ページや一覧カードで、カバー写真がどう見えるかを大きく確認できます。
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={saveShop}
+                            disabled={saving || uploading}
+                            className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d] disabled:opacity-60"
+                        >
+                            {uploading
+                                ? "画像アップロード中..."
+                                : saving
+                                  ? "保存中..."
+                                  : "この画像設定を保存"}
+                        </button>
+                    </div>
+
+                    <ImageCompositionEditor
+                        imageSrc={previewImageUrl}
+                        imageAlt="店舗カバー画像プレビュー"
+                        subjectName={name}
+                        subjectKind="shop"
+                        surface="plain"
+                        values={{
+                            imageFrame: coverImageFrame,
+                            imageFit: coverImageFit,
+                            imagePosition: coverImagePosition,
+                            imageZoom: coverImageZoom,
+                            imagePositionX: coverImagePositionX,
+                            imagePositionY: coverImagePositionY,
+                        }}
+                        initialValues={{
+                            imageFrame: initialShop.coverImageFrame,
+                            imageFit: initialShop.coverImageFit,
+                            imagePosition: initialShop.coverImagePosition,
+                            imageZoom: initialShop.coverImageZoom,
+                            imagePositionX: initialShop.coverImagePositionX,
+                            imagePositionY: initialShop.coverImagePositionY,
+                        }}
+                        onChange={handleCoverCompositionChange}
+                    />
+
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-5">
+                        <p className="text-xs leading-5 text-gray-500">
+                            画像の位置・ズーム・表示方法は、保存すると公開ページにも反映されます。
+                        </p>
+                        <button
+                            type="button"
+                            onClick={saveShop}
+                            disabled={saving || uploading}
+                            className="inline-flex items-center justify-center rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition hover:bg-black/80 disabled:opacity-60"
+                        >
+                            {uploading
+                                ? "画像アップロード中..."
+                                : saving
+                                  ? "保存中..."
+                                  : "変更を保存"}
+                        </button>
+                    </div>
+                </section>
+            ) : null}
+
             <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <form
                     onSubmit={onSubmit}
@@ -343,7 +702,7 @@ export default function ShopEditClient({
                         <button
                             type="submit"
                             disabled={saving || uploading}
-                            className="rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition hover:bg-black/80 disabled:opacity-60"
+                            className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
                             {uploading
                                 ? "画像アップロード中..."
@@ -474,33 +833,204 @@ export default function ShopEditClient({
                             >
                                 住所
                             </label>
-                            <textarea
+                            <input
                                 id="shop-address"
+                                type="text"
                                 value={address}
                                 onChange={(e) => setAddress(e.target.value)}
-                                placeholder="例：愛知県名古屋市..."
-                                rows={3}
+                                placeholder="例：愛知県名古屋市天白区○○ 1-2-3"
                                 className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
                             />
+                            <p className="mt-2 text-xs text-gray-500">
+                                公開ページにそのまま表示される住所です。建物名まで必要なら続けて入力してください。
+                            </p>
+                        </div>
+
+                        <div>
+                            <div className="mb-2 block text-sm font-bold text-gray-900">
+                                営業時間
+                            </div>
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                                <p className="text-xs font-bold text-gray-700">
+                                    設定方法
+                                </p>
+                                <div
+                                    className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2"
+                                    role="radiogroup"
+                                    aria-label="営業時間の設定方法"
+                                >
+                                    <button
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={hoursMode === "single"}
+                                        onClick={() =>
+                                            changeBusinessHoursMode("single")
+                                        }
+                                        className={`rounded-xl px-4 py-3 text-left text-sm font-bold transition ${
+                                            hoursMode === "single"
+                                                ? "bg-white text-gray-950 shadow-sm ring-2 ring-green-400"
+                                                : "bg-transparent text-gray-600 hover:bg-white"
+                                        }`}
+                                    >
+                                        一括入力
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={
+                                            hoursMode === "weekdayHoliday"
+                                        }
+                                        onClick={() =>
+                                            changeBusinessHoursMode(
+                                                "weekdayHoliday",
+                                            )
+                                        }
+                                        className={`rounded-xl px-4 py-3 text-left text-sm font-bold transition ${
+                                            hoursMode === "weekdayHoliday"
+                                                ? "bg-white text-gray-950 shadow-sm ring-2 ring-green-400"
+                                                : "bg-transparent text-gray-600 hover:bg-white"
+                                        }`}
+                                    >
+                                        平日 / 土日祝
+                                    </button>
+                                </div>
+                                <p className="mt-3 text-xs leading-5 text-gray-500">
+                                    {hoursMode === "single"
+                                        ? "営業時間が毎日ほぼ同じ場合はこちらを使います。"
+                                        : "平日と土日祝で営業時間が異なる場合に使います。"}
+                                </p>
+                            </div>
+
+                            {hoursMode === "single" ? (
+                                <div className="mt-3">
+                                    <label
+                                        htmlFor="shop-hours"
+                                        className="mb-2 block text-sm font-bold text-gray-900"
+                                    >
+                                        営業時間
+                                    </label>
+                                    <input
+                                        id="shop-hours"
+                                        type="text"
+                                        value={hoursSingle}
+                                        onChange={(e) =>
+                                            setHoursSingle(e.target.value)
+                                        }
+                                        placeholder="例：11:00〜20:00"
+                                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                                    />
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        営業している時間帯だけを入力します。定休日や電話番号は下の専用欄に分けてください。
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <label
+                                            htmlFor="shop-hours-weekday"
+                                            className="mb-2 block text-sm font-bold text-gray-900"
+                                        >
+                                            平日
+                                        </label>
+                                        <input
+                                            id="shop-hours-weekday"
+                                            type="text"
+                                            value={hoursWeekday}
+                                            onChange={(e) =>
+                                                setHoursWeekday(e.target.value)
+                                            }
+                                            placeholder="例：11:00〜20:00"
+                                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label
+                                            htmlFor="shop-hours-holiday"
+                                            className="mb-2 block text-sm font-bold text-gray-900"
+                                        >
+                                            土日祝
+                                        </label>
+                                        <input
+                                            id="shop-hours-holiday"
+                                            type="text"
+                                            value={hoursHoliday}
+                                            onChange={(e) =>
+                                                setHoursHoliday(e.target.value)
+                                            }
+                                            placeholder="例：11:00〜21:00"
+                                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                                        />
+                                    </div>
+                                    <p className="text-xs leading-5 text-gray-500 sm:col-span-2">
+                                        保存時は「平日 {hoursWeekday.trim() || "11:00〜20:00"}」
+                                        と「土日祝 {hoursHoliday.trim() || "11:00〜21:00"}」
+                                        の形式で公開ページに表示されます。
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         <div>
                             <label
-                                htmlFor="shop-hours"
+                                htmlFor="shop-regular-holiday"
                                 className="mb-2 block text-sm font-bold text-gray-900"
                             >
-                                営業時間
+                                定休日
                             </label>
-                            <textarea
-                                id="shop-hours"
-                                value={hours}
-                                onChange={(e) => setHours(e.target.value)}
-                                placeholder={
-                                    "例：\n平日 11:00-15:00 / 17:00-21:00\n土日祝 11:00-21:00"
+                            <input
+                                id="shop-regular-holiday"
+                                type="text"
+                                value={regularHoliday}
+                                onChange={(e) =>
+                                    setRegularHoliday(e.target.value)
                                 }
-                                rows={4}
+                                placeholder="例：水曜日"
                                 className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
                             />
+                            <p className="mt-2 text-xs text-gray-500">
+                                不定休の場合は「不定休」など、来店前に分かる表現で入力してください。
+                            </p>
+                        </div>
+
+                        <div>
+                            <label
+                                htmlFor="shop-phone-number"
+                                className="mb-2 block text-sm font-bold text-gray-900"
+                            >
+                                電話番号
+                            </label>
+                            <input
+                                id="shop-phone-number"
+                                type="tel"
+                                inputMode="tel"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                                placeholder="例：052-123-4567"
+                                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                            />
+                            <p className="mt-2 text-xs text-gray-500">
+                                公開してよい店舗の問い合わせ番号だけを入力してください。
+                            </p>
+                        </div>
+
+                        <div>
+                            <label
+                                htmlFor="shop-note"
+                                className="mb-2 block text-sm font-bold text-gray-900"
+                            >
+                                備考
+                            </label>
+                            <textarea
+                                id="shop-note"
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                placeholder="例：ラストオーダーは閉店30分前"
+                                rows={3}
+                                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                            />
+                            <p className="mt-2 text-xs text-gray-500">
+                                営業時間だけでは伝わりにくい案内がある場合に使います。
+                            </p>
                         </div>
                     </div>
 
@@ -508,7 +1038,7 @@ export default function ShopEditClient({
                         <button
                             type="submit"
                             disabled={saving || uploading}
-                            className="inline-flex items-center justify-center rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d] disabled:opacity-60"
+                            className="inline-flex items-center justify-center rounded-xl bg-[#13ec13] px-6 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
                             {uploading
                                 ? "画像アップロード中..."
@@ -519,7 +1049,7 @@ export default function ShopEditClient({
 
                         <Link
                             href="/admin/menus"
-                            className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-bold text-gray-800 transition hover:bg-gray-50"
+                            className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 hover:text-gray-900"
                         >
                             メニュー管理へ戻る
                         </Link>
@@ -569,7 +1099,7 @@ export default function ShopEditClient({
                                 住所・営業時間
                             </p>
                             <p className="mt-1">
-                                来店前に確認されやすいので、改行を使って見やすく書くのがおすすめです。
+                                営業時間、定休日、電話番号は別々の欄に分けると、公開ページで読みやすく表示できます。
                             </p>
                         </div>
 
