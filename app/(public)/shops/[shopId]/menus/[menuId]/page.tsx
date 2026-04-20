@@ -62,6 +62,12 @@ export default async function PublicMenuDetailPage({
                     ingredients: true,
                     precaution: true,
                     imageUrl: true,
+                    imageFrame: true,
+                    imageFit: true,
+                    imagePosition: true,
+                    imageZoom: true,
+                    imagePositionX: true,
+                    imagePositionY: true,
                     updatedAt: true,
                     shop: {
                         select: { id: true, name: true },
@@ -159,6 +165,12 @@ export default async function PublicMenuDetailPage({
                     priceText={priceText}
                     updatedAtText={formatDateTimeJa(menu.updatedAt)}
                     safeImageUrl={safeImageUrl}
+                    imageFrame={menu.imageFrame}
+                    imageFit={menu.imageFit}
+                    imagePosition={menu.imagePosition}
+                    imageZoom={menu.imageZoom}
+                    imagePositionX={menu.imagePositionX}
+                    imagePositionY={menu.imagePositionY}
                     ingredients={menu.ingredients}
                     precaution={menu.precaution}
                     specifiedIngredientNotice={specifiedIngredientNotice}
