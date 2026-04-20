@@ -5,6 +5,7 @@
 // app/(public)/shops/[shopId]/page.tsx
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
@@ -14,6 +15,11 @@ import PublicDataUnavailable from "@/components/public/PublicDataUnavailable";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
 import { readPublicDataOrFallback } from "@/lib/public-db";
+import {
+    parseMenuImageFit,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/menu-image-display";
 
 type Params = { shopId: string };
 type SearchParams = { q?: string };
@@ -86,6 +92,7 @@ export default async function PublicShopDetailPage({
             const shop = await prisma.shop.findFirst({
                 where: {
                     id: shopId,
+                    isActive: true,
                     menus: {
                         some: {
                             isPublished: true,
@@ -98,8 +105,15 @@ export default async function PublicShopDetailPage({
                     description: true,
                     address: true,
                     hours: true,
+                    regularHoliday: true,
+                    phoneNumber: true,
+                    note: true,
                     averageBudgetYen: true,
                     coverImageUrl: true,
+                    coverImageFit: true,
+                    coverImageZoom: true,
+                    coverImagePositionX: true,
+                    coverImagePositionY: true,
                     updatedAt: true,
                     _count: {
                         select: {
@@ -134,6 +148,9 @@ export default async function PublicShopDetailPage({
             const firstPublishedMenu = await prisma.menuItem.findFirst({
                 where: {
                     shopId,
+                    shop: {
+                        isActive: true,
+                    },
                     isPublished: true,
                 },
                 orderBy: { updatedAt: "desc" },
@@ -209,13 +226,21 @@ export default async function PublicShopDetailPage({
         shopId,
     });
     const heroStyle = safeCoverImageUrl
-        ? {
-              backgroundImage: `url("${safeCoverImageUrl}")`,
-          }
+        ? {}
         : {
               backgroundImage:
                   "linear-gradient(90deg, rgba(19,236,19,0.25) 0%, rgba(19,236,19,0.10) 55%, rgba(255,255,255,0) 100%)",
           };
+    const heroImageStyle: CSSProperties = {
+        objectFit: parseMenuImageFit(shop.coverImageFit),
+        objectPosition: `${parseMenuImagePositionPercent(
+            shop.coverImagePositionX,
+        )}% ${parseMenuImagePositionPercent(shop.coverImagePositionY)}%`,
+        transform: `scale(${parseMenuImageZoom(shop.coverImageZoom) / 100})`,
+        transformOrigin: `${parseMenuImagePositionPercent(
+            shop.coverImagePositionX,
+        )}% ${parseMenuImagePositionPercent(shop.coverImagePositionY)}%`,
+    };
 
     return (
         <main className="flex justify-center px-4 py-6 md:px-8">
@@ -236,6 +261,14 @@ export default async function PublicShopDetailPage({
                         className="relative h-56 w-full bg-cover bg-center bg-no-repeat md:h-64"
                         style={heroStyle}
                     >
+                        {safeCoverImageUrl ? (
+                            <img
+                                src={safeCoverImageUrl}
+                                alt=""
+                                className="absolute inset-0 h-full w-full"
+                                style={heroImageStyle}
+                            />
+                        ) : null}
                         <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-black/15 to-transparent" />
 
                         <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
@@ -343,11 +376,55 @@ export default async function PublicShopDetailPage({
                                         <p className="font-semibold">
                                             営業時間
                                         </p>
-                                        <p className="text-gray-600">
+                                        <p className="whitespace-pre-wrap text-gray-600">
                                             {shop.hours || "未設定"}
                                         </p>
                                     </div>
                                 </div>
+
+                                <div className="flex items-start gap-2">
+                                    <span className="mt-0.5 text-gray-500">
+                                        休
+                                    </span>
+                                    <div>
+                                        <p className="font-semibold">
+                                            定休日
+                                        </p>
+                                        <p className="text-gray-600">
+                                            {shop.regularHoliday || "未設定"}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-2">
+                                    <span className="mt-0.5 text-gray-500">
+                                        TEL
+                                    </span>
+                                    <div>
+                                        <p className="font-semibold">
+                                            電話番号
+                                        </p>
+                                        <p className="text-gray-600">
+                                            {shop.phoneNumber || "未設定"}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {shop.note ? (
+                                    <div className="flex items-start gap-2">
+                                        <span className="mt-0.5 text-gray-500">
+                                            ※
+                                        </span>
+                                        <div>
+                                            <p className="font-semibold">
+                                                備考
+                                            </p>
+                                            <p className="whitespace-pre-wrap text-gray-600">
+                                                {shop.note}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : null}
 
                                 <div className="flex items-start gap-2">
                                     <span className="mt-0.5 text-gray-500">

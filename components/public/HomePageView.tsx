@@ -110,7 +110,7 @@ export default function HomePageView({
                                         デモ用として
                                         <span className="font-semibold">
                                             {" "}
-                                            Clear Cafe Demo と Cafe Hibi
+                                            Cafe Hibi
                                         </span>
                                         を公開しています。
                                     </p>

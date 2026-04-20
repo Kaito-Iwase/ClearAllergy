@@ -8,6 +8,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { buildAllergenRows } from "@/lib/allergens";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
+import {
+    parseMenuImageFit,
+    parseMenuImageFrame,
+    parseMenuImagePosition,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/menu-image-display";
 
 type Context = {
     // Next.js のバージョン差で params が Promise のこともあるため両対応にしています。
@@ -51,6 +58,12 @@ export async function GET(req: Request, context: Context) {
                 ingredients: true,
                 precaution: true,
                 imageUrl: true,
+                imageFrame: true,
+                imageFit: true,
+                imagePosition: true,
+                imageZoom: true,
+                imagePositionX: true,
+                imagePositionY: true,
                 isPublished: true,
                 createdAt: true,
                 updatedAt: true,
@@ -104,6 +117,16 @@ export async function GET(req: Request, context: Context) {
                 // 公開 API でも保存済み URL をそのまま信用せず、
                 // 表示してよい画像 URL だけ返します。
                 imageUrl: safeImageUrl.ok ? safeImageUrl.value : null,
+                imageFrame: parseMenuImageFrame(menu.imageFrame),
+                imageFit: parseMenuImageFit(menu.imageFit),
+                imagePosition: parseMenuImagePosition(menu.imagePosition),
+                imageZoom: parseMenuImageZoom(menu.imageZoom),
+                imagePositionX: parseMenuImagePositionPercent(
+                    menu.imagePositionX,
+                ),
+                imagePositionY: parseMenuImagePositionPercent(
+                    menu.imagePositionY,
+                ),
                 isPublished: menu.isPublished,
                 createdAt: menu.createdAt,
                 updatedAt: menu.updatedAt,

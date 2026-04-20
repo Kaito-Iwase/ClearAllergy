@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import MenuAllergenAlertClient from "@/components/public/MenuAllergenAlertClient";
 import SelectedFreeAllergenCardsClient from "@/components/public/SelectedFreeAllergenCardsClient";
 import {
@@ -13,6 +14,14 @@ import {
     statusLabelJa,
     type AllergenStatus,
 } from "@/lib/allergens";
+import {
+    parseMenuImageFit,
+    parseMenuImageFrame,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+    type MenuImageFit,
+    type MenuImageFrame,
+} from "@/lib/menu-image-display";
 
 type SpecifiedIngredientNotice = {
     title: string;
@@ -39,6 +48,12 @@ export default function PublicMenuDetailBodyClient(props: {
     priceText: string;
     updatedAtText: string;
     safeImageUrl: string | null;
+    imageFrame: string | null;
+    imageFit: string | null;
+    imagePosition: string | null;
+    imageZoom: number | null;
+    imagePositionX: number | null;
+    imagePositionY: number | null;
     ingredients: string | null;
     precaution: string | null;
     specifiedIngredientNotice: SpecifiedIngredientNotice;
@@ -55,6 +70,11 @@ export default function PublicMenuDetailBodyClient(props: {
         priceText,
         updatedAtText,
         safeImageUrl,
+        imageFrame,
+        imageFit,
+        imageZoom,
+        imagePositionX,
+        imagePositionY,
         ingredients,
         precaution,
         specifiedIngredientNotice,
@@ -64,9 +84,19 @@ export default function PublicMenuDetailBodyClient(props: {
     } = props;
 
     const preferenceState = useUserAllergenPreferenceState();
+    const displayFrame: MenuImageFrame = parseMenuImageFrame(imageFrame);
+    const displayFit: MenuImageFit = parseMenuImageFit(imageFit);
+    const displayZoom = parseMenuImageZoom(imageZoom);
+    const displayPositionX = parseMenuImagePositionPercent(imagePositionX);
+    const displayPositionY = parseMenuImagePositionPercent(imagePositionY);
 
-    const imageStyle = safeImageUrl
-        ? { backgroundImage: `url("${safeImageUrl}")` }
+    const imageStyle: CSSProperties = safeImageUrl
+        ? {
+              objectFit: displayFit,
+              objectPosition: `${displayPositionX}% ${displayPositionY}%`,
+              transform: `scale(${displayZoom / 100})`,
+              transformOrigin: `${displayPositionX}% ${displayPositionY}%`,
+          }
         : {
               backgroundImage:
                   "linear-gradient(135deg, rgba(19,236,19,0.25), rgba(0,0,0,0.05))",
@@ -126,7 +156,13 @@ export default function PublicMenuDetailBodyClient(props: {
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:items-start">
                 <div className="space-y-8 lg:col-span-2">
                     <div className="grid grid-cols-1 items-start gap-x-8 gap-y-6 md:grid-cols-2 lg:gap-x-12">
-                        <div className="relative aspect-square overflow-hidden rounded-2xl bg-white p-8 shadow-sm">
+                        <div
+                            className={`relative overflow-hidden rounded-2xl bg-neutral-100 shadow-sm ${
+                                displayFrame === "wide"
+                                    ? "aspect-[4/3]"
+                                    : "aspect-square"
+                            }`}
+                        >
                             <div className="absolute right-4 top-4 z-10 flex gap-2">
                                 <button
                                     type="button"
@@ -142,11 +178,20 @@ export default function PublicMenuDetailBodyClient(props: {
                                 </button>
                             </div>
 
-                            <div
-                                className="h-full w-full bg-contain bg-center bg-no-repeat transition-transform duration-300 hover:scale-105"
-                                style={imageStyle}
-                                aria-label={menuName}
-                            />
+                            {safeImageUrl ? (
+                                <img
+                                    src={safeImageUrl}
+                                    alt={menuName}
+                                    className="absolute inset-0 h-full w-full transition-transform duration-300 hover:scale-[1.03]"
+                                    style={imageStyle}
+                                />
+                            ) : (
+                                <div
+                                    className="absolute inset-0"
+                                    style={imageStyle}
+                                    aria-label={menuName}
+                                />
+                            )}
                         </div>
 
                         <div className="flex flex-col gap-6">

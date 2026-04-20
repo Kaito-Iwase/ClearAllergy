@@ -1,0 +1,192 @@
+import { Prisma } from "@prisma/client";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
+import { requirePlatformAdminApi } from "@/lib/admin-platform-auth";
+import {
+    buildInvitationRedirectUrl,
+    getInvitationExpiresAt,
+    serializeAdminInvite,
+} from "@/lib/invitations";
+import {
+    createClerkApplicationInvitation,
+    findClerkUserByEmail,
+    revokeClerkApplicationInvitation,
+} from "@/lib/auth/clerkAdminServer";
+import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
+import { isDatabaseUnavailableError } from "@/lib/db-errors";
+
+type Context = {
+    params?: { inviteId?: string } | Promise<{ inviteId?: string }>;
+};
+
+async function getInviteId(req: Request, context: Context) {
+    const params = context.params ? await context.params : undefined;
+    if (params?.inviteId) {
+        return params.inviteId;
+    }
+
+    const parts = new URL(req.url).pathname.split("/").filter(Boolean);
+    return parts[parts.length - 2];
+}
+
+function isUniqueConstraintError(error: unknown) {
+    return (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+    );
+}
+
+export async function POST(req: Request, context: Context) {
+    let newClerkInvitationId: string | null = null;
+
+    try {
+        const originError = enforceSameOriginAdminMutation(req);
+        if (originError) {
+            return originError;
+        }
+
+        const admin = await requirePlatformAdminApi();
+        if (!admin.ok) {
+            return admin.res;
+        }
+
+        const inviteId = await getInviteId(req, context);
+        if (!inviteId) {
+            return NextResponse.json(
+                { message: "招待IDが指定されていません。" },
+                { status: 400 },
+            );
+        }
+
+        const oldInvite = await prisma.adminInvite.findUnique({
+            where: { id: inviteId },
+            include: {
+                shop: {
+                    select: {
+                        id: true,
+                        name: true,
+                        ownerClerkUserId: true,
+                        isActive: true,
+                    },
+                },
+            },
+        });
+
+        if (!oldInvite) {
+            return NextResponse.json(
+                { message: "招待が見つかりません。" },
+                { status: 404 },
+            );
+        }
+
+        if (oldInvite.status !== "pending") {
+            return NextResponse.json(
+                { message: "再送できるのは未承認の招待だけです。" },
+                { status: 409 },
+            );
+        }
+
+        if (oldInvite.shop.ownerClerkUserId || oldInvite.shop.isActive) {
+            return NextResponse.json(
+                { message: "この店舗にはすでに管理者が設定されています。" },
+                { status: 409 },
+            );
+        }
+
+        const existingClerkUser = await findClerkUserByEmail(oldInvite.email);
+        if (existingClerkUser) {
+            return NextResponse.json(
+                {
+                    message:
+                        "既存のClerkユーザーへの招待はMVPではサポートしていません。",
+                },
+                { status: 409 },
+            );
+        }
+
+        const expiresInDays = 30;
+        const newClerkInvitation = await createClerkApplicationInvitation({
+            email: oldInvite.email,
+            expiresInDays,
+            redirectUrl: buildInvitationRedirectUrl(req),
+            publicMetadata: {
+                clearAllergyInvite: true,
+            },
+        });
+        newClerkInvitationId = newClerkInvitation.id;
+
+        const newInvite = await prisma.$transaction(async (tx) => {
+            await tx.adminInvite.update({
+                where: { id: oldInvite.id },
+                data: {
+                    status: "revoked",
+                    revokedAt: new Date(),
+                },
+            });
+
+            return tx.adminInvite.create({
+                data: {
+                    email: oldInvite.email,
+                    shopId: oldInvite.shopId,
+                    status: "pending",
+                    clerkInvitationId: newClerkInvitation.id,
+                    expiresAt: getInvitationExpiresAt(expiresInDays),
+                    invitedByClerkUserId: admin.clerkUserId,
+                },
+                include: {
+                    shop: {
+                        select: {
+                            id: true,
+                            name: true,
+                            isActive: true,
+                            ownerClerkUserId: true,
+                        },
+                    },
+                },
+            });
+        });
+
+        if (oldInvite.clerkInvitationId) {
+            await revokeClerkApplicationInvitation(
+                oldInvite.clerkInvitationId,
+            ).catch(() => undefined);
+        }
+
+        return NextResponse.json({
+            message: "招待を再送しました。",
+            invitation: serializeAdminInvite(newInvite),
+            clerkInvitationUrl: newClerkInvitation.url ?? null,
+        });
+    } catch (error) {
+        if (newClerkInvitationId) {
+            await revokeClerkApplicationInvitation(
+                newClerkInvitationId,
+            ).catch(() => undefined);
+        }
+
+        if (isUniqueConstraintError(error)) {
+            return NextResponse.json(
+                { message: "このメールアドレスまたは店舗には未承認の招待があります。" },
+                { status: 409 },
+            );
+        }
+
+        if (isDatabaseUnavailableError(error)) {
+            return NextResponse.json(
+                { message: "現在データベースへ接続できません。" },
+                { status: 503 },
+            );
+        }
+
+        return NextResponse.json(
+            {
+                message: extractClerkErrorMessage(
+                    error,
+                    "招待の再送に失敗しました。",
+                ),
+            },
+            { status: 500 },
+        );
+    }
+}

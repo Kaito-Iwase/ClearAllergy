@@ -1,0 +1,2 @@
+ALTER TABLE "MenuItem"
+ADD COLUMN "imageFrame" TEXT NOT NULL DEFAULT 'square';

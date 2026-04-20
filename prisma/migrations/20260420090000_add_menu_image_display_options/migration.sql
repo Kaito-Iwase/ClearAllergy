@@ -1,0 +1,3 @@
+ALTER TABLE "MenuItem"
+ADD COLUMN "imageFit" TEXT NOT NULL DEFAULT 'cover',
+ADD COLUMN "imagePosition" TEXT NOT NULL DEFAULT 'center';

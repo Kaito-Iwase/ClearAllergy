@@ -19,35 +19,73 @@ model User {
 }
 
 model Shop {
-  id               String     @id @default(cuid())
-  userId           String     @unique
-  name             String
-  description      String?
-  address          String?
-  hours            String?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-  coverImageUrl    String?
-  averageBudgetYen Int?
-  menus            MenuItem[]
-  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String        @id @default(cuid())
+  userId              String?       @unique
+  ownerClerkUserId    String?       @unique
+  name                String
+  description         String?
+  address             String?
+  hours               String?
+  regularHoliday      String?
+  phoneNumber         String?
+  note                String?
+  isActive            Boolean       @default(false)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  coverImageUrl       String?
+  coverImageFrame     String        @default("wide")
+  coverImageFit       String        @default("cover")
+  coverImagePosition  String        @default("center")
+  coverImageZoom      Int           @default(100)
+  coverImagePositionX Int           @default(50)
+  coverImagePositionY Int           @default(50)
+  averageBudgetYen    Int?
+  adminInvites        AdminInvite[]
+  menus               MenuItem[]
+  user                User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model AdminInvite {
+  id                    String       @id @default(cuid())
+  email                 String
+  shopId                String
+  status                InviteStatus @default(pending)
+  clerkInvitationId     String?      @unique
+  expiresAt             DateTime?
+  invitedByClerkUserId  String
+  acceptedByClerkUserId String?
+  acceptedAt            DateTime?
+  revokedAt             DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  shop                  Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([email, status])
+  @@index([shopId, status])
+  @@index([status])
 }
 
 model MenuItem {
-  id            String             @id @default(cuid())
-  shopId        String
-  name          String
-  description   String?
-  priceYen      Int?
-  category      String?
-  ingredients   String?
-  precaution    String?
-  imageUrl      String?
-  isPublished   Boolean            @default(false)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  shop          Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  allergenLinks MenuItemAllergen[]
+  id             String             @id @default(cuid())
+  shopId         String
+  name           String
+  description    String?
+  priceYen       Int?
+  category       String?
+  ingredients    String?
+  precaution     String?
+  imageUrl       String?
+  imageFrame     String             @default("square")
+  imageFit       String             @default("cover")
+  imagePosition  String             @default("center")
+  imageZoom      Int                @default(100)
+  imagePositionX Int                @default(50)
+  imagePositionY Int                @default(50)
+  isPublished    Boolean            @default(false)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  shop           Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  allergenLinks  MenuItemAllergen[]
 
   @@index([shopId])
 }
@@ -82,4 +120,12 @@ enum AllergenStatus {
   FREE
   MAY_CONTAIN
   UNKNOWN
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  revoked
+  expired
+  failed
 }
