@@ -156,7 +156,7 @@ npm run auth:migrate:clerk
 この seed で以下が作成されます。
 
 - アレルゲン28品目マスタ
-- デモ店舗 `Clear Cafe Demo`
+- デモ店舗 `[デモ店舗]Cafe Hibi（カフェ ヒビ）`
 - 公開メニュー数件
 - デモ管理アカウント
 
@@ -185,7 +185,7 @@ npm run dev
 
 ## 動作確認の流れ
 
-1. `/shops` を開き、seed で作成された `Clear Cafe Demo` が見えることを確認する
+1. `/shops` を開き、seed で作成された `[デモ店舗]Cafe Hibi（カフェ ヒビ）` が見えることを確認する
 2. 店舗ページ `/shops/[shopId]` で公開メニュー一覧と店舗情報が表示されることを確認する
 3. メニュー詳細 `/shops/[shopId]/menus/[menuId]` でアレルゲン28品目、原材料、注意書きが見えることを確認する
 4. 公開側で個人アレルゲン設定を変更し、再読み込み後も `localStorage` 由来の表示が維持されることを確認する

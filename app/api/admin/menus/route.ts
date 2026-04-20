@@ -19,6 +19,13 @@ import {
 } from "@/lib/allergens";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
+import {
+    parseMenuImageFit,
+    parseMenuImageFrame,
+    parseMenuImagePosition,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/menu-image-display";
 
 // request.json() の結果は unknown に近いので、まず期待する形を宣言しておきます。
 type MenuCreateBody = {
@@ -30,6 +37,12 @@ type MenuCreateBody = {
     precaution?: unknown;
     isPublished?: unknown;
     imageUrl?: unknown;
+    imageFrame?: unknown;
+    imageFit?: unknown;
+    imagePosition?: unknown;
+    imageZoom?: unknown;
+    imagePositionX?: unknown;
+    imagePositionY?: unknown;
     allergenStatusBySlug?: unknown;
 };
 
@@ -53,6 +66,12 @@ export async function GET() {
                 priceYen: true,
                 category: true,
                 imageUrl: true,
+                imageFrame: true,
+                imageFit: true,
+                imagePosition: true,
+                imageZoom: true,
+                imagePositionX: true,
+                imagePositionY: true,
                 isPublished: true,
                 updatedAt: true,
             },
@@ -113,6 +132,16 @@ export async function POST(req: Request) {
         const ingredients = toTrimmedNullableString(body?.ingredients);
         const precaution = toTrimmedNullableString(body?.precaution);
         const imageUrl = toTrimmedNullableString(body?.imageUrl);
+        const imageFrame = parseMenuImageFrame(body?.imageFrame);
+        const imageFit = parseMenuImageFit(body?.imageFit);
+        const imagePosition = parseMenuImagePosition(body?.imagePosition);
+        const imageZoom = parseMenuImageZoom(body?.imageZoom);
+        const imagePositionX = parseMenuImagePositionPercent(
+            body?.imagePositionX,
+        );
+        const imagePositionY = parseMenuImagePositionPercent(
+            body?.imagePositionY,
+        );
         const imageUrlResult = validateStoredImageUrl(imageUrl, {
             kind: "menu",
             shopId: auth.shopId,
@@ -211,6 +240,12 @@ export async function POST(req: Request) {
                     precaution,
                     isPublished,
                     imageUrl: imageUrlResult.value,
+                    imageFrame,
+                    imageFit,
+                    imagePosition,
+                    imageZoom,
+                    imagePositionX,
+                    imagePositionY,
                 },
                 select: {
                     id: true,

@@ -146,19 +146,27 @@ export default function SelectedFreeAllergenCardsClient({
         );
     }
 
-    // 選択済みアレルゲンのうち、この商品で FREE のものだけ拾います。
-    const selectedFreeAllergens = allergens
+    // 選択済みアレルゲンのうち、この商品で FREE / MAY_CONTAIN のものを拾います。
+    const selectedReferenceAllergens = allergens
         .filter((allergen) => selectedSlugs.includes(allergen.slug))
-        .filter((allergen) => statusBySlug[allergen.slug] === "FREE");
+        .map((allergen) => ({
+            ...allergen,
+            status: statusBySlug[allergen.slug] ?? "UNKNOWN",
+        }))
+        .filter(
+            (allergen) =>
+                allergen.status === "FREE" ||
+                allergen.status === "MAY_CONTAIN",
+        );
 
-    if (selectedFreeAllergens.length === 0) {
+    if (selectedReferenceAllergens.length === 0) {
         return (
             <AllergenInfoCard
-                title="選択中アレルゲンのうち含まない項目"
-                description="選択中の項目から、このメニューで含まないものを表示しています。"
+                title="選択中アレルゲンの確認項目"
+                description="選択中の項目から、このメニューで含まないもの・含む可能性があるものを表示しています。"
             >
                 <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-bold text-gray-600 md:text-right">
-                    選択中アレルゲンのうち「含まない」項目はありません。
+                    選択中アレルゲンのうち「含まない」「含む可能性があります」の項目はありません。
                 </p>
             </AllergenInfoCard>
         );
@@ -166,21 +174,29 @@ export default function SelectedFreeAllergenCardsClient({
 
     return (
         <AllergenInfoCard
-            title="選択中アレルゲンのうち含まない項目"
-            description="選択中の項目から、このメニューで含まないものを表示しています。"
+            title="選択中アレルゲンの確認項目"
+            description="選択中の項目から、このメニューで含まないもの・含む可能性があるものを表示しています。"
         >
             <div className="flex flex-wrap gap-2 md:justify-end">
-                {selectedFreeAllergens.map((allergen) => (
-                    <span
-                        key={allergen.slug}
-                        className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800"
-                    >
-                        {allergen.nameJa}
-                        <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-extrabold leading-none">
-                            含まない
+                {selectedReferenceAllergens.map((allergen) => {
+                    const isMayContain = allergen.status === "MAY_CONTAIN";
+
+                    return (
+                        <span
+                            key={allergen.slug}
+                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${
+                                isMayContain
+                                    ? "border-amber-200 bg-amber-50 text-amber-900"
+                                    : "border-green-100 bg-emerald-50 text-emerald-800"
+                            }`}
+                        >
+                            {allergen.nameJa}
+                            <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-extrabold leading-none">
+                                {isMayContain ? "可能性あり" : "含まない"}
+                            </span>
                         </span>
-                    </span>
-                ))}
+                    );
+                })}
             </div>
         </AllergenInfoCard>
     );

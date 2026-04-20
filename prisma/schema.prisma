@@ -66,6 +66,12 @@ model MenuItem {
   ingredients   String?
   precaution    String?
   imageUrl      String?
+  imageFrame    String             @default("square")
+  imageFit      String             @default("cover")
+  imagePosition String             @default("center")
+  imageZoom     Int                @default(100)
+  imagePositionX Int               @default(50)
+  imagePositionY Int               @default(50)
   isPublished   Boolean            @default(false)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt

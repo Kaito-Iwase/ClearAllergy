@@ -8,10 +8,22 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { type AllergenStatus } from "@/lib/allergens";
 import { createMenuButtonClassName } from "@/components/admin/menu/CreateMenuButton";
+import ImageCompositionEditor from "@/components/admin/menu/ImageCompositionEditor";
 import {
     getApiErrorMessage,
     getThrownErrorMessage,
 } from "@/lib/api-error-message";
+import {
+    DEFAULT_MENU_IMAGE_FIT,
+    DEFAULT_MENU_IMAGE_FRAME,
+    DEFAULT_MENU_IMAGE_POSITION,
+    DEFAULT_MENU_IMAGE_POSITION_X,
+    DEFAULT_MENU_IMAGE_POSITION_Y,
+    DEFAULT_MENU_IMAGE_ZOOM,
+    type MenuImageFit,
+    type MenuImageFrame,
+    type MenuImagePosition,
+} from "@/lib/menu-image-display";
 
 type Allergen = {
     slug: string;
@@ -43,6 +55,21 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
     const [ingredients, setIngredients] = React.useState("");
     const [precaution, setPrecaution] = React.useState("");
     const [imageUrl, setImageUrl] = React.useState("");
+    const [imageFrame, setImageFrame] = React.useState<MenuImageFrame>(
+        DEFAULT_MENU_IMAGE_FRAME,
+    );
+    const [imageFit, setImageFit] = React.useState<MenuImageFit>(
+        DEFAULT_MENU_IMAGE_FIT,
+    );
+    const [imagePosition, setImagePosition] =
+        React.useState<MenuImagePosition>(DEFAULT_MENU_IMAGE_POSITION);
+    const [imageZoom, setImageZoom] = React.useState(DEFAULT_MENU_IMAGE_ZOOM);
+    const [imagePositionX, setImagePositionX] = React.useState(
+        DEFAULT_MENU_IMAGE_POSITION_X,
+    );
+    const [imagePositionY, setImagePositionY] = React.useState(
+        DEFAULT_MENU_IMAGE_POSITION_Y,
+    );
     const [isPublished, setIsPublished] = React.useState(false);
     const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
     const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(
@@ -192,6 +219,12 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                 precaution: normalizeOptionalText(precaution),
                 isPublished,
                 imageUrl: uploadedImageUrl,
+                imageFrame,
+                imageFit,
+                imagePosition,
+                imageZoom,
+                imagePositionX,
+                imagePositionY,
                 allergenStatusBySlug: statusBySlug,
             };
 
@@ -398,13 +431,35 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                 </div>
 
                 {(localPreviewUrl || imageUrl.trim()) && (
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                        <img
-                            src={localPreviewUrl || imageUrl.trim()}
-                            alt="メニュー画像プレビュー"
-                            className="h-56 w-full object-cover"
-                        />
-                    </div>
+                    <ImageCompositionEditor
+                        imageSrc={localPreviewUrl || imageUrl.trim()}
+                        imageAlt="メニュー画像プレビュー"
+                        menuName={name}
+                        values={{
+                            imageFrame,
+                            imageFit,
+                            imagePosition,
+                            imageZoom,
+                            imagePositionX,
+                            imagePositionY,
+                        }}
+                        onChange={(next) => {
+                            if (next.imageFrame) setImageFrame(next.imageFrame);
+                            if (next.imageFit) setImageFit(next.imageFit);
+                            if (next.imagePosition) {
+                                setImagePosition(next.imagePosition);
+                            }
+                            if (typeof next.imageZoom === "number") {
+                                setImageZoom(next.imageZoom);
+                            }
+                            if (typeof next.imagePositionX === "number") {
+                                setImagePositionX(next.imagePositionX);
+                            }
+                            if (typeof next.imagePositionY === "number") {
+                                setImagePositionY(next.imagePositionY);
+                            }
+                        }}
+                    />
                 )}
             </div>
 
