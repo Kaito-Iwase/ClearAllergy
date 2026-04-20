@@ -434,7 +434,8 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                     <ImageCompositionEditor
                         imageSrc={localPreviewUrl || imageUrl.trim()}
                         imageAlt="メニュー画像プレビュー"
-                        menuName={name}
+                        subjectName={name}
+                        subjectKind="menu"
                         values={{
                             imageFrame,
                             imageFit,

@@ -19,6 +19,13 @@ export const DEFAULT_MENU_IMAGE_ZOOM = 100;
 export const DEFAULT_MENU_IMAGE_POSITION_X = 50;
 export const DEFAULT_MENU_IMAGE_POSITION_Y = 50;
 
+export const DEFAULT_SHOP_COVER_IMAGE_FIT: MenuImageFit = "cover";
+export const DEFAULT_SHOP_COVER_IMAGE_POSITION: MenuImagePosition = "center";
+export const DEFAULT_SHOP_COVER_IMAGE_FRAME: MenuImageFrame = "wide";
+export const DEFAULT_SHOP_COVER_IMAGE_ZOOM = 100;
+export const DEFAULT_SHOP_COVER_IMAGE_POSITION_X = 50;
+export const DEFAULT_SHOP_COVER_IMAGE_POSITION_Y = 50;
+
 const MIN_MENU_IMAGE_ZOOM = 50;
 const MAX_MENU_IMAGE_ZOOM = 250;
 const MIN_MENU_IMAGE_POSITION = 0;

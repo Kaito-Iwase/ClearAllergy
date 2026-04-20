@@ -13,14 +13,30 @@ import {
 } from "@/lib/validators/admin-input";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
 import { writeAdminAuditLog } from "@/lib/audit-log";
+import {
+    parseMenuImageFit,
+    parseMenuImageFrame,
+    parseMenuImagePosition,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/menu-image-display";
 
 type ShopUpdateBody = {
     name?: unknown;
     description?: unknown;
     address?: unknown;
     hours?: unknown;
+    regularHoliday?: unknown;
+    phoneNumber?: unknown;
+    note?: unknown;
     averageBudgetYen?: unknown;
     coverImageUrl?: unknown;
+    coverImageFrame?: unknown;
+    coverImageFit?: unknown;
+    coverImagePosition?: unknown;
+    coverImageZoom?: unknown;
+    coverImagePositionX?: unknown;
+    coverImagePositionY?: unknown;
 };
 
 export async function GET() {
@@ -39,8 +55,17 @@ export async function GET() {
                 description: true,
                 address: true,
                 hours: true,
+                regularHoliday: true,
+                phoneNumber: true,
+                note: true,
                 averageBudgetYen: true,
                 coverImageUrl: true,
+                coverImageFrame: true,
+                coverImageFit: true,
+                coverImagePosition: true,
+                coverImageZoom: true,
+                coverImagePositionX: true,
+                coverImagePositionY: true,
                 updatedAt: true,
             },
         });
@@ -107,8 +132,17 @@ export async function PUT(req: Request) {
                 description: true,
                 address: true,
                 hours: true,
+                regularHoliday: true,
+                phoneNumber: true,
+                note: true,
                 averageBudgetYen: true,
                 coverImageUrl: true,
+                coverImageFrame: true,
+                coverImageFit: true,
+                coverImagePosition: true,
+                coverImageZoom: true,
+                coverImagePositionX: true,
+                coverImagePositionY: true,
             },
         });
         if (!existing) {
@@ -141,12 +175,39 @@ export async function PUT(req: Request) {
         const description = toTrimmedNullableString(body.description);
         const address = toTrimmedNullableString(body.address);
         const hours = toTrimmedNullableString(body.hours);
+        const regularHoliday = toTrimmedNullableString(body.regularHoliday);
+        const phoneNumber = toTrimmedNullableString(body.phoneNumber);
+        const note = toTrimmedNullableString(body.note);
         const averageBudgetResult = parseAverageBudgetYen(body.averageBudgetYen);
         const coverImageUrl = toTrimmedNullableString(body.coverImageUrl);
         const coverImageUrlResult = validateStoredImageUrl(coverImageUrl, {
             kind: "shop",
             shopId: auth.shopId,
         });
+        const coverImageFrame =
+            body.coverImageFrame === undefined
+                ? parseMenuImageFrame(existing.coverImageFrame)
+                : parseMenuImageFrame(body.coverImageFrame);
+        const coverImageFit =
+            body.coverImageFit === undefined
+                ? parseMenuImageFit(existing.coverImageFit)
+                : parseMenuImageFit(body.coverImageFit);
+        const coverImagePosition =
+            body.coverImagePosition === undefined
+                ? parseMenuImagePosition(existing.coverImagePosition)
+                : parseMenuImagePosition(body.coverImagePosition);
+        const coverImageZoom =
+            body.coverImageZoom === undefined
+                ? parseMenuImageZoom(existing.coverImageZoom)
+                : parseMenuImageZoom(body.coverImageZoom);
+        const coverImagePositionX =
+            body.coverImagePositionX === undefined
+                ? parseMenuImagePositionPercent(existing.coverImagePositionX)
+                : parseMenuImagePositionPercent(body.coverImagePositionX);
+        const coverImagePositionY =
+            body.coverImagePositionY === undefined
+                ? parseMenuImagePositionPercent(existing.coverImagePositionY)
+                : parseMenuImagePositionPercent(body.coverImagePositionY);
 
         if (!averageBudgetResult.ok) {
             await writeAdminAuditLog({
@@ -191,8 +252,17 @@ export async function PUT(req: Request) {
                 description,
                 address,
                 hours,
+                regularHoliday,
+                phoneNumber,
+                note,
                 averageBudgetYen: averageBudgetResult.value,
                 coverImageUrl: coverImageUrlResult.value,
+                coverImageFrame,
+                coverImageFit,
+                coverImagePosition,
+                coverImageZoom,
+                coverImagePositionX,
+                coverImagePositionY,
             },
             select: {
                 id: true,
@@ -200,8 +270,17 @@ export async function PUT(req: Request) {
                 description: true,
                 address: true,
                 hours: true,
+                regularHoliday: true,
+                phoneNumber: true,
+                note: true,
                 averageBudgetYen: true,
                 coverImageUrl: true,
+                coverImageFrame: true,
+                coverImageFit: true,
+                coverImagePosition: true,
+                coverImageZoom: true,
+                coverImagePositionX: true,
+                coverImagePositionY: true,
                 updatedAt: true,
             },
         });
@@ -220,11 +299,36 @@ export async function PUT(req: Request) {
                     existing.description !== description ? "description" : null,
                     existing.address !== address ? "address" : null,
                     existing.hours !== hours ? "hours" : null,
+                    existing.regularHoliday !== regularHoliday
+                        ? "regularHoliday"
+                        : null,
+                    existing.phoneNumber !== phoneNumber
+                        ? "phoneNumber"
+                        : null,
+                    existing.note !== note ? "note" : null,
                     existing.averageBudgetYen !== averageBudgetResult.value
                         ? "averageBudgetYen"
                         : null,
                     existing.coverImageUrl !== coverImageUrlResult.value
                         ? "coverImageUrl"
+                        : null,
+                    existing.coverImageFrame !== coverImageFrame
+                        ? "coverImageFrame"
+                        : null,
+                    existing.coverImageFit !== coverImageFit
+                        ? "coverImageFit"
+                        : null,
+                    existing.coverImagePosition !== coverImagePosition
+                        ? "coverImagePosition"
+                        : null,
+                    existing.coverImageZoom !== coverImageZoom
+                        ? "coverImageZoom"
+                        : null,
+                    existing.coverImagePositionX !== coverImagePositionX
+                        ? "coverImagePositionX"
+                        : null,
+                    existing.coverImagePositionY !== coverImagePositionY
+                        ? "coverImagePositionY"
                         : null,
                 ].filter(Boolean),
             },
