@@ -11,6 +11,13 @@ import Link from "next/link";
 import { createStatusBySlug } from "@/lib/allergens";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
+import {
+    parseMenuImageFit,
+    parseMenuImageFrame,
+    parseMenuImagePosition,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/menu-image-display";
 
 type PageProps = {
     params: Promise<{ menuId: string }> | { menuId: string };
@@ -48,6 +55,12 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
             ingredients: true,
             precaution: true,
             imageUrl: true,
+            imageFrame: true,
+            imageFit: true,
+            imagePosition: true,
+            imageZoom: true,
+            imagePositionX: true,
+            imagePositionY: true,
             isPublished: true,
             allergenLinks: {
                 select: {
@@ -98,6 +111,18 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                             kind: "menu",
                             shopId,
                         })}
+                        initialImageFrame={parseMenuImageFrame(menu.imageFrame)}
+                        initialImageFit={parseMenuImageFit(menu.imageFit)}
+                        initialImagePosition={parseMenuImagePosition(
+                            menu.imagePosition,
+                        )}
+                        initialImageZoom={parseMenuImageZoom(menu.imageZoom)}
+                        initialImagePositionX={parseMenuImagePositionPercent(
+                            menu.imagePositionX,
+                        )}
+                        initialImagePositionY={parseMenuImagePositionPercent(
+                            menu.imagePositionY,
+                        )}
                         initialIsPublished={menu.isPublished}
                         allergens={allergens}
                         initialStatusBySlug={initialStatusBySlug}

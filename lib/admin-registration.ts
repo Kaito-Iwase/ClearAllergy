@@ -1,14 +1,8 @@
 export type AdminRegistrationMode = "disabled" | "invite_only" | "open";
 
-// この関数は、環境変数から現在の登録モードを読み取ります。
-// 想定外の値が来た時は安全側で "disabled" に倒します。
+// A方式では店舗の自己登録は使わず、Clerk招待 + /api/invitations/accept に寄せます。
+// 旧環境変数が残っていても自由登録を再度開かないよう、常に disabled に倒します。
 export function getAdminRegistrationMode(): AdminRegistrationMode {
-    const raw = process.env.ADMIN_REGISTRATION_MODE?.trim().toLowerCase();
-
-    if (raw === "open" || raw === "invite_only" || raw === "disabled") {
-        return raw;
-    }
-
     return "disabled";
 }
 

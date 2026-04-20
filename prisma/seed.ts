@@ -72,6 +72,7 @@ const ALLERGENS: AllergenSeed[] = [
 
 const DEMO_USER_EMAIL = "demo@clearallergy.local";
 const DEMO_USER_PASSWORD = "demo1234";
+const DEMO_SHOP_NAME = "[デモ店舗]Cafe Hibi（カフェ ヒビ）";
 
 type DemoMenuSeed = {
     name: string;
@@ -201,20 +202,30 @@ async function seedDemoShop() {
     const shop = await prisma.shop.upsert({
         where: { userId: user.id },
         update: {
-            name: "Clear Cafe Demo",
+            name: DEMO_SHOP_NAME,
+            ownerClerkUserId: user.clerkUserId,
+            isActive: true,
             description:
-                "公開ページの見え方を確認できるデモ店舗です。メニューごとの価格とアレルゲン情報を事前に確認できます。",
-            address: "東京都渋谷区デモ1-2-3",
+                "日々の食事を安心して選べるように、メニューごとの価格とアレルゲン情報を公開しているデモ店舗です。",
+            address: "東京都渋谷区ヒビ1-2-3",
             hours: "平日 11:00-18:00 / 土日祝 10:00-19:00",
+            regularHoliday: "水曜日",
+            phoneNumber: "052-123-4567",
+            note: "ラストオーダーは閉店30分前です。",
             coverImageUrl: null,
         },
         create: {
             userId: user.id,
-            name: "Clear Cafe Demo",
+            ownerClerkUserId: user.clerkUserId,
+            isActive: true,
+            name: DEMO_SHOP_NAME,
             description:
-                "公開ページの見え方を確認できるデモ店舗です。メニューごとの価格とアレルゲン情報を事前に確認できます。",
-            address: "東京都渋谷区デモ1-2-3",
+                "日々の食事を安心して選べるように、メニューごとの価格とアレルゲン情報を公開しているデモ店舗です。",
+            address: "東京都渋谷区ヒビ1-2-3",
             hours: "平日 11:00-18:00 / 土日祝 10:00-19:00",
+            regularHoliday: "水曜日",
+            phoneNumber: "052-123-4567",
+            note: "ラストオーダーは閉店30分前です。",
             coverImageUrl: null,
         },
         select: { id: true },

@@ -5,6 +5,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import { prisma } from "@/lib/db";
 
 type AdminSessionLike = {
     user: {
@@ -25,24 +26,28 @@ type AdminContext = {
         updatedAt: Date;
         shop: {
             id: string;
-            userId: string;
+            userId: string | null;
+            ownerClerkUserId: string | null;
             name: string;
             description: string | null;
             address: string | null;
             hours: string | null;
             coverImageUrl: string | null;
+            isActive: boolean;
             createdAt: Date;
             updatedAt: Date;
         } | null;
     };
     shop: {
         id: string;
-        userId: string;
+        userId: string | null;
+        ownerClerkUserId: string | null;
         name: string;
         description: string | null;
         address: string | null;
         hours: string | null;
         coverImageUrl: string | null;
+        isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
     } | null;
@@ -77,9 +82,18 @@ export async function getCurrentAdminContext(): Promise<AdminContext | null> {
         return null;
     }
 
+    const activeOwnedShop = clerkAppUser.clerkUserId
+        ? await prisma.shop.findFirst({
+              where: {
+                  ownerClerkUserId: clerkAppUser.clerkUserId,
+                  isActive: true,
+              },
+          })
+        : null;
+
     return {
         appUser: clerkAppUser,
-        shop: clerkAppUser.shop ?? null,
+        shop: activeOwnedShop,
         authProvider: "clerk",
     };
 }
@@ -107,7 +121,11 @@ export async function requireCurrentAdminContextOrRedirect(): Promise<{
         redirect("/admin/login");
     }
 
-    if (!context.shop) {
+    if (
+        !context.shop ||
+        !context.shop.isActive ||
+        context.shop.ownerClerkUserId !== context.appUser.clerkUserId
+    ) {
         redirect("/admin/register");
     }
 

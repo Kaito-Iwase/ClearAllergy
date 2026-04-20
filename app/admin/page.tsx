@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import AdminLoginPageClient from "@/components/admin/auth/AdminLoginPageClient";
 import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
+import { getCurrentPlatformAdmin } from "@/lib/admin-platform-auth";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
 const DATABASE_UNAVAILABLE_REASON =
@@ -16,6 +17,11 @@ const DATABASE_UNAVAILABLE_REASON =
 // まだ店舗未作成なら /admin/register、
 // 既に店舗があるなら、最初は店舗情報ページへ送ります。
 export default async function AdminIndexPage() {
+    const platformAdmin = await getCurrentPlatformAdmin();
+    if (platformAdmin) {
+        redirect("/admin/invitations");
+    }
+
     // 管理者の認証状態と店舗情報をまとめて取得します。
     let context = null;
 

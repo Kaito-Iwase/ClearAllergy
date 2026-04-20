@@ -7,6 +7,13 @@ import { redirect } from "next/navigation";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 import ShopEditClient from "@/components/admin/shop/ShopEditClient";
 import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
+import {
+    parseMenuImageFit,
+    parseMenuImageFrame,
+    parseMenuImagePosition,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/menu-image-display";
 
 export default async function AdminShopPage() {
     // 認証されていない人や、店舗未作成の人をここで弾きます。
@@ -22,8 +29,17 @@ export default async function AdminShopPage() {
             description: true,
             address: true,
             hours: true,
+            regularHoliday: true,
+            phoneNumber: true,
+            note: true,
             averageBudgetYen: true,
             coverImageUrl: true,
+            coverImageFrame: true,
+            coverImageFit: true,
+            coverImagePosition: true,
+            coverImageZoom: true,
+            coverImagePositionX: true,
+            coverImagePositionY: true,
             updatedAt: true,
             _count: {
                 select: {
@@ -60,11 +76,26 @@ export default async function AdminShopPage() {
                     description: shop.description,
                     address: shop.address,
                     hours: shop.hours,
+                    regularHoliday: shop.regularHoliday,
+                    phoneNumber: shop.phoneNumber,
+                    note: shop.note,
                     averageBudgetYen: shop.averageBudgetYen,
                     coverImageUrl: sanitizeStoredImageUrl(shop.coverImageUrl, {
                         kind: "shop",
                         shopId,
                     }),
+                    coverImageFrame: parseMenuImageFrame(shop.coverImageFrame),
+                    coverImageFit: parseMenuImageFit(shop.coverImageFit),
+                    coverImagePosition: parseMenuImagePosition(
+                        shop.coverImagePosition,
+                    ),
+                    coverImageZoom: parseMenuImageZoom(shop.coverImageZoom),
+                    coverImagePositionX: parseMenuImagePositionPercent(
+                        shop.coverImagePositionX,
+                    ),
+                    coverImagePositionY: parseMenuImagePositionPercent(
+                        shop.coverImagePositionY,
+                    ),
                     updatedAt: shop.updatedAt.toISOString(),
                     publishedMenuCount: shop._count.menus,
                 }}

@@ -28,6 +28,13 @@ import {
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
+import {
+    parseMenuImageFit,
+    parseMenuImageFrame,
+    parseMenuImagePosition,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/menu-image-display";
 
 // 更新用の request body です。
 // shopId はクライアントから受け取らず、必ず session 側の shopId を使います。
@@ -40,6 +47,12 @@ type UpdateMenuBody = {
     precaution?: unknown;
     isPublished?: unknown;
     imageUrl?: unknown;
+    imageFrame?: unknown;
+    imageFit?: unknown;
+    imagePosition?: unknown;
+    imageZoom?: unknown;
+    imagePositionX?: unknown;
+    imagePositionY?: unknown;
     allergenStatusBySlug?: unknown;
 };
 
@@ -71,6 +84,12 @@ export async function GET(req: Request, context: Context) {
                 ingredients: true,
                 precaution: true,
                 imageUrl: true,
+                imageFrame: true,
+                imageFit: true,
+                imagePosition: true,
+                imageZoom: true,
+                imagePositionX: true,
+                imagePositionY: true,
                 isPublished: true,
                 createdAt: true,
                 updatedAt: true,
@@ -123,6 +142,16 @@ export async function GET(req: Request, context: Context) {
                 ingredients: menu.ingredients,
                 precaution: menu.precaution,
                 imageUrl: safeImageUrl.ok ? safeImageUrl.value : null,
+                imageFrame: parseMenuImageFrame(menu.imageFrame),
+                imageFit: parseMenuImageFit(menu.imageFit),
+                imagePosition: parseMenuImagePosition(menu.imagePosition),
+                imageZoom: parseMenuImageZoom(menu.imageZoom),
+                imagePositionX: parseMenuImagePositionPercent(
+                    menu.imagePositionX,
+                ),
+                imagePositionY: parseMenuImagePositionPercent(
+                    menu.imagePositionY,
+                ),
                 isPublished: menu.isPublished,
                 createdAt: menu.createdAt,
                 updatedAt: menu.updatedAt,
@@ -185,6 +214,12 @@ export async function PUT(req: Request, context: Context) {
                 ingredients: true,
                 precaution: true,
                 imageUrl: true,
+                imageFrame: true,
+                imageFit: true,
+                imagePosition: true,
+                imageZoom: true,
+                imagePositionX: true,
+                imagePositionY: true,
                 isPublished: true,
                 allergenLinks: {
                     select: {
@@ -292,6 +327,30 @@ export async function PUT(req: Request, context: Context) {
                 { status: 400 },
             );
         }
+        const nextImageFrame =
+            body.imageFrame === undefined
+                ? parseMenuImageFrame(existing.imageFrame)
+                : parseMenuImageFrame(body.imageFrame);
+        const nextImageFit =
+            body.imageFit === undefined
+                ? parseMenuImageFit(existing.imageFit)
+                : parseMenuImageFit(body.imageFit);
+        const nextImagePosition =
+            body.imagePosition === undefined
+                ? parseMenuImagePosition(existing.imagePosition)
+                : parseMenuImagePosition(body.imagePosition);
+        const nextImageZoom =
+            body.imageZoom === undefined
+                ? parseMenuImageZoom(existing.imageZoom)
+                : parseMenuImageZoom(body.imageZoom);
+        const nextImagePositionX =
+            body.imagePositionX === undefined
+                ? parseMenuImagePositionPercent(existing.imagePositionX)
+                : parseMenuImagePositionPercent(body.imagePositionX);
+        const nextImagePositionY =
+            body.imagePositionY === undefined
+                ? parseMenuImagePositionPercent(existing.imagePositionY)
+                : parseMenuImagePositionPercent(body.imagePositionY);
         const nextIsPublished =
             body.isPublished === undefined
                 ? existing.isPublished
@@ -355,6 +414,12 @@ export async function PUT(req: Request, context: Context) {
                     precaution: nextPrecaution,
                     isPublished: nextIsPublished,
                     imageUrl: imageUrlResult.value,
+                    imageFrame: nextImageFrame,
+                    imageFit: nextImageFit,
+                    imagePosition: nextImagePosition,
+                    imageZoom: nextImageZoom,
+                    imagePositionX: nextImagePositionX,
+                    imagePositionY: nextImagePositionY,
                 },
                 select: {
                     id: true,
@@ -362,6 +427,12 @@ export async function PUT(req: Request, context: Context) {
                     name: true,
                     isPublished: true,
                     imageUrl: true,
+                    imageFrame: true,
+                    imageFit: true,
+                    imagePosition: true,
+                    imageZoom: true,
+                    imagePositionX: true,
+                    imagePositionY: true,
                     updatedAt: true,
                 },
             });

@@ -8,10 +8,22 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { type AllergenStatus } from "@/lib/allergens";
 import { createMenuButtonClassName } from "@/components/admin/menu/CreateMenuButton";
+import ImageCompositionEditor from "@/components/admin/menu/ImageCompositionEditor";
 import {
     getApiErrorMessage,
     getThrownErrorMessage,
 } from "@/lib/api-error-message";
+import {
+    DEFAULT_MENU_IMAGE_FIT,
+    DEFAULT_MENU_IMAGE_FRAME,
+    DEFAULT_MENU_IMAGE_POSITION,
+    DEFAULT_MENU_IMAGE_POSITION_X,
+    DEFAULT_MENU_IMAGE_POSITION_Y,
+    DEFAULT_MENU_IMAGE_ZOOM,
+    type MenuImageFit,
+    type MenuImageFrame,
+    type MenuImagePosition,
+} from "@/lib/menu-image-display";
 
 type Allergen = {
     slug: string;
@@ -47,6 +59,12 @@ export default function MenuEditClient(props: {
     initialIngredients: string | null;
     initialPrecaution: string | null;
     initialImageUrl: string | null;
+    initialImageFrame: MenuImageFrame;
+    initialImageFit: MenuImageFit;
+    initialImagePosition: MenuImagePosition;
+    initialImageZoom: number;
+    initialImagePositionX: number;
+    initialImagePositionY: number;
     initialIsPublished: boolean;
     allergens: Allergen[];
     initialStatusBySlug: Record<string, AllergenStatus>;
@@ -63,6 +81,12 @@ export default function MenuEditClient(props: {
         initialIngredients,
         initialPrecaution,
         initialImageUrl,
+        initialImageFrame,
+        initialImageFit,
+        initialImagePosition,
+        initialImageZoom,
+        initialImagePositionX,
+        initialImagePositionY,
         initialIsPublished,
         allergens,
         initialStatusBySlug,
@@ -79,6 +103,25 @@ export default function MenuEditClient(props: {
     );
     const [precaution, setPrecaution] = React.useState(initialPrecaution ?? "");
     const [imageUrl, setImageUrl] = React.useState(initialImageUrl ?? "");
+    const [imageFrame, setImageFrame] = React.useState<MenuImageFrame>(
+        initialImageFrame ?? DEFAULT_MENU_IMAGE_FRAME,
+    );
+    const [imageFit, setImageFit] = React.useState<MenuImageFit>(
+        initialImageFit ?? DEFAULT_MENU_IMAGE_FIT,
+    );
+    const [imagePosition, setImagePosition] =
+        React.useState<MenuImagePosition>(
+            initialImagePosition ?? DEFAULT_MENU_IMAGE_POSITION,
+        );
+    const [imageZoom, setImageZoom] = React.useState(
+        initialImageZoom ?? DEFAULT_MENU_IMAGE_ZOOM,
+    );
+    const [imagePositionX, setImagePositionX] = React.useState(
+        initialImagePositionX ?? DEFAULT_MENU_IMAGE_POSITION_X,
+    );
+    const [imagePositionY, setImagePositionY] = React.useState(
+        initialImagePositionY ?? DEFAULT_MENU_IMAGE_POSITION_Y,
+    );
 
     const [priceYenInput, setPriceYenInput] = React.useState(
         initialPriceYen === null ? "" : String(initialPriceYen),
@@ -230,6 +273,12 @@ export default function MenuEditClient(props: {
                 ingredients: normalizeOptionalText(ingredients),
                 precaution: normalizeOptionalText(precaution),
                 imageUrl: uploadedImageUrl,
+                imageFrame,
+                imageFit,
+                imagePosition,
+                imageZoom,
+                imagePositionX,
+                imagePositionY,
                 isPublished,
                 allergenStatusBySlug: statusBySlug,
             };
@@ -473,14 +522,46 @@ export default function MenuEditClient(props: {
                 </div>
 
                 {(localPreviewUrl || imageUrl.trim()) && (
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                        <img
-                            src={localPreviewUrl || imageUrl.trim()}
-                            alt="メニュー画像プレビュー"
-                            className="h-56 w-full object-cover"
-                        />
-                    </div>
+                    <ImageCompositionEditor
+                        imageSrc={localPreviewUrl || imageUrl.trim()}
+                        imageAlt="メニュー画像プレビュー"
+                        subjectName={name}
+                        subjectKind="menu"
+                        values={{
+                            imageFrame,
+                            imageFit,
+                            imagePosition,
+                            imageZoom,
+                            imagePositionX,
+                            imagePositionY,
+                        }}
+                        initialValues={{
+                            imageFrame: initialImageFrame,
+                            imageFit: initialImageFit,
+                            imagePosition: initialImagePosition,
+                            imageZoom: initialImageZoom,
+                            imagePositionX: initialImagePositionX,
+                            imagePositionY: initialImagePositionY,
+                        }}
+                        onChange={(next) => {
+                            if (next.imageFrame) setImageFrame(next.imageFrame);
+                            if (next.imageFit) setImageFit(next.imageFit);
+                            if (next.imagePosition) {
+                                setImagePosition(next.imagePosition);
+                            }
+                            if (typeof next.imageZoom === "number") {
+                                setImageZoom(next.imageZoom);
+                            }
+                            if (typeof next.imagePositionX === "number") {
+                                setImagePositionX(next.imagePositionX);
+                            }
+                            if (typeof next.imagePositionY === "number") {
+                                setImagePositionY(next.imagePositionY);
+                            }
+                        }}
+                    />
                 )}
+
             </div>
 
             <div className="rounded-2xl bg-white p-5 shadow-sm">
