@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requirePlatformAdminOrRedirect } from "@/lib/admin-platform-auth";
 import AdminInvitationManager from "@/components/admin/invitations/AdminInvitationManager";
 import type { AdminInvitationListItem } from "@/components/admin/invitations/AdminInvitationManager";
+import AdminLogoutButton from "@/components/admin/common/AdminLogoutButton";
 import BrandLogo from "@/components/layout/BrandLogo";
 
 export default async function AdminInvitationsPage() {
@@ -41,12 +42,9 @@ export default async function AdminInvitationsPage() {
                     <Link href="/" className="inline-flex items-center">
                         <BrandLogo priority />
                     </Link>
-                    <Link
-                        href="/admin/login"
-                        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-900 transition hover:bg-gray-50"
-                    >
-                        管理ログイン
-                    </Link>
+                    <div className="w-[140px]">
+                        <AdminLogoutButton />
+                    </div>
                 </div>
             </header>
 

@@ -14,10 +14,36 @@ import { getCurrentAdminContext } from "@/lib/admin-auth";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
+type RegisterSearchParams = Record<string, string | string[] | undefined>;
+
+function hasClerkInvitationParams(searchParams: RegisterSearchParams) {
+    return (
+        typeof searchParams.__clerk_ticket === "string" ||
+        typeof searchParams.__clerk_invitation_token === "string"
+    );
+}
+
+function buildSignUpUrl(searchParams: RegisterSearchParams) {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(searchParams)) {
+        if (typeof value === "string") {
+            params.set(key, value);
+        } else if (Array.isArray(value)) {
+            for (const item of value) {
+                params.append(key, item);
+            }
+        }
+    }
+
+    const query = params.toString();
+    return query ? `/sign-up?${query}` : "/sign-up";
+}
+
 export default async function AdminRegisterPage({
     searchParams,
 }: {
-    searchParams?: Promise<{ invite?: string }> | { invite?: string };
+    searchParams?: Promise<RegisterSearchParams> | RegisterSearchParams;
 }) {
     const resolvedSearchParams = (await searchParams) ?? {};
     const inviteToken =
@@ -50,6 +76,10 @@ export default async function AdminRegisterPage({
         }
 
         throw error;
+    }
+
+    if (!clerkIdentity && hasClerkInvitationParams(resolvedSearchParams)) {
+        redirect(buildSignUpUrl(resolvedSearchParams));
     }
 
     // 管理者状態を確認し、店舗がある人は管理画面へ戻します。
