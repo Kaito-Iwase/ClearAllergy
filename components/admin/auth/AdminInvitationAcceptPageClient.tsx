@@ -100,6 +100,17 @@ export default function AdminInvitationAcceptPageClient({ email }: Props) {
                         <p className="mt-5 text-center text-xs leading-6 text-text-sub">
                             有効な招待が見つからない場合は、運営から届いた招待メールの宛先と同じClerkアカウントでログインしてください。
                         </p>
+
+                        <div className="mt-4 flex justify-center">
+                            <SignOutButton redirectUrl="/admin/login">
+                                <button
+                                    type="button"
+                                    className="text-sm font-bold text-neutral-700 underline underline-offset-4 transition hover:text-black"
+                                >
+                                    別のメールアドレスでログインし直す
+                                </button>
+                            </SignOutButton>
+                        </div>
                     </div>
                 </section>
             </main>

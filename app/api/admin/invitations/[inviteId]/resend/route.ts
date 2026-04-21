@@ -14,7 +14,10 @@ import {
     revokeClerkApplicationInvitation,
 } from "@/lib/auth/clerkAdminServer";
 import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
-import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import {
+    isDatabaseUnavailableError,
+    retryOnceOnDatabaseUnavailable,
+} from "@/lib/db-errors";
 
 type Context = {
     params?: { inviteId?: string } | Promise<{ inviteId?: string }>;
@@ -59,19 +62,21 @@ export async function POST(req: Request, context: Context) {
             );
         }
 
-        const oldInvite = await prisma.adminInvite.findUnique({
-            where: { id: inviteId },
-            include: {
-                shop: {
-                    select: {
-                        id: true,
-                        name: true,
-                        ownerClerkUserId: true,
-                        isActive: true,
+        const oldInvite = await retryOnceOnDatabaseUnavailable(() =>
+            prisma.adminInvite.findUnique({
+                where: { id: inviteId },
+                include: {
+                    shop: {
+                        select: {
+                            id: true,
+                            name: true,
+                            ownerClerkUserId: true,
+                            isActive: true,
+                        },
                     },
                 },
-            },
-        });
+            }),
+        );
 
         if (!oldInvite) {
             return NextResponse.json(
@@ -102,6 +107,12 @@ export async function POST(req: Request, context: Context) {
                         "既存のClerkユーザーへの招待はMVPではサポートしていません。",
                 },
                 { status: 409 },
+            );
+        }
+
+        if (oldInvite.clerkInvitationId) {
+            await revokeClerkApplicationInvitation(
+                oldInvite.clerkInvitationId,
             );
         }
 
@@ -146,12 +157,6 @@ export async function POST(req: Request, context: Context) {
                 },
             });
         });
-
-        if (oldInvite.clerkInvitationId) {
-            await revokeClerkApplicationInvitation(
-                oldInvite.clerkInvitationId,
-            ).catch(() => undefined);
-        }
 
         return NextResponse.json({
             message: "招待を再送しました。",
