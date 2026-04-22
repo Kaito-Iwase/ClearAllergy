@@ -18,6 +18,7 @@ export default function AdminRegisterPageClient({
     registrationMode,
     lockMessage,
     inviteToken,
+    portfolioMode = false,
     databaseUnavailable = false,
 }: {
     showGoogleAuthButton: boolean;
@@ -25,6 +26,7 @@ export default function AdminRegisterPageClient({
     registrationMode: "disabled" | "invite_only" | "open";
     lockMessage: string | null;
     inviteToken: string | null;
+    portfolioMode?: boolean;
     databaseUnavailable?: boolean;
 }) {
     const { fetchStatus, signIn } = useSignIn();
@@ -151,10 +153,17 @@ export default function AdminRegisterPageClient({
 
             const data = (await response.json().catch(() => null)) as {
                 message?: string;
+                redirectTo?: string;
+                portfolioMode?: boolean;
             } | null;
 
             if (!response.ok) {
                 setError(data?.message ?? "新規登録に失敗しました。");
+                return;
+            }
+
+            if (data?.portfolioMode && data.redirectTo) {
+                window.location.href = data.redirectTo;
                 return;
             }
 
@@ -219,6 +228,20 @@ export default function AdminRegisterPageClient({
                         {databaseUnavailable ? (
                             <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
                                 現在データベースへ接続できないため、店舗アカウント登録を一時停止しています。時間をおいて再度お試しください。
+                            </div>
+                        ) : null}
+
+                        {portfolioMode ? (
+                            <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm leading-6 text-green-900">
+                                <p className="font-extrabold">
+                                    このサイトはポートフォリオ公開版です。
+                                </p>
+                                <p className="mt-1">
+                                    現在はデモ用に公開しており、登録後はデモ管理画面を表示します。
+                                </p>
+                                <p className="mt-1">
+                                    新規登録・編集機能の一般公開は今後調整予定です。
+                                </p>
                             </div>
                         ) : null}
 

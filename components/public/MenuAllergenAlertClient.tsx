@@ -24,13 +24,17 @@ export default function MenuAllergenAlertClient({
     statusBySlug: Record<string, AllergenStatus>;
 }) {
     // 端末に保存された選択アレルゲンを画面状態として持ちます。
-    const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
+    const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
+    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
+    const [includeMayContain, setIncludeMayContain] = React.useState(true);
     const [loaded, setLoaded] = React.useState(false);
 
     React.useEffect(() => {
         function syncPreferences() {
             const stored = loadUserAllergenPreferences();
-            setSelectedSlugs(stored.selectedSlugs);
+            setHighlightSlugs(stored.highlightSlugs);
+            setExcludedSlugs(stored.excludedSlugs);
+            setIncludeMayContain(stored.includeMayContain);
             setLoaded(true);
         }
 
@@ -62,6 +66,11 @@ export default function MenuAllergenAlertClient({
     }, [allergens]);
 
     // 選択中のアレルゲンのうち、実際に「含む」ものだけを抜き出します。
+    const selectedSlugs = React.useMemo(
+        () => [...new Set([...highlightSlugs, ...excludedSlugs])],
+        [highlightSlugs, excludedSlugs],
+    );
+
     const containsMatched = React.useMemo(() => {
         return selectedSlugs.filter(
             (slug) => statusBySlug[slug] === "CONTAINS",
@@ -70,10 +79,14 @@ export default function MenuAllergenAlertClient({
 
     // 「含む可能性があります」も別扱いで集計します。
     const mayContainMatched = React.useMemo(() => {
+        if (!includeMayContain) {
+            return [];
+        }
+
         return selectedSlugs.filter(
             (slug) => statusBySlug[slug] === "MAY_CONTAIN",
         );
-    }, [selectedSlugs, statusBySlug]);
+    }, [includeMayContain, selectedSlugs, statusBySlug]);
 
     const unknownMatched = React.useMemo(() => {
         return selectedSlugs.filter(

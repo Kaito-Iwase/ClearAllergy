@@ -13,6 +13,10 @@ import { shouldShowAdminGoogleRegister } from "@/lib/auth/clerkAdmin";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import {
+    getCurrentUserIsAppAdmin,
+    isPortfolioMode,
+} from "@/lib/portfolio-mode";
 
 type RegisterSearchParams = Record<string, string | string[] | undefined>;
 
@@ -51,8 +55,11 @@ export default async function AdminRegisterPage({
             ? resolvedSearchParams.invite
             : null;
     const registrationGuard = getAdminRegistrationGuard({ inviteToken });
+    const portfolioMode = isPortfolioMode();
+    const isAppAdmin = await getCurrentUserIsAppAdmin();
+    const canUseRealRegistration = !portfolioMode || isAppAdmin;
     const showGoogleAuthButton = shouldShowAdminGoogleRegister({
-        canRegister: registrationGuard.allowed,
+        canRegister: canUseRealRegistration && registrationGuard.allowed,
     });
     let appUser = null;
     let clerkIdentity = null;
@@ -66,10 +73,17 @@ export default async function AdminRegisterPage({
             return (
                 <AdminRegisterPageClient
                     showGoogleAuthButton={false}
-                    canRegister={registrationGuard.allowed}
+                    canRegister={
+                        canUseRealRegistration ? registrationGuard.allowed : true
+                    }
                     registrationMode={registrationGuard.mode}
-                    lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
+                    lockMessage={
+                        canUseRealRegistration && !registrationGuard.allowed
+                            ? registrationGuard.message
+                            : null
+                    }
                     inviteToken={inviteToken}
+                    portfolioMode={portfolioMode && !isAppAdmin}
                     databaseUnavailable
                 />
             );
@@ -92,10 +106,17 @@ export default async function AdminRegisterPage({
             return (
                 <AdminRegisterPageClient
                     showGoogleAuthButton={false}
-                    canRegister={registrationGuard.allowed}
+                    canRegister={
+                        canUseRealRegistration ? registrationGuard.allowed : true
+                    }
                     registrationMode={registrationGuard.mode}
-                    lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
+                    lockMessage={
+                        canUseRealRegistration && !registrationGuard.allowed
+                            ? registrationGuard.message
+                            : null
+                    }
                     inviteToken={inviteToken}
+                    portfolioMode={portfolioMode && !isAppAdmin}
                     databaseUnavailable
                 />
             );
@@ -106,6 +127,19 @@ export default async function AdminRegisterPage({
 
     if (context?.shop) {
         redirect("/admin/shop");
+    }
+
+    if (portfolioMode && !isAppAdmin) {
+        return (
+            <AdminRegisterPageClient
+                showGoogleAuthButton={false}
+                canRegister
+                registrationMode={registrationGuard.mode}
+                lockMessage={null}
+                inviteToken={inviteToken}
+                portfolioMode
+            />
+        );
     }
 
     if (appUser && !context?.shop) {
@@ -119,10 +153,17 @@ export default async function AdminRegisterPage({
     return (
         <AdminRegisterPageClient
             showGoogleAuthButton={showGoogleAuthButton}
-            canRegister={registrationGuard.allowed}
+            canRegister={
+                canUseRealRegistration ? registrationGuard.allowed : true
+            }
             registrationMode={registrationGuard.mode}
-            lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
+            lockMessage={
+                canUseRealRegistration && !registrationGuard.allowed
+                    ? registrationGuard.message
+                    : null
+            }
             inviteToken={inviteToken}
+            portfolioMode={portfolioMode && !isAppAdmin}
         />
     );
 }
