@@ -10,8 +10,12 @@ import BrandLogo from "@/components/layout/BrandLogo";
 
 export default function AdminDashboardShell({
     children,
+    shopHref = "/admin/shop",
+    menusHref = "/admin/menus",
 }: {
     children: ReactNode;
+    shopHref?: string;
+    menusHref?: string;
 }) {
     return (
         <div className="relative flex min-h-screen w-full flex-row overflow-hidden bg-background-light text-text-main">
@@ -26,7 +30,7 @@ export default function AdminDashboardShell({
                 <div className="px-6 py-4">
                     <nav className="flex flex-col gap-2">
                         <Link
-                            href="/admin/shop"
+                            href={shopHref}
                             className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50"
                         >
                             <span className="material-symbols-outlined text-text-sub group-hover:text-primary">
@@ -38,7 +42,7 @@ export default function AdminDashboardShell({
                         </Link>
 
                         <Link
-                            href="/admin/menus"
+                            href={menusHref}
                             className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50"
                         >
                             <span className="material-symbols-outlined text-text-sub group-hover:text-primary">

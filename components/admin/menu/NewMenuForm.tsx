@@ -45,7 +45,17 @@ const CREATE_ERROR_MESSAGE =
 const UPLOAD_ERROR_MESSAGE =
     "画像のアップロードに失敗しました。時間をおいてもう一度お試しください。";
 
-export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
+export default function NewMenuForm({
+    allergens,
+    readOnly = false,
+    readOnlyPreview = false,
+    backHref = "/admin/menus",
+}: {
+    allergens: Allergen[];
+    readOnly?: boolean;
+    readOnlyPreview?: boolean;
+    backHref?: string;
+}) {
     const router = useRouter();
     // フォーム全体の入力値と UI 状態を state で持ちます。
     const [name, setName] = React.useState("");
@@ -196,6 +206,13 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
         e.preventDefault();
         setError(null);
 
+        if (readOnly) {
+            setError(
+                "ポートフォリオ公開版のため、メニュー登録はできません。",
+            );
+            return;
+        }
+
         // メニュー名だけは必須なので、空欄ならここで止めます。
         const trimmed = name.trim();
         if (!trimmed) {
@@ -274,7 +291,11 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
                         <button
                             type="button"
                             onClick={() => setIsPublished((prev) => !prev)}
-                            disabled={isSubmitting || uploading}
+                            disabled={
+                                (readOnly && !readOnlyPreview) ||
+                                isSubmitting ||
+                                uploading
+                            }
                             className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${
                                 isPublished ? "bg-green-600" : "bg-gray-900"
                             }`}
@@ -284,10 +305,16 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
 
                         <button
                             type="submit"
-                            disabled={isSubmitting || uploading}
+                            disabled={
+                                (readOnly && !readOnlyPreview) ||
+                                isSubmitting ||
+                                uploading
+                            }
                             className={createMenuButtonClassName}
                         >
-                            {isSubmitting
+                            {readOnly && !readOnlyPreview
+                                ? "閲覧専用"
+                                : isSubmitting
                                 ? "登録中..."
                                 : uploading
                                   ? "画像アップロード中..."
@@ -296,7 +323,7 @@ export default function NewMenuForm({ allergens }: { allergens: Allergen[] }) {
 
                         <button
                             type="button"
-                            onClick={() => router.push("/admin/menus")}
+                            onClick={() => router.push(backHref)}
                             className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                         >
                             一覧に戻る

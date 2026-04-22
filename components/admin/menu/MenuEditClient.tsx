@@ -68,6 +68,9 @@ export default function MenuEditClient(props: {
     initialIsPublished: boolean;
     allergens: Allergen[];
     initialStatusBySlug: Record<string, AllergenStatus>;
+    readOnly?: boolean;
+    readOnlyPreview?: boolean;
+    readOnlyCreateHref?: string;
 }) {
     const router = useRouter();
 
@@ -90,6 +93,9 @@ export default function MenuEditClient(props: {
         initialIsPublished,
         allergens,
         initialStatusBySlug,
+        readOnly = false,
+        readOnlyPreview = false,
+        readOnlyCreateHref,
     } = props;
 
     // 入力欄の値、保存中表示、画像プレビューなどを state として持ちます。
@@ -254,6 +260,14 @@ export default function MenuEditClient(props: {
         setError(null);
         setSaved(false);
 
+        if (readOnly) {
+            setError(
+                "ポートフォリオ公開版のため、メニュー保存はできません。",
+            );
+            setSaving(false);
+            return;
+        }
+
         try {
             // 必須項目チェックは API 側にもあるが、画面側でも早めに知らせます。
             const trimmedName = name.trim();
@@ -313,6 +327,20 @@ export default function MenuEditClient(props: {
         setError(null);
         setSaved(false);
 
+        if (readOnly) {
+            if (readOnlyCreateHref) {
+                router.push(readOnlyCreateHref);
+                setCreating(false);
+                return;
+            }
+
+            setError(
+                "ポートフォリオ公開版のため、メニュー作成はできません。",
+            );
+            setCreating(false);
+            return;
+        }
+
         try {
             // 空 body で POST すると、サーバー側が下書きを作ってくれます。
             const res = await fetch("/api/admin/menus", {
@@ -355,16 +383,30 @@ export default function MenuEditClient(props: {
                         <button
                             type="button"
                             onClick={handleCreateMenu}
-                            disabled={creating || saving || uploading}
+                            disabled={
+                                (readOnly && !readOnlyPreview) ||
+                                creating ||
+                                saving ||
+                                uploading
+                            }
                             className={createMenuButtonClassName}
                         >
-                            {creating ? "作成中..." : "＋ 新しいメニューを作る"}
+                            {readOnly && !readOnlyPreview
+                                ? "閲覧専用"
+                                : creating
+                                  ? "作成中..."
+                                  : "＋ 新しいメニューを作る"}
                         </button>
 
                         <button
                             type="button"
                             onClick={() => setIsPublished((prev) => !prev)}
-                            disabled={creating || saving || uploading}
+                            disabled={
+                                (readOnly && !readOnlyPreview) ||
+                                creating ||
+                                saving ||
+                                uploading
+                            }
                             className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${
                                 isPublished ? "bg-green-600" : "bg-gray-900"
                             }`}
@@ -375,10 +417,17 @@ export default function MenuEditClient(props: {
                         <button
                             type="button"
                             onClick={onSave}
-                            disabled={saving || creating || uploading}
+                            disabled={
+                                (readOnly && !readOnlyPreview) ||
+                                saving ||
+                                creating ||
+                                uploading
+                            }
                             className="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                         >
-                            {saving
+                            {readOnly && !readOnlyPreview
+                                ? "閲覧専用"
+                                : saving
                                 ? "保存中..."
                                 : uploading
                                   ? "画像アップロード中..."
@@ -651,10 +700,17 @@ export default function MenuEditClient(props: {
                     <button
                         type="button"
                         onClick={onSave}
-                        disabled={saving || creating || uploading}
+                        disabled={
+                            (readOnly && !readOnlyPreview) ||
+                            saving ||
+                            creating ||
+                            uploading
+                        }
                         className="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                     >
-                        {saving
+                        {readOnly && !readOnlyPreview
+                            ? "閲覧専用"
+                            : saving
                             ? "保存中..."
                             : uploading
                               ? "画像アップロード中..."

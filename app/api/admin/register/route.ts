@@ -10,6 +10,7 @@ import { enforceSameOriginAdminMutation, consumeIpAndIdentifierRateLimit } from 
 import { adminRegisterSchema } from "@/lib/validators/admin-auth";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { getIpFromHeaders } from "@/lib/request-ip";
+import { getPortfolioRegistrationDemoResponse } from "@/lib/portfolio-mode";
 import {
     createClerkPasswordUser,
     deleteClerkUser,
@@ -33,6 +34,12 @@ export async function POST(req: Request) {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
             return originError;
+        }
+
+        const portfolioDemoResponse =
+            await getPortfolioRegistrationDemoResponse();
+        if (portfolioDemoResponse) {
+            return portfolioDemoResponse;
         }
 
         const ip = getIpFromHeaders(req.headers);

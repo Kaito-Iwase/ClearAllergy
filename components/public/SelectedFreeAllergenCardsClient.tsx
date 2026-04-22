@@ -54,13 +54,17 @@ export default function SelectedFreeAllergenCardsClient({
     statusBySlug: Record<string, AllergenStatus>;
 }) {
     // 端末に保存された選択アレルゲンを画面状態として持ちます。
-    const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
+    const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
+    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
+    const [includeMayContain, setIncludeMayContain] = React.useState(true);
     const [loaded, setLoaded] = React.useState(false);
 
     React.useEffect(() => {
         function syncPreferences() {
             const stored = loadUserAllergenPreferences();
-            setSelectedSlugs(stored.selectedSlugs);
+            setHighlightSlugs(stored.highlightSlugs);
+            setExcludedSlugs(stored.excludedSlugs);
+            setIncludeMayContain(stored.includeMayContain);
             setLoaded(true);
         }
 
@@ -87,6 +91,8 @@ export default function SelectedFreeAllergenCardsClient({
     if (!loaded) {
         return null;
     }
+
+    const selectedSlugs = [...new Set([...highlightSlugs, ...excludedSlugs])];
 
     if (selectedSlugs.length === 0) {
         const specifiedRiskAllergens = allergens
@@ -156,7 +162,7 @@ export default function SelectedFreeAllergenCardsClient({
         .filter(
             (allergen) =>
                 allergen.status === "FREE" ||
-                allergen.status === "MAY_CONTAIN",
+                (includeMayContain && allergen.status === "MAY_CONTAIN"),
         );
 
     if (selectedReferenceAllergens.length === 0) {

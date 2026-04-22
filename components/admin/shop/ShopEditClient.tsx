@@ -96,8 +96,10 @@ function buildBusinessHoursText({
 
 export default function ShopEditClient({
     initialShop,
+    readOnly = false,
 }: {
     initialShop: ShopViewModel;
+    readOnly?: boolean;
 }) {
     const initialBusinessHours = React.useMemo(
         () => parseBusinessHoursText(initialShop.hours),
@@ -296,6 +298,13 @@ export default function ShopEditClient({
     async function saveShop() {
         setError(null);
         setSavedMessage("");
+
+        if (readOnly) {
+            setError(
+                "ポートフォリオ公開版のため、店舗情報は保存できません。",
+            );
+            return;
+        }
 
         // 店舗名だけは必須なので、空なら API を呼ばずに止めます。
         const trimmedName = name.trim();
@@ -628,10 +637,12 @@ export default function ShopEditClient({
                         <button
                             type="button"
                             onClick={saveShop}
-                            disabled={saving || uploading}
+                            disabled={readOnly || saving || uploading}
                             className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
-                            {uploading
+                            {readOnly
+                                ? "閲覧専用"
+                                : uploading
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."
@@ -671,10 +682,12 @@ export default function ShopEditClient({
                         <button
                             type="button"
                             onClick={saveShop}
-                            disabled={saving || uploading}
+                            disabled={readOnly || saving || uploading}
                             className="inline-flex items-center justify-center rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition hover:bg-black/80 disabled:opacity-60"
                         >
-                            {uploading
+                            {readOnly
+                                ? "閲覧専用"
+                                : uploading
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."
@@ -701,10 +714,12 @@ export default function ShopEditClient({
 
                         <button
                             type="submit"
-                            disabled={saving || uploading}
+                            disabled={readOnly || saving || uploading}
                             className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
-                            {uploading
+                            {readOnly
+                                ? "閲覧専用"
+                                : uploading
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."
@@ -1037,10 +1052,12 @@ export default function ShopEditClient({
                     <div className="mt-6 flex flex-wrap gap-3">
                         <button
                             type="submit"
-                            disabled={saving || uploading}
+                            disabled={readOnly || saving || uploading}
                             className="inline-flex items-center justify-center rounded-xl bg-[#13ec13] px-6 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
-                            {uploading
+                            {readOnly
+                                ? "閲覧専用"
+                                : uploading
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."
