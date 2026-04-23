@@ -11,16 +11,20 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String?  @unique
+  // Clerk 移行時の互換用。現在のランタイム認証は Clerk セッションを正とします。
   passwordHash String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  // Clerk ユーザーとアプリ内 User を結び付ける主キーです。
   clerkUserId  String?  @unique
   shop         Shop?
+  auditLogs    AuditLog[]
 }
 
 model Shop {
   id                  String        @id @default(cuid())
   userId              String?       @unique
+  // 現在の店舗所有者は Clerk user id で判定します。
   ownerClerkUserId    String?       @unique
   name                String
   description         String?
@@ -46,6 +50,7 @@ model Shop {
 }
 
 model AdminInvite {
+  // 店舗管理者を Clerk 招待で追加するための管理テーブルです。
   id                    String       @id @default(cuid())
   email                 String
   shopId                String
@@ -63,6 +68,27 @@ model AdminInvite {
   @@index([email, status])
   @@index([shopId, status])
   @@index([status])
+}
+
+model AuditLog {
+  // 認証、招待、メニュー更新などの管理操作を追跡します。
+  id          String   @id @default(cuid())
+  actorUserId String?
+  actorShopId String?
+  action      String
+  targetType  String
+  targetId    String?
+  success     Boolean
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actorUser   User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([actorShopId])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
+  @@index([createdAt])
 }
 
 model MenuItem {
@@ -104,6 +130,7 @@ model Allergen {
 model MenuItemAllergen {
   menuItemId String
   allergenId String
+  // 未確認を安全側に扱うため、初期値は UNKNOWN にしています。
   status     AllergenStatus @default(UNKNOWN)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt

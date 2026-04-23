@@ -12,10 +12,6 @@ import { isDatabaseUnavailableError } from "@/lib/db-errors";
 const DATABASE_UNAVAILABLE_REASON =
     "Clerk セッションの有無ではなく、管理者ユーザーと店舗状態の照会に必要なデータベース接続が失敗しています。";
 
-// /admin の入口。
-// Clerk ログイン済みなら DB の状態を見て、
-// まだ店舗未作成なら /admin/register、
-// 既に店舗があるなら、最初は店舗情報ページへ送ります。
 export default async function AdminIndexPage() {
     const platformAdmin = await getCurrentPlatformAdmin();
     if (platformAdmin) {

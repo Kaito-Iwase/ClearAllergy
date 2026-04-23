@@ -1,7 +1,5 @@
-// app/(public)/layout.tsx
-// 公開側レイアウト：ヘッダーをここに1本化
-// - 「商品一覧」リンクは削除（/menus を使わない方針）
-// - 検索プレースホルダーも「店舗を検索」に寄せる
+// 公開画面共通のレイアウトです。
+// 公開側のヘッダーはここに集約し、各ページは本文だけを担当します。
 
 import PublicHeader from "@/components/layout/PublicHeader";
 

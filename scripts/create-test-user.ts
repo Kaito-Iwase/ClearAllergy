@@ -1,4 +1,4 @@
-// scripts/create-test-user.ts
+// ローカル確認用の管理アカウントを DB と Clerk の両方にそろえる補助スクリプトです。
 import { loadEnvConfig } from "@next/env";
 import { prisma } from "../lib/db";
 import bcrypt from "bcrypt";
@@ -7,16 +7,12 @@ import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminCore";
 loadEnvConfig(process.cwd());
 
 async function main() {
-    // 必要なら CLI 引数で上書きできます。
-    // 例: tsx scripts/create-test-user.ts test@test.com Passw0rd! "テスト店舗"
     const email = process.argv[2]?.trim().toLowerCase() || "test@test.com";
     const password = process.argv[3] || "Passw0rd!";
     const shopName = process.argv[4] || "テスト店舗";
 
-    // 1) パスワードをハッシュ化（bcrypt）
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // 2) Userを作成（既にあれば更新）
     const user = await prisma.user.upsert({
         where: { email },
         update: { passwordHash },
@@ -24,7 +20,6 @@ async function main() {
         select: { id: true, clerkUserId: true, email: true, createdAt: true },
     });
 
-    // 3) Shopを作成（User 1 : 1）
     const shop = await prisma.shop.upsert({
         where: { userId: user.id },
         update: {},

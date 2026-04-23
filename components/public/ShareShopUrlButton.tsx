@@ -10,7 +10,6 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
     // 初回は server / client で同じ描画にしたいので、URL は null から始めます。
     const [shopUrl, setShopUrl] = React.useState<string | null>(null);
 
-    // 2) 共有メッセージ
     const [message, setMessage] = React.useState("");
 
     // ブラウザでしか origin が取れないため、マウント後に公開 URL を組み立てます。
@@ -19,7 +18,6 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
         setShopUrl(`${origin}/shops/${shopId}`);
     }, [shopId]);
 
-    // 成功メッセージは短時間だけ表示します。
     function showMessage(text: string) {
         setMessage(text);
 
@@ -35,7 +33,6 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
         }
 
         try {
-            // スマホなどで navigator.share が使えれば、ネイティブ共有 UI を開きます。
             if (navigator.share) {
                 await navigator.share({
                     title: "ClearAllergy 店舗ページ",
@@ -45,7 +42,6 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
                 return;
             }
 
-            // 共有 API が無い環境では、URL をコピーして共有しやすくします。
             await navigator.clipboard.writeText(shopUrl);
             showMessage("店舗URLをコピーしました。");
         } catch (error) {

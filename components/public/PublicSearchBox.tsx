@@ -4,24 +4,16 @@
 // URL クエリ (?q=...) を更新し、その結果を Server Component 側の絞り込みに反映させます。
 // Client Component なのは、入力イベントと router.replace を使うためです。
 
-// components/public/PublicSearchBox.tsx
-
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Props = {
-    // これが渡されたらそれを優先し、未指定なら現在のページに応じて自動決定します。
     placeholder?: string;
 };
 
 function autoPlaceholder(pathname: string): string {
-    // /shops は店舗一覧なので「店舗を検索」にします。
     if (pathname === "/shops") return "店舗を検索";
-
-    // 店舗詳細配下では、店内のメニューを探すニュアンスに切り替えます。
     if (pathname.startsWith("/shops/")) return "この店舗のメニューを検索";
-
-    // それ以外は汎用の文言にします。
     return "検索";
 }
 
@@ -30,12 +22,10 @@ export default function PublicSearchBox({ placeholder }: Props) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // 現在の URL に入っている q を初期値として取り出します。
     const initialQ = useMemo(() => {
         return searchParams.get("q") ?? "";
     }, [searchParams]);
 
-    // 入力欄の内容そのものを state として持ちます。
     const [q, setQ] = useState(initialQ);
 
     // 戻る / 進む などで URL の q が変わった時も入力欄を同期します。
@@ -43,7 +33,6 @@ export default function PublicSearchBox({ placeholder }: Props) {
         setQ(initialQ);
     }, [initialQ]);
 
-    // placeholder は props 優先、無ければ現在パスから自動決定します。
     const resolvedPlaceholder = useMemo(() => {
         return placeholder ?? autoPlaceholder(pathname);
     }, [placeholder, pathname]);
@@ -62,7 +51,6 @@ export default function PublicSearchBox({ placeholder }: Props) {
         router.replace(queryString ? `${pathname}?${queryString}` : pathname);
     };
 
-    // クリア時は入力欄だけでなく URL からも q を消します。
     const onClear = () => {
         setQ("");
         const sp = new URLSearchParams(searchParams.toString());

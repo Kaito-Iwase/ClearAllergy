@@ -19,6 +19,7 @@ import {
 } from "@/lib/allergens";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import {
     parseMenuImageFit,
     parseMenuImageFrame,
@@ -113,9 +114,14 @@ export async function POST(req: Request) {
         auditActorUserId = auth.appUser.id;
         auditShopId = auth.shopId;
 
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
+        }
+
         const body = await readJson<MenuCreateBody>(req);
 
-        // 下書き作成では、名前未入力でも仮タイトルで進められるようにします。
+        // 下書き作成では、名前未入力でも既定タイトルで進められるようにします。
         const name = toRequiredTrimmedString(body?.name) ?? "新しいメニュー";
 
         // 価格だけは数値ルールが多いので専用 helper で検証します。

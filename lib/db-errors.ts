@@ -7,15 +7,35 @@ export function isDatabaseUnavailableError(error: unknown) {
 
     if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P1001"
+        ["P1001", "P1002", "P1017"].includes(error.code)
     ) {
         return true;
     }
 
     return (
         error instanceof Error &&
-        error.message.includes("Can't reach database server")
+        [
+            "Can't reach database server",
+            "Server has closed the connection",
+            "Connection terminated unexpectedly",
+            "ECONNRESET",
+        ].some((message) => error.message.includes(message))
     );
+}
+
+export async function retryOnceOnDatabaseUnavailable<T>(
+    operation: () => Promise<T>,
+): Promise<T> {
+    try {
+        return await operation();
+    } catch (error) {
+        if (!isDatabaseUnavailableError(error)) {
+            throw error;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return operation();
+    }
 }
 
 type DatabaseUrlSummary = {
@@ -24,8 +44,10 @@ type DatabaseUrlSummary = {
     scheme: string | null;
     host: string | null;
     port: number | null;
+    explicitPort: boolean | null;
     database: string | null;
     queryKeys: string[];
+    hasSslmode: boolean | null;
     usesPoolerHost: boolean | null;
 };
 
@@ -62,8 +84,10 @@ function summarizeDatabaseUrl(value: string | undefined): DatabaseUrlSummary {
             scheme: null,
             host: null,
             port: null,
+            explicitPort: null,
             database: null,
             queryKeys: [],
+            hasSslmode: null,
             usesPoolerHost: null,
         };
     }
@@ -82,8 +106,10 @@ function summarizeDatabaseUrl(value: string | undefined): DatabaseUrlSummary {
                         ? 5432
                         : null
                     : Number(parsed.port),
+            explicitPort: parsed.port !== "",
             database: parsed.pathname.replace(/^\//, "") || null,
             queryKeys: [...parsed.searchParams.keys()].sort(),
+            hasSslmode: parsed.searchParams.has("sslmode"),
             usesPoolerHost: parsed.hostname.includes("-pooler."),
         };
     } catch {
@@ -93,8 +119,10 @@ function summarizeDatabaseUrl(value: string | undefined): DatabaseUrlSummary {
             scheme: null,
             host: null,
             port: null,
+            explicitPort: null,
             database: null,
             queryKeys: [],
+            hasSslmode: null,
             usesPoolerHost: null,
         };
     }

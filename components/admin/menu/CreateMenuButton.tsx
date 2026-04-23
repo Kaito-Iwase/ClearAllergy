@@ -7,10 +7,27 @@ import Link from "next/link";
 export const createMenuButtonClassName =
     "inline-flex items-center justify-center rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60";
 
-export default function CreateMenuButton() {
+export default function CreateMenuButton({
+    disabled = false,
+    href = "/admin/menus/new",
+}: {
+    disabled?: boolean;
+    href?: string;
+}) {
+    if (disabled) {
+        return (
+            <span
+                className={`${createMenuButtonClassName} cursor-not-allowed opacity-60`}
+                aria-disabled="true"
+            >
+                ＋ 新規作成
+            </span>
+        );
+    }
+
     return (
         <Link
-            href="/admin/menus/new"
+            href={href}
             className={createMenuButtonClassName}
         >
             ＋ 新規作成

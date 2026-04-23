@@ -1,8 +1,6 @@
 // このページは公開側のメニュー詳細画面です。
 // 1 件のメニューについて、価格・原材料・アレルゲン 28 品目をまとめて表示します。
-// Server Component で DB 取得を行い、localStorage を使う個人向け警告だけ Client Component に 맡せます。
-
-// app/(public)/shops/[shopId]/menus/[menuId]/page.tsx
+// Server Component で DB 取得を行い、localStorage を使う個人向け警告だけ Client Component に任せます。
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
