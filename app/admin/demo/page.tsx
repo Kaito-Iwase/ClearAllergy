@@ -63,10 +63,11 @@ export default async function AdminDemoPage() {
         <AdminDashboardShell
             shopHref="/admin/demo"
             menusHref="/admin/demo/menus"
+            showAuthControls={false}
         >
             <div className="space-y-6">
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-                    ポートフォリオ公開版のため、この管理画面は閲覧専用です。
+                    ポートフォリオ公開版のため、この管理画面は閲覧専用です。入力してもDB・画像ストレージへ保存されません。
                 </div>
 
                 <div>
@@ -74,7 +75,7 @@ export default async function AdminDemoPage() {
                         店舗情報編集
                     </h1>
                     <p className="mt-2 text-sm text-gray-600">
-                        通常の管理画面と同じ見た目で確認できます。保存や公開などの編集権限はありません。
+                        通常の管理画面と同じ見た目で確認できます。保存や公開などの編集権限はなく、変更内容は反映されません。
                     </p>
                 </div>
 

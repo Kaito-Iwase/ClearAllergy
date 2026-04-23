@@ -11,6 +11,7 @@ import {
     validateImageFile,
 } from "@/lib/upload-images";
 import { writeAdminAuditLog } from "@/lib/audit-log";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 
 export async function POST(req: Request) {
     let actorUserId: string | null = null;
@@ -28,6 +29,11 @@ export async function POST(req: Request) {
         }
         actorUserId = auth.appUser.id;
         actorShopId = auth.shopId;
+
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
+        }
 
         // formData はファイル送信に向いた形式です。
         const formData = await req.formData();

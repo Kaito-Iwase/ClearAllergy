@@ -20,11 +20,12 @@ export default async function AdminDemoMenuNewPage() {
         <AdminDashboardShell
             shopHref="/admin/demo"
             menusHref="/admin/demo/menus"
+            showAuthControls={false}
         >
             <div className="min-h-screen bg-gray-50">
                 <div className="mx-auto max-w-6xl px-4 py-6">
                     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-                        ポートフォリオ公開版のため、この画面は操作プレビューです。登録内容は保存されません。
+                        ポートフォリオ公開版のため、この画面は操作プレビューです。登録内容は保存されず、画像もアップロードされません。
                     </div>
 
                     <nav className="mb-4 text-sm text-gray-500">
@@ -44,7 +45,7 @@ export default async function AdminDemoMenuNewPage() {
                         メニュー新規作成
                     </h1>
                     <p className="mt-1 text-gray-600">
-                        通常の新規作成画面と同じ項目を確認できます。登録ボタンを押してもDBには保存されません。
+                        通常の新規作成画面と同じ項目を確認できます。登録ボタンを押してもDB・画像ストレージには保存されません。
                     </p>
 
                     <div className="mt-6">

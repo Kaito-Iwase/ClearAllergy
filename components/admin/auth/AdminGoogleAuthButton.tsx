@@ -11,13 +11,10 @@ type AdminGoogleAuthButtonProps = {
     onError?: (message: string) => void;
 };
 
-// Clerk の既定 UI は使わず、
-// 既存のログイン / 新規登録画面の中から Google OAuth を開始するためのボタン。
 export default function AdminGoogleAuthButton({
     label,
     onError,
 }: AdminGoogleAuthButtonProps) {
-    // useSignIn() は Clerk のサインイン開始用 hook です。
     const { fetchStatus, signIn } = useSignIn();
 
     async function handleGoogleSignIn() {

@@ -2,8 +2,6 @@
 // ログイン不要で localStorage に保存し、メニュー一覧や詳細の警告表示に使います。
 // Server Component では localStorage を触れないため、Client Component から呼ばれます。
 
-// lib/public-allergen-preferences.ts
-
 export const USER_ALLERGEN_STORAGE_KEY = "clearallergy:user-allergens";
 export const USER_ALLERGENS_UPDATED_EVENT =
     "clearallergy:user-allergens-updated";

@@ -2,8 +2,6 @@
 // 店舗情報と、その店舗の公開メニュー一覧をまとめて表示します。
 // Server Component で DB 取得を行い、localStorage を使う部分だけ Client Component へ切り出しています。
 
-// app/(public)/shops/[shopId]/page.tsx
-
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
@@ -458,7 +456,7 @@ export default async function PublicShopDetailPage({
                             </div>
 
                             <p className="mt-3 text-xs text-gray-500">
-                                ※QR表示は次で追加できます
+                                店舗ページの共有には上のボタンを利用できます。
                             </p>
                         </div>
 

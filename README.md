@@ -18,6 +18,7 @@
 ### 管理側
 
 - 店舗アカウントを新規登録する
+- 運営管理者が店舗管理者の招待、再送、取消を行う
 - メニューを作成し、そのまま編集画面へ遷移する
 - メニューの公開 / 非公開、価格、画像、原材料、注意書き、アレルゲン28品目を更新する
 - 店舗情報、カバー画像、公開URL用QRコードを更新する
@@ -41,11 +42,13 @@
 | ルート | 用途 |
 | --- | --- |
 | `/` | トップページ。公開中メニューを持つ店舗を 1 件ピックアップ表示 |
+| `/terms` | 利用規約 |
 | `/shops` | 公開店舗一覧。`?q=` で店舗名 / 説明を検索可能 |
 | `/shops/[shopId]` | 公開店舗ページ。公開メニュー一覧、店舗情報、共有導線を表示 |
 | `/shops/[shopId]/menus/[menuId]` | 公開メニュー詳細。アレルゲン28品目、原材料、注意書きを表示 |
 | `/admin/register` | 店舗アカウント新規登録 |
 | `/admin/login` | 管理画面ログイン |
+| `/admin/invitations` | 運営管理者向けの店舗管理者招待 |
 | `/admin/menus` | 自店舗のメニュー一覧 |
 | `/admin/menus/new` | メニュー新規作成。作成後 `/admin/menus/[menuId]/edit` へ遷移 |
 | `/admin/menus/[menuId]/edit` | メニュー編集 |
@@ -57,6 +60,11 @@
 | --- | --- |
 | `/api/admin/register` | 店舗アカウント登録 |
 | `/api/admin/onboarding` | Clerk ログイン後の初回店舗作成 |
+| `/api/admin/auth/login` | 管理ログイン試行の事前確認と監査ログ |
+| `/api/admin/auth/sso` | Google / SSO 導線の監査ログ |
+| `/api/admin/invitations` | 店舗管理者招待の一覧 / 作成 |
+| `/api/admin/invitations/[inviteId]/resend` | 招待の再送 |
+| `/api/admin/invitations/[inviteId]/revoke` | 招待の取消 |
 | `/api/admin/shop` | ログイン中店舗の取得 / 更新 |
 | `/api/admin/menus` | ログイン中店舗のメニュー一覧 / 新規作成 |
 | `/api/admin/menus/[menuId]` | ログイン中店舗のメニュー取得 / 更新 / 削除 |
@@ -145,14 +153,6 @@ npx prisma generate
 npm run seed
 ```
 
-### 6. 既存メール+パスワードユーザーを Clerk へ移行
-
-```bash
-npm run auth:migrate:clerk
-```
-
-`passwordHash` を持つ既存ユーザーを Clerk へ事前インポートします。`demo@clearallergy.local` を含む既存アカウントは、このコマンド後も今までのメールアドレス + パスワードでそのままログインできます。
-
 この seed で以下が作成されます。
 
 - アレルゲン28品目マスタ
@@ -165,7 +165,13 @@ npm run auth:migrate:clerk
 | メールアドレス | `demo@clearallergy.local` |
 | パスワード | `demo1234` |
 
-デモログインも Clerk に移行済みです。`npm run seed` のあとに `npm run auth:migrate:clerk` を実行すると、今までと同じメールアドレス / パスワードで `/admin/login` から入れます。
+### 6. 既存メール+パスワードユーザーを Clerk へ移行
+
+```bash
+npm run auth:migrate:clerk
+```
+
+`passwordHash` を持つ既存ユーザーを Clerk へ事前インポートします。`npm run seed` のあとに実行すると、デモ管理アカウントも同じメールアドレス / パスワードで `/admin/login` から利用できます。
 
 既存のテスト管理者を既知のパスワードで作り直したい時は、次も使えます。
 
@@ -191,7 +197,8 @@ npm run dev
 4. 公開側で個人アレルゲン設定を変更し、再読み込み後も `localStorage` 由来の表示が維持されることを確認する
 5. `npm run auth:migrate:clerk` 実行後、`/admin/login` からデモアカウントでログインし、`/admin/menus` と `/admin/shop` が表示できることを確認する
 6. `/admin/menus/new` からメニューを作成し、作成後に編集画面へ遷移することを確認する
-7. `BLOB_READ_WRITE_TOKEN` を設定した場合は、JPEG / PNG / WebP / GIF / AVIF の5MB以下画像だけがアップロード成功することを確認する
+7. `/terms` が表示できることを確認する
+8. `BLOB_READ_WRITE_TOKEN` を設定した場合は、JPEG / PNG / WebP / GIF / AVIF の5MB以下画像だけがアップロード成功することを確認する
 
 ## 公開前の注意
 

@@ -2,8 +2,6 @@
 // 公開メニューを 1 件以上持つ店舗だけを表示し、必要なら検索語でも絞り込みます。
 // Server Component なので、検索条件に応じた DB 取得を直接ここで行います。
 
-// app/(public)/shops/page.tsx
-
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { prisma } from "@/lib/db";
@@ -28,7 +26,6 @@ export default async function PublicShopListPage({
     // App Router では searchParams が Promise のこともあるため await してから使います。
     const resolvedSearchParams = (await searchParams) ?? {};
 
-    // URL クエリ ?q=... から検索語を取り出します。
     const qRaw = resolvedSearchParams.q ?? "";
     const q = qRaw.trim();
 

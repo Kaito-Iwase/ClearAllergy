@@ -1,8 +1,12 @@
+// 店舗管理者招待の再送 API です。
+// 古い招待を失効させてから新しい Clerk 招待と AdminInvite を作り直します。
+
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { requirePlatformAdminApi } from "@/lib/admin-platform-auth";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import {
     buildInvitationRedirectUrl,
     getInvitationExpiresAt,
@@ -52,6 +56,11 @@ export async function POST(req: Request, context: Context) {
         const admin = await requirePlatformAdminApi();
         if (!admin.ok) {
             return admin.res;
+        }
+
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
         }
 
         const inviteId = await getInviteId(req, context);
@@ -104,7 +113,7 @@ export async function POST(req: Request, context: Context) {
             return NextResponse.json(
                 {
                     message:
-                        "既存のClerkユーザーへの招待はMVPではサポートしていません。",
+                        "既存のClerkユーザーへの招待は現在サポートしていません。",
                 },
                 { status: 409 },
             );

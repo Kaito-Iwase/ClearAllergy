@@ -42,21 +42,9 @@ export async function writeAdminAuditLog(args: {
     metadata?: Prisma.InputJsonValue;
 }) {
     try {
-        const auditLogDelegate = (
-            prisma as typeof prisma & {
-                auditLog?: {
-                    create: (args: { data: unknown }) => Promise<unknown>;
-                };
-            }
-        ).auditLog;
-
-        if (!auditLogDelegate) {
-            return;
-        }
-
         // 監査ログ書き込みの失敗で本来の更新処理まで止めないように、
         // ログ処理は補助扱いにしています。
-        await auditLogDelegate.create({
+        await prisma.auditLog.create({
             data: {
                 actorUserId: args.actorUserId,
                 actorShopId: args.actorShopId,

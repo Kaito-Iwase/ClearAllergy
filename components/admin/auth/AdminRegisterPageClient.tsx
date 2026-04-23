@@ -48,8 +48,12 @@ export default function AdminRegisterPageClient({
             ? "招待リンクが必要です"
             : "現在は登録できません"
         : loading
-          ? "登録中..."
-          : "新規登録";
+          ? portfolioMode
+              ? "デモ画面へ移動中..."
+              : "登録中..."
+          : portfolioMode
+            ? "保存せずデモ管理画面を見る"
+            : "新規登録";
 
     async function autoSignIn(normalizedEmail: string, rawPassword: string) {
         if (!signIn) {
@@ -238,6 +242,9 @@ export default function AdminRegisterPageClient({
                                 </p>
                                 <p className="mt-1">
                                     現在はデモ用に公開しており、登録後はデモ管理画面を表示します。
+                                </p>
+                                <p className="mt-1 font-bold">
+                                    入力内容は保存されず、店舗アカウントや店舗データは作成されません。
                                 </p>
                                 <p className="mt-1">
                                     新規登録・編集機能の一般公開は今後調整予定です。
@@ -456,7 +463,9 @@ export default function AdminRegisterPageClient({
 
                     <div className="bg-background-light dark:bg-black/20 p-4 text-center border-t border-[#e5e7eb] dark:border-white/5">
                         <p className="text-xs text-text-sub dark:text-gray-500">
-                            登録後はこのアカウントで店舗メニューを管理できます。
+                            {portfolioMode
+                                ? "ポートフォリオ公開中は入力内容を保存せず、閲覧専用のデモ管理画面へ移動します。"
+                                : "登録後はこのアカウントで店舗メニューを管理できます。"}
                         </p>
                     </div>
                 </div>
