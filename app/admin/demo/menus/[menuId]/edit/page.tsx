@@ -33,7 +33,15 @@ export default async function AdminDemoMenuEditPage({ params }: PageProps) {
             },
         }),
         prisma.menuItem.findFirst({
-            where: { id: menuId },
+            where: {
+                id: menuId,
+                shop: {
+                    OR: [
+                        { name: { contains: "デモ" } },
+                        { name: { contains: "Cafe Hibi" } },
+                    ],
+                },
+            },
             select: {
                 id: true,
                 shopId: true,
@@ -71,11 +79,12 @@ export default async function AdminDemoMenuEditPage({ params }: PageProps) {
         <AdminDashboardShell
             shopHref="/admin/demo"
             menusHref="/admin/demo/menus"
+            showAuthControls={false}
         >
             <div className="min-h-screen bg-gray-50">
                 <div className="mx-auto max-w-6xl px-4 py-6">
                     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-                        ポートフォリオ公開版のため、この画面は操作プレビューです。保存・公開・削除は実行されません。
+                        ポートフォリオ公開版のため、この画面は操作プレビューです。保存・公開・削除は実行されず、DB・画像ストレージには反映されません。
                     </div>
 
                     <nav className="mb-4 text-sm text-gray-500">
@@ -95,7 +104,7 @@ export default async function AdminDemoMenuEditPage({ params }: PageProps) {
                         メニュー編集
                     </h1>
                     <p className="mt-1 text-gray-600">
-                        通常の編集画面と同じ操作項目を確認できます。保存ボタンを押してもDBには反映されません。
+                        通常の編集画面と同じ操作項目を確認できます。保存ボタンを押してもDB・画像ストレージには反映されません。
                     </p>
 
                     <div className="mt-6">

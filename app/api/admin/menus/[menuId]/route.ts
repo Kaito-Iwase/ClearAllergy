@@ -2,8 +2,6 @@
 // /api/admin/menus/[menuId] の GET / PUT / DELETE をまとめています。
 // 毎回 shopId で絞り込み、「自分の店舗のメニューだけ触れる」ことを保証します。
 
-// app/api/admin/menus/[menuId]/route.ts
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
@@ -28,6 +26,7 @@ import {
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import {
     parseMenuImageFit,
     parseMenuImageFrame,
@@ -58,11 +57,9 @@ type UpdateMenuBody = {
 
 export async function GET(req: Request, context: Context) {
     try {
-        // 認証された管理者か確認し、権限判定に使う shopId を取ります。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
 
-        // 動的ルートの menuId を取得します。
         const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
@@ -184,7 +181,12 @@ export async function PUT(req: Request, context: Context) {
         auditActorUserId = auth.appUser.id;
         auditShopId = auth.shopId;
 
-        // 2) menuId 取得
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
+        }
+
+        // 対象メニュー ID は URL から取り出します。
         const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
@@ -193,7 +195,6 @@ export async function PUT(req: Request, context: Context) {
             );
         }
 
-        // request body が JSON として壊れていたら早めに 400 を返します。
         const body = await readJson<UpdateMenuBody>(req);
         if (!body) {
             return NextResponse.json(
@@ -202,7 +203,6 @@ export async function PUT(req: Request, context: Context) {
             );
         }
 
-        // 対象メニューが自分の店舗に属しているか確認します。
         const existing = await prisma.menuItem.findFirst({
             where: { id: menuId, shopId: auth.shopId },
             select: {
@@ -502,7 +502,12 @@ export async function DELETE(req: Request, context: Context) {
         auditActorUserId = auth.appUser.id;
         auditShopId = auth.shopId;
 
-        // 2) menuId 取得
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
+        }
+
+        // 対象メニュー ID は URL から取り出します。
         const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
@@ -512,7 +517,7 @@ export async function DELETE(req: Request, context: Context) {
         }
         auditTargetId = menuId;
 
-        // 3) この店のメニューか確認（他店なら404）
+        // 他店舗のメニュー ID を指定されても、存在を推測されないよう 404 にします。
         const existing = await prisma.menuItem.findFirst({
             where: { id: menuId, shopId: auth.shopId },
             select: { id: true },
@@ -524,12 +529,11 @@ export async function DELETE(req: Request, context: Context) {
             );
         }
 
-        // 中間テーブルが残っていると外部キー制約で本体を消せないため、先に削除します。
+        // 中間テーブルが残ると外部キー制約で本体を消せないため、先に削除します。
         await prisma.menuItemAllergen.deleteMany({
             where: { menuItemId: menuId },
         });
 
-        // その後で menu 本体を削除します。
         await prisma.menuItem.delete({
             where: { id: menuId },
         });

@@ -2,8 +2,6 @@
 // 認証確認、shopId の取り出し、JSON 読み取り、500 エラー整形をまとめています。
 // 各 route.ts から使い回し、同じ認可ルールとレスポンス形式を保ちます。
 
-// app/api/admin/_utils.ts
-
 import { NextResponse } from "next/server";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";

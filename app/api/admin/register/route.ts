@@ -6,7 +6,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
-import { enforceSameOriginAdminMutation, consumeIpAndIdentifierRateLimit } from "@/lib/admin-api-security";
+import {
+    consumeIpAndIdentifierRateLimit,
+    enforceSameOriginAdminMutation,
+} from "@/lib/admin-api-security";
 import { adminRegisterSchema } from "@/lib/validators/admin-auth";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { getIpFromHeaders } from "@/lib/request-ip";
@@ -210,6 +213,7 @@ export async function POST(req: Request) {
         });
         createdClerkUserId = createdClerkUser.id;
 
+        // Clerk ユーザー作成後に DB 側を作るため、後続で失敗した場合は catch で Clerk を巻き戻します。
         const createdUser = await prisma.user.create({
             data: {
                 email,

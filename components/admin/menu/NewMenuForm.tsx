@@ -57,7 +57,6 @@ export default function NewMenuForm({
     backHref?: string;
 }) {
     const router = useRouter();
-    // フォーム全体の入力値と UI 状態を state で持ちます。
     const [name, setName] = React.useState("");
     const [description, setDescription] = React.useState("");
     const [priceYenInput, setPriceYenInput] = React.useState("");
@@ -136,7 +135,6 @@ export default function NewMenuForm({
     }
 
     function setOne(slug: string, status: AllergenStatus) {
-        // 1 品目ずつ状態を切り替えられるよう、slug をキーにして保持します。
         setStatusBySlug((prev) => ({ ...prev, [slug]: status }));
     }
 
@@ -202,18 +200,16 @@ export default function NewMenuForm({
     }
 
     const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        // フォーム既定の再読み込みを止め、処理結果を画面内で扱います。
         e.preventDefault();
         setError(null);
 
         if (readOnly) {
             setError(
-                "ポートフォリオ公開版のため、メニュー登録はできません。",
+                "ポートフォリオ公開版のため、入力内容は保存されません。",
             );
             return;
         }
 
-        // メニュー名だけは必須なので、空欄ならここで止めます。
         const trimmed = name.trim();
         if (!trimmed) {
             setError("名前は必須です。");
@@ -223,7 +219,6 @@ export default function NewMenuForm({
         setIsSubmitting(true);
 
         try {
-            // 先に画像をアップロードし、取得した URL を body に入れてから作成 API を呼びます。
             const priceYen = buildPriceYen();
             const uploadedImageUrl = await uploadSelectedImage();
 
@@ -300,7 +295,13 @@ export default function NewMenuForm({
                                 isPublished ? "bg-green-600" : "bg-gray-900"
                             }`}
                         >
-                            {isPublished ? "公開中" : "非公開"}
+                            {readOnly
+                                ? isPublished
+                                    ? "公開中（デモ）"
+                                    : "非公開（デモ）"
+                                : isPublished
+                                  ? "公開中"
+                                  : "非公開"}
                         </button>
 
                         <button
@@ -314,6 +315,8 @@ export default function NewMenuForm({
                         >
                             {readOnly && !readOnlyPreview
                                 ? "閲覧専用"
+                                : readOnly
+                                  ? "保存されないデモ操作"
                                 : isSubmitting
                                 ? "登録中..."
                                 : uploading
@@ -332,7 +335,9 @@ export default function NewMenuForm({
                 </div>
 
                 <p className="mt-3 text-xs text-gray-500">
-                    登録後、このメニューの編集画面へ移動します。
+                    {readOnly
+                        ? "この画面は操作確認用です。登録ボタンを押しても保存されません。"
+                        : "登録後、このメニューの編集画面へ移動します。"}
                 </p>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -363,7 +368,9 @@ export default function NewMenuForm({
                             placeholder="例：1200"
                         />
                         <p className="mt-1 text-xs text-gray-500">
-                            未入力なら価格なしとして保存します。
+                            {readOnly
+                                ? "デモ表示のため、この入力内容は保存されません。"
+                                : "未入力なら価格なしとして保存します。"}
                         </p>
                     </div>
                 </div>
@@ -439,7 +446,9 @@ export default function NewMenuForm({
                             className="block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-gray-100 file:px-4 file:py-2 file:font-semibold file:text-gray-700"
                         />
                         <p className="mt-1 text-xs text-gray-500">
-                            作成時に画像をアップロードしてURLを保存します。
+                            {readOnly
+                                ? "デモ表示のため、画像はアップロードされません。"
+                                : "作成時に画像をアップロードしてURLを保存します。"}
                         </p>
                     </div>
 

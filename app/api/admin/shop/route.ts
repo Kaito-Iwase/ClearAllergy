@@ -13,6 +13,7 @@ import {
 } from "@/lib/validators/admin-input";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
 import { writeAdminAuditLog } from "@/lib/audit-log";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import {
     parseMenuImageFit,
     parseMenuImageFrame,
@@ -114,6 +115,11 @@ export async function PUT(req: Request) {
         }
         auditActorUserId = auth.appUser.id;
         auditShopId = auth.shopId;
+
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
+        }
 
         // JSON が壊れている場合は 400 を返し、DB 更新まで進ませません。
         const body = await readJson<ShopUpdateBody>(req);

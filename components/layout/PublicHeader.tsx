@@ -19,6 +19,12 @@ export default function PublicHeader() {
                         >
                             店舗一覧
                         </Link>
+                        <Link
+                            className="text-sm font-medium text-gray-700 hover:text-[#13ec13]"
+                            href="/terms"
+                        >
+                            利用規約
+                        </Link>
                     </nav>
                 </div>
 

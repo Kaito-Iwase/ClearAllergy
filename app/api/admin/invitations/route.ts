@@ -1,8 +1,12 @@
+// 運営管理者向けの店舗管理者招待 API です。
+// Clerk の招待作成とローカル AdminInvite 作成を対応させ、失敗時は Clerk 側も取り消します。
+
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { requirePlatformAdminApi } from "@/lib/admin-platform-auth";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import {
     buildInvitationRedirectUrl,
     expirePendingInvitesForEmail,
@@ -88,6 +92,11 @@ export async function POST(req: Request) {
             return admin.res;
         }
 
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
+        }
+
         const body = (await req.json().catch(() => null)) as InviteCreateBody | null;
         const parsed = adminInviteCreateSchema.safeParse({
             email: body?.email,
@@ -138,7 +147,7 @@ export async function POST(req: Request) {
             return NextResponse.json(
                 {
                     message:
-                        "既存のClerkユーザーへの招待はMVPではサポートしていません。",
+                        "既存のClerkユーザーへの招待は現在サポートしていません。",
                 },
                 { status: 409 },
             );

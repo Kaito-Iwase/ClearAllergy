@@ -57,7 +57,7 @@ export default async function AdminInvitationsPage() {
                         店舗管理者招待
                     </h1>
                     <p className="mt-2 text-sm leading-7 text-gray-600">
-                        招待メールの送信、再送、取消だけを扱うMVP用の運営画面です。
+                        店舗管理者の招待メール送信、再送、取消を扱う運営画面です。
                     </p>
                 </div>
 

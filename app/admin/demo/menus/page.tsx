@@ -81,11 +81,12 @@ export default async function AdminDemoMenusPage() {
         <AdminDashboardShell
             shopHref="/admin/demo"
             menusHref="/admin/demo/menus"
+            showAuthControls={false}
         >
             <div className="min-h-screen bg-[#f5f7f4]">
                 <div className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:pb-8">
                     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-                        ポートフォリオ公開版のため、この管理画面は閲覧専用です。
+                        ポートフォリオ公開版のため、この管理画面は閲覧専用です。作成・編集・削除ボタンを操作しても保存されません。
                     </div>
 
                     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -97,7 +98,7 @@ export default async function AdminDemoMenusPage() {
                                 メニュー管理
                             </h1>
                             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-                                通常の管理画面と同じ見た目で、公開状態・価格・アレルゲン設定状況を確認できます。作成・削除などの編集権限はありません。
+                                通常の管理画面と同じ見た目で、公開状態・価格・アレルゲン設定状況を確認できます。作成・削除などの編集権限はなく、DB には反映されません。
                             </p>
                         </div>
 
