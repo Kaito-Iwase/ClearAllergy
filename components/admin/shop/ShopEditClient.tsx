@@ -96,15 +96,16 @@ function buildBusinessHoursText({
 
 export default function ShopEditClient({
     initialShop,
+    readOnly = false,
 }: {
     initialShop: ShopViewModel;
+    readOnly?: boolean;
 }) {
     const initialBusinessHours = React.useMemo(
         () => parseBusinessHoursText(initialShop.hours),
         [initialShop.hours],
     );
 
-    // フォーム入力値と UI 状態を state として持ちます。
     const [name, setName] = React.useState(initialShop.name);
     const [description, setDescription] = React.useState(
         initialShop.description ?? "",
@@ -297,7 +298,13 @@ export default function ShopEditClient({
         setError(null);
         setSavedMessage("");
 
-        // 店舗名だけは必須なので、空なら API を呼ばずに止めます。
+        if (readOnly) {
+            setError(
+                "ポートフォリオ公開版のため、入力内容は保存されません。",
+            );
+            return;
+        }
+
         const trimmedName = name.trim();
         if (!trimmedName) {
             setError("店舗名は必須です。");
@@ -434,7 +441,6 @@ export default function ShopEditClient({
     }
 
     async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-        // フォーム既定の再読み込みを止め、画面内で成功・失敗を表示します。
         e.preventDefault();
         await saveShop();
     }
@@ -628,10 +634,12 @@ export default function ShopEditClient({
                         <button
                             type="button"
                             onClick={saveShop}
-                            disabled={saving || uploading}
+                            disabled={readOnly || saving || uploading}
                             className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
-                            {uploading
+                            {readOnly
+                                ? "保存不可（デモ）"
+                                : uploading
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."
@@ -671,10 +679,12 @@ export default function ShopEditClient({
                         <button
                             type="button"
                             onClick={saveShop}
-                            disabled={saving || uploading}
+                            disabled={readOnly || saving || uploading}
                             className="inline-flex items-center justify-center rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition hover:bg-black/80 disabled:opacity-60"
                         >
-                            {uploading
+                            {readOnly
+                                ? "保存不可（デモ）"
+                                : uploading
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."
@@ -701,10 +711,12 @@ export default function ShopEditClient({
 
                         <button
                             type="submit"
-                            disabled={saving || uploading}
+                            disabled={readOnly || saving || uploading}
                             className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
-                            {uploading
+                            {readOnly
+                                ? "保存不可（デモ）"
+                                : uploading
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."
@@ -1037,10 +1049,12 @@ export default function ShopEditClient({
                     <div className="mt-6 flex flex-wrap gap-3">
                         <button
                             type="submit"
-                            disabled={saving || uploading}
+                            disabled={readOnly || saving || uploading}
                             className="inline-flex items-center justify-center rounded-xl bg-[#13ec13] px-6 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
-                            {uploading
+                            {readOnly
+                                ? "保存不可（デモ）"
+                                : uploading
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."

@@ -2,13 +2,15 @@
 // ログイン不要で localStorage に保存し、メニュー一覧や詳細の警告表示に使います。
 // Server Component では localStorage を触れないため、Client Component から呼ばれます。
 
-// lib/public-allergen-preferences.ts
-
 export const USER_ALLERGEN_STORAGE_KEY = "clearallergy:user-allergens";
 export const USER_ALLERGENS_UPDATED_EVENT =
     "clearallergy:user-allergens-updated";
 
 export type UserAllergenPreferences = {
+    highlightSlugs: string[];
+    excludedSlugs: string[];
+    includeMayContain: boolean;
+    // 旧形式との互換用。新規保存では highlightSlugs / excludedSlugs を使います。
     selectedSlugs: string[];
 };
 
@@ -30,23 +32,50 @@ function normalizeSlugs(values: unknown): string[] {
 
 export function loadUserAllergenPreferences(): UserAllergenPreferences {
     if (typeof window === "undefined") {
-        return { selectedSlugs: [] };
+        return {
+            highlightSlugs: [],
+            excludedSlugs: [],
+            includeMayContain: true,
+            selectedSlugs: [],
+        };
     }
 
     try {
         const raw = window.localStorage.getItem(USER_ALLERGEN_STORAGE_KEY);
 
         if (!raw) {
-            return { selectedSlugs: [] };
+            return {
+                highlightSlugs: [],
+                excludedSlugs: [],
+                includeMayContain: true,
+                selectedSlugs: [],
+            };
         }
 
         const parsed = JSON.parse(raw) as Partial<UserAllergenPreferences>;
+        const legacySelectedSlugs = normalizeSlugs(parsed.selectedSlugs);
+        const highlightSlugs = normalizeSlugs(parsed.highlightSlugs);
+        const excludedSlugs = normalizeSlugs(parsed.excludedSlugs);
+        const normalizedHighlightSlugs =
+            highlightSlugs.length > 0 || excludedSlugs.length > 0
+                ? highlightSlugs
+                : legacySelectedSlugs;
 
         return {
-            selectedSlugs: normalizeSlugs(parsed.selectedSlugs),
+            highlightSlugs: normalizedHighlightSlugs,
+            excludedSlugs,
+            includeMayContain: parsed.includeMayContain !== false,
+            selectedSlugs: [
+                ...new Set([...normalizedHighlightSlugs, ...excludedSlugs]),
+            ],
         };
     } catch {
-        return { selectedSlugs: [] };
+        return {
+            highlightSlugs: [],
+            excludedSlugs: [],
+            includeMayContain: true,
+            selectedSlugs: [],
+        };
     }
 }
 
@@ -58,7 +87,15 @@ export function saveUserAllergenPreferences(
     }
 
     const normalized: UserAllergenPreferences = {
-        selectedSlugs: normalizeSlugs(preferences.selectedSlugs),
+        highlightSlugs: normalizeSlugs(preferences.highlightSlugs),
+        excludedSlugs: normalizeSlugs(preferences.excludedSlugs),
+        includeMayContain: preferences.includeMayContain !== false,
+        selectedSlugs: [
+            ...new Set([
+                ...normalizeSlugs(preferences.highlightSlugs),
+                ...normalizeSlugs(preferences.excludedSlugs),
+            ]),
+        ],
     };
 
     window.localStorage.setItem(

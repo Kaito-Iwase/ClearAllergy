@@ -1,7 +1,11 @@
+// 店舗管理者招待の取消 API です。
+// ローカルの招待状態と Clerk 側 invitation の両方を取り消します。
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { requirePlatformAdminApi } from "@/lib/admin-platform-auth";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import { serializeAdminInvite } from "@/lib/invitations";
 import { revokeClerkApplicationInvitation } from "@/lib/auth/clerkAdminServer";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
@@ -30,6 +34,11 @@ export async function POST(req: Request, context: Context) {
         const admin = await requirePlatformAdminApi();
         if (!admin.ok) {
             return admin.res;
+        }
+
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
         }
 
         const inviteId = await getInviteId(req, context);

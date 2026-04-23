@@ -1,8 +1,12 @@
+// 店舗管理者招待の再送 API です。
+// 古い招待を失効させてから新しい Clerk 招待と AdminInvite を作り直します。
+
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { requirePlatformAdminApi } from "@/lib/admin-platform-auth";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import {
     buildInvitationRedirectUrl,
     getInvitationExpiresAt,
@@ -14,7 +18,10 @@ import {
     revokeClerkApplicationInvitation,
 } from "@/lib/auth/clerkAdminServer";
 import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
-import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import {
+    isDatabaseUnavailableError,
+    retryOnceOnDatabaseUnavailable,
+} from "@/lib/db-errors";
 
 type Context = {
     params?: { inviteId?: string } | Promise<{ inviteId?: string }>;
@@ -51,6 +58,11 @@ export async function POST(req: Request, context: Context) {
             return admin.res;
         }
 
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
+        }
+
         const inviteId = await getInviteId(req, context);
         if (!inviteId) {
             return NextResponse.json(
@@ -59,19 +71,21 @@ export async function POST(req: Request, context: Context) {
             );
         }
 
-        const oldInvite = await prisma.adminInvite.findUnique({
-            where: { id: inviteId },
-            include: {
-                shop: {
-                    select: {
-                        id: true,
-                        name: true,
-                        ownerClerkUserId: true,
-                        isActive: true,
+        const oldInvite = await retryOnceOnDatabaseUnavailable(() =>
+            prisma.adminInvite.findUnique({
+                where: { id: inviteId },
+                include: {
+                    shop: {
+                        select: {
+                            id: true,
+                            name: true,
+                            ownerClerkUserId: true,
+                            isActive: true,
+                        },
                     },
                 },
-            },
-        });
+            }),
+        );
 
         if (!oldInvite) {
             return NextResponse.json(
@@ -99,9 +113,15 @@ export async function POST(req: Request, context: Context) {
             return NextResponse.json(
                 {
                     message:
-                        "既存のClerkユーザーへの招待はMVPではサポートしていません。",
+                        "既存のClerkユーザーへの招待は現在サポートしていません。",
                 },
                 { status: 409 },
+            );
+        }
+
+        if (oldInvite.clerkInvitationId) {
+            await revokeClerkApplicationInvitation(
+                oldInvite.clerkInvitationId,
             );
         }
 
@@ -146,12 +166,6 @@ export async function POST(req: Request, context: Context) {
                 },
             });
         });
-
-        if (oldInvite.clerkInvitationId) {
-            await revokeClerkApplicationInvitation(
-                oldInvite.clerkInvitationId,
-            ).catch(() => undefined);
-        }
 
         return NextResponse.json({
             message: "招待を再送しました。",

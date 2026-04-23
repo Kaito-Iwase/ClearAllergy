@@ -1,3 +1,6 @@
+// Clerk 管理 API を直接呼ぶ処理を集約します。
+// ローカル User / Shop と Clerk user の対応を崩さないよう、同期処理もここで扱います。
+
 import { createClerkClient, type User as ClerkUser } from "@clerk/backend";
 import { prisma } from "../db";
 import { normalizeEmail } from "../email";
@@ -106,6 +109,7 @@ async function linkLocalUserToClerk(params: {
     clerkUser: ClerkUser;
     email: string | null;
 }) {
+    // User と Shop の所有者を同じ Clerk user id へ更新し、片方だけ進む状態を防ぎます。
     await prisma.$transaction(async (tx) => {
         await tx.user.update({
             where: { id: params.appUserId },

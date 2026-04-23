@@ -9,6 +9,7 @@ import {
     serializeAdminInvite,
 } from "@/lib/invitations";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 
 function isUniqueConstraintConflict(error: unknown) {
     return (
@@ -22,6 +23,11 @@ export async function POST(req: Request) {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
             return originError;
+        }
+
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
         }
 
         const identity = await getCurrentClerkIdentity();

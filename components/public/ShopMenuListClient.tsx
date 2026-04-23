@@ -36,6 +36,11 @@ type MenuItemCard = {
     }>;
 };
 
+type MenuItemWithStatus = {
+    menu: MenuItemCard;
+    statusBySlug: Record<string, AllergenStatus>;
+};
+
 function badgeClass(kind: BadgeKind): string {
     if (kind === "danger") {
         return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200";
@@ -135,6 +140,7 @@ function buildOverallSummary(args: {
 function buildPersonalizedSummary(args: {
     statusBySlug: Record<string, AllergenStatus>;
     selectedSlugs: string[];
+    includeMayContain: boolean;
     nameJaBySlug: Map<string, string>;
     rankBySlug: Map<string, number>;
 }): {
@@ -146,7 +152,13 @@ function buildPersonalizedSummary(args: {
 } {
     // こちらは、利用者が自分で選んだアレルゲンだけを見た要約です。
     // 全体表示と同じく UNKNOWN を数えないと、重要な未確認項目が消えてしまいます。
-    const { statusBySlug, selectedSlugs, nameJaBySlug, rankBySlug } = args;
+    const {
+        statusBySlug,
+        selectedSlugs,
+        includeMayContain,
+        nameJaBySlug,
+        rankBySlug,
+    } = args;
 
     const containsSlugs: string[] = [];
     const maySlugs: string[] = [];
@@ -156,7 +168,7 @@ function buildPersonalizedSummary(args: {
         const status = statusBySlug[slug] ?? "UNKNOWN";
         if (status === "CONTAINS") {
             containsSlugs.push(slug);
-        } else if (status === "MAY_CONTAIN") {
+        } else if (includeMayContain && status === "MAY_CONTAIN") {
             maySlugs.push(slug);
         } else if (status === "UNKNOWN") {
             unknownSlugs.push(slug);
@@ -227,13 +239,17 @@ export default function ShopMenuListClient({
     const router = useRouter();
 
     // 端末に保存されたアレルゲン設定を読み込み、画面に反映します。
-    const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
+    const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
+    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
+    const [includeMayContain, setIncludeMayContain] = React.useState(true);
     const [loaded, setLoaded] = React.useState(false);
 
     React.useEffect(() => {
         function syncPreferences() {
             const next = loadUserAllergenPreferences();
-            setSelectedSlugs(next.selectedSlugs);
+            setHighlightSlugs(next.highlightSlugs);
+            setExcludedSlugs(next.excludedSlugs);
+            setIncludeMayContain(next.includeMayContain);
             setLoaded(true);
         }
 
@@ -270,12 +286,43 @@ export default function ShopMenuListClient({
         );
     }, [allergenMaster]);
 
-    const hasPreference = loaded && selectedSlugs.length > 0;
+    const hasPreference =
+        loaded && (highlightSlugs.length > 0 || excludedSlugs.length > 0);
+    const hasHighlightPreference = loaded && highlightSlugs.length > 0;
+
+    const isExcludedByPreference = React.useCallback((statusBySlug: Record<string, AllergenStatus>) => {
+        return excludedSlugs.some((slug) => {
+            const status = statusBySlug[slug] ?? "UNKNOWN";
+            return (
+                status === "CONTAINS" ||
+                (includeMayContain && status === "MAY_CONTAIN")
+            );
+        });
+    }, [excludedSlugs, includeMayContain]);
 
     function goToMenu(menuId: string) {
         // カード全体を押した時にメニュー詳細へ移動します。
         router.push(`/shops/${shopId}/menus/${menuId}`);
     }
+
+    const menuItems = React.useMemo<MenuItemWithStatus[]>(() => {
+        return menus.map((menu) => ({
+            menu,
+            statusBySlug: createStatusBySlug(allergenMaster, menu.allergenLinks),
+        }));
+    }, [allergenMaster, menus]);
+
+    const visibleMenuItems = React.useMemo(() => {
+        if (!hasPreference) {
+            return menuItems;
+        }
+
+        return menuItems.filter(
+            ({ statusBySlug }) => !isExcludedByPreference(statusBySlug),
+        );
+    }, [hasPreference, isExcludedByPreference, menuItems]);
+
+    const excludedMenuCount = menuItems.length - visibleMenuItems.length;
 
     return (
         <div
@@ -295,13 +342,18 @@ export default function ShopMenuListClient({
                             : "現在公開中のメニューはありません。"}
                     </p>
                 </div>
+            ) : visibleMenuItems.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-red-200 bg-red-50 p-6">
+                    <p className="text-sm font-bold text-red-800">
+                        除外設定により表示できるメニューがありません。
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-red-700">
+                        必要に応じて、あなた向けのアレルゲン設定で「除外」を外してください。
+                    </p>
+                </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {menus.map((menu) => {
-                        const statusBySlug = createStatusBySlug(
-                            allergenMaster,
-                            menu.allergenLinks,
-                        );
+                    {visibleMenuItems.map(({ menu, statusBySlug }) => {
                         const overallSummary = buildOverallSummary({
                             statusBySlug,
                             nameJaBySlug,
@@ -310,12 +362,13 @@ export default function ShopMenuListClient({
 
                         const personalizedSummary = buildPersonalizedSummary({
                             statusBySlug,
-                            selectedSlugs,
+                            selectedSlugs: highlightSlugs,
+                            includeMayContain,
                             nameJaBySlug,
                             rankBySlug,
                         });
 
-                        const activeSummary = hasPreference
+                        const activeSummary = hasHighlightPreference
                             ? personalizedSummary
                             : overallSummary;
 
@@ -378,9 +431,9 @@ export default function ShopMenuListClient({
                                     {activeSummary.summaryText}
                                 </p>
 
-                                {hasPreference ? (
+                                {hasHighlightPreference ? (
                                     <p className="mt-2 text-[11px] text-gray-400">
-                                        あなたの設定項目に基づく表示
+                                        強調表示の設定に基づく表示
                                     </p>
                                 ) : null}
                             </article>
@@ -388,6 +441,15 @@ export default function ShopMenuListClient({
                     })}
                 </div>
             )}
+            {hasPreference ? (
+                <p className="mt-4 text-xs font-medium text-gray-500">
+                    除外設定に一致するメニューは一覧から非表示になります
+                    {includeMayContain
+                        ? "（含む可能性ありも対象）"
+                        : "（含む可能性ありは対象外）"}
+                    。{excludedMenuCount > 0 ? `${excludedMenuCount}件を非表示にしています。` : ""}
+                </p>
+            ) : null}
         </div>
     );
 }

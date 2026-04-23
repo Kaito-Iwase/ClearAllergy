@@ -61,8 +61,12 @@ function buildUnknownPreview(names: string[]) {
 
 export default function MenuListPageClient({
     initialMenus,
+    readOnly = false,
+    readOnlyEditHrefBase,
 }: {
     initialMenus: MenuRow[];
+    readOnly?: boolean;
+    readOnlyEditHrefBase?: string;
 }) {
     // state として一覧・検索語・エラーメッセージを持ちます。
     const [menus, setMenus] = useState<MenuRow[]>(initialMenus);
@@ -114,6 +118,13 @@ export default function MenuListPageClient({
     const onDelete = async (menuId: string, menuName: string) => {
         // 前回のエラーを消してから削除処理を始めます。
         setError(null);
+
+        if (readOnly) {
+            setError(
+                "ポートフォリオ公開版のため、メニュー削除はできません。",
+            );
+            return;
+        }
 
         // 取り消し不能な操作なので、まずブラウザ確認ダイアログを出します。
         const ok = window.confirm(
@@ -230,7 +241,9 @@ export default function MenuListPageClient({
                     const unknownPreview = buildUnknownPreview(
                         menu.unknownAllergenNames,
                     );
-                    const editHref = `/admin/menus/${menu.id}/edit`;
+                    const editHref = readOnlyEditHrefBase
+                        ? `${readOnlyEditHrefBase}/${menu.id}/edit`
+                        : `/admin/menus/${menu.id}/edit`;
 
                     return (
                         <article
@@ -334,26 +347,41 @@ export default function MenuListPageClient({
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                                    <Link
-                                        href={editHref}
-                                        className={`inline-flex h-10 items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold transition ${
-                                            hasUnknown
-                                                ? "bg-amber-600 text-white hover:bg-amber-700"
-                                                : "bg-[#0f4c2f] text-white hover:bg-[#0b3d25]"
-                                        }`}
-                                    >
-                                        <span className="material-symbols-outlined text-[18px]">
-                                            {hasUnknown ? "notification_important" : "edit"}
+                                    {readOnly && !readOnlyEditHrefBase ? (
+                                        <span
+                                            className="inline-flex h-10 cursor-not-allowed items-center justify-center gap-1 rounded-lg bg-gray-100 px-3 text-sm font-bold text-gray-500 opacity-70"
+                                            aria-disabled="true"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">
+                                                visibility
+                                            </span>
+                                            閲覧専用
                                         </span>
-                                        {hasUnknown ? "アレルゲン設定" : "編集"}
-                                    </Link>
+                                    ) : (
+                                        <Link
+                                            href={editHref}
+                                            className={`inline-flex h-10 items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold transition ${
+                                                hasUnknown
+                                                    ? "bg-amber-600 text-white hover:bg-amber-700"
+                                                    : "bg-[#0f4c2f] text-white hover:bg-[#0b3d25]"
+                                            }`}
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">
+                                                {hasUnknown
+                                                    ? "notification_important"
+                                                    : "edit"}
+                                            </span>
+                                            {hasUnknown ? "アレルゲン設定" : "編集"}
+                                        </Link>
+                                    )}
 
                                     <button
                                         type="button"
                                         onClick={() =>
                                             onDelete(menu.id, menu.name)
                                         }
-                                        className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                                        disabled={readOnly}
+                                        className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                                         aria-label={`${menu.name}を削除`}
                                     >
                                         <span className="material-symbols-outlined text-[20px]">

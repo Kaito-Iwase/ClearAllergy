@@ -19,6 +19,7 @@ import { prisma } from "@/lib/db";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 import { getIpFromHeaders } from "@/lib/request-ip";
+import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 
 type OnboardingBody = {
     shopName?: unknown;
@@ -30,6 +31,11 @@ export async function POST(req: Request) {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
             return originError;
+        }
+
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
         }
 
         // 初回セットアップでは店舗名だけ受け取り、最小構成で Shop を作ります。

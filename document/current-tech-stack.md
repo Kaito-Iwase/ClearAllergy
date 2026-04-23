@@ -1,6 +1,6 @@
 # ClearAllergy 現在技術スタック
 
-このドキュメントは、2026-04-16 時点の実コードを基準に、ClearAllergy の現在構成を簡潔に整理したものです。  
+このドキュメントは、2026-04-23 時点の実コードを基準に、ClearAllergy の現在構成を簡潔に整理したものです。  
 古い NextAuth 前提の説明はこのリポジトリの現在実装とは一致しません。認証の正は Clerk です。
 
 ## 1. アプリの役割
@@ -57,11 +57,13 @@ ClearAllergy は次の 4 層で構成されています。
 ## 5. 主な画面ルート
 
 - `/`
+- `/terms`
 - `/shops`
 - `/shops/[shopId]`
 - `/shops/[shopId]/menus/[menuId]`
 - `/admin/login`
 - `/admin/register`
+- `/admin/invitations`
 - `/admin/menus`
 - `/admin/menus/new`
 - `/admin/menus/[menuId]/edit`
@@ -73,6 +75,9 @@ ClearAllergy は次の 4 層で構成されています。
 - `/api/admin/onboarding`
 - `/api/admin/auth/login`
 - `/api/admin/auth/sso`
+- `/api/admin/invitations`
+- `/api/admin/invitations/[inviteId]/resend`
+- `/api/admin/invitations/[inviteId]/revoke`
 - `/api/admin/shop`
 - `/api/admin/menus`
 - `/api/admin/menus/[menuId]`
@@ -105,7 +110,7 @@ ClearAllergy は次の 4 層で構成されています。
 - `npm run repair:published-menus`
   - 公開メニュー整合性を補修します。
 
-## 9. 今回の整理で重要な注意
+## 9. 公開前に重要な注意
 
 - NextAuth は現在の正ではありません。
 - URL 直結の route segment 名は安易に変えないでください。

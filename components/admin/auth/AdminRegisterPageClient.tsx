@@ -18,6 +18,7 @@ export default function AdminRegisterPageClient({
     registrationMode,
     lockMessage,
     inviteToken,
+    portfolioMode = false,
     databaseUnavailable = false,
 }: {
     showGoogleAuthButton: boolean;
@@ -25,6 +26,7 @@ export default function AdminRegisterPageClient({
     registrationMode: "disabled" | "invite_only" | "open";
     lockMessage: string | null;
     inviteToken: string | null;
+    portfolioMode?: boolean;
     databaseUnavailable?: boolean;
 }) {
     const { fetchStatus, signIn } = useSignIn();
@@ -46,8 +48,12 @@ export default function AdminRegisterPageClient({
             ? "招待リンクが必要です"
             : "現在は登録できません"
         : loading
-          ? "登録中..."
-          : "新規登録";
+          ? portfolioMode
+              ? "デモ画面へ移動中..."
+              : "登録中..."
+          : portfolioMode
+            ? "保存せずデモ管理画面を見る"
+            : "新規登録";
 
     async function autoSignIn(normalizedEmail: string, rawPassword: string) {
         if (!signIn) {
@@ -151,10 +157,17 @@ export default function AdminRegisterPageClient({
 
             const data = (await response.json().catch(() => null)) as {
                 message?: string;
+                redirectTo?: string;
+                portfolioMode?: boolean;
             } | null;
 
             if (!response.ok) {
                 setError(data?.message ?? "新規登録に失敗しました。");
+                return;
+            }
+
+            if (data?.portfolioMode && data.redirectTo) {
+                window.location.href = data.redirectTo;
                 return;
             }
 
@@ -219,6 +232,23 @@ export default function AdminRegisterPageClient({
                         {databaseUnavailable ? (
                             <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
                                 現在データベースへ接続できないため、店舗アカウント登録を一時停止しています。時間をおいて再度お試しください。
+                            </div>
+                        ) : null}
+
+                        {portfolioMode ? (
+                            <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm leading-6 text-green-900">
+                                <p className="font-extrabold">
+                                    このサイトはポートフォリオ公開版です。
+                                </p>
+                                <p className="mt-1">
+                                    現在はデモ用に公開しており、登録後はデモ管理画面を表示します。
+                                </p>
+                                <p className="mt-1 font-bold">
+                                    入力内容は保存されず、店舗アカウントや店舗データは作成されません。
+                                </p>
+                                <p className="mt-1">
+                                    新規登録・編集機能の一般公開は今後調整予定です。
+                                </p>
                             </div>
                         ) : null}
 
@@ -433,7 +463,9 @@ export default function AdminRegisterPageClient({
 
                     <div className="bg-background-light dark:bg-black/20 p-4 text-center border-t border-[#e5e7eb] dark:border-white/5">
                         <p className="text-xs text-text-sub dark:text-gray-500">
-                            登録後はこのアカウントで店舗メニューを管理できます。
+                            {portfolioMode
+                                ? "ポートフォリオ公開中は入力内容を保存せず、閲覧専用のデモ管理画面へ移動します。"
+                                : "登録後はこのアカウントで店舗メニューを管理できます。"}
                         </p>
                     </div>
                 </div>

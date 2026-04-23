@@ -2,8 +2,6 @@
 // /api/menus/[menuId] の GET だけを担当し、公開中メニューのみ返します。
 // 公開画面から読まれるため、非公開メニューは存在していても 404 扱いにします。
 
-// app/api/menus/[menuId]/route.ts
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { buildAllergenRows } from "@/lib/allergens";

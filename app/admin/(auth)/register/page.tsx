@@ -13,11 +13,41 @@ import { shouldShowAdminGoogleRegister } from "@/lib/auth/clerkAdmin";
 import { getCurrentAdminContext } from "@/lib/admin-auth";
 import { getAdminRegistrationGuard } from "@/lib/admin-registration";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import {
+    getCurrentUserIsAppAdmin,
+    isPortfolioMode,
+} from "@/lib/portfolio-mode";
+
+type RegisterSearchParams = Record<string, string | string[] | undefined>;
+
+function hasClerkInvitationParams(searchParams: RegisterSearchParams) {
+    return (
+        typeof searchParams.__clerk_ticket === "string" ||
+        typeof searchParams.__clerk_invitation_token === "string"
+    );
+}
+
+function buildSignUpUrl(searchParams: RegisterSearchParams) {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(searchParams)) {
+        if (typeof value === "string") {
+            params.set(key, value);
+        } else if (Array.isArray(value)) {
+            for (const item of value) {
+                params.append(key, item);
+            }
+        }
+    }
+
+    const query = params.toString();
+    return query ? `/sign-up?${query}` : "/sign-up";
+}
 
 export default async function AdminRegisterPage({
     searchParams,
 }: {
-    searchParams?: Promise<{ invite?: string }> | { invite?: string };
+    searchParams?: Promise<RegisterSearchParams> | RegisterSearchParams;
 }) {
     const resolvedSearchParams = (await searchParams) ?? {};
     const inviteToken =
@@ -25,8 +55,11 @@ export default async function AdminRegisterPage({
             ? resolvedSearchParams.invite
             : null;
     const registrationGuard = getAdminRegistrationGuard({ inviteToken });
+    const portfolioMode = isPortfolioMode();
+    const isAppAdmin = await getCurrentUserIsAppAdmin();
+    const canUseRealRegistration = !portfolioMode || isAppAdmin;
     const showGoogleAuthButton = shouldShowAdminGoogleRegister({
-        canRegister: registrationGuard.allowed,
+        canRegister: canUseRealRegistration && registrationGuard.allowed,
     });
     let appUser = null;
     let clerkIdentity = null;
@@ -40,16 +73,27 @@ export default async function AdminRegisterPage({
             return (
                 <AdminRegisterPageClient
                     showGoogleAuthButton={false}
-                    canRegister={registrationGuard.allowed}
+                    canRegister={
+                        canUseRealRegistration ? registrationGuard.allowed : true
+                    }
                     registrationMode={registrationGuard.mode}
-                    lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
+                    lockMessage={
+                        canUseRealRegistration && !registrationGuard.allowed
+                            ? registrationGuard.message
+                            : null
+                    }
                     inviteToken={inviteToken}
+                    portfolioMode={portfolioMode && !isAppAdmin}
                     databaseUnavailable
                 />
             );
         }
 
         throw error;
+    }
+
+    if (!clerkIdentity && hasClerkInvitationParams(resolvedSearchParams)) {
+        redirect(buildSignUpUrl(resolvedSearchParams));
     }
 
     // 管理者状態を確認し、店舗がある人は管理画面へ戻します。
@@ -62,10 +106,17 @@ export default async function AdminRegisterPage({
             return (
                 <AdminRegisterPageClient
                     showGoogleAuthButton={false}
-                    canRegister={registrationGuard.allowed}
+                    canRegister={
+                        canUseRealRegistration ? registrationGuard.allowed : true
+                    }
                     registrationMode={registrationGuard.mode}
-                    lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
+                    lockMessage={
+                        canUseRealRegistration && !registrationGuard.allowed
+                            ? registrationGuard.message
+                            : null
+                    }
                     inviteToken={inviteToken}
+                    portfolioMode={portfolioMode && !isAppAdmin}
                     databaseUnavailable
                 />
             );
@@ -76,6 +127,19 @@ export default async function AdminRegisterPage({
 
     if (context?.shop) {
         redirect("/admin/shop");
+    }
+
+    if (portfolioMode && !isAppAdmin) {
+        return (
+            <AdminRegisterPageClient
+                showGoogleAuthButton={false}
+                canRegister
+                registrationMode={registrationGuard.mode}
+                lockMessage={null}
+                inviteToken={inviteToken}
+                portfolioMode
+            />
+        );
     }
 
     if (appUser && !context?.shop) {
@@ -89,10 +153,17 @@ export default async function AdminRegisterPage({
     return (
         <AdminRegisterPageClient
             showGoogleAuthButton={showGoogleAuthButton}
-            canRegister={registrationGuard.allowed}
+            canRegister={
+                canUseRealRegistration ? registrationGuard.allowed : true
+            }
             registrationMode={registrationGuard.mode}
-            lockMessage={registrationGuard.allowed ? null : registrationGuard.message}
+            lockMessage={
+                canUseRealRegistration && !registrationGuard.allowed
+                    ? registrationGuard.message
+                    : null
+            }
             inviteToken={inviteToken}
+            portfolioMode={portfolioMode && !isAppAdmin}
         />
     );
 }

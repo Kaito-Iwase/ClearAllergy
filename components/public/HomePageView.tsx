@@ -41,12 +41,18 @@ export default function HomePageView({
                         <BrandLogo priority />
                     </Link>
 
-                    <nav className="flex items-center gap-4">
+                    <nav className="flex items-center gap-3 sm:gap-4">
                         <Link
                             href="/shops"
                             className="text-sm font-semibold text-gray-700 transition hover:text-[#13ec13]"
                         >
                             店舗一覧
+                        </Link>
+                        <Link
+                            href="/terms"
+                            className="hidden text-sm font-semibold text-gray-600 transition hover:text-[#13ec13] sm:inline"
+                        >
+                            利用規約
                         </Link>
                         <Link
                             href="/admin/login"
@@ -80,6 +86,16 @@ export default function HomePageView({
                                 外食前の確認を少しでもしやすくすることを目指しています。
                             </p>
 
+                            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                                <p className="font-bold">
+                                    このサイトは ClearAllergy
+                                    のポートフォリオ公開版です
+                                </p>
+                                <p className="mt-1 leading-6">
+                                    現在はデモ用に公開しており、掲載内容には閲覧体験・UI確認のためのサンプル情報が含まれる場合があります。
+                                </p>
+                            </div>
+
                             <div className="mt-2 flex flex-wrap gap-4">
                                 <Link
                                     href="/shops"
@@ -99,7 +115,7 @@ export default function HomePageView({
                             </div>
 
                             <div className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-900">
-                                <p className="font-semibold">MVP版について</p>
+                                <p className="font-semibold">現在の提供範囲</p>
                                 <p className="mt-1 leading-6">
                                     現在は、まず
                                     「店舗ページでメニューごとのアレルゲン情報を確認できる」
@@ -121,6 +137,22 @@ export default function HomePageView({
                                         画面はサンプル表示に切り替えています。
                                     </p>
                                 ) : null}
+                            </div>
+
+                            <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700 shadow-sm">
+                                <p className="font-semibold text-neutral-900">
+                                    利用者向けのご案内
+                                </p>
+                                <p className="mt-1 leading-6">
+                                    アレルゲン情報を確認する際は、実際の利用前に店舗へ直接ご確認ください。
+                                    新規登録・編集機能の一般公開は今後調整予定です。
+                                </p>
+                                <Link
+                                    href="/terms"
+                                    className="mt-2 inline-flex text-sm font-semibold text-green-800 underline-offset-4 hover:underline"
+                                >
+                                    利用規約を確認する
+                                </Link>
                             </div>
                         </div>
 
@@ -395,8 +427,14 @@ export default function HomePageView({
             </section>
 
             <footer className="border-t border-neutral-100 bg-white">
-                <div className="mx-auto max-w-[1200px] px-6 py-10 text-center text-sm text-neutral-400">
-                    © 2026 ClearAllergy. All rights reserved.
+                <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-center gap-3 px-6 py-10 text-center text-sm text-neutral-400 sm:flex-row">
+                    <span>© 2026 ClearAllergy. All rights reserved.</span>
+                    <Link
+                        href="/terms"
+                        className="font-medium text-neutral-500 underline-offset-4 hover:text-neutral-800 hover:underline"
+                    >
+                        利用規約
+                    </Link>
                 </div>
             </footer>
         </main>

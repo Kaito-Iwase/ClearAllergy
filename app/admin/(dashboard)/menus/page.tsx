@@ -2,8 +2,6 @@
 // ログイン中の店舗に紐づくメニューだけを取得して表示します。
 // Server Component なので DB 取得を直接ここで行い、表示用データだけを Client Component に渡します。
 
-// app/admin/(dashboard)/menus/page.tsx
-
 import { prisma } from "@/lib/db";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
 import MenuListPageClient from "@/components/admin/menu/MenuListPageClient";

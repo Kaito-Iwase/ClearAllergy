@@ -2,8 +2,6 @@
 // menuId に対応する 1 件のメニューを取得し、編集用の初期値を作って Client Component へ渡します。
 // Server Component なので、他店舗メニューのアクセス制御と初期データ取得を先に行えます。
 
-// app/admin/(dashboard)/menus/[menuId]/edit/page.tsx
-
 import MenuEditClient from "@/components/admin/menu/MenuEditClient";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";

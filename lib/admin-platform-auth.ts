@@ -1,16 +1,11 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
+import { hasAppAdminRole } from "@/lib/portfolio-mode";
 
 export type PlatformAdmin = {
     clerkUserId: string;
 };
-
-function hasPlatformAdminRole(
-    user: Awaited<ReturnType<typeof currentUser>>,
-) {
-    return user?.publicMetadata?.role === "admin";
-}
 
 export async function getCurrentPlatformAdmin(): Promise<PlatformAdmin | null> {
     const { userId } = await auth();
@@ -21,7 +16,7 @@ export async function getCurrentPlatformAdmin(): Promise<PlatformAdmin | null> {
 
     const user = await currentUser();
 
-    if (!hasPlatformAdminRole(user)) {
+    if (!hasAppAdminRole(user)) {
         return null;
     }
 
@@ -42,7 +37,7 @@ export async function requirePlatformAdminApi() {
 
     const user = await currentUser();
 
-    if (!hasPlatformAdminRole(user)) {
+    if (!hasAppAdminRole(user)) {
         return {
             ok: false as const,
             res: NextResponse.json({ error: "forbidden" }, { status: 403 }),

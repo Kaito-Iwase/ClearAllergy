@@ -1,7 +1,7 @@
 # ClearAllergy コードベース案内
 
 このドキュメントは、初学者が現在のコードベースを追いやすくするための最小ガイドです。  
-2026-04-16 時点の実装に合わせて、今どこに何があるかだけに絞って整理しています。
+2026-04-23 時点の実装に合わせて、今どこに何があるかだけに絞って整理しています。
 
 ## 1. 最初に見る順番
 
@@ -20,6 +20,8 @@
 
 - `app/page.tsx`
   - `/`
+- `app/(public)/terms/page.tsx`
+  - `/terms`
 - `app/(public)/shops/page.tsx`
   - `/shops`
 - `app/(public)/shops/[shopId]/page.tsx`
@@ -33,6 +35,8 @@
   - `/admin/login`
 - `app/admin/(auth)/register/page.tsx`
   - `/admin/register`
+- `app/admin/invitations/page.tsx`
+  - `/admin/invitations`
 - `app/admin/(dashboard)/menus/page.tsx`
   - `/admin/menus`
 - `app/admin/(dashboard)/menus/new/page.tsx`
@@ -54,6 +58,12 @@
   - ログイン試行の事前検査と監査ログ
 - `app/api/admin/auth/sso/route.ts`
   - Google / SSO 導線の監査ログ
+- `app/api/admin/invitations/route.ts`
+  - 店舗管理者招待の一覧 / 作成
+- `app/api/admin/invitations/[inviteId]/resend/route.ts`
+  - 招待の再送
+- `app/api/admin/invitations/[inviteId]/revoke/route.ts`
+  - 招待の取消
 
 ### 管理データ更新
 
