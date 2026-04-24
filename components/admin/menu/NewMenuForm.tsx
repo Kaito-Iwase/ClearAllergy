@@ -501,7 +501,7 @@ export default function NewMenuForm({
             </div>
 
             <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <div className="font-bold text-gray-900">アレルゲン28品目</div>
+                <div className="font-bold text-gray-900">アレルゲン29品目</div>
                 <p className="mt-1 text-sm text-gray-600">
                     各品目について「未設定 / 含む / 含まない / 含む可能性があります」を選択してください。
                 </p>

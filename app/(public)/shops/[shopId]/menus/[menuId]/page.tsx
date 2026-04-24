@@ -1,5 +1,5 @@
 // このページは公開側のメニュー詳細画面です。
-// 1 件のメニューについて、価格・原材料・アレルゲン 28 品目をまとめて表示します。
+// 1 件のメニューについて、価格・原材料・アレルゲン 29 品目をまとめて表示します。
 // Server Component で DB 取得を行い、localStorage を使う個人向け警告だけ Client Component に任せます。
 
 import Link from "next/link";
@@ -35,7 +35,7 @@ export default async function PublicMenuDetailPage({
         isDatabaseAvailable,
     } = await readPublicDataOrFallback(
         async () => {
-            // 未登録品目も画面に出したいので、まず 28 品目マスタを全件取得します。
+            // 未登録品目も画面に出したいので、まず 29 品目マスタを全件取得します。
             const allergenMaster = await prisma.allergen.findMany({
                 select: { slug: true, nameJa: true, sortOrder: true },
                 orderBy: { sortOrder: "asc" },
@@ -105,7 +105,7 @@ export default async function PublicMenuDetailPage({
         notFound();
     }
 
-    // マスタ 28 品目を基準に rows を作り、未登録項目も UNKNOWN として常に表示します。
+    // マスタ 29 品目を基準に rows を作り、未登録項目も UNKNOWN として常に表示します。
     const rows = buildAllergenRows(allergenMaster, menu.allergenLinks);
 
     // 特定原材料 8 品目は、上部の大きな注意ボックスでまとめて見せます。
