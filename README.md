@@ -1,84 +1,231 @@
 # ClearAllergy
 
-外食時のアレルゲン情報確認を、店舗と利用者の双方にとってシンプルにする Web アプリです。
+飲食店がメニューごとのアレルゲン情報を登録・公開し、利用者が来店前や注文前に確認できる Web アプリです。
 
-[![Next.js](https://img.shields.io/badge/Next.js-App_Router-black)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)](https://www.typescriptlang.org/)
-[![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748)](https://www.prisma.io/)
+ClearAllergy は、食物アレルギーを持つ人が外食時に感じる「このメニューは自分が食べても大丈夫だろうか」という不安を減らすことを目指した、ポートフォリオ用の個人開発プロジェクトです。
 
-## できること
+## 概要
 
-### 公開側
+飲食店側は、管理画面から店舗情報・メニュー情報・画像・アレルゲン28品目の状態を登録できます。利用者側は、ログイン不要で公開店舗やメニューを閲覧し、各メニューに含まれる可能性のあるアレルゲン情報を確認できます。
 
-- 公開中の店舗一覧を閲覧する
-- 店舗ページで公開メニューを検索し、価格やカテゴリを確認する
-- メニュー詳細でアレルゲン28品目を確認する
-- `localStorage` に保存した個人設定に基づいて警告表示を出す
+公開画面と管理画面を分け、店舗管理者が自分の店舗データだけを更新できる構成にしています。
 
-### 管理側
+## 制作背景
 
-- 店舗アカウントを新規登録する
-- 運営管理者が店舗管理者の招待、再送、取消を行う
-- メニューを作成し、そのまま編集画面へ遷移する
-- メニューの公開 / 非公開、価格、画像、原材料、注意書き、アレルゲン28品目を更新する
-- 店舗情報、カバー画像、公開URL用QRコードを更新する
+自分自身に食物アレルギーの経験があり、外食時にアレルゲン情報を探す手間や、店員さんに確認する心理的な負担を感じていました。
 
-## 技術スタック
+一方で、飲食店側にとっても、紙のメニューや口頭説明だけで最新情報を伝え続けるのは負担が大きいと考えました。そこで、店舗側が情報を更新し、利用者側が事前に確認できる仕組みを Web アプリとして作成しました。
 
-| カテゴリ | 技術 |
+## 解決したい課題
+
+- 利用者が、来店前や注文前にアレルゲン情報を確認しづらい
+- 店舗側が、メニューごとのアレルゲン情報を継続的に更新・公開しづらい
+- メニューの「含む」「含まない」だけでなく、「含む可能性」「未確認」も区別して伝える必要がある
+- 公開情報と店舗管理情報を分け、安全に更新できる管理画面が必要
+
+このアプリは医療的な判断を代替するものではなく、アレルゲン情報を確認しやすくするための補助ツールとして設計しています。
+
+## 主な機能
+
+### 利用者向け機能
+
+- 公開中の店舗一覧の閲覧
+- 店舗名・説明文による店舗検索
+- 店舗ページでの公開メニュー一覧表示
+- メニュー名・説明・カテゴリによるメニュー検索
+- メニュー詳細での価格、カテゴリ、原材料、注意書きの確認
+- アレルゲン28品目の状態表示
+- 特定原材料8品目の注意表示
+- 利用者自身の気になるアレルゲンを `localStorage` に保存し、公開画面で注意表示
+- 店舗公開 URL の共有
+
+### 店舗管理者向け機能
+
+- Clerk を利用した管理者ログイン
+- 店舗情報の登録・編集
+- 店舗画像のアップロード
+- 店舗公開ページ用 QR コードの表示・印刷
+- メニューの作成・編集・削除
+- メニュー画像のアップロード
+- メニュー画像・店舗画像の表示位置や拡大率の調整
+- メニューの公開 / 非公開切り替え
+- アレルゲン28品目ごとの状態登録
+- 公開時にアレルゲン未設定項目が残っていないかサーバー側で確認
+- 店舗管理者招待の作成・再送・取消
+- 認証や管理操作の監査ログ記録
+- ポートフォリオ公開用の閲覧専用モード
+
+## 画面イメージ
+
+| トップページ | メニュー詳細 | 店舗管理 |
+| --- | --- | --- |
+| ![トップページ](document/screenshot/rootpage.png) | ![メニュー詳細](document/screenshot/menuview.png) | ![店舗編集](document/screenshot/shopedit.png) |
+
+## 使用技術
+
+| 分類 | 技術 |
 | --- | --- |
-| フレームワーク | Next.js 16 (App Router) |
-| 言語 | TypeScript |
-| スタイリング | Tailwind CSS |
+| フロントエンド | Next.js App Router / React / TypeScript / Tailwind CSS |
+| バックエンド / サーバーサイド | Next.js Route Handler / Server Component |
+| データベース | PostgreSQL / Neon 想定 |
 | ORM | Prisma |
-| データベース | PostgreSQL |
-| 認証 | Clerk（管理ログインUIは custom flow。既製 SignIn / SignUp UI は未使用） |
-| 画像アップロード | Vercel Blob |
+| 認証 | Clerk |
+| 画像保存 | Vercel Blob |
+| デプロイ | Vercel |
+| その他 | `qrcode.react` / Zod / ESLint |
 
-## 主要ルーティング
+## 技術選定理由
 
-### 画面ルート
-
-| ルート | 用途 |
+| 技術 | 選定理由 |
 | --- | --- |
-| `/` | トップページ。公開中メニューを持つ店舗を 1 件ピックアップ表示 |
+| Next.js App Router | 公開画面、管理画面、API Route、認証連携、DB アクセスを 1 つのコードベースで整理できるため |
+| TypeScript | メニュー、店舗、アレルゲン状態などのデータ構造を型で扱い、実装時のミスを減らすため |
+| Tailwind CSS | 公開画面と管理画面を素早く作りながら、表示状態ごとのスタイルを調整しやすいため |
+| Prisma | DB スキーマとアプリケーション側の型を対応させ、マイグレーションとクエリを管理しやすいため |
+| PostgreSQL / Neon | 店舗、メニュー、アレルゲン、招待、監査ログなどの関連データを扱いやすいため |
+| Clerk | 認証・セッション管理を外部サービスに任せ、アプリ側では店舗権限の管理に集中するため |
+| Vercel Blob | 店舗画像・メニュー画像をアプリ本体とは分けて保存し、Vercel 環境で扱いやすくするため |
+| Vercel | Next.js アプリをデプロイしやすく、Neon や Blob との組み合わせを想定しやすいため |
+
+## システム構成
+
+```mermaid
+flowchart LR
+    User[利用者] --> Public[公開画面]
+    Admin[店舗管理者] --> AdminUI[管理画面]
+    AdminUI --> Clerk[Clerk 認証]
+    Public --> Routes[Next.js App Router]
+    AdminUI --> Routes
+    Routes --> API[Route Handler]
+    API --> Prisma[Prisma]
+    Prisma --> DB[(PostgreSQL / Neon)]
+    API --> Blob[Vercel Blob]
+```
+
+### 主な画面ルート
+
+| ルート | 役割 |
+| --- | --- |
+| `/` | トップページ |
+| `/shops` | 公開店舗一覧 |
+| `/shops/[shopId]` | 公開店舗ページ |
+| `/shops/[shopId]/menus/[menuId]` | 公開メニュー詳細 |
 | `/terms` | 利用規約 |
-| `/shops` | 公開店舗一覧。`?q=` で店舗名 / 説明を検索可能 |
-| `/shops/[shopId]` | 公開店舗ページ。公開メニュー一覧、店舗情報、共有導線を表示 |
-| `/shops/[shopId]/menus/[menuId]` | 公開メニュー詳細。アレルゲン28品目、原材料、注意書きを表示 |
-| `/admin/register` | 店舗アカウント新規登録 |
-| `/admin/login` | 管理画面ログイン |
-| `/admin/invitations` | 運営管理者向けの店舗管理者招待 |
-| `/admin/menus` | 自店舗のメニュー一覧 |
-| `/admin/menus/new` | メニュー新規作成。作成後 `/admin/menus/[menuId]/edit` へ遷移 |
+| `/admin/login` | 管理ログイン |
+| `/admin/register` | 店舗登録 / 初回セットアップ |
+| `/admin/invitations` | 店舗管理者招待 |
+| `/admin/menus` | メニュー一覧 |
+| `/admin/menus/new` | メニュー新規作成 |
 | `/admin/menus/[menuId]/edit` | メニュー編集 |
-| `/admin/shop` | 店舗情報編集、QRコード表示 |
+| `/admin/shop` | 店舗情報編集 |
+| `/admin/demo` | ポートフォリオ用デモ管理画面 |
 
-### 主な API ルート
+### 主な API Route / Route Handler
 
-| ルート | 用途 |
+| ルート | 役割 |
 | --- | --- |
+| `/api/allergens` | アレルゲン28品目一覧 |
+| `/api/menus/[menuId]` | 公開メニュー取得 |
 | `/api/admin/register` | 店舗アカウント登録 |
 | `/api/admin/onboarding` | Clerk ログイン後の初回店舗作成 |
-| `/api/admin/auth/login` | 管理ログイン試行の事前確認と監査ログ |
+| `/api/admin/auth/login` | 管理ログイン時の事前確認・監査ログ |
 | `/api/admin/auth/sso` | Google / SSO 導線の監査ログ |
-| `/api/admin/invitations` | 店舗管理者招待の一覧 / 作成 |
-| `/api/admin/invitations/[inviteId]/resend` | 招待の再送 |
-| `/api/admin/invitations/[inviteId]/revoke` | 招待の取消 |
-| `/api/admin/shop` | ログイン中店舗の取得 / 更新 |
-| `/api/admin/menus` | ログイン中店舗のメニュー一覧 / 新規作成 |
-| `/api/admin/menus/[menuId]` | ログイン中店舗のメニュー取得 / 更新 / 削除 |
+| `/api/admin/shop` | ログイン中店舗の取得・更新 |
+| `/api/admin/menus` | ログイン中店舗のメニュー一覧・作成 |
+| `/api/admin/menus/[menuId]` | ログイン中店舗のメニュー取得・更新・削除 |
 | `/api/admin/upload-shop-image` | 店舗画像アップロード |
 | `/api/admin/upload-menu-image` | メニュー画像アップロード |
-| `/api/allergens` | アレルゲン28品目一覧 |
-| `/api/menus/[menuId]` | 公開中メニューの取得 |
+| `/api/admin/invitations` | 店舗管理者招待の一覧・作成 |
+| `/api/admin/invitations/[inviteId]/resend` | 招待再送 |
+| `/api/admin/invitations/[inviteId]/revoke` | 招待取消 |
+| `/api/invitations/accept` | 招待受諾 |
 
-## セットアップ
+## ディレクトリ構成
+
+```text
+ClearAllergy/
+├─ app/
+│  ├─ (public)/               # 公開画面
+│  ├─ admin/                  # 管理画面
+│  ├─ api/                    # Route Handler
+│  ├─ sign-in/                # Clerk サインイン導線
+│  └─ sign-up/                # Clerk サインアップ導線
+├─ components/
+│  ├─ admin/                  # 管理画面コンポーネント
+│  ├─ public/                 # 公開画面コンポーネント
+│  └─ layout/                 # 共通レイアウト
+├─ lib/
+│  ├─ auth/                   # Clerk 連携
+│  ├─ validators/             # 入力検証
+│  ├─ admin-auth.ts           # 管理画面の認証・店舗解決
+│  ├─ upload-images.ts        # 画像アップロード検証
+│  ├─ image-url-policy.ts     # 保存済み画像URLの検証
+│  └─ allergens.ts            # アレルゲン共通ロジック
+├─ prisma/
+│  ├─ schema.prisma           # DB スキーマ
+│  ├─ migrations/             # マイグレーション
+│  └─ seed.ts                 # 初期データ
+├─ document/                  # 説明資料・スクリーンショット
+├─ docs/                      # 開発ルール・検証観点
+├─ scripts/                   # 開発・移行用スクリプト
+├─ proxy.ts                   # Clerk middleware
+├─ package.json
+└─ .env.example
+```
+
+※ このリポジトリでは `middleware.ts` ではなく、`proxy.ts` で Clerk の middleware を有効化しています。
+
+## DB設計概要
+
+主なモデルは以下です。
+
+| モデル | 役割 |
+| --- | --- |
+| `User` | アプリ内ユーザー。`clerkUserId` で Clerk ユーザーと紐づける |
+| `Shop` | 店舗情報。店舗名、説明、住所、営業時間、画像、公開状態などを持つ |
+| `MenuItem` | メニュー情報。価格、カテゴリ、原材料、注意書き、画像、公開状態を持つ |
+| `Allergen` | アレルゲン28品目のマスタ |
+| `MenuItemAllergen` | メニューとアレルゲンの中間テーブル。状態を保持する |
+| `AdminInvite` | 店舗管理者招待の状態管理 |
+| `AuditLog` | 認証・招待・メニュー更新などの監査ログ |
+
+### アレルゲン状態
+
+`MenuItemAllergen.status` では、以下の 4 状態を扱います。
+
+| 状態 | 表示上の意味 |
+| --- | --- |
+| `CONTAINS` | 含む |
+| `FREE` | 含まない |
+| `MAY_CONTAIN` | 含む可能性があります |
+| `UNKNOWN` | 未設定 / 未確認 |
+
+新規作成時や欠損時は `UNKNOWN` を基準にし、公開時には 28 品目が未設定のままにならないようサーバー側でも確認しています。
+
+## 認証・権限管理
+
+認証の正本は Clerk です。`proxy.ts` で Clerk middleware を通し、`lib/auth/getCurrentAppUser.ts` と `lib/admin-auth.ts` で Clerk ユーザーとアプリ内の `User` / `Shop` を結びつけています。
+
+管理画面では、ログイン中の Clerk ユーザー ID と `Shop.ownerClerkUserId` を照合し、認証済みユーザーの店舗データだけを取得・更新します。API 側でも `requireShopId()` を通して `shopId` を確定し、クライアントから渡された店舗 ID を信用しない設計にしています。
+
+古いローカル認証用の `passwordHash` は、既存ユーザーを Clerk へ移行するための互換情報として残っています。現行のランタイム認証は Clerk を前提にしています。
+
+## アレルゲン情報の扱い
+
+アレルゲンは 28 品目をマスタデータとして保持し、各メニューに対して `CONTAINS` / `FREE` / `MAY_CONTAIN` / `UNKNOWN` の状態を登録します。
+
+公開画面では、28 品目の状態を一覧で表示し、特定原材料8品目は上部で目立つように表示します。利用者が選択した気になるアレルゲンは `localStorage` に保存し、端末内の設定として表示に反映します。
+
+この情報は利用者の確認を支援するためのものであり、医療的な正確性を保証するものではありません。最終的な判断が必要な場合は、店舗への確認を前提としています。
+
+## セットアップ方法
 
 ### 前提条件
 
 - Node.js 20 以上
-- PostgreSQL が起動していること
+- PostgreSQL または Neon のデータベース
+- Clerk アプリケーション
+- 画像アップロードを確認する場合は Vercel Blob
 
 ### 1. 依存関係をインストール
 
@@ -86,9 +233,7 @@
 npm install
 ```
 
-### 2. 環境変数ファイルを作成
-
-`.env.example` をコピーして `.env` を作成します。Prisma CLI は `.env` を読むため、まずは `.env` を基準にするのが安全です。必要なら `.env.local` で上書きしてください。
+### 2. 環境変数を作成
 
 ```bash
 cp .env.example .env
@@ -100,118 +245,129 @@ PowerShell の場合:
 Copy-Item .env.example .env
 ```
 
-### 3. 環境変数を設定
-
-| 変数名 | 必須 | 用途 |
-| --- | --- | --- |
-| `DATABASE_URL` | 必須 | Prisma / PostgreSQL 接続先 |
-| `DIRECT_URL` | 必須 | Prisma Migrate 用の直接接続先 |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | 必須 | Clerk SDK 読み込み用 |
-| `CLERK_SECRET_KEY` | 必須 | Clerk サーバー側認証用 |
-| `ENABLE_CLERK_ADMIN_AUTH` | 推奨 | 管理画面で Google / Clerk SSO 導線を開くかどうか。既定値は `false` |
-| `ADMIN_REGISTRATION_MODE` | 推奨 | 管理者自己登録のモード。`disabled` / `invite_only` / `open` |
-| `ADMIN_REGISTRATION_INVITE_TOKEN` | 条件付き必須 | `invite_only` のときに使う招待トークン |
-| `NEXT_PUBLIC_APP_URL` | 任意 | 管理画面の QR コード生成時に使う公開 URL のベース。未設定時は現在のブラウザ origin を使う |
-| `BLOB_READ_WRITE_TOKEN` | 任意 | 店舗画像 / メニュー画像のアップロードを有効にする Vercel Blob トークン |
-| `ALLOWED_IMAGE_URL_PREFIXES` | 推奨 | DB に保存してよい画像URLの prefix 一覧。独自配信URLを使う場合に設定 |
-
-最小構成でローカル起動する場合は `DATABASE_URL`、`DIRECT_URL`、`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`、`CLERK_SECRET_KEY` が必要です。画像アップロードまで確認する場合は `BLOB_READ_WRITE_TOKEN` も設定してください。
-
-`.env.example` の初期値:
-
-```env
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/clearallergy"
-DIRECT_URL="postgresql://USER:PASSWORD@localhost:5432/clearallergy"
-ENABLE_CLERK_ADMIN_AUTH="false"
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""
-CLERK_SECRET_KEY=""
-ADMIN_REGISTRATION_MODE="disabled"
-ADMIN_REGISTRATION_INVITE_TOKEN=""
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-BLOB_READ_WRITE_TOKEN=""
-ALLOWED_IMAGE_URL_PREFIXES=""
-```
-
-`invite_only` でローカル確認する最小例:
-
-```env
-ENABLE_CLERK_ADMIN_AUTH="true"
-ADMIN_REGISTRATION_MODE="invite_only"
-ADMIN_REGISTRATION_INVITE_TOKEN="replace-with-a-long-random-invite-token"
-```
-
-### 4. DB スキーマを適用
+### 3. Prisma Client を生成
 
 ```bash
-npx prisma migrate dev
 npx prisma generate
 ```
 
-### 5. デモデータを投入
+### 4. DB マイグレーションを実行
+
+```bash
+npx prisma migrate dev
+```
+
+### 5. 初期データを投入
 
 ```bash
 npm run seed
 ```
 
-この seed で以下が作成されます。
+`seed` では、アレルゲン28品目、デモ店舗、公開メニューが作成されます。Clerk のキーを設定している場合は、デモユーザーの Clerk 同期も試みます。
 
-- アレルゲン28品目マスタ
-- デモ店舗 `[デモ店舗]Cafe Hibi（カフェ ヒビ）`
-- 公開メニュー数件
-- デモ管理アカウント
-
-| 項目 | 値 |
-| --- | --- |
-| メールアドレス | `demo@clearallergy.local` |
-| パスワード | `demo1234` |
-
-### 6. 既存メール+パスワードユーザーを Clerk へ移行
-
-```bash
-npm run auth:migrate:clerk
-```
-
-`passwordHash` を持つ既存ユーザーを Clerk へ事前インポートします。`npm run seed` のあとに実行すると、デモ管理アカウントも同じメールアドレス / パスワードで `/admin/login` から利用できます。
-
-既存のテスト管理者を既知のパスワードで作り直したい時は、次も使えます。
-
-```bash
-npm run auth:create:test-user -- test@test.com Passw0rd!
-```
-
-このコマンドは local DB の `passwordHash` と Clerk 側パスワードを同じ値に揃えます。
-
-### 7. 開発サーバーを起動
+### 6. 開発サーバーを起動
 
 ```bash
 npm run dev
 ```
 
-ブラウザで [http://localhost:3000](http://localhost:3000) を開きます。
+起動後、ブラウザで [http://localhost:3000](http://localhost:3000) を開きます。
 
-## 動作確認の流れ
+## 環境変数
 
-1. `/shops` を開き、seed で作成された `[デモ店舗]Cafe Hibi（カフェ ヒビ）` が見えることを確認する
-2. 店舗ページ `/shops/[shopId]` で公開メニュー一覧と店舗情報が表示されることを確認する
-3. メニュー詳細 `/shops/[shopId]/menus/[menuId]` でアレルゲン28品目、原材料、注意書きが見えることを確認する
-4. 公開側で個人アレルゲン設定を変更し、再読み込み後も `localStorage` 由来の表示が維持されることを確認する
-5. `npm run auth:migrate:clerk` 実行後、`/admin/login` からデモアカウントでログインし、`/admin/menus` と `/admin/shop` が表示できることを確認する
-6. `/admin/menus/new` からメニューを作成し、作成後に編集画面へ遷移することを確認する
-7. `/terms` が表示できることを確認する
-8. `BLOB_READ_WRITE_TOKEN` を設定した場合は、JPEG / PNG / WebP / GIF / AVIF の5MB以下画像だけがアップロード成功することを確認する
+`.env.example` を元に設定します。実際の値や秘密情報は README に記載しません。
 
-## 公開前の注意
+| 変数名 | 必須 | 用途 |
+| --- | --- | --- |
+| `DATABASE_URL` | 必須 | Prisma / PostgreSQL 接続先 |
+| `DIRECT_URL` | 必須 | Prisma Migrate 用の直接接続先 |
+| `PORTFOLIO_MODE` | 任意 | ポートフォリオ公開時に一般ユーザーの更新を閲覧専用にする |
+| `ADMIN_REGISTRATION_MODE` | 推奨 | 管理者自己登録の制御。`disabled` / `invite_only` / `open` |
+| `ADMIN_REGISTRATION_INVITE_TOKEN` | 条件付き | `invite_only` の招待トークン |
+| `ENABLE_CLERK_ADMIN_AUTH` | 任意 | Google / Clerk SSO 導線の表示制御 |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | 必須 | Clerk の公開キー |
+| `CLERK_SECRET_KEY` | 必須 | Clerk のサーバー側キー |
+| `NEXT_PUBLIC_APP_URL` | 任意 | QR コードや公開 URL 生成に使うベース URL |
+| `BLOB_READ_WRITE_TOKEN` | 画像アップロード時に必要 | Vercel Blob の読み書きトークン |
+| `ALLOWED_IMAGE_URL_PREFIXES` | 任意 | 許可する画像 URL prefix |
 
-- 認証基盤は Clerk に一本化しています。管理ログイン UI は既存フォームを維持し、submit 時だけ Clerk の custom flow を使います。
-- 旧 `passwordHash` は既存ユーザーを Clerk へ移行するためだけに残しています。ランタイム認証では使いません。
-- Google / Clerk SSO 導線は `ENABLE_CLERK_ADMIN_AUTH=false` を既定として閉じています。メールアドレス + パスワードの Clerk ログインは常に有効です。
-- `Clerk` 側のアプリ内ユーザー作成は、認証確認時には行わず、明示的な初回セットアップ API だけで行うようにしています。
-- `ADMIN_REGISTRATION_MODE=open` は誰でも店舗アカウント登録を試せるため、本番では `disabled` か `invite_only` を推奨します。
-- `invite_only` を使う場合は `ADMIN_REGISTRATION_INVITE_TOKEN` を必ず設定し、配布方法も管理してください。
-- `invite_only` 運用では、`/admin/login` に Google ログインを表示したまま、`/admin/register` は有効な招待トークン付き URL を開いた時だけ Google / メール登録導線を表示します。
-- `npm run seed` のデモアカウントとデモデータは開発確認用です。本番 DB には投入しないでください。
-- 本番では少なくとも `DATABASE_URL`、`DIRECT_URL`、`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`、`CLERK_SECRET_KEY` を適切な値に置き換えてください。
-- 独自ドメインや固定URLで QR を配布するなら `NEXT_PUBLIC_APP_URL` を本番 URL に合わせて設定してください。
-- 画像アップロードを使う場合は `BLOB_READ_WRITE_TOKEN` が必要です。未設定のままだとアップロード API は失敗します。対応形式は JPEG / PNG / WebP / GIF / AVIF、上限は 5MB です。
-- 画像URLは保存時に許可prefix / Blob 由来ホスト / 想定 path を検証します。既存の外部URLデータは今後の保存で弾かれ、公開画面では非表示になります。
-- 公開側の個人アレルゲン設定は `localStorage` 保存です。端末間同期はされません。
+ローカルで画像アップロードまで確認する場合は、`BLOB_READ_WRITE_TOKEN` も設定してください。
+
+## 動作確認方法
+
+### 基本確認
+
+```bash
+npm run lint
+npm run build
+```
+
+### 画面での確認例
+
+1. `/shops` を開き、公開店舗一覧が表示されることを確認する
+2. `/shops/[shopId]` で店舗情報と公開メニューが表示されることを確認する
+3. `/shops/[shopId]/menus/[menuId]` でアレルゲン28品目、原材料、注意書きが表示されることを確認する
+4. 公開画面で気になるアレルゲンを選び、再読み込み後も表示が維持されることを確認する
+5. `/admin/login` から管理画面へ入り、`/admin/menus` と `/admin/shop` が表示できることを確認する
+6. メニューを作成し、28品目の状態を入力して保存できることを確認する
+7. 未設定のアレルゲンが残った状態で公開しようとすると、エラーになることを確認する
+8. `BLOB_READ_WRITE_TOKEN` を設定した場合、店舗画像・メニュー画像をアップロードできることを確認する
+
+### package.json の主なスクリプト
+
+| コマンド | 用途 |
+| --- | --- |
+| `npm run dev` | 開発サーバー起動 |
+| `npm run build` | 本番ビルド |
+| `npm run start` | ビルド後の起動 |
+| `npm run lint` | ESLint |
+| `npm run seed` | 初期データ投入 |
+| `npm run auth:migrate:clerk` | 既存ユーザーの Clerk 移行 |
+| `npm run auth:create:test-user` | テストユーザー作成 |
+| `npm run repair:published-menus` | 公開メニュー整合性の補修 |
+
+## 工夫した点
+
+- 公開画面と管理画面を分け、利用者と店舗管理者の目的を分離した
+- 店舗管理者は自分の店舗データだけを扱えるよう、Clerk のユーザー ID と DB の店舗所有者を照合している
+- アレルゲンを単なる Boolean ではなく、`CONTAINS` / `FREE` / `MAY_CONTAIN` / `UNKNOWN` の 4 状態で扱った
+- 公開時には 28 品目の未設定が残っていないか、UI だけでなくサーバー側でも確認している
+- 画像は Vercel Blob に保存し、DB には URL と表示設定を保存する構成にした
+- 保存済み画像 URL は、許可した Blob 由来の URL かどうかを表示時・保存時に確認している
+- 管理系の更新 API では同一オリジン確認や監査ログ記録を入れている
+- ポートフォリオ公開用に、一般ユーザーの更新を制限する閲覧専用モードを用意している
+
+## 苦労した点・学んだこと
+
+- 認証は Clerk、アプリ固有の権限は DB で管理するという役割分担を整理するのに苦労した
+- メニューとアレルゲン28品目の関係を中間テーブルで扱い、画面上では常に 28 品目を欠けずに表示する設計を学んだ
+- 「未設定」と「含まない」を分けないと、利用者に誤解を与える可能性があることに気づいた
+- 画像アップロードでは、ファイル形式・サイズ・保存先 URL の検証が必要だと学んだ
+- ポートフォリオとして見せるために、実運用機能とデモ表示のバランスを考える必要があった
+
+## 今後の改善予定
+
+- 店舗向けの入力補助や確認フローをさらに分かりやすくする
+- アレルゲン情報の更新履歴を利用者にも分かりやすく表示する
+- 店舗ごとの複数管理者運用をより実運用に近い形に整える
+- 画像アップロード後の削除・差し替え管理を改善する
+- E2E テストを追加し、公開画面と管理画面の主要導線を継続的に確認する
+- 本番運用に向けて、エラーログ監視や問い合わせ導線を整備する
+- スマートフォンでの閲覧性をさらに改善する
+
+## 注意事項
+
+- ClearAllergy はポートフォリオ用の個人開発プロジェクトです
+- アレルゲン情報は確認を支援するための表示であり、医療的な判断を代替するものではありません
+- 実際の利用では、店舗側の最新情報やスタッフへの確認も必要です
+- `.env` や Clerk / DB / Blob の秘密情報はリポジトリに含めないでください
+- デモデータは開発確認用であり、本番 DB へ投入しない想定です
+- `ADMIN_REGISTRATION_MODE=open` は誰でも登録を試せるため、本番では `disabled` または `invite_only` を推奨します
+- `PORTFOLIO_MODE=true` の場合、一般ユーザーの更新操作は閲覧専用として扱われます
+- 画像アップロードを使うには `BLOB_READ_WRITE_TOKEN` が必要です
+- 現行実装の認証は Clerk です
+
+## 作者
+
+Kaito  
+食物アレルギーの当事者としての経験をもとに、外食時の情報確認をしやすくすることを目指して制作しました。
