@@ -69,14 +69,11 @@ export default function HomePageView({
                     <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-8">
                         <div className="flex flex-col gap-5">
                             <h1 className="text-neutral-900">
-                                <span className="block text-[42px] font-black leading-[0.92] tracking-[-0.06em] xl:text-[54px]">
-                                    『聞かなくても分かる』
+                                <span className="block text-[32px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[38px] lg:text-[34px] xl:text-[36px]">
+                                    外食前に、安心を確認できる。
                                 </span>
-                                <span className="block text-[44px] font-black leading-[0.92] tracking-[-0.06em] xl:text-[58px]">
-                                    を増やす
-                                </span>
-                                <span className="block text-[44px] font-black leading-[0.92] tracking-[-0.06em] xl:text-[58px]">
-                                    外食のアレルゲン情報
+                                <span className="block text-[32px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[38px] lg:text-[34px] xl:text-[36px]">
+                                    アレルゲン情報を見やすく届ける。
                                 </span>
                             </h1>
 
