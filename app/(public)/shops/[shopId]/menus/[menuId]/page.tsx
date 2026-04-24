@@ -47,9 +47,6 @@ export default async function PublicMenuDetailPage({
                     id: menuId,
                     shopId,
                     isPublished: true,
-                    shop: {
-                        isActive: true,
-                    },
                 },
                 select: {
                     id: true,
