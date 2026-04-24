@@ -121,7 +121,7 @@ export async function GET(req: Request, context: Context) {
             },
         });
 
-        // 管理 API でも 28 品目を欠損なく返し、画面や外部クライアントの解釈差をなくします。
+        // 管理 API でも 29 品目を欠損なく返し、画面や外部クライアントの解釈差をなくします。
         const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
         const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
             kind: "menu",

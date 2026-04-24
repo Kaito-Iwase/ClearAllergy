@@ -73,7 +73,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
         notFound();
     }
 
-    // 未登録アレルゲンも含めて 28 品目を常に表示したいので、
+    // 未登録アレルゲンも含めて 29 品目を常に表示したいので、
     // まず UNKNOWN で埋めてから既存の保存状態で上書きします。
     const initialStatusBySlug = createStatusBySlug(allergens, menu.allergenLinks);
 
@@ -93,7 +93,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                     メニュー編集
                 </h1>
                 <p className="mt-1 text-gray-600">
-                    基本情報、価格、原材料名、食品画像、アレルゲン28品目を入力してください。
+                    基本情報、価格、原材料名、食品画像、アレルゲン29品目を入力してください。
                 </p>
 
                 <div className="mt-6">

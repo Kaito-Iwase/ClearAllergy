@@ -68,6 +68,12 @@ const ALLERGENS: AllergenSeed[] = [
     { slug: "apple", nameJa: "りんご", nameEn: "Apple", sortOrder: 26 },
     { slug: "yam", nameJa: "やまいも", nameEn: "Yam", sortOrder: 27 },
     { slug: "gelatin", nameJa: "ゼラチン", nameEn: "Gelatin", sortOrder: 28 },
+    {
+        slug: "pistachio",
+        nameJa: "ピスタチオ",
+        nameEn: "Pistachio",
+        sortOrder: 29,
+    },
 ];
 
 const DEMO_USER_EMAIL = "demo@clearallergy.local";
@@ -84,7 +90,7 @@ type DemoMenuSeed = {
     allergenStatusBySlug: Record<string, AllergenStatus>;
 };
 
-// 公開デモメニューは 28 品目を必ず持つ形にそろえます。
+// 公開デモメニューは 29 品目を必ず持つ形にそろえます。
 // seed に欠損データがあると、開発中に「これで正しい」と誤解しやすいためです。
 function buildPublishedSeedStatusMap(
     allergens: AllergenSeed[],
@@ -94,7 +100,8 @@ function buildPublishedSeedStatusMap(
 
     for (const allergen of allergens) {
         completeStatusBySlug[allergen.slug] =
-            partialStatusBySlug[allergen.slug] ?? "FREE";
+            partialStatusBySlug[allergen.slug] ??
+            (allergen.slug === "pistachio" ? "UNKNOWN" : "FREE");
     }
 
     return completeStatusBySlug;
@@ -118,7 +125,7 @@ const DEMO_MENUS: DemoMenuSeed[] = [
     {
         name: "豆乳ベジカレー",
         description:
-            "野菜を中心にしたやさしい辛さのカレー。メニュー詳細で28品目を確認できます。",
+            "野菜を中心にしたやさしい辛さのカレー。メニュー詳細で29品目を確認できます。",
         category: "メイン",
         priceYen: 1280,
         ingredients:
@@ -282,7 +289,7 @@ async function seedDemoShop() {
             where: { menuItemId: savedMenu.id },
         });
 
-        // ここで 28 品目を全部作っておくことで、
+        // ここで 29 品目を全部作っておくことで、
         // 公開 API や画面が「欠損なし前提」で安全に確認できます。
         const statuses = Object.entries(
             buildPublishedSeedStatusMap(ALLERGENS, menu.allergenStatusBySlug),
