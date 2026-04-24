@@ -130,7 +130,7 @@ export default async function PublicShopListPage({
                     公開店舗から、メニューごとの価格とアレルゲン情報を確認できます
                 </h1>
                 <p className="mt-3 text-sm leading-7 text-neutral-600">
-                    各店舗ページでは公開メニュー一覧、各メニュー詳細ではアレルゲン28品目の状態を確認できます。未ログインでも閲覧できます。
+                    各店舗ページでは公開メニュー一覧、各メニュー詳細ではアレルゲン29品目の状態を確認できます。未ログインでも閲覧できます。
                 </p>
                 {!isDatabaseAvailable ? (
                     <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">

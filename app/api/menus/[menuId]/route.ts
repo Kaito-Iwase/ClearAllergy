@@ -95,7 +95,7 @@ export async function GET(req: Request, context: Context) {
             },
         });
 
-        // 28 品目を基準に正規化し、欠損しているリンクも UNKNOWN として返します。
+        // 29 品目を基準に正規化し、欠損しているリンクも UNKNOWN として返します。
         const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
         const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
             kind: "menu",

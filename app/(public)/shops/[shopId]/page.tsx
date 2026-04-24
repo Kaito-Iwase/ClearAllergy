@@ -322,7 +322,7 @@ export default async function PublicShopDetailPage({
                                     平均予算 {averageBudgetLabel}
                                 </span>
                                 <span className="rounded-full bg-gray-100 px-2 py-1">
-                                    アレルゲン28品目を表示
+                                    アレルゲン29品目を表示
                                 </span>
                                 <span className="rounded-full bg-gray-100 px-2 py-1">
                                     価格表示あり

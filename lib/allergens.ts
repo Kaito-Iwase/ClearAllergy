@@ -68,7 +68,7 @@ export function buildAllergenRows(
     allergens: AllergenWithNamesLike[],
     links: AllergenLinkLike[],
 ) {
-    // API や画面で 28 品目を毎回同じ順・同じ件数で扱えるよう、
+    // API や画面で 29 品目を毎回同じ順・同じ件数で扱えるよう、
     // マスタ基準で配列を組み直します。
     const statusBySlug = createStatusBySlug(allergens, links);
 
@@ -173,7 +173,7 @@ export function getMenuPublishValidationErrors(args: {
         // ここで UNKNOWN を止めるのは、
         // 未設定のまま公開されると利用者が安全性を誤解する危険があるためです。
         errors.push(
-            `公開するにはアレルゲン28品目を確定してください。未設定: ${unknownAllergens.join("・")}`,
+            `公開するにはアレルゲン29品目を確定してください。未設定: ${unknownAllergens.join("・")}`,
         );
     }
 
@@ -183,7 +183,7 @@ export function getMenuPublishValidationErrors(args: {
 export function buildSpecifiedIngredientNotice(args: {
     rows: Array<{ slug: string; nameJa: string; status: AllergenStatus }>;
 }) {
-    // 28品目のうち、特定原材料だけを抜き出して警告 UI 用の文言を作ります。
+    // 29品目のうち、特定原材料だけを抜き出して警告 UI 用の文言を作ります。
     const specifiedRows = args.rows.filter((row) =>
         SPECIFIED_INGREDIENT_SLUGS.includes(
             row.slug as (typeof SPECIFIED_INGREDIENT_SLUGS)[number],
