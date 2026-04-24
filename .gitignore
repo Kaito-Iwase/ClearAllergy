@@ -46,6 +46,6 @@ next-env.d.ts
 # clerk configuration (can include secrets)
 /.clerk/
 
-.docs
-
-.document
+# local documentation directories
+docs/
+document/
