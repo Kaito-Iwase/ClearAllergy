@@ -65,15 +65,21 @@ export default function HomePageView({
             </header>
 
             <section className="bg-white">
-                <div className="mx-auto max-w-[1200px] px-6 py-12 lg:py-20">
-                    <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-8">
+                <div className="mx-auto max-w-[1200px] px-6 py-12 lg:py-16">
+                    <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-8">
                         <div className="flex flex-col gap-5">
                             <h1 className="text-neutral-900">
-                                <span className="block text-[32px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[38px] lg:text-[34px] xl:text-[36px]">
-                                    外食前に、安心を確認できる。
+                                <span className="block text-[44px] font-black leading-[1.02] tracking-[-0.05em] sm:text-[56px] lg:text-[54px] xl:text-[62px]">
+                                    外食前に、
                                 </span>
-                                <span className="block text-[32px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[38px] lg:text-[34px] xl:text-[36px]">
-                                    アレルゲン情報を見やすく届ける。
+                                <span className="block text-[44px] font-black leading-[1.02] tracking-[-0.05em] sm:text-[56px] lg:text-[54px] xl:text-[62px]">
+                                    安心を確認できる。
+                                </span>
+                                <span className="block text-[44px] font-black leading-[1.02] tracking-[-0.05em] sm:text-[56px] lg:text-[54px] xl:text-[62px]">
+                                    アレルゲン情報を
+                                </span>
+                                <span className="block text-[44px] font-black leading-[1.02] tracking-[-0.05em] sm:text-[56px] lg:text-[54px] xl:text-[62px]">
+                                    見やすく届ける。
                                 </span>
                             </h1>
 
@@ -108,47 +114,6 @@ export default function HomePageView({
                                 >
                                     <span className="mr-2">🏪</span>
                                     店舗の方はこちら
-                                </Link>
-                            </div>
-
-                            <div className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-900">
-                                <p className="font-semibold">現在の提供範囲</p>
-                                <p className="mt-1 leading-6">
-                                    現在は、まず
-                                    「店舗ページでメニューごとのアレルゲン情報を確認できる」
-                                    体験に集中して開発しています。
-                                </p>
-                                {featuredShop ? (
-                                    <p className="mt-2 leading-6">
-                                        デモ用として
-                                        <span className="font-semibold">
-                                            {" "}
-                                            Cafe Hibi
-                                        </span>
-                                        を公開しています。
-                                    </p>
-                                ) : null}
-                                {!isDatabaseAvailable ? (
-                                    <p className="mt-2 leading-6 text-amber-800">
-                                        現在は公開データの読み込みに失敗しているため、
-                                        画面はサンプル表示に切り替えています。
-                                    </p>
-                                ) : null}
-                            </div>
-
-                            <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700 shadow-sm">
-                                <p className="font-semibold text-neutral-900">
-                                    利用者向けのご案内
-                                </p>
-                                <p className="mt-1 leading-6">
-                                    アレルゲン情報を確認する際は、実際の利用前に店舗へ直接ご確認ください。
-                                    新規登録・編集機能の一般公開は今後調整予定です。
-                                </p>
-                                <Link
-                                    href="/terms"
-                                    className="mt-2 inline-flex text-sm font-semibold text-green-800 underline-offset-4 hover:underline"
-                                >
-                                    利用規約を確認する
                                 </Link>
                             </div>
                         </div>
@@ -272,6 +237,49 @@ export default function HomePageView({
                                     </p>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 grid items-stretch gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-8">
+                        <div className="h-full rounded-2xl border border-green-100 bg-green-50 px-5 py-4 text-sm text-green-900">
+                            <p className="font-semibold">現在の提供範囲</p>
+                            <p className="mt-1 leading-6">
+                                現在は、まず
+                                「店舗ページでメニューごとのアレルゲン情報を確認できる」
+                                体験に集中して開発しています。
+                            </p>
+                            {featuredShop ? (
+                                <p className="mt-2 leading-6">
+                                    デモ用として
+                                    <span className="font-semibold">
+                                        {" "}
+                                        Cafe Hibi
+                                    </span>
+                                    を公開しています。
+                                </p>
+                            ) : null}
+                            {!isDatabaseAvailable ? (
+                                <p className="mt-2 leading-6 text-amber-800">
+                                    現在は公開データの読み込みに失敗しているため、
+                                    画面はサンプル表示に切り替えています。
+                                </p>
+                            ) : null}
+                        </div>
+
+                        <div className="flex h-full flex-col rounded-2xl border border-neutral-200 bg-white px-5 py-4 text-sm text-neutral-700 shadow-sm">
+                            <p className="font-semibold text-neutral-900">
+                                利用者向けのご案内
+                            </p>
+                            <p className="mt-1 leading-6">
+                                アレルゲン情報を確認する際は、実際の利用前に店舗へ直接ご確認ください。
+                                新規登録・編集機能の一般公開は今後調整予定です。
+                            </p>
+                            <Link
+                                href="/terms"
+                                className="mt-auto inline-flex pt-2 text-sm font-semibold text-green-800 underline-offset-4 hover:underline"
+                            >
+                                利用規約を確認する
+                            </Link>
                         </div>
                     </div>
                 </div>
