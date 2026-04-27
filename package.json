@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
+    "allergens:backfill:pistachio": "tsx scripts/backfill-pistachio-allergen.ts",
+    "allergens:check": "tsx scripts/check-allergen-master.ts",
     "auth:create:test-user": "tsx scripts/create-test-user.ts",
     "auth:migrate:clerk": "tsx scripts/migrate-users-to-clerk.ts",
     "repair:published-menus": "tsx prisma/repair-published-menus.ts"
