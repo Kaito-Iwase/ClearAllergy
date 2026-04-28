@@ -3,6 +3,7 @@
 // Server Component で DB 取得を行い、localStorage を使う部分だけ Client Component へ切り出しています。
 
 import Link from "next/link";
+import Image from "next/image";
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -21,6 +22,8 @@ import {
 
 type Params = { shopId: string };
 type SearchParams = { q?: string };
+
+export const revalidate = 60;
 
 function buildMenuWhere(q: string) {
     // 検索語が空なら公開メニュー全件、入っていれば名前・説明・カテゴリで絞り込みます。
@@ -260,9 +263,12 @@ export default async function PublicShopDetailPage({
                         style={heroStyle}
                     >
                         {safeCoverImageUrl ? (
-                            <img
+                            <Image
                                 src={safeCoverImageUrl}
                                 alt=""
+                                fill
+                                priority
+                                sizes="(min-width: 768px) 1024px, 100vw"
                                 className="absolute inset-0 h-full w-full"
                                 style={heroImageStyle}
                             />

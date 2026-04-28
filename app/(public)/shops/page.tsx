@@ -3,6 +3,7 @@
 // Server Component なので、検索条件に応じた DB 取得を直接ここで行います。
 
 import Link from "next/link";
+import Image from "next/image";
 import type { CSSProperties } from "react";
 import { prisma } from "@/lib/db";
 import { formatDateTimeJa } from "@/lib/formatters";
@@ -17,6 +18,8 @@ import {
 type SearchParams = {
     q?: string;
 };
+
+export const revalidate = 60;
 
 export default async function PublicShopListPage({
     searchParams,
@@ -165,7 +168,7 @@ export default async function PublicShopListPage({
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {shops.map((shop) => {
+                    {shops.map((shop, index) => {
                         const descriptionText =
                             shop.description?.trim() || "説明は未登録です。";
                         const addressText = shop.address?.trim() || "住所未設定";
@@ -212,9 +215,12 @@ export default async function PublicShopListPage({
                                     className="group relative min-h-[320px] overflow-hidden rounded-[28px] border border-neutral-200 bg-neutral-900 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                                 >
                                     <div className="absolute inset-0 transition duration-500 group-hover:scale-105">
-                                        <img
+                                        <Image
                                             src={safeCoverImageUrl ?? ""}
                                             alt=""
+                                            fill
+                                            priority={index === 0}
+                                            sizes="(min-width: 640px) 50vw, 100vw"
                                             className="h-full w-full"
                                             style={coverImageStyle}
                                         />
