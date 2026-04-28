@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { CSSProperties } from "react";
 import MenuAllergenAlertClient from "@/components/public/MenuAllergenAlertClient";
 import SelectedFreeAllergenCardsClient from "@/components/public/SelectedFreeAllergenCardsClient";
@@ -184,9 +185,12 @@ export default function PublicMenuDetailBodyClient(props: {
                             </div>
 
                             {safeImageUrl ? (
-                                <img
+                                <Image
                                     src={safeImageUrl}
                                     alt={menuName}
+                                    fill
+                                    priority
+                                    sizes="(min-width: 1024px) 590px, (min-width: 768px) 50vw, 100vw"
                                     className="absolute inset-0 h-full w-full transition-transform duration-300 hover:scale-[1.03]"
                                     style={imageStyle}
                                 />
