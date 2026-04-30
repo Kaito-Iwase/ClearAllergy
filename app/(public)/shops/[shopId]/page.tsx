@@ -5,12 +5,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { CSSProperties } from "react";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 import ShopMenuListClient from "@/components/public/ShopMenuListClient";
 import UserAllergenPreferenceClient from "@/components/public/UserAllergenPreferenceClient";
 import PublicDataUnavailable from "@/components/public/PublicDataUnavailable";
+import PublicMenuSearchSummaryClient from "@/components/public/PublicMenuSearchSummaryClient";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
 import { readPublicDataOrFallback } from "@/lib/public-db";
@@ -21,62 +23,20 @@ import {
 } from "@/lib/menu-image-display";
 
 type Params = { shopId: string };
-type SearchParams = { q?: string };
 
 export const revalidate = 60;
-
-function buildMenuWhere(q: string) {
-    // 検索語が空なら公開メニュー全件、入っていれば名前・説明・カテゴリで絞り込みます。
-    if (q === "") {
-        return {
-            isPublished: true,
-        };
-    }
-
-    return {
-        isPublished: true,
-        OR: [
-            {
-                name: {
-                    contains: q,
-                    mode: "insensitive" as const,
-                },
-            },
-            {
-                description: {
-                    contains: q,
-                    mode: "insensitive" as const,
-                },
-            },
-            {
-                category: {
-                    contains: q,
-                    mode: "insensitive" as const,
-                },
-            },
-        ],
-    };
-}
+export const dynamic = "force-static";
 
 export default async function PublicShopDetailPage({
     params,
-    searchParams,
 }: {
     params: Params | Promise<Params>;
-    searchParams?: SearchParams | Promise<SearchParams>;
 }) {
     // 動的ルートの shopId を取得し、無ければ 404 とします。
     const { shopId } = await params;
     if (!shopId) {
         notFound();
     }
-
-    // クエリ検索は文字列の前後空白を除いてから使います。
-    const resolvedSearchParams = (await searchParams) ?? {};
-    const qRaw = resolvedSearchParams.q ?? "";
-    const q = qRaw.trim();
-
-    const menuWhere = buildMenuWhere(q);
 
     const {
         data: publicShopData,
@@ -126,7 +86,7 @@ export default async function PublicShopDetailPage({
                         },
                     },
                     menus: {
-                        where: menuWhere,
+                        where: { isPublished: true },
                         orderBy: { updatedAt: "desc" },
                         select: {
                             id: true,
@@ -146,28 +106,14 @@ export default async function PublicShopDetailPage({
                 },
             });
 
-            const firstPublishedMenu = await prisma.menuItem.findFirst({
-                where: {
-                    shopId,
-                    shop: {
-                        isActive: true,
-                    },
-                    isPublished: true,
-                },
-                orderBy: { updatedAt: "desc" },
-                select: { id: true },
-            });
-
             return {
                 allergenMaster,
                 shop,
-                firstPublishedMenu,
             };
         },
         {
             allergenMaster: [],
             shop: null,
-            firstPublishedMenu: null,
         },
         { context: `public-shop-detail:${shopId}` },
     );
@@ -183,7 +129,7 @@ export default async function PublicShopDetailPage({
         );
     }
 
-    const { allergenMaster, shop, firstPublishedMenu } = publicShopData;
+    const { allergenMaster, shop } = publicShopData;
 
     if (!shop) {
         // 公開メニューが 1 件も無い店舗は、公開準備中として 404 にします。
@@ -213,8 +159,7 @@ export default async function PublicShopDetailPage({
         nameJa: allergen.nameJa,
     }));
 
-    const firstPublishedMenuId =
-        shop.menus[0]?.id ?? firstPublishedMenu?.id ?? null;
+    const firstPublishedMenuId = shop.menus[0]?.id ?? null;
     const publishedMenuCount = shop._count.menus;
     const averageBudgetLabel =
         typeof shop.averageBudgetYen === "number"
@@ -287,11 +232,11 @@ export default async function PublicShopDetailPage({
                                     <p className="mt-1 text-sm font-semibold text-white/90 drop-shadow">
                                         {shop.description || "—"}
                                     </p>
-                                    {q !== "" ? (
-                                        <p className="mt-2 text-xs font-semibold text-white/90 drop-shadow">
-                                            検索: {q}（{shop.menus.length}件）
-                                        </p>
-                                    ) : null}
+                                    <Suspense fallback={null}>
+                                        <PublicMenuSearchSummaryClient
+                                            menus={menusForClient}
+                                        />
+                                    </Suspense>
                                 </div>
 
                                 <div className="relative z-10 flex gap-3">
@@ -342,12 +287,19 @@ export default async function PublicShopDetailPage({
                             />
                         </div>
 
-                        <ShopMenuListClient
-                            shopId={shop.id}
-                            menus={menusForClient}
-                            allergenMaster={allergenMaster}
-                            q={q}
-                        />
+                        <Suspense
+                            fallback={
+                                <div className="rounded-xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+                                    公開メニューを読み込み中です。
+                                </div>
+                            }
+                        >
+                            <ShopMenuListClient
+                                shopId={shop.id}
+                                menus={menusForClient}
+                                allergenMaster={allergenMaster}
+                            />
+                        </Suspense>
                     </div>
 
                     <aside

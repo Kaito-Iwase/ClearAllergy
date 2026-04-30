@@ -4,6 +4,8 @@ export const metadata = {
     title: "利用規約 | ClearAllergy",
 };
 
+export const dynamic = "force-static";
+
 const LAST_UPDATED = "2026年4月22日";
 
 const sections = [

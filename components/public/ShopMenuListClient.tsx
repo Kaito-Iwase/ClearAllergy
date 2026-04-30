@@ -5,7 +5,7 @@
 // 通常表示と個人向け表示を切り替えてカード一覧を描画します。
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createStatusBySlug, type AllergenStatus } from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/formatters";
 import {
@@ -229,14 +229,14 @@ export default function ShopMenuListClient({
     shopId,
     menus,
     allergenMaster,
-    q,
 }: {
     shopId: string;
     menus: MenuItemCard[];
     allergenMaster: AllergenMasterItem[];
-    q: string;
 }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const q = (searchParams.get("q") ?? "").trim();
 
     // 端末に保存されたアレルゲン設定を読み込み、画面に反映します。
     const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
@@ -305,12 +305,31 @@ export default function ShopMenuListClient({
         router.push(`/shops/${shopId}/menus/${menuId}`);
     }
 
+    const searchedMenus = React.useMemo(() => {
+        if (q === "") {
+            return menus;
+        }
+
+        const needle = q.toLocaleLowerCase("ja-JP");
+        return menus.filter((menu) => {
+            return (
+                menu.name.toLocaleLowerCase("ja-JP").includes(needle) ||
+                (menu.description ?? "")
+                    .toLocaleLowerCase("ja-JP")
+                    .includes(needle) ||
+                (menu.category ?? "")
+                    .toLocaleLowerCase("ja-JP")
+                    .includes(needle)
+            );
+        });
+    }, [menus, q]);
+
     const menuItems = React.useMemo<MenuItemWithStatus[]>(() => {
-        return menus.map((menu) => ({
+        return searchedMenus.map((menu) => ({
             menu,
             statusBySlug: createStatusBySlug(allergenMaster, menu.allergenLinks),
         }));
-    }, [allergenMaster, menus]);
+    }, [allergenMaster, searchedMenus]);
 
     const visibleMenuItems = React.useMemo(() => {
         if (!hasPreference) {
@@ -331,10 +350,12 @@ export default function ShopMenuListClient({
         >
             <div className="mb-4 flex items-end justify-between">
                 <h2 className="text-base font-extrabold">公開メニュー</h2>
-                <p className="text-xs text-gray-500">{menus.length} 件</p>
+                <p className="text-xs text-gray-500">
+                    {searchedMenus.length} 件
+                </p>
             </div>
 
-            {menus.length === 0 ? (
+            {searchedMenus.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
                     <p className="text-sm text-gray-700">
                         {q !== ""

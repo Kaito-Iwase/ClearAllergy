@@ -19,6 +19,7 @@ import { readPublicDataOrFallback } from "@/lib/public-db";
 type Params = { shopId: string; menuId: string };
 
 export const revalidate = 60;
+export const dynamic = "force-static";
 
 export default async function PublicMenuDetailPage({
     params,
@@ -177,7 +178,7 @@ export default async function PublicMenuDetailPage({
                 />
 
                 <footer className="mt-8 border-t border-gray-200 py-10 text-center text-xs text-gray-500">
-                    © ClearAllergy. All rights reserved.
+                    © 2026 ClearAllergy Project
                 </footer>
             </div>
         </main>

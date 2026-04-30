@@ -1,67 +1,42 @@
-import { prisma } from "@/lib/db";
 import HomePageView from "@/components/public/HomePageView";
-import { readPublicDataOrFallback } from "@/lib/public-db";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 
-export default async function HomePage() {
-    const { data: featuredShop, isDatabaseAvailable } =
-        await readPublicDataOrFallback(
-            () =>
-                prisma.shop.findFirst({
-                    where: {
-                        menus: {
-                            some: {
-                                isPublished: true,
-                            },
-                        },
-                    },
-                    orderBy: {
-                        updatedAt: "desc",
-                    },
-                    select: {
-                        id: true,
-                        name: true,
-                        description: true,
-                        menus: {
-                            where: { isPublished: true },
-                            orderBy: { updatedAt: "desc" },
-                            take: 3,
-                            select: {
-                                id: true,
-                                name: true,
-                                priceYen: true,
-                                allergenLinks: {
-                                    where: {
-                                        status: {
-                                            in: ["CONTAINS", "MAY_CONTAIN"],
-                                        },
-                                    },
-                                    select: {
-                                        status: true,
-                                    },
-                                },
-                            },
-                        },
-                        _count: {
-                            select: {
-                                menus: {
-                                    where: {
-                                        isPublished: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                }),
-            null,
-            { context: "home:featured-shop" },
-        );
+const featuredShop = {
+    id: "demo-cafe-hibi",
+    name: "[デモ店舗]Cafe Hibi（カフェ ヒビ）",
+    description:
+        "日々の食事を安心して選べるように、メニューごとの価格とアレルゲン情報を公開しているデモ店舗です。",
+    menus: [
+        {
+            id: "demo-rice-flour-pancake",
+            name: "米粉パンケーキ",
+            priceYen: 980,
+            allergenLinks: [{ status: "CONTAINS" }, { status: "MAY_CONTAIN" }],
+        },
+        {
+            id: "demo-soy-veggie-curry",
+            name: "豆乳ベジカレー",
+            priceYen: 1280,
+            allergenLinks: [{ status: "CONTAINS" }, { status: "MAY_CONTAIN" }],
+        },
+        {
+            id: "demo-teriyaki-chicken-plate",
+            name: "照り焼きチキンプレート",
+            priceYen: 1420,
+            allergenLinks: [{ status: "CONTAINS" }, { status: "MAY_CONTAIN" }],
+        },
+    ],
+    _count: {
+        menus: 3,
+    },
+};
 
+export default function HomePage() {
     return (
         <HomePageView
             featuredShop={featuredShop}
-            isDatabaseAvailable={isDatabaseAvailable}
+            isDatabaseAvailable={true}
         />
     );
 }
