@@ -569,7 +569,7 @@ export default function AdminLoginPageClient({
 
             <footer className="py-6 text-center">
                 <p className="text-xs text-text-sub dark:text-gray-500 font-medium">
-                    © 2026 ClearAllergy
+                    © 2026 ClearAllergy Project
                 </p>
             </footer>
             <div id="clerk-captcha" />

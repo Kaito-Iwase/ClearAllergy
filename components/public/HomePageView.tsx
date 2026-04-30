@@ -433,7 +433,7 @@ export default function HomePageView({
 
             <footer className="border-t border-neutral-100 bg-white">
                 <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-center gap-3 px-6 py-10 text-center text-sm text-neutral-400 sm:flex-row">
-                    <span>© 2026 ClearAllergy. All rights reserved.</span>
+                    <span>© 2026 ClearAllergy Project</span>
                     <Link
                         href="/terms"
                         className="font-medium text-neutral-500 underline-offset-4 hover:text-neutral-800 hover:underline"
