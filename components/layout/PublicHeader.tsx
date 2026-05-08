@@ -5,11 +5,11 @@ import PublicSearchBox from "@/components/public/PublicSearchBox";
 
 export default function PublicHeader() {
     return (
-        <header className="sticky top-0 z-50 border-b border-gray-200 bg-white px-4 py-3 shadow-sm md:px-10">
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-8">
-                    <Link href="/" className="flex items-center">
-                        <BrandLogo priority />
+        <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
+            <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between gap-3 px-4 sm:px-6 md:px-10">
+                <div className="flex min-w-0 items-center gap-8">
+                    <Link href="/" className="flex min-w-0 items-center">
+                        <BrandLogo variant="publicHeader" priority />
                     </Link>
 
                     <nav className="hidden items-center gap-9 md:flex">

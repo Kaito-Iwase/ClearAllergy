@@ -35,30 +35,31 @@ export default function HomePageView({
 }) {
     return (
         <main className="min-h-screen bg-[#f6f8f6] text-[#111811]">
-            <header className="sticky top-0 z-50 border-b border-gray-200 bg-white px-4 py-3 shadow-sm md:px-10">
-                <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
-                    <Link href="/" className="flex items-center">
-                        <BrandLogo priority />
+            <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
+                <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between gap-3 px-4 sm:px-6 md:px-10">
+                    <Link href="/" className="flex min-w-0 items-center">
+                        <BrandLogo variant="publicHeader" priority />
                     </Link>
 
-                    <nav className="flex items-center gap-3 sm:gap-4">
+                    <nav className="flex shrink-0 items-center gap-2 sm:gap-4">
                         <Link
                             href="/shops"
-                            className="text-sm font-semibold text-gray-700 transition hover:text-[#13ec13]"
+                            className="hidden text-sm font-semibold leading-tight text-gray-700 transition hover:text-[#13ec13] sm:inline"
                         >
                             店舗一覧
                         </Link>
                         <Link
                             href="/terms"
-                            className="hidden text-sm font-semibold text-gray-600 transition hover:text-[#13ec13] sm:inline"
+                            className="hidden text-sm font-semibold leading-tight text-gray-600 transition hover:text-[#13ec13] sm:inline"
                         >
                             利用規約
                         </Link>
                         <Link
                             href="/admin/login"
-                            className="rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-extrabold text-black transition hover:bg-[#0db80d]"
+                            className="shrink-0 whitespace-nowrap rounded-lg bg-[#13ec13] px-3 py-1.5 text-xs font-extrabold leading-none text-black transition hover:bg-[#0db80d] sm:px-4 sm:py-2 sm:text-sm"
                         >
-                            店舗ログイン
+                            <span className="sm:hidden">ログイン</span>
+                            <span className="hidden sm:inline">店舗ログイン</span>
                         </Link>
                     </nav>
                 </div>
