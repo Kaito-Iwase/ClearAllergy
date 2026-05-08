@@ -36,7 +36,9 @@ export async function POST(req: Request) {
     }
 
     try {
-        const body = (await req.json().catch(() => null)) as LoginAuditRequest | null;
+        const body = (await req
+            .json()
+            .catch(() => null)) as LoginAuditRequest | null;
         if (!body || typeof body !== "object" || !("mode" in body)) {
             return NextResponse.json(
                 { message: "不正なリクエストです。" },
@@ -51,7 +53,9 @@ export async function POST(req: Request) {
 
             if (!parsed.success) {
                 const emailForAudit =
-                    typeof body.email === "string" ? body.email.trim().toLowerCase() : null;
+                    typeof body.email === "string"
+                        ? body.email.trim().toLowerCase()
+                        : null;
                 await writeAdminAuditLog({
                     req,
                     actorUserId: null,
@@ -68,7 +72,11 @@ export async function POST(req: Request) {
                 });
 
                 return NextResponse.json(
-                    { message: parsed.error.issues[0]?.message ?? "入力内容を確認してください。" },
+                    {
+                        message:
+                            parsed.error.issues[0]?.message ??
+                            "入力内容を確認してください。",
+                    },
                     { status: 400 },
                 );
             }
