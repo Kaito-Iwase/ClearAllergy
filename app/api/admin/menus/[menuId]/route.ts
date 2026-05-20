@@ -27,6 +27,7 @@ import { writeAdminAuditLog } from "@/lib/audit-log";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
 import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
+import { revalidatePublicMenuPaths } from "@/lib/public-cache";
 import {
     parseMenuImageFit,
     parseMenuImageFrame,
@@ -468,6 +469,10 @@ export async function PUT(req: Request, context: Context) {
             },
         });
 
+        if (existing.isPublished || nextIsPublished) {
+            revalidatePublicMenuPaths(auth.shopId, updatedMenu.id);
+        }
+
         return NextResponse.json({ menu: updatedMenu });
     } catch (e) {
         if (auditShopId) {
@@ -520,7 +525,7 @@ export async function DELETE(req: Request, context: Context) {
         // 他店舗のメニュー ID を指定されても、存在を推測されないよう 404 にします。
         const existing = await prisma.menuItem.findFirst({
             where: { id: menuId, shopId: auth.shopId },
-            select: { id: true },
+            select: { id: true, isPublished: true },
         });
         if (!existing) {
             return NextResponse.json(
@@ -547,6 +552,10 @@ export async function DELETE(req: Request, context: Context) {
             targetId: auditTargetId,
             success: true,
         });
+
+        if (existing.isPublished) {
+            revalidatePublicMenuPaths(auth.shopId, menuId);
+        }
 
         return NextResponse.json({ ok: true });
     } catch (e) {

@@ -43,68 +43,70 @@ export default async function PublicShopDetailPage({
         isDatabaseAvailable,
     } = await readPublicDataOrFallback(
         async () => {
-            // アレルゲンマスタは一覧カードや設定 UI の両方で使うため、先に 1 回だけ取得します。
-            const allergenMaster = await prisma.allergen.findMany({
-                select: { slug: true, nameJa: true, sortOrder: true },
-                orderBy: { sortOrder: "asc" },
-            });
+            const [allergenMaster, shop] = await Promise.all([
+                // アレルゲンマスタは一覧カードや設定 UI の両方で使うため、1 回だけ取得します。
+                prisma.allergen.findMany({
+                    select: { slug: true, nameJa: true, sortOrder: true },
+                    orderBy: { sortOrder: "asc" },
+                }),
 
-            // 店舗本体と公開メニューを一緒に取り、N+1 を避けます。
-            const shop = await prisma.shop.findFirst({
-                where: {
-                    id: shopId,
-                    isActive: true,
-                    menus: {
-                        some: {
-                            isPublished: true,
+                // 店舗本体と公開メニューを一緒に取り、N+1 を避けます。
+                prisma.shop.findFirst({
+                    where: {
+                        id: shopId,
+                        isActive: true,
+                        menus: {
+                            some: {
+                                isPublished: true,
+                            },
                         },
                     },
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    address: true,
-                    hours: true,
-                    regularHoliday: true,
-                    phoneNumber: true,
-                    note: true,
-                    averageBudgetYen: true,
-                    coverImageUrl: true,
-                    coverImageFit: true,
-                    coverImageZoom: true,
-                    coverImagePositionX: true,
-                    coverImagePositionY: true,
-                    updatedAt: true,
-                    _count: {
-                        select: {
-                            menus: {
-                                where: {
-                                    isPublished: true,
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        address: true,
+                        hours: true,
+                        regularHoliday: true,
+                        phoneNumber: true,
+                        note: true,
+                        averageBudgetYen: true,
+                        coverImageUrl: true,
+                        coverImageFit: true,
+                        coverImageZoom: true,
+                        coverImagePositionX: true,
+                        coverImagePositionY: true,
+                        updatedAt: true,
+                        _count: {
+                            select: {
+                                menus: {
+                                    where: {
+                                        isPublished: true,
+                                    },
+                                },
+                            },
+                        },
+                        menus: {
+                            where: { isPublished: true },
+                            orderBy: { updatedAt: "desc" },
+                            select: {
+                                id: true,
+                                name: true,
+                                description: true,
+                                priceYen: true,
+                                category: true,
+                                updatedAt: true,
+                                allergenLinks: {
+                                    select: {
+                                        status: true,
+                                        allergen: { select: { slug: true } },
+                                    },
                                 },
                             },
                         },
                     },
-                    menus: {
-                        where: { isPublished: true },
-                        orderBy: { updatedAt: "desc" },
-                        select: {
-                            id: true,
-                            name: true,
-                            description: true,
-                            priceYen: true,
-                            category: true,
-                            updatedAt: true,
-                            allergenLinks: {
-                                select: {
-                                    status: true,
-                                    allergen: { select: { slug: true } },
-                                },
-                            },
-                        },
-                    },
-                },
-            });
+                }),
+            ]);
 
             return {
                 allergenMaster,

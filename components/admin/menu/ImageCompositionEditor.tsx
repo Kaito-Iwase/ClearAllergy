@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React from "react";
 import {
     DEFAULT_MENU_IMAGE_FIT,
@@ -273,11 +274,14 @@ function ImagePreview({
             aria-label="画像をドラッグして表示位置を調整"
             tabIndex={0}
         >
-            <img
+            <Image
                 src={imageSrc}
                 alt={imageAlt}
+                fill
+                sizes="(min-width: 768px) 50vw, 100vw"
+                unoptimized={imageSrc.startsWith("blob:")}
                 draggable={false}
-                className="h-full w-full cursor-grab transition-transform duration-150 active:cursor-grabbing"
+                className="cursor-grab transition-transform duration-150 active:cursor-grabbing"
                 style={imageStyle}
             />
             <div className="pointer-events-none absolute inset-[12%] rounded-lg border border-white/70 shadow-[0_0_0_999px_rgba(0,0,0,0.08)]" />
