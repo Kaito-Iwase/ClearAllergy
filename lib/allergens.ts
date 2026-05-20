@@ -11,6 +11,25 @@ export const ALLERGEN_STATUS_VALUES = [
 
 export type AllergenStatus = (typeof ALLERGEN_STATUS_VALUES)[number];
 
+export const ALLERGEN_EFFECTIVE_RISK_VALUES = [
+    "CONTAINS",
+    "MAY_CONTAIN",
+    "STORE_HANDLED",
+    "FREE",
+    "UNKNOWN",
+] as const;
+
+export type AllergenEffectiveRisk =
+    (typeof ALLERGEN_EFFECTIVE_RISK_VALUES)[number];
+
+export type AllergenDisplayItem = {
+    slug: string;
+    nameJa: string;
+    status: AllergenStatus;
+    storeHandlesAllergen: boolean;
+    effectiveRisk: AllergenEffectiveRisk;
+};
+
 // えび・かに・くるみ・小麦・そば・卵・乳・落花生は、
 // 公開画面で特に強調して見せたい「特定原材料」として別扱いしています。
 export const SPECIFIED_INGREDIENT_SLUGS = [
@@ -81,10 +100,56 @@ export function buildAllergenRows(
     }));
 }
 
+export function getAllergenEffectiveRisk(args: {
+    status: AllergenStatus;
+    storeHandlesAllergen: boolean;
+}): AllergenEffectiveRisk {
+    if (args.status === "CONTAINS") return "CONTAINS";
+    if (args.status === "MAY_CONTAIN") return "MAY_CONTAIN";
+    if (args.status === "UNKNOWN") return "UNKNOWN";
+    return args.storeHandlesAllergen ? "STORE_HANDLED" : "FREE";
+}
+
+export function buildAllergenDisplayItems(
+    rows: Array<{
+        slug: string;
+        nameJa: string;
+        status: AllergenStatus;
+    }>,
+    storeHandledAllergenSlugs: ReadonlySet<string>,
+): AllergenDisplayItem[] {
+    return rows.map((row) => {
+        const storeHandlesAllergen = storeHandledAllergenSlugs.has(row.slug);
+
+        return {
+            slug: row.slug,
+            nameJa: row.nameJa,
+            status: row.status,
+            storeHandlesAllergen,
+            effectiveRisk: getAllergenEffectiveRisk({
+                status: row.status,
+                storeHandlesAllergen,
+            }),
+        };
+    });
+}
+
 export function statusLabelJa(status: AllergenStatus): string {
     if (status === "CONTAINS") return "含む";
     if (status === "MAY_CONTAIN") return "含む可能性があります";
     if (status === "UNKNOWN") return "未設定";
+    return "含まない";
+}
+
+export function effectiveRiskLabelJa(
+    effectiveRisk: AllergenEffectiveRisk,
+): string {
+    if (effectiveRisk === "CONTAINS") return "含む";
+    if (effectiveRisk === "MAY_CONTAIN") return "コンタミの可能性あり";
+    if (effectiveRisk === "STORE_HANDLED") {
+        return "原材料には含まないが、同一店舗内で取扱いあり";
+    }
+    if (effectiveRisk === "UNKNOWN") return "未確認";
     return "含まない";
 }
 

@@ -56,7 +56,7 @@ export default function SelectedFreeAllergenCardsClient({
     // 端末に保存された選択アレルゲンを画面状態として持ちます。
     const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
     const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [includeMayContain, setIncludeMayContain] = React.useState(true);
+    const [includeMayContain, setIncludeMayContain] = React.useState(false);
     const [loaded, setLoaded] = React.useState(false);
 
     React.useEffect(() => {

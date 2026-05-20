@@ -6,6 +6,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { SignOutButton, useSignIn } from "@clerk/nextjs";
 import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton";
 import BrandLogo from "@/components/layout/BrandLogo";
@@ -25,6 +26,7 @@ export default function AdminLoginPageClient({
     databaseUnavailable = false,
     databaseUnavailableReason = null,
 }: AdminLoginPageClientProps) {
+    const router = useRouter();
     const { fetchStatus, signIn } = useSignIn();
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState("");
@@ -72,7 +74,7 @@ export default function AdminLoginPageClient({
             return;
         }
 
-        window.location.href = "/admin/shop";
+        router.push("/admin/shop");
     }
 
     async function startEmailCodeStep() {

@@ -3,6 +3,7 @@
 // Server Component や API から「今の管理者」と「その店舗」を取得する時に使います。
 
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
 import { prisma } from "@/lib/db";
@@ -75,28 +76,30 @@ export async function getAdminSession(): Promise<AdminSessionLike | null> {
 
 // 管理画面で必要な「アプリ内 User」と「紐づく Shop」をまとめて返します。
 // 認証は Clerk セッションだけを正本にし、local DB は clerkUserId で引き直します。
-export async function getCurrentAdminContext(): Promise<AdminContext | null> {
-    const clerkAppUser = await getCurrentAppUser();
+export const getCurrentAdminContext = cache(
+    async function getCurrentAdminContext(): Promise<AdminContext | null> {
+        const clerkAppUser = await getCurrentAppUser();
 
-    if (!clerkAppUser) {
-        return null;
-    }
+        if (!clerkAppUser) {
+            return null;
+        }
 
-    const activeOwnedShop = clerkAppUser.clerkUserId
-        ? await prisma.shop.findFirst({
-              where: {
-                  ownerClerkUserId: clerkAppUser.clerkUserId,
-                  isActive: true,
-              },
-          })
-        : null;
+        const activeOwnedShop = clerkAppUser.clerkUserId
+            ? await prisma.shop.findFirst({
+                  where: {
+                      ownerClerkUserId: clerkAppUser.clerkUserId,
+                      isActive: true,
+                  },
+              })
+            : null;
 
-    return {
-        appUser: clerkAppUser,
-        shop: activeOwnedShop,
-        authProvider: "clerk",
-    };
-}
+        return {
+            appUser: clerkAppUser,
+            shop: activeOwnedShop,
+            authProvider: "clerk",
+        };
+    },
+);
 
 export async function requireCurrentAdminContextOrRedirect(): Promise<{
     appUser: AdminContext["appUser"];

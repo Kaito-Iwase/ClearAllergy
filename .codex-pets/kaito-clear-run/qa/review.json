@@ -1,0 +1,962 @@
+{
+  "ok": true,
+  "frames_root": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames",
+  "errors": [],
+  "warnings": [],
+  "rows": [
+    {
+      "state": "idle",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\idle\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7132,
+          "bbox": [
+            44,
+            48,
+            147,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 61
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\idle\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7122,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 59
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\idle\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7122,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 59
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\idle\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7132,
+          "bbox": [
+            44,
+            48,
+            147,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 61
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\idle\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7135,
+          "bbox": [
+            45,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 59
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\idle\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7135,
+          "bbox": [
+            45,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 59
+        }
+      ]
+    },
+    {
+      "state": "running-right",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-right\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7129,
+          "bbox": [
+            44,
+            48,
+            147,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 57
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-right\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7133,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 64
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-right\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7203,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 66
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-right\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7197,
+          "bbox": [
+            44,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 67
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-right\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7139,
+          "bbox": [
+            45,
+            48,
+            147,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 65
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-right\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7131,
+          "bbox": [
+            45,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 60
+        },
+        {
+          "index": 6,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-right\\06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7128,
+          "bbox": [
+            46,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 61
+        },
+        {
+          "index": 7,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-right\\07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7196,
+          "bbox": [
+            45,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 66
+        }
+      ]
+    },
+    {
+      "state": "running-left",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-left\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7199,
+          "bbox": [
+            44,
+            48,
+            147,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 65
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-left\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7133,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 64
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-left\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7137,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 61
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-left\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7129,
+          "bbox": [
+            44,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 63
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-left\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7205,
+          "bbox": [
+            45,
+            48,
+            147,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 68
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-left\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7196,
+          "bbox": [
+            45,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 66
+        },
+        {
+          "index": 6,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-left\\06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7128,
+          "bbox": [
+            46,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 61
+        },
+        {
+          "index": 7,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running-left\\07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7131,
+          "bbox": [
+            45,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 60
+        }
+      ]
+    },
+    {
+      "state": "waving",
+      "expected_frames": 4,
+      "actual_frames": 4,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waving\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7234,
+          "bbox": [
+            45,
+            46,
+            147,
+            161
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 77
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waving\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7209,
+          "bbox": [
+            44,
+            46,
+            147,
+            161
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 86
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waving\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7234,
+          "bbox": [
+            45,
+            46,
+            147,
+            161
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 77
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waving\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7261,
+          "bbox": [
+            46,
+            46,
+            146,
+            161
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 74
+        }
+      ]
+    },
+    {
+      "state": "jumping",
+      "expected_frames": 5,
+      "actual_frames": 5,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\jumping\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7132,
+          "bbox": [
+            44,
+            48,
+            147,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 61
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\jumping\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7127,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 60
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\jumping\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7133,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 64
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\jumping\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7130,
+          "bbox": [
+            45,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 59
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\jumping\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7129,
+          "bbox": [
+            45,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 61
+        }
+      ]
+    },
+    {
+      "state": "failed",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\failed\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7256,
+          "bbox": [
+            46,
+            48,
+            145,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 66
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\failed\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7253,
+          "bbox": [
+            46,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 76
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\failed\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7261,
+          "bbox": [
+            46,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 73
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\failed\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7253,
+          "bbox": [
+            46,
+            48,
+            146,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 76
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\failed\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7256,
+          "bbox": [
+            46,
+            48,
+            145,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 66
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\failed\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7267,
+          "bbox": [
+            47,
+            48,
+            145,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 79
+        },
+        {
+          "index": 6,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\failed\\06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7250,
+          "bbox": [
+            47,
+            48,
+            144,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 67
+        },
+        {
+          "index": 7,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\failed\\07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7267,
+          "bbox": [
+            47,
+            48,
+            145,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 79
+        }
+      ]
+    },
+    {
+      "state": "waiting",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waiting\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7177,
+          "bbox": [
+            40,
+            48,
+            152,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 67
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waiting\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7167,
+          "bbox": [
+            39,
+            48,
+            152,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 63
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waiting\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7167,
+          "bbox": [
+            39,
+            48,
+            152,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 63
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waiting\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7177,
+          "bbox": [
+            40,
+            48,
+            152,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 67
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waiting\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7183,
+          "bbox": [
+            40,
+            48,
+            151,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 64
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\waiting\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7183,
+          "bbox": [
+            40,
+            48,
+            151,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 64
+        }
+      ]
+    },
+    {
+      "state": "running",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7199,
+          "bbox": [
+            42,
+            48,
+            149,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 68
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7185,
+          "bbox": [
+            42,
+            48,
+            149,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 69
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7199,
+          "bbox": [
+            42,
+            48,
+            149,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 68
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7199,
+          "bbox": [
+            42,
+            48,
+            149,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 68
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7258,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 78
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\running\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7278,
+          "bbox": [
+            43,
+            48,
+            148,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 82
+        }
+      ]
+    },
+    {
+      "state": "review",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\review\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7085,
+          "bbox": [
+            51,
+            48,
+            140,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 63
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\review\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7060,
+          "bbox": [
+            51,
+            48,
+            140,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 49
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\review\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7060,
+          "bbox": [
+            51,
+            48,
+            140,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 49
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\review\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7085,
+          "bbox": [
+            51,
+            48,
+            140,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 63
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\review\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7145,
+          "bbox": [
+            52,
+            48,
+            139,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 55
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\kaito\\Documents\\Github\\ClearAllergy\\.codex-pets\\kaito-clear-run\\frames\\review\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7145,
+          "bbox": [
+            52,
+            48,
+            139,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 55
+        }
+      ]
+    }
+  ]
+}

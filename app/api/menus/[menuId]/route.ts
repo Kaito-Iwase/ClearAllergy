@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { buildAllergenRows } from "@/lib/allergens";
+import { buildAllergenDisplayItems, buildAllergenRows } from "@/lib/allergens";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
 import {
     parseMenuImageFit,
@@ -88,6 +88,7 @@ export async function GET(req: Request, context: Context) {
         const allergenMaster = await prisma.allergen.findMany({
             orderBy: { sortOrder: "asc" },
             select: {
+                id: true,
                 slug: true,
                 nameJa: true,
                 nameEn: true,
@@ -95,8 +96,38 @@ export async function GET(req: Request, context: Context) {
             },
         });
 
+        const shopAllergenLinks = await prisma.menuItemAllergen.findMany({
+            where: {
+                menuItem: {
+                    shopId: menu.shopId,
+                },
+            },
+            select: {
+                allergenId: true,
+                status: true,
+            },
+        });
+
+        const storeContainsAllergenIds = new Set(
+            shopAllergenLinks
+                .filter((link) => link.status === "CONTAINS")
+                .map((link) => link.allergenId),
+        );
+        const allergenSlugById = new Map(
+            allergenMaster.map((allergen) => [allergen.id, allergen.slug]),
+        );
+        const storeHandledAllergenSlugs = new Set(
+            [...storeContainsAllergenIds]
+                .map((allergenId) => allergenSlugById.get(allergenId))
+                .filter((slug): slug is string => Boolean(slug)),
+        );
+
         // 29 品目を基準に正規化し、欠損しているリンクも UNKNOWN として返します。
         const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
+        const allergenDisplayItems = buildAllergenDisplayItems(
+            allergens,
+            storeHandledAllergenSlugs,
+        );
         const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
             kind: "menu",
             shopId: menu.shopId,
@@ -129,6 +160,7 @@ export async function GET(req: Request, context: Context) {
                 createdAt: menu.createdAt,
                 updatedAt: menu.updatedAt,
                 allergens,
+                allergenDisplayItems,
             },
         });
     } catch (e) {

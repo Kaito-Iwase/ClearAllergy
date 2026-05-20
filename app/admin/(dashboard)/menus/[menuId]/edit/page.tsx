@@ -29,45 +29,47 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
     // 動的ルートの menuId を使って、どのメニューを編集中か決めます。
     const { menuId } = await params;
 
-    // 編集フォームの選択肢として使うアレルゲンマスタを取得します。
-    const allergens = await prisma.allergen.findMany({
-        orderBy: { sortOrder: "asc" },
-        select: {
-            slug: true,
-            nameJa: true,
-            nameEn: true,
-            sortOrder: true,
-        },
-    });
+    const [allergens, menu] = await Promise.all([
+        // 編集フォームの選択肢として使うアレルゲンマスタを取得します。
+        prisma.allergen.findMany({
+            orderBy: { sortOrder: "asc" },
+            select: {
+                slug: true,
+                nameJa: true,
+                nameEn: true,
+                sortOrder: true,
+            },
+        }),
 
-    // where に shopId を含め、他店舗のメニュー ID を直接入力されても取れないようにします。
-    const menu = await prisma.menuItem.findFirst({
-        where: { id: menuId, shopId },
-        select: {
-            id: true,
-            shopId: true,
-            name: true,
-            description: true,
-            priceYen: true,
-            category: true,
-            ingredients: true,
-            precaution: true,
-            imageUrl: true,
-            imageFrame: true,
-            imageFit: true,
-            imagePosition: true,
-            imageZoom: true,
-            imagePositionX: true,
-            imagePositionY: true,
-            isPublished: true,
-            allergenLinks: {
-                select: {
-                    status: true,
-                    allergen: { select: { slug: true } },
+        // where に shopId を含め、他店舗のメニュー ID を直接入力されても取れないようにします。
+        prisma.menuItem.findFirst({
+            where: { id: menuId, shopId },
+            select: {
+                id: true,
+                shopId: true,
+                name: true,
+                description: true,
+                priceYen: true,
+                category: true,
+                ingredients: true,
+                precaution: true,
+                imageUrl: true,
+                imageFrame: true,
+                imageFit: true,
+                imagePosition: true,
+                imageZoom: true,
+                imagePositionX: true,
+                imagePositionY: true,
+                isPublished: true,
+                allergenLinks: {
+                    select: {
+                        status: true,
+                        allergen: { select: { slug: true } },
+                    },
                 },
             },
-        },
-    });
+        }),
+    ]);
 
     if (!menu) {
         notFound();

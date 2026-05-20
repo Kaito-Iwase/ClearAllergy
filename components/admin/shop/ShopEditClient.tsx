@@ -5,6 +5,7 @@
 // 公開プレビューも同じ state を参照し、入力中の変化が画面で分かるようにしています。
 
 import Link from "next/link";
+import Image from "next/image";
 import React from "react";
 import ShareShopUrlButton from "@/components/public/ShareShopUrlButton";
 import ShopQrCard from "@/components/admin/shop/ShopQrCard";
@@ -470,10 +471,13 @@ export default function ShopEditClient({
                 <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
                     <div className="relative min-h-[360px] overflow-hidden bg-gradient-to-r from-green-200 via-green-100 to-gray-50 p-8 md:p-10">
                         {previewImageUrl ? (
-                            <img
+                            <Image
                                 src={previewImageUrl}
                                 alt=""
-                                className="absolute inset-0 h-full w-full"
+                                fill
+                                sizes="(min-width: 1024px) 60vw, 100vw"
+                                unoptimized={previewImageUrl.startsWith("blob:")}
+                                className="absolute inset-0"
                                 style={coverImageStyle}
                             />
                         ) : null}
