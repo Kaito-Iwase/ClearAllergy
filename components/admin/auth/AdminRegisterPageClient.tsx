@@ -6,6 +6,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSignIn } from "@clerk/nextjs";
 import AdminGoogleAuthButton from "@/components/admin/auth/AdminGoogleAuthButton";
 import BrandLogo from "@/components/layout/BrandLogo";
@@ -29,6 +30,7 @@ export default function AdminRegisterPageClient({
     portfolioMode?: boolean;
     databaseUnavailable?: boolean;
 }) {
+    const router = useRouter();
     const { fetchStatus, signIn } = useSignIn();
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
@@ -90,7 +92,7 @@ export default function AdminRegisterPageClient({
                 );
             }
 
-            window.location.href = "/admin/shop";
+            router.push("/admin/shop");
             return;
         }
 
@@ -167,7 +169,11 @@ export default function AdminRegisterPageClient({
             }
 
             if (data?.portfolioMode && data.redirectTo) {
-                window.location.href = data.redirectTo;
+                if (data.redirectTo.startsWith("http")) {
+                    window.location.assign(data.redirectTo);
+                } else {
+                    router.push(data.redirectTo);
+                }
                 return;
             }
 

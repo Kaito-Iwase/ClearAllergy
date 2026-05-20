@@ -21,6 +21,10 @@ import { writeAdminAuditLog } from "@/lib/audit-log";
 import { validateStoredImageUrl } from "@/lib/image-url-policy";
 import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import {
+    revalidatePublicMenuPaths,
+    revalidatePublicShopPaths,
+} from "@/lib/public-cache";
+import {
     parseMenuImageFit,
     parseMenuImageFrame,
     parseMenuImagePosition,
@@ -283,6 +287,12 @@ export async function POST(req: Request) {
                 hasImage: Boolean(imageUrlResult.value),
             },
         });
+
+        if (isPublished) {
+            revalidatePublicMenuPaths(auth.shopId, created.id);
+        } else {
+            revalidatePublicShopPaths(auth.shopId);
+        }
 
         return NextResponse.json({ id: created.id }, { status: 201 });
     } catch (e) {

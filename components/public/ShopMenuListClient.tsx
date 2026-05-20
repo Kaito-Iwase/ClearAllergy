@@ -241,7 +241,7 @@ export default function ShopMenuListClient({
     // 端末に保存されたアレルゲン設定を読み込み、画面に反映します。
     const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
     const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [includeMayContain, setIncludeMayContain] = React.useState(true);
+    const [includeMayContain, setIncludeMayContain] = React.useState(false);
     const [loaded, setLoaded] = React.useState(false);
 
     React.useEffect(() => {

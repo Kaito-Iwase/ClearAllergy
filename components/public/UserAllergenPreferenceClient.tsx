@@ -35,7 +35,7 @@ export function useUserAllergenPreferenceState() {
     const [targetSlugs, setTargetSlugs] = React.useState<string[]>([]);
     const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
     const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [includeMayContain, setIncludeMayContain] = React.useState(true);
+    const [includeMayContain, setIncludeMayContain] = React.useState(false);
     const [loaded, setLoaded] = React.useState(false);
     const [message, setMessage] = React.useState("");
     const [isOpen, setIsOpen] = React.useState(false);
@@ -138,7 +138,7 @@ export function useUserAllergenPreferenceState() {
         setTargetSlugs([]);
         setHighlightSlugs([]);
         setExcludedSlugs([]);
-        setIncludeMayContain(true);
+        setIncludeMayContain(false);
         notifyUpdated();
         showMessage("保存済み設定を削除しました。");
     }

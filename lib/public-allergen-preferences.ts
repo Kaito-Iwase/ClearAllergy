@@ -14,6 +14,8 @@ export type UserAllergenPreferences = {
     selectedSlugs: string[];
 };
 
+const DEFAULT_INCLUDE_MAY_CONTAIN = false;
+
 // localStorage の値は壊れている可能性もあるため、
 // string 配列だけを残し、重複も消して安全な形へ整えます。
 function normalizeSlugs(values: unknown): string[] {
@@ -35,7 +37,7 @@ export function loadUserAllergenPreferences(): UserAllergenPreferences {
         return {
             highlightSlugs: [],
             excludedSlugs: [],
-            includeMayContain: true,
+            includeMayContain: DEFAULT_INCLUDE_MAY_CONTAIN,
             selectedSlugs: [],
         };
     }
@@ -47,7 +49,7 @@ export function loadUserAllergenPreferences(): UserAllergenPreferences {
             return {
                 highlightSlugs: [],
                 excludedSlugs: [],
-                includeMayContain: true,
+                includeMayContain: DEFAULT_INCLUDE_MAY_CONTAIN,
                 selectedSlugs: [],
             };
         }
@@ -64,7 +66,7 @@ export function loadUserAllergenPreferences(): UserAllergenPreferences {
         return {
             highlightSlugs: normalizedHighlightSlugs,
             excludedSlugs,
-            includeMayContain: parsed.includeMayContain !== false,
+            includeMayContain: parsed.includeMayContain === true,
             selectedSlugs: [
                 ...new Set([...normalizedHighlightSlugs, ...excludedSlugs]),
             ],
@@ -73,7 +75,7 @@ export function loadUserAllergenPreferences(): UserAllergenPreferences {
         return {
             highlightSlugs: [],
             excludedSlugs: [],
-            includeMayContain: true,
+            includeMayContain: DEFAULT_INCLUDE_MAY_CONTAIN,
             selectedSlugs: [],
         };
     }
@@ -89,7 +91,7 @@ export function saveUserAllergenPreferences(
     const normalized: UserAllergenPreferences = {
         highlightSlugs: normalizeSlugs(preferences.highlightSlugs),
         excludedSlugs: normalizeSlugs(preferences.excludedSlugs),
-        includeMayContain: preferences.includeMayContain !== false,
+        includeMayContain: preferences.includeMayContain === true,
         selectedSlugs: [
             ...new Set([
                 ...normalizeSlugs(preferences.highlightSlugs),
