@@ -5,6 +5,7 @@
 // Client Component なのは、入力 state と削除ボタンのイベント処理が必要だからです。
 
 import Link from "next/link";
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api-error-message";
 
@@ -256,12 +257,14 @@ export default function MenuListPageClient({
                         >
                             <div className="grid gap-3 sm:grid-cols-[88px_1fr_auto] sm:items-start">
                                 <div className="flex items-start gap-3 sm:block">
-                                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-[88px] sm:w-[88px]">
+                                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-[88px] sm:w-[88px]">
                                         {menu.imageUrl ? (
-                                            <img
+                                            <Image
                                                 src={menu.imageUrl}
                                                 alt={`${menu.name}の画像`}
-                                                className="h-full w-full object-cover"
+                                                fill
+                                                sizes="88px"
+                                                className="object-cover"
                                             />
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-gray-400">

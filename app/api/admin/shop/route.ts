@@ -15,6 +15,10 @@ import { validateStoredImageUrl } from "@/lib/image-url-policy";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 import {
+    revalidatePublicMenuPaths,
+    revalidatePublicShopPaths,
+} from "@/lib/public-cache";
+import {
     parseMenuImageFit,
     parseMenuImageFrame,
     parseMenuImagePosition,
@@ -288,6 +292,10 @@ export async function PUT(req: Request) {
                 coverImagePositionX: true,
                 coverImagePositionY: true,
                 updatedAt: true,
+                menus: {
+                    where: { isPublished: true },
+                    select: { id: true },
+                },
             },
         });
 
@@ -340,7 +348,14 @@ export async function PUT(req: Request) {
             },
         });
 
-        return NextResponse.json({ shop });
+        const { menus, ...shopResponse } = shop;
+
+        revalidatePublicShopPaths(auth.shopId);
+        for (const menu of menus) {
+            revalidatePublicMenuPaths(auth.shopId, menu.id);
+        }
+
+        return NextResponse.json({ shop: shopResponse });
     } catch (e) {
         if (auditShopId) {
             await writeAdminAuditLog({

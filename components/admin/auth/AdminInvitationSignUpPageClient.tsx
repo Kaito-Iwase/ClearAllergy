@@ -91,7 +91,7 @@ export default function AdminInvitationSignUpPageClient({ ticket }: Props) {
 
                     const url = decorateUrl("/admin/register");
                     if (url.startsWith("http")) {
-                        window.location.href = url;
+                        window.location.assign(url);
                     } else {
                         router.push(url);
                     }

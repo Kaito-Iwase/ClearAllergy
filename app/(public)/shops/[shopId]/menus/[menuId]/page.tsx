@@ -38,46 +38,51 @@ export default async function PublicMenuDetailPage({
         isDatabaseAvailable,
     } = await readPublicDataOrFallback(
         async () => {
-            // 未登録品目も画面に出したいので、まず 29 品目マスタを全件取得します。
-            const allergenMaster = await prisma.allergen.findMany({
-                select: { slug: true, nameJa: true, sortOrder: true },
-                orderBy: { sortOrder: "asc" },
-            });
+            const [allergenMaster, menu] = await Promise.all([
+                // 未登録品目も画面に出したいので、29 品目マスタを全件取得します。
+                prisma.allergen.findMany({
+                    select: { slug: true, nameJa: true, sortOrder: true },
+                    orderBy: { sortOrder: "asc" },
+                }),
 
-            // 公開中のメニューだけを対象にし、非公開データは見せません。
-            const menu = await prisma.menuItem.findFirst({
-                where: {
-                    id: menuId,
-                    shopId,
-                    isPublished: true,
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    priceYen: true,
-                    category: true,
-                    ingredients: true,
-                    precaution: true,
-                    imageUrl: true,
-                    imageFrame: true,
-                    imageFit: true,
-                    imagePosition: true,
-                    imageZoom: true,
-                    imagePositionX: true,
-                    imagePositionY: true,
-                    updatedAt: true,
-                    shop: {
-                        select: { id: true, name: true },
-                    },
-                    allergenLinks: {
-                        select: {
-                            status: true,
-                            allergen: { select: { slug: true } },
+                // 公開中のメニューだけを対象にし、非公開データは見せません。
+                prisma.menuItem.findFirst({
+                    where: {
+                        id: menuId,
+                        shopId,
+                        isPublished: true,
+                        shop: {
+                            isActive: true,
                         },
                     },
-                },
-            });
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        priceYen: true,
+                        category: true,
+                        ingredients: true,
+                        precaution: true,
+                        imageUrl: true,
+                        imageFrame: true,
+                        imageFit: true,
+                        imagePosition: true,
+                        imageZoom: true,
+                        imagePositionX: true,
+                        imagePositionY: true,
+                        updatedAt: true,
+                        shop: {
+                            select: { id: true, name: true },
+                        },
+                        allergenLinks: {
+                            select: {
+                                status: true,
+                                allergen: { select: { slug: true } },
+                            },
+                        },
+                    },
+                }),
+            ]);
 
             return {
                 allergenMaster,
