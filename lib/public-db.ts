@@ -1,7 +1,7 @@
 import {
     isDatabaseUnavailableError,
     logDatabaseUnavailableError,
-} from "@/lib/db-errors";
+} from "@/lib/db/errors";
 
 type PublicQueryResult<T> = {
     data: T;

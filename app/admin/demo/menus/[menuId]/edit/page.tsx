@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import MenuEditClient from "@/components/admin/menu/MenuEditClient";
+import MenuEditClient from "@/features/admin/menus/components/MenuEditClient";
 import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
 import { createStatusBySlug } from "@/lib/allergens";
 import { prisma } from "@/lib/db";
-import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
+import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
 import {
     parseMenuImageFit,
     parseMenuImageFrame,
     parseMenuImagePosition,
     parseMenuImagePositionPercent,
     parseMenuImageZoom,
-} from "@/lib/menu-image-display";
+} from "@/lib/utils/menu-image-display";
 
 export const dynamic = "force-dynamic";
 

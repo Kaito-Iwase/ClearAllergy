@@ -3,11 +3,11 @@
 // Server Component なので、認証確認をサーバー側で先に行えます。
 
 import { redirect } from "next/navigation";
-import AdminLoginPageClient from "@/components/admin/auth/AdminLoginPageClient";
+import AdminLoginPageClient from "@/features/admin/auth/components/AdminLoginPageClient";
 import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
-import { getCurrentAdminContext } from "@/lib/admin-auth";
-import { getCurrentPlatformAdmin } from "@/lib/admin-platform-auth";
-import { isDatabaseUnavailableError } from "@/lib/db-errors";
+import { getCurrentAdminContext } from "@/lib/auth/admin-auth";
+import { getCurrentPlatformAdmin } from "@/lib/auth/admin-platform-auth";
+import { isDatabaseUnavailableError } from "@/lib/db/errors";
 
 const DATABASE_UNAVAILABLE_REASON =
     "Clerk セッションの有無ではなく、管理者ユーザーと店舗状態の照会に必要なデータベース接続が失敗しています。";

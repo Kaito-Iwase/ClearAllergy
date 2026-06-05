@@ -3,8 +3,8 @@ import { prisma } from "@/lib/db";
 import {
     isDatabaseUnavailableError,
     logDatabaseUnavailableError,
-} from "@/lib/db-errors";
-import { getIpFromHeaders } from "@/lib/request-ip";
+} from "@/lib/db/errors";
+import { getIpFromHeaders } from "@/lib/utils/request-ip";
 
 type AdminAuditAction =
     | "auth_login_success"

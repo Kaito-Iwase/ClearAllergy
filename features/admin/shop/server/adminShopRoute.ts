@@ -1,0 +1,381 @@
+// このファイルは管理画面の店舗情報 API です。
+// /api/admin/shop の GET は表示用取得、PUT は更新を担当します。
+// 認証済み管理者の shopId を使い、他店舗の情報が触れないようにします。
+
+import { Hono } from "hono";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { internalError, readJson, requireShopId } from "@/lib/auth/admin-api-utils";
+import { enforceSameOriginAdminMutation } from "@/lib/auth/admin-api-security";
+import {
+    parseAverageBudgetYen,
+    toRequiredTrimmedString,
+    toTrimmedNullableString,
+} from "@/lib/validators/admin-input";
+import { validateStoredImageUrl } from "@/lib/storage/image-url-policy";
+import { writeAdminAuditLog } from "@/lib/audit-log";
+import { requirePortfolioMutationAccessApi } from "@/lib/auth/portfolio-mode";
+import {
+    revalidatePublicMenuPaths,
+    revalidatePublicShopPaths,
+} from "@/lib/public-cache";
+import {
+    parseMenuImageFit,
+    parseMenuImageFrame,
+    parseMenuImagePosition,
+    parseMenuImagePositionPercent,
+    parseMenuImageZoom,
+} from "@/lib/utils/menu-image-display";
+
+const app = new Hono();
+
+type ShopUpdateBody = {
+    name?: unknown;
+    description?: unknown;
+    address?: unknown;
+    hours?: unknown;
+    regularHoliday?: unknown;
+    phoneNumber?: unknown;
+    note?: unknown;
+    averageBudgetYen?: unknown;
+    coverImageUrl?: unknown;
+    coverImageFrame?: unknown;
+    coverImageFit?: unknown;
+    coverImagePosition?: unknown;
+    coverImageZoom?: unknown;
+    coverImagePositionX?: unknown;
+    coverImagePositionY?: unknown;
+};
+
+app.get("/api/admin/shop", async () => {
+    try {
+        // GET は現在ログイン中の店舗情報を取得します。
+        const auth = await requireShopId();
+        if (!auth.ok) {
+            return auth.res;
+        }
+
+        const shop = await prisma.shop.findUnique({
+            where: { id: auth.shopId },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                address: true,
+                hours: true,
+                regularHoliday: true,
+                phoneNumber: true,
+                note: true,
+                averageBudgetYen: true,
+                coverImageUrl: true,
+                coverImageFrame: true,
+                coverImageFit: true,
+                coverImagePosition: true,
+                coverImageZoom: true,
+                coverImagePositionX: true,
+                coverImagePositionY: true,
+                updatedAt: true,
+            },
+        });
+
+        if (!shop) {
+            return NextResponse.json(
+                { error: "shop not found" },
+                { status: 404 },
+            );
+        }
+
+        const sanitizedCoverImageUrl = validateStoredImageUrl(
+            shop.coverImageUrl,
+            {
+                kind: "shop",
+                shopId: auth.shopId,
+            },
+        );
+
+        return NextResponse.json({
+            shop: {
+                ...shop,
+                coverImageUrl: sanitizedCoverImageUrl.ok
+                    ? sanitizedCoverImageUrl.value
+                    : null,
+            },
+        });
+    } catch (e) {
+        return internalError(e);
+    }
+});
+
+app.put("/api/admin/shop", async (c) => {
+    const req = c.req.raw;
+    let auditActorUserId: string | null = null;
+    let auditShopId: string | null = null;
+    try {
+        const originError = enforceSameOriginAdminMutation(req);
+        if (originError) {
+            return originError;
+        }
+
+        // PUT は編集フォームから送られた店舗情報の保存です。
+        const auth = await requireShopId();
+        if (!auth.ok) {
+            return auth.res;
+        }
+        auditActorUserId = auth.appUser.id;
+        auditShopId = auth.shopId;
+
+        const portfolioAccess = await requirePortfolioMutationAccessApi();
+        if (!portfolioAccess.ok) {
+            return portfolioAccess.res;
+        }
+
+        // JSON が壊れている場合は 400 を返し、DB 更新まで進ませません。
+        const body = await readJson<ShopUpdateBody>(req);
+        if (!body) {
+            return NextResponse.json(
+                { error: "bad request: invalid json" },
+                { status: 400 },
+            );
+        }
+
+        const existing = await prisma.shop.findUnique({
+            where: { id: auth.shopId },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                address: true,
+                hours: true,
+                regularHoliday: true,
+                phoneNumber: true,
+                note: true,
+                averageBudgetYen: true,
+                coverImageUrl: true,
+                coverImageFrame: true,
+                coverImageFit: true,
+                coverImagePosition: true,
+                coverImageZoom: true,
+                coverImagePositionX: true,
+                coverImagePositionY: true,
+            },
+        });
+        if (!existing) {
+            return NextResponse.json(
+                { error: "shop not found" },
+                { status: 404 },
+            );
+        }
+
+        // 店舗名は必須なので、空文字や空白だけはここで弾きます。
+        const name = toRequiredTrimmedString(body.name);
+        if (!name) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "shop_update",
+                targetType: "shop",
+                targetId: auth.shopId,
+                success: false,
+                metadata: { reason: "bad request: name is required" },
+            });
+            return NextResponse.json(
+                { error: "bad request: name is required" },
+                { status: 400 },
+            );
+        }
+
+        // 文字列項目は空なら null に寄せて保存し、DB の扱いを揃えます。
+        const description = toTrimmedNullableString(body.description);
+        const address = toTrimmedNullableString(body.address);
+        const hours = toTrimmedNullableString(body.hours);
+        const regularHoliday = toTrimmedNullableString(body.regularHoliday);
+        const phoneNumber = toTrimmedNullableString(body.phoneNumber);
+        const note = toTrimmedNullableString(body.note);
+        const averageBudgetResult = parseAverageBudgetYen(body.averageBudgetYen);
+        const coverImageUrl = toTrimmedNullableString(body.coverImageUrl);
+        const coverImageUrlResult = validateStoredImageUrl(coverImageUrl, {
+            kind: "shop",
+            shopId: auth.shopId,
+        });
+        const coverImageFrame =
+            body.coverImageFrame === undefined
+                ? parseMenuImageFrame(existing.coverImageFrame)
+                : parseMenuImageFrame(body.coverImageFrame);
+        const coverImageFit =
+            body.coverImageFit === undefined
+                ? parseMenuImageFit(existing.coverImageFit)
+                : parseMenuImageFit(body.coverImageFit);
+        const coverImagePosition =
+            body.coverImagePosition === undefined
+                ? parseMenuImagePosition(existing.coverImagePosition)
+                : parseMenuImagePosition(body.coverImagePosition);
+        const coverImageZoom =
+            body.coverImageZoom === undefined
+                ? parseMenuImageZoom(existing.coverImageZoom)
+                : parseMenuImageZoom(body.coverImageZoom);
+        const coverImagePositionX =
+            body.coverImagePositionX === undefined
+                ? parseMenuImagePositionPercent(existing.coverImagePositionX)
+                : parseMenuImagePositionPercent(body.coverImagePositionX);
+        const coverImagePositionY =
+            body.coverImagePositionY === undefined
+                ? parseMenuImagePositionPercent(existing.coverImagePositionY)
+                : parseMenuImagePositionPercent(body.coverImagePositionY);
+
+        if (!averageBudgetResult.ok) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "shop_update",
+                targetType: "shop",
+                targetId: auth.shopId,
+                success: false,
+                metadata: { reason: averageBudgetResult.message },
+            });
+            return NextResponse.json(
+                { error: averageBudgetResult.message },
+                { status: 400 },
+            );
+        }
+        if (!coverImageUrlResult.ok) {
+            // 店舗画像も外部 URL の自由入力は許可せず、
+            // 自前アップロード由来の URL だけ保存できるようにします。
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "shop_update",
+                targetType: "shop",
+                targetId: auth.shopId,
+                success: false,
+                metadata: { reason: coverImageUrlResult.message },
+            });
+            return NextResponse.json(
+                { error: coverImageUrlResult.message },
+                { status: 400 },
+            );
+        }
+
+        // where に auth.shopId を使うことで、必ず本人の店舗だけ更新します。
+        const shop = await prisma.shop.update({
+            where: { id: auth.shopId },
+            data: {
+                name,
+                description,
+                address,
+                hours,
+                regularHoliday,
+                phoneNumber,
+                note,
+                averageBudgetYen: averageBudgetResult.value,
+                coverImageUrl: coverImageUrlResult.value,
+                coverImageFrame,
+                coverImageFit,
+                coverImagePosition,
+                coverImageZoom,
+                coverImagePositionX,
+                coverImagePositionY,
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                address: true,
+                hours: true,
+                regularHoliday: true,
+                phoneNumber: true,
+                note: true,
+                averageBudgetYen: true,
+                coverImageUrl: true,
+                coverImageFrame: true,
+                coverImageFit: true,
+                coverImagePosition: true,
+                coverImageZoom: true,
+                coverImagePositionX: true,
+                coverImagePositionY: true,
+                updatedAt: true,
+                menus: {
+                    where: { isPublished: true },
+                    select: { id: true },
+                },
+            },
+        });
+
+        await writeAdminAuditLog({
+            req,
+            actorUserId: auditActorUserId,
+            actorShopId: auditShopId,
+            action: "shop_update",
+            targetType: "shop",
+            targetId: shop.id,
+            success: true,
+            metadata: {
+                changedFields: [
+                    existing.name !== name ? "name" : null,
+                    existing.description !== description ? "description" : null,
+                    existing.address !== address ? "address" : null,
+                    existing.hours !== hours ? "hours" : null,
+                    existing.regularHoliday !== regularHoliday
+                        ? "regularHoliday"
+                        : null,
+                    existing.phoneNumber !== phoneNumber
+                        ? "phoneNumber"
+                        : null,
+                    existing.note !== note ? "note" : null,
+                    existing.averageBudgetYen !== averageBudgetResult.value
+                        ? "averageBudgetYen"
+                        : null,
+                    existing.coverImageUrl !== coverImageUrlResult.value
+                        ? "coverImageUrl"
+                        : null,
+                    existing.coverImageFrame !== coverImageFrame
+                        ? "coverImageFrame"
+                        : null,
+                    existing.coverImageFit !== coverImageFit
+                        ? "coverImageFit"
+                        : null,
+                    existing.coverImagePosition !== coverImagePosition
+                        ? "coverImagePosition"
+                        : null,
+                    existing.coverImageZoom !== coverImageZoom
+                        ? "coverImageZoom"
+                        : null,
+                    existing.coverImagePositionX !== coverImagePositionX
+                        ? "coverImagePositionX"
+                        : null,
+                    existing.coverImagePositionY !== coverImagePositionY
+                        ? "coverImagePositionY"
+                        : null,
+                ].filter(Boolean),
+            },
+        });
+
+        const { menus, ...shopResponse } = shop;
+
+        revalidatePublicShopPaths(auth.shopId);
+        for (const menu of menus) {
+            revalidatePublicMenuPaths(auth.shopId, menu.id);
+        }
+
+        return NextResponse.json({ shop: shopResponse });
+    } catch (e) {
+        if (auditShopId) {
+            await writeAdminAuditLog({
+                req,
+                actorUserId: auditActorUserId,
+                actorShopId: auditShopId,
+                action: "shop_update",
+                targetType: "shop",
+                targetId: auditShopId,
+                success: false,
+                metadata: { reason: "internal_error" },
+            });
+        }
+        return internalError(e);
+    }
+});
+
+export const GET = (req: Request) => app.fetch(req);
+export const PUT = (req: Request) => app.fetch(req);
