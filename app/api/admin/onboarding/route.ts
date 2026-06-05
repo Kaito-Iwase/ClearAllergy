@@ -2,6 +2,7 @@
 // Google ログインなどで appUser はあるが Shop がまだ無い時に使われます。
 // 1ユーザー1店舗の前提を守るため、既存 Shop がある場合は新規作成しません。
 
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import {
     getCurrentAppUser,
@@ -26,7 +27,10 @@ type OnboardingBody = {
     inviteToken?: unknown;
 };
 
-export async function POST(req: Request) {
+const app = new Hono();
+
+app.post("/api/admin/onboarding", async (c) => {
+    const req = c.req.raw;
     try {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
@@ -247,4 +251,6 @@ export async function POST(req: Request) {
             { status: 500 },
         );
     }
-}
+});
+
+export const POST = (req: Request) => app.fetch(req);

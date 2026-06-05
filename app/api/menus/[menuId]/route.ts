@@ -2,6 +2,7 @@
 // /api/menus/[menuId] の GET だけを担当し、公開中メニューのみ返します。
 // 公開画面から読まれるため、非公開メニューは存在していても 404 扱いにします。
 
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { buildAllergenDisplayItems, buildAllergenRows } from "@/lib/allergens";
@@ -14,16 +15,13 @@ import {
     parseMenuImageZoom,
 } from "@/lib/menu-image-display";
 
-type Context = {
-    // Next.js のバージョン差で params が Promise のこともあるため両対応にしています。
-    params?: { menuId?: string } | Promise<{ menuId?: string }>;
-};
+const app = new Hono();
 
-export async function GET(req: Request, context: Context) {
+app.get("/api/menus/:menuId", async (c) => {
+    const req = c.req.raw;
     try {
-        // まずは動的ルートの params から menuId を取ります。
-        const paramsObj = context.params ? await context.params : undefined;
-        let menuId = paramsObj?.menuId;
+        // まずは Hono の動的ルートから menuId を取ります。
+        let menuId = c.req.param("menuId");
 
         // 一部環境で params が入らない時に備え、URL 末尾からも取得できるようにします。
         if (!menuId) {
@@ -177,4 +175,6 @@ export async function GET(req: Request, context: Context) {
             { status: 500 },
         );
     }
-}
+});
+
+export const GET = (req: Request) => app.fetch(req);

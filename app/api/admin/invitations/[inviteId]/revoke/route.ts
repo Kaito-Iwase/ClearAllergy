@@ -1,6 +1,7 @@
 // 店舗管理者招待の取消 API です。
 // ローカルの招待状態と Clerk 側 invitation の両方を取り消します。
 
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
@@ -10,21 +11,11 @@ import { serializeAdminInvite } from "@/lib/invitations";
 import { revokeClerkApplicationInvitation } from "@/lib/auth/clerkAdminServer";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
 
-type Context = {
-    params?: { inviteId?: string } | Promise<{ inviteId?: string }>;
-};
+const app = new Hono();
 
-async function getInviteId(req: Request, context: Context) {
-    const params = context.params ? await context.params : undefined;
-    if (params?.inviteId) {
-        return params.inviteId;
-    }
-
-    const parts = new URL(req.url).pathname.split("/").filter(Boolean);
-    return parts[parts.length - 2];
-}
-
-export async function POST(req: Request, context: Context) {
+app.post("/api/admin/invitations/:inviteId/revoke", async (c) => {
+    const req = c.req.raw;
+    const inviteId = c.req.param("inviteId");
     try {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
@@ -41,7 +32,6 @@ export async function POST(req: Request, context: Context) {
             return portfolioAccess.res;
         }
 
-        const inviteId = await getInviteId(req, context);
         if (!inviteId) {
             return NextResponse.json(
                 { message: "招待IDが指定されていません。" },
@@ -119,4 +109,6 @@ export async function POST(req: Request, context: Context) {
             { status: 500 },
         );
     }
-}
+});
+
+export const POST = (req: Request) => app.fetch(req);

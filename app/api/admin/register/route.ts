@@ -2,6 +2,7 @@
 // /api/admin/register の POST を担当し、Clerk に認証用ユーザーを作成しつつ、
 // ローカル DB には clerkUserId と Shop だけを保存します。
 
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isDatabaseUnavailableError } from "@/lib/db-errors";
@@ -29,7 +30,10 @@ type RegisterRequestBody = {
     inviteToken?: string;
 };
 
-export async function POST(req: Request) {
+const app = new Hono();
+
+app.post("/api/admin/register", async (c) => {
+    const req = c.req.raw;
     let createdClerkUserId: string | null = null;
     let auditEmail: string | null = null;
 
@@ -326,4 +330,6 @@ export async function POST(req: Request) {
             { status: 500 },
         );
     }
-}
+});
+
+export const POST = (req: Request) => app.fetch(req);

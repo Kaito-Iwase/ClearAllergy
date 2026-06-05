@@ -2,6 +2,7 @@
 // /api/admin/menus の GET は一覧、POST は新規作成を担当します。
 // どちらも requireShopId() を通し、ログイン中の店舗だけを対象にします。
 
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/app/api/admin/_utils";
@@ -32,6 +33,8 @@ import {
     parseMenuImageZoom,
 } from "@/lib/menu-image-display";
 
+const app = new Hono();
+
 // request.json() の結果は unknown に近いので、まず期待する形を宣言しておきます。
 type MenuCreateBody = {
     name?: unknown;
@@ -53,7 +56,7 @@ type MenuCreateBody = {
 
 // GET は保存済みメニュー一覧の取得です。
 // 管理画面トップで表示するため、必要な列だけ絞って返します。
-export async function GET() {
+app.get("/api/admin/menus", async () => {
     try {
         // 認証済みかつ shopId を持つ管理者だけに絞ります。
         const auth = await requireShopId();
@@ -98,11 +101,12 @@ export async function GET() {
     } catch (e) {
         return internalError(e);
     }
-}
+});
 
 // POST は新規メニュー作成です。
 // 編集画面にすぐ遷移できるよう、最小情報でも下書きを作れるようにしています。
-export async function POST(req: Request) {
+app.post("/api/admin/menus", async (c) => {
+    const req = c.req.raw;
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
     try {
@@ -310,4 +314,7 @@ export async function POST(req: Request) {
         }
         return internalError(e);
     }
-}
+});
+
+export const GET = (req: Request) => app.fetch(req);
+export const POST = (req: Request) => app.fetch(req);

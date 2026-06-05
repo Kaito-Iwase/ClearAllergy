@@ -2,6 +2,7 @@
 // Clerk の招待作成とローカル AdminInvite 作成を対応させ、失敗時は Clerk 側も取り消します。
 
 import { Prisma } from "@prisma/client";
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
@@ -30,6 +31,8 @@ type InviteCreateBody = {
     expiresInDays?: unknown;
 };
 
+const app = new Hono();
+
 function isUniqueConstraintError(error: unknown) {
     return (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -37,7 +40,7 @@ function isUniqueConstraintError(error: unknown) {
     );
 }
 
-export async function GET() {
+app.get("/api/admin/invitations", async () => {
     try {
         const admin = await requirePlatformAdminApi();
         if (!admin.ok) {
@@ -76,9 +79,10 @@ export async function GET() {
             { status: 500 },
         );
     }
-}
+});
 
-export async function POST(req: Request) {
+app.post("/api/admin/invitations", async (c) => {
+    const req = c.req.raw;
     let clerkInvitationId: string | null = null;
 
     try {
@@ -294,4 +298,7 @@ export async function POST(req: Request) {
             { status: 500 },
         );
     }
-}
+});
+
+export const GET = (req: Request) => app.fetch(req);
+export const POST = (req: Request) => app.fetch(req);

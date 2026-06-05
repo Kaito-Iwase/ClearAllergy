@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { getCurrentClerkIdentity } from "@/lib/auth/getCurrentAppUser";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
@@ -18,7 +19,10 @@ function isUniqueConstraintConflict(error: unknown) {
     );
 }
 
-export async function POST(req: Request) {
+const app = new Hono();
+
+app.post("/api/invitations/accept", async (c) => {
+    const req = c.req.raw;
     try {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
@@ -97,4 +101,6 @@ export async function POST(req: Request) {
             { status: 500 },
         );
     }
-}
+});
+
+export const POST = (req: Request) => app.fetch(req);
