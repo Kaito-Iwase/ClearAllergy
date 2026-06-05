@@ -1,3 +1,4 @@
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
 import {
@@ -29,7 +30,10 @@ type LoginAuditRequest =
           reason?: string;
       };
 
-export async function POST(req: Request) {
+const app = new Hono();
+
+app.post("/api/admin/auth/login", async (c) => {
+    const req = c.req.raw;
     const originError = enforceSameOriginAdminMutation(req);
     if (originError) {
         return originError;
@@ -177,4 +181,6 @@ export async function POST(req: Request) {
             { status: 500 },
         );
     }
-}
+});
+
+export const POST = (req: Request) => app.fetch(req);

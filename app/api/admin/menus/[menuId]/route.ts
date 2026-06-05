@@ -2,11 +2,10 @@
 // /api/admin/menus/[menuId] の GET / PUT / DELETE をまとめています。
 // 毎回 shopId で絞り込み、「自分の店舗のメニューだけ触れる」ことを保証します。
 
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
-    Context,
-    getMenuId,
     internalError,
     readJson,
     requireShopId,
@@ -36,6 +35,8 @@ import {
     parseMenuImageZoom,
 } from "@/lib/menu-image-display";
 
+const app = new Hono();
+
 // 更新用の request body です。
 // shopId はクライアントから受け取らず、必ず session 側の shopId を使います。
 type UpdateMenuBody = {
@@ -56,12 +57,12 @@ type UpdateMenuBody = {
     allergenStatusBySlug?: unknown;
 };
 
-export async function GET(req: Request, context: Context) {
+app.get("/api/admin/menus/:menuId", async (c) => {
+    const menuId = c.req.param("menuId");
     try {
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
 
-        const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },
@@ -159,9 +160,11 @@ export async function GET(req: Request, context: Context) {
     } catch (e) {
         return internalError(e);
     }
-}
+});
 
-export async function PUT(req: Request, context: Context) {
+app.put("/api/admin/menus/:menuId", async (c) => {
+    const req = c.req.raw;
+    const menuId = c.req.param("menuId");
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
     let auditTargetId: string | null = null;
@@ -188,7 +191,6 @@ export async function PUT(req: Request, context: Context) {
         }
 
         // 対象メニュー ID は URL から取り出します。
-        const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },
@@ -489,9 +491,11 @@ export async function PUT(req: Request, context: Context) {
         }
         return internalError(e);
     }
-}
+});
 
-export async function DELETE(req: Request, context: Context) {
+app.delete("/api/admin/menus/:menuId", async (c) => {
+    const req = c.req.raw;
+    const menuId = c.req.param("menuId");
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
     let auditTargetId: string | null = null;
@@ -513,7 +517,6 @@ export async function DELETE(req: Request, context: Context) {
         }
 
         // 対象メニュー ID は URL から取り出します。
-        const menuId = await getMenuId(req, context);
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },
@@ -573,4 +576,8 @@ export async function DELETE(req: Request, context: Context) {
         }
         return internalError(e);
     }
-}
+});
+
+export const GET = (req: Request) => app.fetch(req);
+export const PUT = (req: Request) => app.fetch(req);
+export const DELETE = (req: Request) => app.fetch(req);

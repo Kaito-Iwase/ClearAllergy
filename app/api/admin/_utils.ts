@@ -61,26 +61,6 @@ export async function requireShopId() {
     };
 }
 
-// Next.js の params はバージョンや呼ばれ方で Promise のことがあるため両対応にしています。
-export type Context = {
-    params?: { menuId?: string } | Promise<{ menuId?: string }>;
-};
-
-function getMenuIdFromUrl(req: Request) {
-    // params が取れない環境でも動くよう、URL 末尾から menuId を抜く保険です。
-    const url = new URL(req.url);
-    const parts = url.pathname.split("/").filter(Boolean);
-    return parts[parts.length - 1];
-}
-
-export async function getMenuId(
-    req: Request,
-    context: Context,
-): Promise<string | undefined> {
-    const p = context.params ? await context.params : undefined;
-    return p?.menuId ?? getMenuIdFromUrl(req);
-}
-
 // 開発中は原因を追いやすくしつつ、本番では内部情報を出しすぎないよう分けています。
 export function internalError(e: unknown) {
     console.error(e);

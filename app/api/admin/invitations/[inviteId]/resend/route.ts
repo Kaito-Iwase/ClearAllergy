@@ -2,6 +2,7 @@
 // 古い招待を失効させてから新しい Clerk 招待と AdminInvite を作り直します。
 
 import { Prisma } from "@prisma/client";
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
@@ -23,19 +24,7 @@ import {
     retryOnceOnDatabaseUnavailable,
 } from "@/lib/db-errors";
 
-type Context = {
-    params?: { inviteId?: string } | Promise<{ inviteId?: string }>;
-};
-
-async function getInviteId(req: Request, context: Context) {
-    const params = context.params ? await context.params : undefined;
-    if (params?.inviteId) {
-        return params.inviteId;
-    }
-
-    const parts = new URL(req.url).pathname.split("/").filter(Boolean);
-    return parts[parts.length - 2];
-}
+const app = new Hono();
 
 function isUniqueConstraintError(error: unknown) {
     return (
@@ -44,7 +33,9 @@ function isUniqueConstraintError(error: unknown) {
     );
 }
 
-export async function POST(req: Request, context: Context) {
+app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
+    const req = c.req.raw;
+    const inviteId = c.req.param("inviteId");
     let newClerkInvitationId: string | null = null;
 
     try {
@@ -63,7 +54,6 @@ export async function POST(req: Request, context: Context) {
             return portfolioAccess.res;
         }
 
-        const inviteId = await getInviteId(req, context);
         if (!inviteId) {
             return NextResponse.json(
                 { message: "招待IDが指定されていません。" },
@@ -203,4 +193,6 @@ export async function POST(req: Request, context: Context) {
             { status: 500 },
         );
     }
-}
+});
+
+export const POST = (req: Request) => app.fetch(req);

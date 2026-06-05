@@ -2,6 +2,7 @@
 // /api/admin/shop の GET は表示用取得、PUT は更新を担当します。
 // 認証済み管理者の shopId を使い、他店舗の情報が触れないようにします。
 
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/app/api/admin/_utils";
@@ -26,6 +27,8 @@ import {
     parseMenuImageZoom,
 } from "@/lib/menu-image-display";
 
+const app = new Hono();
+
 type ShopUpdateBody = {
     name?: unknown;
     description?: unknown;
@@ -44,7 +47,7 @@ type ShopUpdateBody = {
     coverImagePositionY?: unknown;
 };
 
-export async function GET() {
+app.get("/api/admin/shop", async () => {
     try {
         // GET は現在ログイン中の店舗情報を取得します。
         const auth = await requireShopId();
@@ -101,9 +104,10 @@ export async function GET() {
     } catch (e) {
         return internalError(e);
     }
-}
+});
 
-export async function PUT(req: Request) {
+app.put("/api/admin/shop", async (c) => {
+    const req = c.req.raw;
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
     try {
@@ -371,4 +375,7 @@ export async function PUT(req: Request) {
         }
         return internalError(e);
     }
-}
+});
+
+export const GET = (req: Request) => app.fetch(req);
+export const PUT = (req: Request) => app.fetch(req);

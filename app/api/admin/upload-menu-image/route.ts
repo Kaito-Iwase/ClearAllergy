@@ -2,6 +2,7 @@
 // 管理画面の新規作成 / 編集フォームから呼ばれ、画像を Vercel Blob に保存します。
 // 店舗画像と同様に shopId で認可し、他店舗の保存先を使えないようにします。
 
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { requireShopId } from "@/app/api/admin/_utils";
 import { enforceSameOriginAdminMutation } from "@/lib/admin-api-security";
@@ -13,7 +14,10 @@ import {
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { requirePortfolioMutationAccessApi } from "@/lib/portfolio-mode";
 
-export async function POST(req: Request) {
+const app = new Hono();
+
+app.post("/api/admin/upload-menu-image", async (c) => {
+    const req = c.req.raw;
     let actorUserId: string | null = null;
     let actorShopId: string | null = null;
     try {
@@ -117,4 +121,6 @@ export async function POST(req: Request) {
             { status: uploadError.status },
         );
     }
-}
+});
+
+export const POST = (req: Request) => app.fetch(req);

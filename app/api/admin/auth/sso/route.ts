@@ -1,3 +1,4 @@
+import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { adminGoogleSsoAuditSchema } from "@/lib/validators/admin-auth";
 import {
@@ -7,7 +8,10 @@ import {
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { getIpFromHeaders } from "@/lib/request-ip";
 
-export async function POST(req: Request) {
+const app = new Hono();
+
+app.post("/api/admin/auth/sso", async (c) => {
+    const req = c.req.raw;
     const originError = enforceSameOriginAdminMutation(req);
     if (originError) {
         return originError;
@@ -92,4 +96,6 @@ export async function POST(req: Request) {
             { status: 500 },
         );
     }
-}
+});
+
+export const POST = (req: Request) => app.fetch(req);
