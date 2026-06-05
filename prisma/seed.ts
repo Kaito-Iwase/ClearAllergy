@@ -5,7 +5,7 @@ import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminCore";
 import {
     ALLERGEN_MASTER,
     type AllergenMasterSeed,
-} from "../lib/allergen-master";
+} from "../lib/constants/allergen-master";
 
 loadEnvConfig(process.cwd());
 

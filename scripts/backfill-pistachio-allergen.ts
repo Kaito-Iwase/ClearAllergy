@@ -1,6 +1,6 @@
 import { loadEnvConfig } from "@next/env";
 import { AllergenStatus, PrismaClient } from "@prisma/client";
-import { PISTACHIO_ALLERGEN } from "../lib/allergen-master";
+import { PISTACHIO_ALLERGEN } from "../lib/constants/allergen-master";
 
 loadEnvConfig(process.cwd());
 
