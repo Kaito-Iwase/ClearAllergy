@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import PublicDataUnavailable from "@/features/public/shops/components/PublicDataUnavailable";
 import PublicMenuDetailBodyClient from "@/features/public/shops/components/PublicMenuDetailBodyClient";
 import {
+    buildRecommendedIngredientNotice,
     buildSpecifiedIngredientNotice,
     buildAllergenRows,
     createStatusBySlug,
@@ -116,8 +117,11 @@ export default async function PublicMenuDetailPage({
     // マスタ 29 品目を基準に rows を作り、未登録項目も UNKNOWN として常に表示します。
     const rows = buildAllergenRows(allergenMaster, menu.allergenLinks);
 
-    // 特定原材料 8 品目は、上部の大きな注意ボックスでまとめて見せます。
+    // 特定原材料9品目と特定原材料に準ずるもの20品目を、別の注意ボックスで見せます。
     const specifiedIngredientNotice = buildSpecifiedIngredientNotice({ rows });
+    const recommendedIngredientNotice = buildRecommendedIngredientNotice({
+        rows,
+    });
 
     const priceText = formatPriceYen(menu.priceYen);
 
@@ -177,6 +181,7 @@ export default async function PublicMenuDetailPage({
                     ingredients={menu.ingredients}
                     precaution={menu.precaution}
                     specifiedIngredientNotice={specifiedIngredientNotice}
+                    recommendedIngredientNotice={recommendedIngredientNotice}
                     allergensForClient={allergensForClient}
                     statusBySlugForClient={statusBySlugForClient}
                     rows={rows}

@@ -4,6 +4,12 @@ import {
     ALLERGEN_MASTER,
     PISTACHIO_ALLERGEN,
 } from "../lib/constants/allergen-master";
+import {
+    buildRecommendedIngredientNotice,
+    buildSpecifiedIngredientNotice,
+    RECOMMENDED_INGREDIENT_SLUGS,
+    SPECIFIED_INGREDIENT_SLUGS,
+} from "../lib/allergens";
 
 loadEnvConfig(process.cwd());
 
@@ -31,6 +37,95 @@ async function main() {
 
     if (duplicateSlugs.length > 0) {
         fail(`Duplicate allergen slug(s): ${duplicateSlugs.join(", ")}`);
+    }
+
+    if (SPECIFIED_INGREDIENT_SLUGS.length !== 9) {
+        fail(
+            `SPECIFIED_INGREDIENT_SLUGS must contain 9 items, got ${SPECIFIED_INGREDIENT_SLUGS.length}.`,
+        );
+    }
+
+    if (RECOMMENDED_INGREDIENT_SLUGS.length !== 20) {
+        fail(
+            `RECOMMENDED_INGREDIENT_SLUGS must contain 20 items, got ${RECOMMENDED_INGREDIENT_SLUGS.length}.`,
+        );
+    }
+
+    const classifiedSlugs: string[] = [
+        ...SPECIFIED_INGREDIENT_SLUGS,
+        ...RECOMMENDED_INGREDIENT_SLUGS,
+    ];
+    const duplicateClassifiedSlugs = classifiedSlugs.filter(
+        (slug, index) => classifiedSlugs.indexOf(slug) !== index,
+    );
+
+    if (duplicateClassifiedSlugs.length > 0) {
+        fail(
+            `Allergen classifications overlap: ${duplicateClassifiedSlugs.join(", ")}`,
+        );
+    }
+
+    const unclassifiedSlugs = slugs.filter(
+        (slug) => !classifiedSlugs.includes(slug),
+    );
+    const unknownClassifiedSlugs = classifiedSlugs.filter(
+        (slug) => !slugs.includes(slug),
+    );
+
+    if (unclassifiedSlugs.length > 0 || unknownClassifiedSlugs.length > 0) {
+        fail(
+            `Allergen classifications must cover ALLERGEN_MASTER exactly: unclassified=${unclassifiedSlugs.join(", ") || "none"}, unknown=${unknownClassifiedSlugs.join(", ") || "none"}`,
+        );
+    }
+
+    if (!SPECIFIED_INGREDIENT_SLUGS.includes("cashew")) {
+        fail("Cashew must be classified as a specified ingredient.");
+    }
+
+    if (
+        SPECIFIED_INGREDIENT_SLUGS.includes(
+            "pistachio" as (typeof SPECIFIED_INGREDIENT_SLUGS)[number],
+        )
+    ) {
+        fail("Pistachio must not be classified as a specified ingredient.");
+    }
+
+    if (!RECOMMENDED_INGREDIENT_SLUGS.includes("pistachio")) {
+        fail("Pistachio must be classified as a recommended ingredient.");
+    }
+
+    const classificationTestRows = ALLERGEN_MASTER.map((allergen) => ({
+        slug: allergen.slug,
+        nameJa: allergen.nameJa,
+        status:
+            allergen.slug === "cashew"
+                ? ("CONTAINS" as const)
+                : allergen.slug === "pistachio"
+                  ? ("UNKNOWN" as const)
+                  : ("FREE" as const),
+    }));
+    const specifiedNotice = buildSpecifiedIngredientNotice({
+        rows: classificationTestRows,
+    });
+    const recommendedNotice = buildRecommendedIngredientNotice({
+        rows: classificationTestRows,
+    });
+
+    if (
+        specifiedNotice.kind !== "danger" ||
+        !specifiedNotice.resultText.includes("カシューナッツ") ||
+        specifiedNotice.resultText.includes("ピスタチオ")
+    ) {
+        fail(
+            "Specified ingredient notice must include cashew and exclude pistachio.",
+        );
+    }
+
+    if (
+        recommendedNotice.kind !== "unknown" ||
+        !recommendedNotice.resultText.includes("ピスタチオ")
+    ) {
+        fail("Recommended ingredient notice must show pistachio as unknown.");
     }
 
     const cashew = ALLERGEN_MASTER.find((allergen) => allergen.slug === "cashew");
@@ -110,6 +205,9 @@ async function main() {
     });
 
     console.log("Allergen master check passed.");
+    console.log(
+        `Allergen classifications: specified=${SPECIFIED_INGREDIENT_SLUGS.length}, recommended=${RECOMMENDED_INGREDIENT_SLUGS.length}`,
+    );
     console.log(`DB allergens: ${dbAllergens.length}`);
     console.log(`Menu items: ${menuCount}`);
     console.log(`Pistachio menu rows: ${pistachioLinkCount}`);

@@ -30,7 +30,7 @@ export type AllergenDisplayItem = {
     effectiveRisk: AllergenEffectiveRisk;
 };
 
-// えび・かに・くるみ・小麦・そば・卵・乳・落花生は、
+// えび・かに・くるみ・小麦・そば・卵・乳・落花生・カシューナッツは、
 // 公開画面で特に強調して見せたい「特定原材料」として別扱いしています。
 export const SPECIFIED_INGREDIENT_SLUGS = [
     "shrimp",
@@ -41,10 +41,39 @@ export const SPECIFIED_INGREDIENT_SLUGS = [
     "egg",
     "milk",
     "peanut",
+    "cashew",
 ] as const;
 
 export const SPECIFIED_INGREDIENT_LABEL =
-    "対象：えび・かに・くるみ・小麦・そば・卵・乳・落花生（ピーナッツ）";
+    "対象：えび・かに・くるみ・小麦・そば・卵・乳・落花生（ピーナッツ）・カシューナッツ";
+
+// 特定原材料9品目以外は「特定原材料に準ずるもの」として別の注意表示に使います。
+// ピスタチオはこの分類に含め、特定原材料側には含めません。
+export const RECOMMENDED_INGREDIENT_SLUGS = [
+    "almond",
+    "abalone",
+    "squid",
+    "salmon_roe",
+    "orange",
+    "kiwifruit",
+    "beef",
+    "sesame",
+    "salmon",
+    "mackerel",
+    "soybean",
+    "chicken",
+    "banana",
+    "pork",
+    "macadamia_nut",
+    "peach",
+    "apple",
+    "yam",
+    "gelatin",
+    "pistachio",
+] as const;
+
+export const RECOMMENDED_INGREDIENT_LABEL =
+    "対象：アーモンド・あわび・いか・いくら・オレンジ・キウイフルーツ・牛肉・ごま・さけ・さば・大豆・鶏肉・バナナ・豚肉・マカダミアナッツ・もも・りんご・やまいも・ゼラチン・ピスタチオ";
 
 type AllergenLike = {
     slug: string;
@@ -245,26 +274,36 @@ export function getMenuPublishValidationErrors(args: {
     return errors;
 }
 
-export function buildSpecifiedIngredientNotice(args: {
-    rows: Array<{ slug: string; nameJa: string; status: AllergenStatus }>;
-}) {
-    // 29品目のうち、特定原材料だけを抜き出して警告 UI 用の文言を作ります。
-    const specifiedRows = args.rows.filter((row) =>
-        SPECIFIED_INGREDIENT_SLUGS.includes(
-            row.slug as (typeof SPECIFIED_INGREDIENT_SLUGS)[number],
-        ),
-    );
+export type AllergenClassificationNotice = {
+    kind: "danger" | "caution" | "unknown" | "safe";
+    title: string;
+    resultText: string;
+    unknownText: string | null;
+    desc: string;
+    boxClass: string;
+    titleClass: string;
+    textClass: string;
+};
 
-    const containsRows = specifiedRows.filter(
+function buildAllergenClassificationNotice(args: {
+    rows: Array<{ slug: string; nameJa: string; status: AllergenStatus }>;
+    targetSlugs: readonly string[];
+    classificationName: string;
+    label: string;
+}): AllergenClassificationNotice {
+    const targetSlugs = new Set(args.targetSlugs);
+    const targetRows = args.rows.filter((row) => targetSlugs.has(row.slug));
+
+    const containsRows = targetRows.filter(
         (row) => row.status === "CONTAINS",
     );
-    const mayContainRows = specifiedRows.filter(
+    const mayContainRows = targetRows.filter(
         (row) => row.status === "MAY_CONTAIN",
     );
 
     const containsNames = containsRows.map((row) => row.nameJa);
     const mayContainNames = mayContainRows.map((row) => row.nameJa);
-    const unknownNames = specifiedRows
+    const unknownNames = targetRows
         .filter((row) => row.status === "UNKNOWN")
         .map((row) => row.nameJa);
     const unknownText =
@@ -273,10 +312,10 @@ export function buildSpecifiedIngredientNotice(args: {
     if (containsNames.length > 0) {
         return {
             kind: "danger" as const,
-            title: "特定原材料を含みます",
+            title: `${args.classificationName}を含みます`,
             resultText: containsNames.join("・"),
             unknownText,
-            desc: SPECIFIED_INGREDIENT_LABEL,
+            desc: args.label,
             boxClass: "border border-red-200 bg-red-50",
             titleClass: "text-red-700",
             textClass: "text-red-900/90",
@@ -286,10 +325,10 @@ export function buildSpecifiedIngredientNotice(args: {
     if (mayContainNames.length > 0) {
         return {
             kind: "caution" as const,
-            title: "特定原材料を含む可能性があります",
+            title: `${args.classificationName}を含む可能性があります`,
             resultText: mayContainNames.join("・"),
             unknownText,
-            desc: SPECIFIED_INGREDIENT_LABEL,
+            desc: args.label,
             boxClass: "border border-yellow-200 bg-yellow-50",
             titleClass: "text-yellow-800",
             textClass: "text-yellow-900/90",
@@ -299,10 +338,10 @@ export function buildSpecifiedIngredientNotice(args: {
     if (unknownNames.length > 0) {
         return {
             kind: "unknown" as const,
-            title: "特定原材料に未設定項目があります",
+            title: `${args.classificationName}に未設定項目があります`,
             resultText: unknownNames.join("・"),
             unknownText,
-            desc: SPECIFIED_INGREDIENT_LABEL,
+            desc: args.label,
             boxClass: "border border-gray-200 bg-gray-50",
             titleClass: "text-gray-800",
             textClass: "text-gray-900/90",
@@ -311,12 +350,34 @@ export function buildSpecifiedIngredientNotice(args: {
 
     return {
         kind: "safe" as const,
-        title: "特定原材料は含まれていません",
+        title: `${args.classificationName}は含まれていません`,
         resultText: "該当なし",
         unknownText,
-        desc: SPECIFIED_INGREDIENT_LABEL,
+        desc: args.label,
         boxClass: "border border-green-200 bg-green-50",
         titleClass: "text-green-800",
         textClass: "text-green-900/90",
     };
+}
+
+export function buildSpecifiedIngredientNotice(args: {
+    rows: Array<{ slug: string; nameJa: string; status: AllergenStatus }>;
+}) {
+    return buildAllergenClassificationNotice({
+        rows: args.rows,
+        targetSlugs: SPECIFIED_INGREDIENT_SLUGS,
+        classificationName: "特定原材料",
+        label: SPECIFIED_INGREDIENT_LABEL,
+    });
+}
+
+export function buildRecommendedIngredientNotice(args: {
+    rows: Array<{ slug: string; nameJa: string; status: AllergenStatus }>;
+}) {
+    return buildAllergenClassificationNotice({
+        rows: args.rows,
+        targetSlugs: RECOMMENDED_INGREDIENT_SLUGS,
+        classificationName: "特定原材料に準ずるもの",
+        label: RECOMMENDED_INGREDIENT_LABEL,
+    });
 }

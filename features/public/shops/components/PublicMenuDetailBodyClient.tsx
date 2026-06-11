@@ -13,6 +13,7 @@ import {
 import {
     statusBadgeClass,
     statusLabelJa,
+    type AllergenClassificationNotice,
     type AllergenStatus,
 } from "@/lib/allergens";
 import {
@@ -23,16 +24,6 @@ import {
     type MenuImageFit,
     type MenuImageFrame,
 } from "@/lib/utils/menu-image-display";
-
-type SpecifiedIngredientNotice = {
-    title: string;
-    desc: string;
-    resultText: string;
-    unknownText: string | null;
-    boxClass: string;
-    titleClass: string;
-    textClass: string;
-};
 
 type AllergenRow = {
     slug: string;
@@ -57,7 +48,8 @@ export default function PublicMenuDetailBodyClient(props: {
     imagePositionY: number | null;
     ingredients: string | null;
     precaution: string | null;
-    specifiedIngredientNotice: SpecifiedIngredientNotice;
+    specifiedIngredientNotice: AllergenClassificationNotice;
+    recommendedIngredientNotice: AllergenClassificationNotice;
     allergensForClient: UserAllergenPreferenceAllergen[];
     statusBySlugForClient: Record<string, AllergenStatus>;
     rows: AllergenRow[];
@@ -79,6 +71,7 @@ export default function PublicMenuDetailBodyClient(props: {
         ingredients,
         precaution,
         specifiedIngredientNotice,
+        recommendedIngredientNotice,
         allergensForClient,
         statusBySlugForClient,
         rows,
@@ -130,33 +123,13 @@ export default function PublicMenuDetailBodyClient(props: {
                 statusBySlug={statusBySlugForClient}
             />
 
-            <div
-                className={`rounded-xl p-6 shadow-sm ${specifiedIngredientNotice.boxClass}`}
-            >
-                <h2
-                    className={`text-xl font-extrabold md:text-2xl ${specifiedIngredientNotice.titleClass}`}
-                >
-                    {specifiedIngredientNotice.title}
-                </h2>
-
-                <p
-                    className={`mt-2 text-sm font-medium ${specifiedIngredientNotice.textClass}`}
-                >
-                    {specifiedIngredientNotice.desc}
-                </p>
-
-                <p
-                    className={`mt-2 text-sm ${specifiedIngredientNotice.textClass}`}
-                >
-                    判定結果：{specifiedIngredientNotice.resultText}
-                </p>
-                {specifiedIngredientNotice.unknownText ? (
-                    <p
-                        className={`mt-2 text-sm ${specifiedIngredientNotice.textClass}`}
-                    >
-                        {specifiedIngredientNotice.unknownText}
-                    </p>
-                ) : null}
+            <div className="space-y-4">
+                <AllergenClassificationNoticeCard
+                    notice={specifiedIngredientNotice}
+                />
+                <AllergenClassificationNoticeCard
+                    notice={recommendedIngredientNotice}
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:items-start">
@@ -355,5 +328,34 @@ export default function PublicMenuDetailBodyClient(props: {
                 </div>
             </div>
         </>
+    );
+}
+
+function AllergenClassificationNoticeCard({
+    notice,
+}: {
+    notice: AllergenClassificationNotice;
+}) {
+    return (
+        <div className={`rounded-xl p-6 shadow-sm ${notice.boxClass}`}>
+            <h2
+                className={`text-xl font-extrabold md:text-2xl ${notice.titleClass}`}
+            >
+                {notice.title}
+            </h2>
+
+            <p className={`mt-2 text-sm font-medium ${notice.textClass}`}>
+                {notice.desc}
+            </p>
+
+            <p className={`mt-2 text-sm ${notice.textClass}`}>
+                判定結果：{notice.resultText}
+            </p>
+            {notice.unknownText ? (
+                <p className={`mt-2 text-sm ${notice.textClass}`}>
+                    {notice.unknownText}
+                </p>
+            ) : null}
+        </div>
     );
 }
