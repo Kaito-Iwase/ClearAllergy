@@ -114,11 +114,11 @@ export default function SelectedFreeAllergenCardsClient({
         if (specifiedRiskAllergens.length === 0) {
             return (
                 <AllergenInfoCard
-                    title="特定原材料の注意項目"
-                    description="個人設定が未選択のため、特定原材料を表示しています。"
+                    title="特定原材料9品目の注意項目"
+                    description="個人設定が未選択のため、特定原材料9品目を表示しています。"
                 >
                     <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 md:text-right">
-                        特定原材料で「含む」「含む可能性あり」はありません。
+                        特定原材料9品目で「含む」「含む可能性あり」はありません。
                     </p>
                 </AllergenInfoCard>
             );
@@ -126,8 +126,8 @@ export default function SelectedFreeAllergenCardsClient({
 
         return (
             <AllergenInfoCard
-                title="特定原材料の注意項目"
-                description="個人設定が未選択のため、特定原材料を表示しています。"
+                title="特定原材料9品目の注意項目"
+                description="個人設定が未選択のため、特定原材料9品目を表示しています。"
             >
                 <div className="flex flex-wrap gap-2 md:justify-end">
                     {specifiedRiskAllergens.map((allergen) => (
