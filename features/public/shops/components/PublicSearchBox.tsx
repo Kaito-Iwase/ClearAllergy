@@ -46,6 +46,7 @@ export default function PublicSearchBox({ placeholder }: Props) {
 
         if (next.trim() === "") sp.delete("q");
         else sp.set("q", next);
+        sp.delete("places");
 
         const queryString = sp.toString();
         router.replace(queryString ? `${pathname}?${queryString}` : pathname);

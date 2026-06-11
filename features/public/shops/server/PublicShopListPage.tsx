@@ -25,6 +25,13 @@ export default async function PublicShopListPage() {
                     name: true,
                     description: true,
                     address: true,
+                    prefecture: true,
+                    city: true,
+                    nearestStation: true,
+                    category: true,
+                    latitude: true,
+                    longitude: true,
+                    googlePlaceId: true,
                     averageBudgetYen: true,
                     coverImageUrl: true,
                     coverImageFit: true,
@@ -35,9 +42,14 @@ export default async function PublicShopListPage() {
                     menus: {
                         where: { isPublished: true },
                         orderBy: { updatedAt: "desc" },
-                        take: 1,
                         select: {
                             priceYen: true,
+                            allergenLinks: {
+                                select: {
+                                    status: true,
+                                    allergen: { select: { slug: true } },
+                                },
+                            },
                         },
                     },
                     _count: {
