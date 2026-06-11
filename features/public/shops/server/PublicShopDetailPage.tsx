@@ -66,6 +66,10 @@ export default async function PublicShopDetailPage({
                         name: true,
                         description: true,
                         address: true,
+                        prefecture: true,
+                        city: true,
+                        nearestStation: true,
+                        category: true,
                         hours: true,
                         regularHoliday: true,
                         phoneNumber: true,
@@ -280,6 +284,11 @@ export default async function PublicShopDetailPage({
                                 <span className="rounded-full bg-gray-100 px-2 py-1">
                                     価格表示あり
                                 </span>
+                                {shop.category ? (
+                                    <span className="rounded-full bg-gray-100 px-2 py-1">
+                                        {shop.category}
+                                    </span>
+                                ) : null}
                             </div>
                         </div>
 
@@ -325,6 +334,16 @@ export default async function PublicShopDetailPage({
                                         </p>
                                     </div>
                                 </div>
+
+                                {shop.nearestStation ? (
+                                    <div className="flex items-start gap-2">
+                                        <span className="mt-0.5 text-gray-500">駅</span>
+                                        <div>
+                                            <p className="font-semibold">最寄り駅</p>
+                                            <p className="text-gray-600">{shop.nearestStation}</p>
+                                        </div>
+                                    </div>
+                                ) : null}
 
                                 <div className="flex items-start gap-2">
                                     <span className="mt-0.5 text-gray-500">
