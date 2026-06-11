@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import BrandLogo from "@/components/layout/BrandLogo";
-import PublicSearchBox from "@/components/public/PublicSearchBox";
+import PublicSearchBox from "@/features/public/shops/components/PublicSearchBox";
 
 export default function PublicHeader() {
     return (

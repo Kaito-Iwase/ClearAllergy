@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import {
     isDatabaseUnavailableError,
     logDatabaseUnavailableError,
-} from "@/lib/db-errors";
+} from "@/lib/db/errors";
 import { normalizeEmail } from "@/lib/email";
 
 function extractPrimaryEmail(

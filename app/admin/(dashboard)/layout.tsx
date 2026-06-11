@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
-import { requireCurrentAdminContextOrRedirect } from "@/lib/admin-auth";
+import { requireCurrentAdminContextOrRedirect } from "@/lib/auth/admin-auth";
 
 export default async function AdminDashboardLayout({
     children,

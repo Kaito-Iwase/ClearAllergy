@@ -1,15 +1,15 @@
 import Link from "next/link";
 import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
-import ShopEditClient from "@/components/admin/shop/ShopEditClient";
+import ShopEditClient from "@/features/admin/shop/components/ShopEditClient";
 import { prisma } from "@/lib/db";
-import { sanitizeStoredImageUrl } from "@/lib/image-url-policy";
+import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
 import {
     parseMenuImageFit,
     parseMenuImageFrame,
     parseMenuImagePosition,
     parseMenuImagePositionPercent,
     parseMenuImageZoom,
-} from "@/lib/menu-image-display";
+} from "@/lib/utils/menu-image-display";
 
 export const dynamic = "force-dynamic";
 
