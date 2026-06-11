@@ -1,47 +1,119 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import type { CSSProperties } from "react";
-import { useMemo } from "react";
-import { useSearchParams } from "next/navigation";
-import { formatDateTimeJa } from "@/lib/utils/formatters";
-import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
+import React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { PREFECTURES } from "@/lib/constants/prefectures";
 import {
-    parseMenuImageFit,
-    parseMenuImagePositionPercent,
-    parseMenuImageZoom,
-} from "@/lib/utils/menu-image-display";
+    loadUserAllergenPreferences,
+    USER_ALLERGENS_UPDATED_EVENT,
+} from "@/lib/public-allergen-preferences";
+import type { GooglePlaceCandidate } from "@/types/google-places";
+import PublicShopMap from "@/features/public/shops/components/PublicShopMap";
+
+type AllergenStatus = "CONTAINS" | "FREE" | "MAY_CONTAIN" | "UNKNOWN";
 
 export type PublicShopListShop = {
     id: string;
     name: string;
     description: string | null;
     address: string | null;
+    prefecture: string | null;
+    city: string | null;
+    nearestStation: string | null;
+    category: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    googlePlaceId: string | null;
     averageBudgetYen: number | null;
-    coverImageUrl: string | null;
-    coverImageFit: string | null;
-    coverImageZoom: number | null;
-    coverImagePositionX: number | null;
-    coverImagePositionY: number | null;
     updatedAt: string;
     menus: Array<{
         priceYen: number | null;
+        allergenLinks: Array<{
+            status: AllergenStatus;
+            allergen: { slug: string };
+        }>;
     }>;
-    _count: {
-        menus: number;
-    };
+    _count: { menus: number };
 };
 
-function getBudgetText(
-    averageBudgetYen: number | null | undefined,
-    priceYen: number | null | undefined,
-) {
-    return typeof averageBudgetYen === "number"
-        ? `平均予算 ¥${averageBudgetYen.toLocaleString("ja-JP")}前後`
-        : typeof priceYen === "number"
-          ? `価格例 ¥${priceYen.toLocaleString("ja-JP")}`
-          : "価格情報 近日追加";
+function normalize(value: string | null | undefined) {
+    return (value ?? "").toLocaleLowerCase("ja-JP");
+}
+
+function getShopPrefecture(shop: PublicShopListShop) {
+    if (shop.prefecture?.trim()) return shop.prefecture.trim();
+    return PREFECTURES.find((value) => shop.address?.includes(value)) ?? null;
+}
+
+function getShopCity(shop: PublicShopListShop) {
+    if (shop.city?.trim()) return shop.city.trim();
+    const address = shop.address?.trim();
+    const prefecture = getShopPrefecture(shop);
+    if (!address) return null;
+
+    const areaText =
+        prefecture && address.startsWith(prefecture)
+            ? address.slice(prefecture.length)
+            : address;
+    return (
+        areaText.match(/^(.+?市.+?区)/)?.[1] ??
+        areaText.match(/^(.+?(?:市|区|町|村))/)?.[1] ??
+        null
+    );
+}
+
+function matchesSafeMenu(shop: PublicShopListShop, excludedSlugs: string[]) {
+    if (excludedSlugs.length === 0) return true;
+    return shop.menus.some((menu) => {
+        const statusBySlug = new Map(
+            menu.allergenLinks.map((link) => [link.allergen.slug, link.status]),
+        );
+        return excludedSlugs.every((slug) => statusBySlug.get(slug) === "FREE");
+    });
+}
+
+function ShopCards({ shops }: { shops: PublicShopListShop[] }) {
+    return (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {shops.map((shop) => (
+                <Link
+                    id={`shop-${shop.id}`}
+                    key={shop.id}
+                    href={`/shops/${shop.id}`}
+                    className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-300 hover:shadow-md"
+                >
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-bold text-green-700">
+                                {shop.category || "カテゴリ未設定"}
+                            </p>
+                            <h3 className="mt-1 text-xl font-black text-neutral-900">{shop.name}</h3>
+                        </div>
+                        <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-800">
+                            アレルゲン情報あり
+                        </span>
+                    </div>
+                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-neutral-600">
+                        {shop.description || "説明は未登録です。"}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-neutral-700">
+                        <span className="rounded-full bg-neutral-100 px-3 py-1.5">
+                            {shop.address || "住所未設定"}
+                        </span>
+                        {shop.nearestStation ? (
+                            <span className="rounded-full bg-neutral-100 px-3 py-1.5">
+                                {shop.nearestStation}
+                            </span>
+                        ) : null}
+                        <span className="rounded-full bg-neutral-100 px-3 py-1.5">
+                            公開メニュー {shop._count.menus}件
+                        </span>
+                    </div>
+                </Link>
+            ))}
+        </div>
+    );
 }
 
 export default function PublicShopListClient({
@@ -51,242 +123,197 @@ export default function PublicShopListClient({
     initialShops: PublicShopListShop[];
     isDatabaseAvailable: boolean;
 }) {
+    const router = useRouter();
     const searchParams = useSearchParams();
-    const q = (searchParams.get("q") ?? "").trim();
+    const [query, setQuery] = React.useState(searchParams.get("q") ?? "");
+    const [prefecture, setPrefecture] = React.useState(searchParams.get("prefecture") ?? "");
+    const [city, setCity] = React.useState(searchParams.get("city") ?? "");
+    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
+    const [places, setPlaces] = React.useState<GooglePlaceCandidate[]>([]);
+    const [placesError, setPlacesError] = React.useState("");
+    const [placesLoading, setPlacesLoading] = React.useState(false);
+    const lastPlacesQueryRef = React.useRef("");
+    const placesRequestRef = React.useRef<AbortController | null>(null);
 
-    const shops = useMemo(() => {
-        if (q === "") {
-            return initialShops;
-        }
+    React.useEffect(() => {
+        setQuery(searchParams.get("q") ?? "");
+        setPrefecture(searchParams.get("prefecture") ?? "");
+        setCity(searchParams.get("city") ?? "");
+    }, [searchParams]);
 
-        const needle = q.toLocaleLowerCase("ja-JP");
-        return initialShops.filter((shop) => {
-            return (
-                shop.name.toLocaleLowerCase("ja-JP").includes(needle) ||
-                (shop.description ?? "")
-                    .toLocaleLowerCase("ja-JP")
-                    .includes(needle)
+    React.useEffect(() => {
+        const sync = () => setExcludedSlugs(loadUserAllergenPreferences().excludedSlugs);
+        sync();
+        window.addEventListener(USER_ALLERGENS_UPDATED_EVENT, sync as EventListener);
+        window.addEventListener("storage", sync);
+        return () => {
+            window.removeEventListener(USER_ALLERGENS_UPDATED_EVENT, sync as EventListener);
+            window.removeEventListener("storage", sync);
+        };
+    }, []);
+
+    const cityOptions = React.useMemo(
+        () => Array.from(new Set(initialShops
+            .filter((shop) => !prefecture || getShopPrefecture(shop) === prefecture)
+            .map(getShopCity)
+            .filter((value): value is string => Boolean(value)))).sort(),
+        [initialShops, prefecture],
+    );
+
+    const filtered = React.useMemo(() => {
+        const keywords = query.trim().split(/\s+/).filter(Boolean).map(normalize);
+        const results = initialShops
+            .filter((shop) => !prefecture || getShopPrefecture(shop) === prefecture)
+            .filter((shop) => !city || getShopCity(shop) === city)
+            .filter((shop) => matchesSafeMenu(shop, excludedSlugs))
+            .map((shop) => {
+                const haystack = [
+                    shop.name, shop.description, shop.address, shop.prefecture,
+                    getShopPrefecture(shop), getShopCity(shop),
+                    shop.city, shop.nearestStation, shop.category,
+                ].map(normalize).join(" ");
+                const matched = keywords.filter((keyword) => haystack.includes(keyword)).length;
+                return { shop, matched, all: keywords.length === 0 || matched === keywords.length };
+            })
+            .filter((result) => query.trim() === "" || result.matched > 0);
+        return {
+            exact: results.filter((result) => result.all).map((result) => result.shop),
+            related: results.filter((result) => !result.all).sort((a, b) => b.matched - a.matched).map((result) => result.shop),
+        };
+    }, [city, excludedSlugs, initialShops, prefecture, query]);
+
+    const registeredPlaceIds = React.useMemo(
+        () => new Set(initialShops.map((shop) => shop.googlePlaceId).filter(Boolean)),
+        [initialShops],
+    );
+    const unregisteredPlaces = places.filter((place) => !registeredPlaceIds.has(place.placeId));
+    const visibleShops = [...filtered.exact, ...filtered.related];
+
+    async function submitSearch(event: React.FormEvent) {
+        event.preventDefault();
+        const params = new URLSearchParams();
+        if (query.trim()) params.set("q", query.trim());
+        if (prefecture) params.set("prefecture", prefecture);
+        if (city) params.set("city", city);
+        router.replace(params.size ? `/shops?${params}` : "/shops");
+
+        const placesQuery = [query.trim(), city, prefecture].filter(Boolean).join(" ");
+        setPlaces([]);
+        setPlacesError("");
+        if (placesQuery.length < 2) return;
+        if (placesQuery === lastPlacesQueryRef.current) return;
+        lastPlacesQueryRef.current = placesQuery;
+        placesRequestRef.current?.abort();
+        const controller = new AbortController();
+        placesRequestRef.current = controller;
+        setPlacesLoading(true);
+        try {
+            const response = await fetch(
+                `/api/places/search?q=${encodeURIComponent(placesQuery)}`,
+                { signal: controller.signal },
             );
-        });
-    }, [initialShops, q]);
-
-    const resultText = q !== "" ? `検索: ${q}（${shops.length}件）` : null;
-
-    const emptyText =
-        !isDatabaseAvailable
-            ? "現在データベースに接続できないため、公開店舗を読み込めません。時間をおいて再度お試しください。"
-            : q !== ""
-              ? "該当する店舗が見つかりませんでした。"
-              : "公開中の店舗がありません。";
+            const data = (await response.json().catch(() => null)) as {
+                places?: GooglePlaceCandidate[];
+                error?: string;
+                message?: string;
+                available?: boolean;
+            } | null;
+            if (!response.ok) throw new Error(data?.error ?? "周辺店舗検索に失敗しました。");
+            setPlaces(data?.places ?? []);
+            if (data?.available === false) {
+                setPlacesError(
+                    data.message ??
+                        "Google Places検索は現在設定されていません。",
+                );
+            }
+        } catch (error) {
+            if (error instanceof DOMException && error.name === "AbortError") return;
+            lastPlacesQueryRef.current = "";
+            setPlacesError(error instanceof Error ? error.message : String(error));
+        } finally {
+            if (placesRequestRef.current === controller) {
+                placesRequestRef.current = null;
+                setPlacesLoading(false);
+            }
+        }
+    }
 
     return (
-        <main className="mx-auto max-w-5xl px-4 py-8">
-            <section className="mb-6 rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
-                <p className="text-sm font-semibold text-green-700">
-                    まず試すなら
+        <main className="mx-auto max-w-6xl px-4 py-8">
+            <section className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
+                <h1 className="text-2xl font-black text-neutral-900">エリア・キーワードから店舗を探す</h1>
+                <p className="mt-2 text-sm leading-6 text-neutral-600">
+                    例: 「栄 居酒屋」「名古屋駅 ラーメン」。登録済み店舗のアレルゲン情報を優先して表示します。
                 </p>
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900">
-                    公開店舗から、メニューごとの価格とアレルゲン情報を確認できます
-                </h1>
-                <p className="mt-3 text-sm leading-7 text-neutral-600">
-                    各店舗ページでは公開メニュー一覧、各メニュー詳細ではアレルゲン29品目の状態を確認できます。未ログインでも閲覧できます。
-                </p>
-                {!isDatabaseAvailable ? (
-                    <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                        現在は公開データベースに接続できないため、店舗一覧を表示できません。
+                <form onSubmit={submitSearch} className="mt-5 grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
+                    <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="場所名・駅名・ジャンル・店舗名" className="rounded-xl border border-neutral-300 px-4 py-3" />
+                    <select value={prefecture} onChange={(e) => { setPrefecture(e.target.value); setCity(""); }} className="rounded-xl border border-neutral-300 px-3 py-3">
+                        <option value="">すべての都道府県</option>
+                        {PREFECTURES.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                    <select value={city} onChange={(e) => setCity(e.target.value)} className="rounded-xl border border-neutral-300 px-3 py-3">
+                        <option value="">すべての市区町村</option>
+                        {cityOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                    <button type="submit" className="rounded-xl bg-[#13ec13] px-5 py-3 font-extrabold text-black">
+                        {placesLoading ? "検索中..." : "検索"}
+                    </button>
+                </form>
+                {excludedSlugs.length > 0 ? (
+                    <p className="mt-3 rounded-xl bg-green-50 px-4 py-3 text-xs font-bold text-green-900">
+                        保存済み除外設定に対して、すべてFREEの公開メニューがある店舗だけを表示中です。
                     </p>
                 ) : null}
             </section>
 
-            <div className="mb-6 flex items-end justify-between gap-4">
-                <div>
-                    <p className="text-xs text-neutral-500">ClearAllergy</p>
-                    <h1 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900">
-                        店舗一覧
-                    </h1>
+            <section className="mt-6">
+                <PublicShopMap shops={visibleShops} places={unregisteredPlaces} />
+            </section>
 
-                    {resultText ? (
-                        <p className="mt-2 text-sm text-gray-600">
-                            検索: <span className="font-semibold">{q}</span>（
-                            {shops.length}件）
-                        </p>
-                    ) : null}
+            {!isDatabaseAvailable ? (
+                <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    現在データベースに接続できないため、登録済み店舗を読み込めません。
+                </p>
+            ) : null}
+
+            <section className="mt-8">
+                <h2 className="text-xl font-black text-neutral-900">条件に一致するClearAllergy登録済み店舗</h2>
+                <p className="mt-1 text-sm text-neutral-500">{filtered.exact.length}件</p>
+                <div className="mt-4">
+                    {filtered.exact.length ? <ShopCards shops={filtered.exact} /> : <p className="rounded-xl border border-dashed p-5 text-sm text-neutral-600">完全一致する登録済み店舗はありません。</p>}
                 </div>
+            </section>
 
-                <div className="text-xs text-neutral-500">
-                    {shops.length} shops
-                </div>
-            </div>
+            {filtered.related.length > 0 ? (
+                <section className="mt-10">
+                    <h2 className="text-xl font-black text-neutral-900">条件の一部に一致する店舗</h2>
+                    <p className="mt-1 text-sm text-neutral-500">{filtered.related.length}件</p>
+                    <div className="mt-4"><ShopCards shops={filtered.related} /></div>
+                </section>
+            ) : null}
 
-            {shops.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-6">
-                    <p className="text-sm text-neutral-700">{emptyText}</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {shops.map((shop, index) => {
-                        const descriptionText =
-                            shop.description?.trim() || "説明は未登録です。";
-                        const addressText = shop.address?.trim() || "住所未設定";
-                        const budgetText = getBudgetText(
-                            shop.averageBudgetYen,
-                            shop.menus[0]?.priceYen,
-                        );
-                        const safeCoverImageUrl = sanitizeStoredImageUrl(
-                            shop.coverImageUrl,
-                            {
-                                kind: "shop",
-                                shopId: shop.id,
-                            },
-                        );
-                        const hasCoverImage = Boolean(safeCoverImageUrl);
-                        const coverImageStyle: CSSProperties = {
-                            objectFit: parseMenuImageFit(shop.coverImageFit),
-                            objectPosition: `${parseMenuImagePositionPercent(
-                                shop.coverImagePositionX,
-                            )}% ${parseMenuImagePositionPercent(
-                                shop.coverImagePositionY,
-                            )}%`,
-                            transform: `scale(${
-                                parseMenuImageZoom(shop.coverImageZoom) / 100
-                            })`,
-                            transformOrigin: `${parseMenuImagePositionPercent(
-                                shop.coverImagePositionX,
-                            )}% ${parseMenuImagePositionPercent(
-                                shop.coverImagePositionY,
-                            )}%`,
-                        };
-
-                        if (hasCoverImage) {
-                            return (
-                                <Link
-                                    key={shop.id}
-                                    href={`/shops/${shop.id}`}
-                                    className="group relative min-h-[320px] overflow-hidden rounded-[28px] border border-neutral-200 bg-neutral-900 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-                                >
-                                    <div className="absolute inset-0 transition duration-500 group-hover:scale-105">
-                                        <Image
-                                            src={safeCoverImageUrl ?? ""}
-                                            alt=""
-                                            fill
-                                            priority={index === 0}
-                                            sizes="(min-width: 640px) 50vw, 100vw"
-                                            className="h-full w-full"
-                                            style={coverImageStyle}
-                                        />
-                                    </div>
-                                    <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/20" />
-                                    <div className="relative flex h-full flex-col justify-between p-5 text-white sm:p-6">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <span className="inline-flex rounded-full bg-white/18 px-3 py-1 text-xs font-semibold tracking-wide text-white backdrop-blur-sm">
-                                                公開メニュー {shop._count.menus}件
-                                            </span>
-                                            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-sm">
-                                                店舗ページへ
-                                            </span>
-                                        </div>
-
-                                        <div className="max-w-[520px]">
-                                            <h2 className="text-2xl font-black leading-tight tracking-[-0.03em] sm:text-[2rem]">
-                                                {shop.name}
-                                            </h2>
-                                            <p className="mt-3 line-clamp-3 text-sm leading-7 text-white/90 sm:text-base">
-                                                {descriptionText}
-                                            </p>
-
-                                            <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/90">
-                                                <span className="rounded-full bg-white/12 px-3 py-1.5 backdrop-blur-sm">
-                                                    {budgetText}
-                                                </span>
-                                                <span className="rounded-full bg-white/12 px-3 py-1.5 backdrop-blur-sm">
-                                                    {addressText}
-                                                </span>
-                                            </div>
-
-                                            <div className="mt-5 flex items-center justify-between gap-4">
-                                                <p className="text-xs text-white/75">
-                                                    更新:{" "}
-                                                    {formatDateTimeJa(
-                                                        shop.updatedAt,
-                                                    )}
-                                                </p>
-                                                <span className="inline-flex items-center rounded-2xl bg-[#13ec13] px-4 py-2 text-sm font-extrabold text-black transition group-hover:translate-x-0.5">
-                                                    公開メニューを見る
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Link>
-                            );
-                        }
-
-                        return (
-                            <Link
-                                key={shop.id}
-                                href={`/shops/${shop.id}`}
-                                className="group relative min-h-[320px] overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-green-200 hover:shadow-xl"
-                            >
-                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(19,236,19,0.18),_transparent_34%),linear-gradient(135deg,_#ffffff_0%,_#f4fbf4_55%,_#ecf7ec_100%)]" />
-                                <div className="absolute right-[-36px] top-[-36px] h-36 w-36 rounded-full bg-[#13ec13]/10 blur-2xl" />
-                                <div className="absolute bottom-[-24px] left-[-12px] h-24 w-24 rounded-full border border-[#13ec13]/15" />
-
-                                <div className="relative flex h-full flex-col justify-between p-5 sm:p-6">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm ring-1 ring-inset ring-neutral-200">
-                                            <span className="text-base leading-none">
-                                                🏪
-                                            </span>
-                                            写真準備中
-                                        </div>
-                                        <span className="text-xl text-neutral-300 transition group-hover:text-neutral-500">
-                                            →
-                                        </span>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-green-700">
-                                            Public shop
-                                        </p>
-                                        <h2 className="mt-3 text-2xl font-black leading-tight tracking-[-0.03em] text-neutral-900">
-                                            {shop.name}
-                                        </h2>
-                                        <p
-                                            className={`mt-3 text-sm leading-7 ${
-                                                shop.description
-                                                    ? "line-clamp-3 text-neutral-700"
-                                                    : "text-neutral-500"
-                                            }`}
-                                        >
-                                            {descriptionText}
-                                        </p>
-
-                                        <div className="mt-5 flex flex-wrap gap-2 text-xs text-neutral-700">
-                                            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-inset ring-neutral-200">
-                                                公開メニュー {shop._count.menus}件
-                                            </span>
-                                            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-inset ring-neutral-200">
-                                                {budgetText}
-                                            </span>
-                                            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-inset ring-neutral-200">
-                                                {addressText}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-6 flex items-center justify-between gap-4 border-t border-neutral-200/80 pt-4">
-                                        <p className="text-xs text-neutral-500">
-                                            更新: {formatDateTimeJa(shop.updatedAt)}
-                                        </p>
-                                        <span className="inline-flex items-center rounded-2xl border border-neutral-200 bg-white px-4 py-2 text-sm font-bold text-neutral-900 shadow-sm transition group-hover:border-[#13ec13]/40 group-hover:bg-[#f4fff4]">
-                                            店舗ページを見る
-                                        </span>
-                                    </div>
-                                </div>
-                            </Link>
-                        );
-                    })}
-                </div>
-            )}
+            <section className="mt-10 border-t border-neutral-200 pt-8">
+                <h2 className="text-xl font-black text-neutral-900">アレルゲン情報未登録の周辺店舗</h2>
+                <p className="mt-2 text-sm leading-6 text-neutral-600">
+                    Google Places由来の場所情報です。安全候補には含めず、アレルゲン情報の確認には利用できません。
+                </p>
+                {placesError ? <p className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{placesError}</p> : null}
+                {unregisteredPlaces.length > 0 ? (
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                        {unregisteredPlaces.map((place) => (
+                            <article key={place.placeId} className="rounded-2xl border border-neutral-300 bg-neutral-50 p-5">
+                                <span className="rounded-full bg-neutral-200 px-3 py-1 text-xs font-bold text-neutral-700">未登録</span>
+                                <h3 className="mt-3 text-lg font-black text-neutral-900">{place.name}</h3>
+                                <p className="mt-2 text-sm text-neutral-600">{place.address}</p>
+                                <p className="mt-3 text-xs font-bold text-red-700">この店舗はClearAllergyにアレルゲン情報が登録されていません。</p>
+                                {place.googleMapsUri ? <a href={place.googleMapsUri} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-bold text-blue-700 underline">Google Mapsで確認</a> : null}
+                            </article>
+                        ))}
+                    </div>
+                ) : !placesLoading && !placesError ? (
+                    <p className="mt-4 text-sm text-neutral-500">検索確定後に周辺店舗候補を表示します。</p>
+                ) : null}
+            </section>
         </main>
     );
 }

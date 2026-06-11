@@ -31,6 +31,8 @@ ClearAllergy は、食物アレルギーを持つ人が外食時に感じる「�
 
 - 公開中の店舗一覧の閲覧
 - 店舗名・説明文による店舗検索
+- 都道府県・市区町村・駅名・住所・カテゴリによるエリア検索
+- Google Maps表示と、Google Places由来の未登録周辺店舗候補表示
 - 店舗ページでの公開メニュー一覧表示
 - メニュー名・説明・カテゴリによるメニュー検索
 - メニュー詳細での価格、カテゴリ、原材料、注意書きの確認
@@ -43,6 +45,7 @@ ClearAllergy は、食物アレルギーを持つ人が外食時に感じる「�
 
 - Clerk を利用した管理者ログイン
 - 店舗情報の登録・編集
+- 店舗カテゴリ・エリア情報・Google店舗候補の登録
 - 店舗画像のアップロード
 - 店舗公開ページ用 QR コードの表示・印刷
 - メニューの作成・編集・削除
@@ -86,6 +89,7 @@ ClearAllergy は、食物アレルギーを持つ人が外食時に感じる「�
 | Clerk | 認証・セッション管理を外部サービスに任せ、アプリ側では店舗権限の管理に集中するため |
 | Vercel Blob | 店舗画像・メニュー画像をアプリ本体とは分けて保存し、Vercel 環境で扱いやすくするため |
 | Vercel | Next.js アプリをデプロイしやすく、Neon や Blob との組み合わせを想定しやすいため |
+| Google Maps Platform | 登録済み店舗の地図表示と、周辺の未登録店舗候補を補助的に表示するため |
 
 ## システム構成
 
@@ -288,6 +292,9 @@ npm run dev
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | 必須 | Clerk の公開キー |
 | `CLERK_SECRET_KEY` | 必須 | Clerk のサーバー側キー |
 | `NEXT_PUBLIC_APP_URL` | 任意 | QR コードや公開 URL 生成に使うベース URL |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | 地図利用時 | Maps JavaScript API用。HTTPリファラー制限を設定 |
+| `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | 地図利用時 | Advanced Marker用のJavaScript Map ID |
+| `GOOGLE_MAPS_SERVER_API_KEY` | Places利用時 | Places API (New) Text Search用。サーバー専用 |
 | `BLOB_READ_WRITE_TOKEN` | 画像アップロード時に必要 | Vercel Blob の読み書きトークン |
 | `ALLOWED_IMAGE_URL_PREFIXES` | 任意 | 許可する画像 URL prefix |
 
