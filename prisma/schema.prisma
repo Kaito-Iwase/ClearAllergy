@@ -29,6 +29,13 @@ model Shop {
   name                String
   description         String?
   address             String?
+  prefecture          String?
+  city                String?
+  nearestStation      String?
+  category            String?
+  latitude            Float?
+  longitude           Float?
+  googlePlaceId       String?       @unique
   hours               String?
   regularHoliday      String?
   phoneNumber         String?

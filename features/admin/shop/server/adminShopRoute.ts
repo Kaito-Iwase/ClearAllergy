@@ -26,6 +26,7 @@ import {
     parseMenuImagePositionPercent,
     parseMenuImageZoom,
 } from "@/lib/utils/menu-image-display";
+import { PREFECTURES } from "@/lib/constants/prefectures";
 
 const app = new Hono();
 
@@ -33,6 +34,13 @@ type ShopUpdateBody = {
     name?: unknown;
     description?: unknown;
     address?: unknown;
+    prefecture?: unknown;
+    city?: unknown;
+    nearestStation?: unknown;
+    category?: unknown;
+    latitude?: unknown;
+    longitude?: unknown;
+    googlePlaceId?: unknown;
     hours?: unknown;
     regularHoliday?: unknown;
     phoneNumber?: unknown;
@@ -46,6 +54,20 @@ type ShopUpdateBody = {
     coverImagePositionX?: unknown;
     coverImagePositionY?: unknown;
 };
+
+function parseCoordinate(
+    value: unknown,
+    min: number,
+    max: number,
+): number | null | undefined {
+    if (value === undefined || value === null || value === "") return null;
+    if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+    return value >= min && value <= max ? value : undefined;
+}
+
+function hasTooLongValue(values: Array<[string | null, number]>) {
+    return values.some(([value, max]) => value !== null && value.length > max);
+}
 
 app.get("/api/admin/shop", async () => {
     try {
@@ -62,6 +84,13 @@ app.get("/api/admin/shop", async () => {
                 name: true,
                 description: true,
                 address: true,
+                prefecture: true,
+                city: true,
+                nearestStation: true,
+                category: true,
+                latitude: true,
+                longitude: true,
+                googlePlaceId: true,
                 hours: true,
                 regularHoliday: true,
                 phoneNumber: true,
@@ -145,6 +174,13 @@ app.put("/api/admin/shop", async (c) => {
                 name: true,
                 description: true,
                 address: true,
+                prefecture: true,
+                city: true,
+                nearestStation: true,
+                category: true,
+                latitude: true,
+                longitude: true,
+                googlePlaceId: true,
                 hours: true,
                 regularHoliday: true,
                 phoneNumber: true,
@@ -188,6 +224,13 @@ app.put("/api/admin/shop", async (c) => {
         // 文字列項目は空なら null に寄せて保存し、DB の扱いを揃えます。
         const description = toTrimmedNullableString(body.description);
         const address = toTrimmedNullableString(body.address);
+        const prefecture = toTrimmedNullableString(body.prefecture);
+        const city = toTrimmedNullableString(body.city);
+        const nearestStation = toTrimmedNullableString(body.nearestStation);
+        const category = toTrimmedNullableString(body.category);
+        const latitude = parseCoordinate(body.latitude, -90, 90);
+        const longitude = parseCoordinate(body.longitude, -180, 180);
+        const googlePlaceId = toTrimmedNullableString(body.googlePlaceId);
         const hours = toTrimmedNullableString(body.hours);
         const regularHoliday = toTrimmedNullableString(body.regularHoliday);
         const phoneNumber = toTrimmedNullableString(body.phoneNumber);
@@ -222,6 +265,42 @@ app.put("/api/admin/shop", async (c) => {
             body.coverImagePositionY === undefined
                 ? parseMenuImagePositionPercent(existing.coverImagePositionY)
                 : parseMenuImagePositionPercent(body.coverImagePositionY);
+
+        if (
+            hasTooLongValue([
+                [name, 120],
+                [description, 2000],
+                [address, 500],
+                [prefecture, 20],
+                [city, 120],
+                [nearestStation, 120],
+                [category, 120],
+                [hours, 1000],
+                [regularHoliday, 500],
+                [phoneNumber, 50],
+                [note, 2000],
+                [googlePlaceId, 255],
+            ])
+        ) {
+            return NextResponse.json(
+                { error: "bad request: input is too long" },
+                { status: 400 },
+            );
+        }
+
+        if (
+            latitude === undefined ||
+            longitude === undefined ||
+            (latitude === null) !== (longitude === null) ||
+            (googlePlaceId === null) !== (latitude === null) ||
+            (prefecture !== null &&
+                !PREFECTURES.includes(prefecture as (typeof PREFECTURES)[number]))
+        ) {
+            return NextResponse.json(
+                { error: "bad request: invalid Google place location" },
+                { status: 400 },
+            );
+        }
 
         if (!averageBudgetResult.ok) {
             await writeAdminAuditLog({
@@ -265,6 +344,13 @@ app.put("/api/admin/shop", async (c) => {
                 name,
                 description,
                 address,
+                prefecture,
+                city,
+                nearestStation,
+                category,
+                latitude,
+                longitude,
+                googlePlaceId,
                 hours,
                 regularHoliday,
                 phoneNumber,
@@ -283,6 +369,13 @@ app.put("/api/admin/shop", async (c) => {
                 name: true,
                 description: true,
                 address: true,
+                prefecture: true,
+                city: true,
+                nearestStation: true,
+                category: true,
+                latitude: true,
+                longitude: true,
+                googlePlaceId: true,
                 hours: true,
                 regularHoliday: true,
                 phoneNumber: true,
@@ -316,6 +409,17 @@ app.put("/api/admin/shop", async (c) => {
                     existing.name !== name ? "name" : null,
                     existing.description !== description ? "description" : null,
                     existing.address !== address ? "address" : null,
+                    existing.prefecture !== prefecture ? "prefecture" : null,
+                    existing.city !== city ? "city" : null,
+                    existing.nearestStation !== nearestStation
+                        ? "nearestStation"
+                        : null,
+                    existing.category !== category ? "category" : null,
+                    existing.latitude !== latitude ? "latitude" : null,
+                    existing.longitude !== longitude ? "longitude" : null,
+                    existing.googlePlaceId !== googlePlaceId
+                        ? "googlePlaceId"
+                        : null,
                     existing.hours !== hours ? "hours" : null,
                     existing.regularHoliday !== regularHoliday
                         ? "regularHoliday"

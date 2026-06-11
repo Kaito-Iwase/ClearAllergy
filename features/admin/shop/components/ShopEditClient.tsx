@@ -10,6 +10,9 @@ import React from "react";
 import ShareShopUrlButton from "@/features/public/shops/components/ShareShopUrlButton";
 import ShopQrCard from "@/features/admin/shop/components/ShopQrCard";
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
+import AdminGooglePlacePicker from "@/features/admin/shop/components/AdminGooglePlacePicker";
+import { PREFECTURES } from "@/lib/constants/prefectures";
+import type { GooglePlaceCandidate } from "@/types/google-places";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import {
     DEFAULT_SHOP_COVER_IMAGE_FIT,
@@ -28,6 +31,13 @@ type ShopViewModel = {
     name: string;
     description: string | null;
     address: string | null;
+    prefecture: string | null;
+    city: string | null;
+    nearestStation: string | null;
+    category: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    googlePlaceId: string | null;
     hours: string | null;
     regularHoliday: string | null;
     phoneNumber: string | null;
@@ -112,6 +122,15 @@ export default function ShopEditClient({
         initialShop.description ?? "",
     );
     const [address, setAddress] = React.useState(initialShop.address ?? "");
+    const [prefecture, setPrefecture] = React.useState(initialShop.prefecture ?? "");
+    const [city, setCity] = React.useState(initialShop.city ?? "");
+    const [nearestStation, setNearestStation] = React.useState(initialShop.nearestStation ?? "");
+    const [category, setCategory] = React.useState(initialShop.category ?? "");
+    const [latitude, setLatitude] = React.useState<number | null>(initialShop.latitude);
+    const [longitude, setLongitude] = React.useState<number | null>(initialShop.longitude);
+    const [googlePlaceId, setGooglePlaceId] = React.useState<string | null>(
+        initialShop.googlePlaceId,
+    );
     const [hoursMode, setHoursMode] = React.useState<BusinessHoursMode>(
         initialBusinessHours.mode,
     );
@@ -295,6 +314,20 @@ export default function ShopEditClient({
         setHoursMode(nextMode);
     }
 
+    function clearGooglePlaceLink() {
+        setLatitude(null);
+        setLongitude(null);
+        setGooglePlaceId(null);
+    }
+
+    function selectGooglePlace(place: GooglePlaceCandidate) {
+        setAddress(place.address);
+        setLatitude(place.latitude);
+        setLongitude(place.longitude);
+        setGooglePlaceId(place.placeId);
+        setSavedMessage("Google店舗候補を選択しました。保存すると反映されます。");
+    }
+
     async function saveShop() {
         setError(null);
         setSavedMessage("");
@@ -328,6 +361,13 @@ export default function ShopEditClient({
                     name: trimmedName,
                     description: description.trim(),
                     address: address.trim(),
+                    prefecture: prefecture.trim(),
+                    city: city.trim(),
+                    nearestStation: nearestStation.trim(),
+                    category: category.trim(),
+                    latitude,
+                    longitude,
+                    googlePlaceId,
                     hours: buildBusinessHoursText({
                         mode: hoursMode,
                         single: hoursSingle,
@@ -353,6 +393,13 @@ export default function ShopEditClient({
                 shop?: {
                     updatedAt: string;
                     hours?: string | null;
+                    prefecture?: string | null;
+                    city?: string | null;
+                    nearestStation?: string | null;
+                    category?: string | null;
+                    latitude?: number | null;
+                    longitude?: number | null;
+                    googlePlaceId?: string | null;
                     regularHoliday?: string | null;
                     phoneNumber?: string | null;
                     note?: string | null;
@@ -388,6 +435,13 @@ export default function ShopEditClient({
                     setHoursHoliday(parsedHours.holiday);
                 }
             }
+            if (data?.shop?.prefecture !== undefined) setPrefecture(data.shop.prefecture ?? "");
+            if (data?.shop?.city !== undefined) setCity(data.shop.city ?? "");
+            if (data?.shop?.nearestStation !== undefined) setNearestStation(data.shop.nearestStation ?? "");
+            if (data?.shop?.category !== undefined) setCategory(data.shop.category ?? "");
+            if (data?.shop?.latitude !== undefined) setLatitude(data.shop.latitude ?? null);
+            if (data?.shop?.longitude !== undefined) setLongitude(data.shop.longitude ?? null);
+            if (data?.shop?.googlePlaceId !== undefined) setGooglePlaceId(data.shop.googlePlaceId ?? null);
             if (data?.shop?.regularHoliday !== undefined) {
                 setRegularHoliday(data.shop.regularHoliday ?? "");
             }
@@ -853,7 +907,10 @@ export default function ShopEditClient({
                                 id="shop-address"
                                 type="text"
                                 value={address}
-                                onChange={(e) => setAddress(e.target.value)}
+                                onChange={(e) => {
+                                    setAddress(e.target.value);
+                                    clearGooglePlaceLink();
+                                }}
                                 placeholder="例：愛知県名古屋市天白区○○ 1-2-3"
                                 className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
                             />
@@ -861,6 +918,74 @@ export default function ShopEditClient({
                                 公開ページにそのまま表示される住所です。建物名まで必要なら続けて入力してください。
                             </p>
                         </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label htmlFor="shop-prefecture" className="mb-2 block text-sm font-bold text-gray-900">
+                                    都道府県
+                                </label>
+                                <select
+                                    id="shop-prefecture"
+                                    value={prefecture}
+                                    onChange={(e) => {
+                                        setPrefecture(e.target.value);
+                                        clearGooglePlaceLink();
+                                    }}
+                                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                                >
+                                    <option value="">未設定</option>
+                                    {PREFECTURES.map((value) => (
+                                        <option key={value} value={value}>{value}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="shop-city" className="mb-2 block text-sm font-bold text-gray-900">
+                                    市区町村
+                                </label>
+                                <input
+                                    id="shop-city"
+                                    value={city}
+                                    onChange={(e) => {
+                                        setCity(e.target.value);
+                                        clearGooglePlaceLink();
+                                    }}
+                                    placeholder="例：名古屋市中区"
+                                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="shop-station" className="mb-2 block text-sm font-bold text-gray-900">
+                                    最寄り駅
+                                </label>
+                                <input
+                                    id="shop-station"
+                                    value={nearestStation}
+                                    onChange={(e) => setNearestStation(e.target.value)}
+                                    placeholder="例：栄駅"
+                                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="shop-category" className="mb-2 block text-sm font-bold text-gray-900">
+                                    店舗カテゴリ
+                                </label>
+                                <input
+                                    id="shop-category"
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    placeholder="例：居酒屋、カフェ"
+                                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                                />
+                            </div>
+                        </div>
+
+                        <AdminGooglePlacePicker
+                            query={`${name} ${address}`}
+                            selectedPlaceId={googlePlaceId}
+                            disabled={readOnly}
+                            onSelect={selectGooglePlace}
+                        />
 
                         <div>
                             <div className="mb-2 block text-sm font-bold text-gray-900">
