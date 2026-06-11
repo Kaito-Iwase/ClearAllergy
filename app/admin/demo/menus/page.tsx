@@ -1,5 +1,5 @@
-import CreateMenuButton from "@/components/admin/menu/CreateMenuButton";
-import MenuListPageClient from "@/components/admin/menu/MenuListPageClient";
+import CreateMenuButton from "@/features/admin/menus/components/CreateMenuButton";
+import MenuListPageClient from "@/features/admin/menus/components/MenuListPageClient";
 import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
 import {
     createStatusBySlug,

@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import AdminLogoutButton from "@/components/admin/common/AdminLogoutButton";
+import AdminLogoutButton from "@/components/layout/AdminLogoutButton";
 import BrandLogo from "@/components/layout/BrandLogo";
 
 export default function AdminDashboardShell({

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import NewMenuForm from "@/components/admin/menu/NewMenuForm";
+import NewMenuForm from "@/features/admin/menus/components/NewMenuForm";
 import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
 import { prisma } from "@/lib/db";
 
