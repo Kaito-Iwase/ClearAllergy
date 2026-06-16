@@ -7,7 +7,7 @@ export const revalidate = 60;
 export const dynamic = "force-static";
 
 export default async function PublicShopListPage() {
-    // 公開メニューを持つ店舗だけを 60 秒単位で取得し、検索は URL q を見てクライアント側で絞ります。
+    // 公開メニューを持つ店舗だけを 60 秒単位で取得し、検索は URL query を見てクライアント側で絞ります。
     const { data: shops, isDatabaseAvailable } = await readPublicDataOrFallback(
         () =>
             prisma.shop.findMany({
