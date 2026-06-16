@@ -9,10 +9,12 @@ import {
     USER_ALLERGENS_UPDATED_EVENT,
 } from "@/lib/public-allergen-preferences";
 import PublicShopMap from "@/features/public/shops/components/PublicShopMap";
+import UserAllergenPreferenceClient from "@/features/public/shops/components/UserAllergenPreferenceClient";
 
 type AllergenStatus = "CONTAINS" | "FREE" | "MAY_CONTAIN" | "UNKNOWN";
 type CurrentLocation = { latitude: number; longitude: number };
 type LocationStatus = "idle" | "loading" | "active" | "error";
+type PublicAllergen = { slug: string; nameJa: string };
 
 export type PublicShopListShop = {
     id: string;
@@ -184,9 +186,11 @@ function ShopCards({
 
 export default function PublicShopListClient({
     initialShops,
+    allergens,
     isDatabaseAvailable,
 }: {
     initialShops: PublicShopListShop[];
+    allergens: PublicAllergen[];
     isDatabaseAvailable: boolean;
 }) {
     const router = useRouter();
@@ -372,6 +376,11 @@ export default function PublicShopListClient({
                     }`}>
                         {locationMessage}
                     </p>
+                ) : null}
+                {allergens.length > 0 ? (
+                    <div className="mt-4">
+                        <UserAllergenPreferenceClient allergens={allergens} />
+                    </div>
                 ) : null}
                 {excludedSlugs.length > 0 ? (
                     <p className="mt-3 rounded-xl bg-green-50 px-4 py-3 text-xs font-bold text-green-900">
