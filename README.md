@@ -286,6 +286,7 @@ npm run dev
 | `DATABASE_URL` | 必須 | Prisma / PostgreSQL 接続先 |
 | `DIRECT_URL` | 必須 | Prisma Migrate 用の直接接続先 |
 | `PORTFOLIO_MODE` | 任意 | ポートフォリオ公開時に一般ユーザーの更新を閲覧専用にする |
+| `PORTFOLIO_EDITOR_APP_USER_IDS` | 任意 | `PORTFOLIO_MODE=true` でも更新を許可するアプリ内 `User.id`。カンマ区切り |
 | `ADMIN_REGISTRATION_MODE` | 推奨 | 管理者自己登録の制御。`disabled` / `invite_only` / `open` |
 | `ADMIN_REGISTRATION_INVITE_TOKEN` | 条件付き | `invite_only` の招待トークン |
 | `ENABLE_CLERK_ADMIN_AUTH` | 任意 | Google / Clerk SSO 導線の表示制御 |
