@@ -3,10 +3,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { type AllergenStatus } from "@/lib/allergens";
 import { formatDateTimeJa } from "@/lib/utils/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
+import {
+    loadUserAllergenPreferences,
+    USER_ALLERGENS_UPDATED_EVENT,
+} from "@/lib/public-allergen-preferences";
 import {
     parseMenuImageFit,
     parseMenuImagePositionPercent,
@@ -27,6 +32,12 @@ export type PublicShopListShop = {
     updatedAt: string;
     menus: Array<{
         priceYen: number | null;
+        allergenLinks: Array<{
+            status: AllergenStatus;
+            allergen: {
+                slug: string;
+            };
+        }>;
     }>;
     _count: {
         menus: number;
@@ -44,6 +55,30 @@ function getBudgetText(
           : "価格情報 近日追加";
 }
 
+function isMenuExcludedByPreference(
+    menu: PublicShopListShop["menus"][number],
+    excludedSlugs: string[],
+    includeMayContain: boolean,
+) {
+    if (excludedSlugs.length === 0) {
+        return false;
+    }
+
+    const statusByExcludedSlug = new Map(
+        menu.allergenLinks
+            .filter((link) => excludedSlugs.includes(link.allergen.slug))
+            .map((link) => [link.allergen.slug, link.status]),
+    );
+
+    return excludedSlugs.some((slug) => {
+        const status = statusByExcludedSlug.get(slug);
+        return (
+            status === "CONTAINS" ||
+            (includeMayContain && status === "MAY_CONTAIN")
+        );
+    });
+}
+
 export default function PublicShopListClient({
     initialShops,
     isDatabaseAvailable,
@@ -53,8 +88,58 @@ export default function PublicShopListClient({
 }) {
     const searchParams = useSearchParams();
     const q = (searchParams.get("q") ?? "").trim();
+    const [excludedSlugs, setExcludedSlugs] = useState<string[]>([]);
+    const [includeMayContain, setIncludeMayContain] = useState(false);
+    const [loadedPreferences, setLoadedPreferences] = useState(false);
 
-    const shops = useMemo(() => {
+    useEffect(() => {
+        function syncPreferences() {
+            const next = loadUserAllergenPreferences();
+            setExcludedSlugs(next.excludedSlugs);
+            setIncludeMayContain(next.includeMayContain);
+            setLoadedPreferences(true);
+        }
+
+        syncPreferences();
+
+        window.addEventListener("storage", syncPreferences);
+        window.addEventListener("focus", syncPreferences);
+        window.addEventListener(
+            USER_ALLERGENS_UPDATED_EVENT,
+            syncPreferences as EventListener,
+        );
+
+        return () => {
+            window.removeEventListener("storage", syncPreferences);
+            window.removeEventListener("focus", syncPreferences);
+            window.removeEventListener(
+                USER_ALLERGENS_UPDATED_EVENT,
+                syncPreferences as EventListener,
+            );
+        };
+    }, []);
+
+    const isShopExcludedByPreference = useCallback(
+        (shop: PublicShopListShop) => {
+            if (!loadedPreferences || excludedSlugs.length === 0) {
+                return false;
+            }
+
+            return (
+                shop.menus.length > 0 &&
+                shop.menus.every((menu) =>
+                    isMenuExcludedByPreference(
+                        menu,
+                        excludedSlugs,
+                        includeMayContain,
+                    ),
+                )
+            );
+        },
+        [excludedSlugs, includeMayContain, loadedPreferences],
+    );
+
+    const searchedShops = useMemo(() => {
         if (q === "") {
             return initialShops;
         }
@@ -70,11 +155,20 @@ export default function PublicShopListClient({
         });
     }, [initialShops, q]);
 
+    const shops = useMemo(() => {
+        return searchedShops.filter((shop) => !isShopExcludedByPreference(shop));
+    }, [isShopExcludedByPreference, searchedShops]);
+
+    const hasExclusionPreference =
+        loadedPreferences && excludedSlugs.length > 0;
+    const excludedShopCount = searchedShops.length - shops.length;
     const resultText = q !== "" ? `検索: ${q}（${shops.length}件）` : null;
 
     const emptyText =
         !isDatabaseAvailable
             ? "現在データベースに接続できないため、公開店舗を読み込めません。時間をおいて再度お試しください。"
+            : hasExclusionPreference && searchedShops.length > 0
+              ? "除外設定に一致するメニューしかない店舗は非表示になっています。"
             : q !== ""
               ? "該当する店舗が見つかりませんでした。"
               : "公開中の店舗がありません。";
@@ -109,6 +203,18 @@ export default function PublicShopListClient({
                         <p className="mt-2 text-sm text-gray-600">
                             検索: <span className="font-semibold">{q}</span>（
                             {shops.length}件）
+                        </p>
+                    ) : null}
+                    {hasExclusionPreference ? (
+                        <p className="mt-2 text-sm text-gray-600">
+                            除外設定に一致するメニューしかない店舗は非表示になります
+                            {includeMayContain
+                                ? "（含む可能性ありも対象）"
+                                : "（含む可能性ありは対象外）"}
+                            。
+                            {excludedShopCount > 0
+                                ? `${excludedShopCount}件を非表示にしています。`
+                                : ""}
                         </p>
                     ) : null}
                 </div>
