@@ -152,6 +152,10 @@ async function seedDemoShop() {
             description:
                 "日々の食事を安心して選べるように、メニューごとの価格とアレルゲン情報を公開しているデモ店舗です。",
             address: "東京都渋谷区ヒビ1-2-3",
+            prefecture: "東京都",
+            city: "渋谷区",
+            nearestStation: "渋谷駅",
+            category: "カフェ",
             hours: "平日 11:00-18:00 / 土日祝 10:00-19:00",
             regularHoliday: "水曜日",
             phoneNumber: "052-123-4567",
@@ -166,6 +170,10 @@ async function seedDemoShop() {
             description:
                 "日々の食事を安心して選べるように、メニューごとの価格とアレルゲン情報を公開しているデモ店舗です。",
             address: "東京都渋谷区ヒビ1-2-3",
+            prefecture: "東京都",
+            city: "渋谷区",
+            nearestStation: "渋谷駅",
+            category: "カフェ",
             hours: "平日 11:00-18:00 / 土日祝 10:00-19:00",
             regularHoliday: "水曜日",
             phoneNumber: "052-123-4567",
