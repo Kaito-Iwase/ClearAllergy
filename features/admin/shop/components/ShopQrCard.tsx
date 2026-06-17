@@ -16,7 +16,6 @@ type ShopQrCardProps = {
 const QR_SIZE_OPTIONS = [
     { label: "小さめ", sizeMm: 45, desc: "ショップカード向け" },
     { label: "標準", sizeMm: 60, desc: "卓上POP向け" },
-    { label: "大きめ", sizeMm: 80, desc: "店頭掲示向け" },
 ] as const;
 
 function formatQrSize(sizeMm: number) {
@@ -120,7 +119,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                 用途に合わせて変更できます。印刷ボタンを押すと、選んだ大きさでQRだけ印刷します。
                             </p>
 
-                            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                            <div className="mt-4 grid gap-2 sm:grid-cols-2">
                                 {QR_SIZE_OPTIONS.map((option) => {
                                     const selected = qrSizeMm === option.sizeMm;
 
@@ -158,7 +157,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                 id="qr-size"
                                 type="range"
                                 min={35}
-                                max={90}
+                                max={60}
                                 step={5}
                                 value={qrSizeMm}
                                 onChange={(event) =>

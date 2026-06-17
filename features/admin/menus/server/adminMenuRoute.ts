@@ -354,16 +354,12 @@ app.put("/api/admin/menus/:menuId", async (c) => {
             body.imagePositionY === undefined
                 ? parseMenuImagePositionPercent(existing.imagePositionY)
                 : parseMenuImagePositionPercent(body.imagePositionY);
-        const nextIsPublished =
+        const requestedIsPublished =
             body.isPublished === undefined
                 ? existing.isPublished
                 : toBooleanOrDefault(body.isPublished, existing.isPublished);
-        auditAction =
-            existing.isPublished !== nextIsPublished
-                ? nextIsPublished
-                    ? "menu_publish"
-                    : "menu_unpublish"
-                : "menu_update";
+        let nextIsPublished = requestedIsPublished;
+        let forcedUnpublishReason: string | null = null;
 
         const nextStatusBySlug = createStatusBySlug(
             allergens,
@@ -378,16 +374,23 @@ app.put("/api/admin/menus/:menuId", async (c) => {
             }
         }
 
-        if (nextIsPublished) {
-            // 編集保存でも公開条件は毎回サーバーで確認します。
-            // これにより、既存の不完全データを公開へ切り替える抜け道を防ぎます。
-            const publishErrors = getMenuPublishValidationErrors({
-                name: nextName,
-                allergens,
-                statusBySlug: nextStatusBySlug,
-            });
+        // 編集保存でも公開条件は毎回サーバーで確認します。
+        // 明示的な公開要求は拒否し、既存公開メニューが不完全になった保存は
+        // 対象メニューだけ非公開へ戻します。
+        const publishErrors = getMenuPublishValidationErrors({
+            name: nextName,
+            allergens,
+            statusBySlug: nextStatusBySlug,
+        });
 
-            if (publishErrors.length > 0) {
+        if (publishErrors.length > 0) {
+            const publishErrorMessage = publishErrors.join(" ");
+
+            if (body.isPublished !== undefined && requestedIsPublished) {
+                auditAction =
+                    existing.isPublished === requestedIsPublished
+                        ? "menu_update"
+                        : "menu_publish";
                 await writeAdminAuditLog({
                     req,
                     actorUserId: auditActorUserId,
@@ -396,14 +399,29 @@ app.put("/api/admin/menus/:menuId", async (c) => {
                     targetType: "menu",
                     targetId: auditTargetId,
                     success: false,
-                    metadata: { reason: publishErrors.join(" ") },
+                    metadata: { reason: publishErrorMessage },
                 });
                 return NextResponse.json(
-                    { error: publishErrors.join(" ") },
+                    { error: publishErrorMessage },
                     { status: 400 },
                 );
             }
+
+            if (requestedIsPublished) {
+                nextIsPublished = false;
+            }
+
+            if (requestedIsPublished || existing.isPublished) {
+                forcedUnpublishReason = publishErrorMessage;
+            }
         }
+
+        auditAction =
+            existing.isPublished !== nextIsPublished
+                ? nextIsPublished
+                    ? "menu_publish"
+                    : "menu_unpublish"
+                : "menu_update";
 
         const updatedMenu = await prisma.$transaction(async (tx) => {
             const updated = await tx.menuItem.update({
@@ -468,6 +486,9 @@ app.put("/api/admin/menus/:menuId", async (c) => {
                 wasPublished: existing.isPublished,
                 isPublished: nextIsPublished,
                 imageChanged: existing.imageUrl !== imageUrlResult.value,
+                ...(forcedUnpublishReason
+                    ? { reason: forcedUnpublishReason }
+                    : {}),
             },
         });
 

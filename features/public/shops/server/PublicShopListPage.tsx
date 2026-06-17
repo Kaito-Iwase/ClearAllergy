@@ -7,62 +7,90 @@ export const revalidate = 60;
 export const dynamic = "force-static";
 
 export default async function PublicShopListPage() {
-    // 公開メニューを持つ店舗だけを 60 秒単位で取得し、検索は URL q を見てクライアント側で絞ります。
-    const { data: shops, isDatabaseAvailable } = await readPublicDataOrFallback(
-        () =>
-            prisma.shop.findMany({
-                where: {
-                    isActive: true,
-                    menus: {
-                        some: {
-                            isPublished: true,
-                        },
-                    },
-                },
-                orderBy: { updatedAt: "desc" },
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    address: true,
-                    averageBudgetYen: true,
-                    coverImageUrl: true,
-                    coverImageFit: true,
-                    coverImageZoom: true,
-                    coverImagePositionX: true,
-                    coverImagePositionY: true,
-                    updatedAt: true,
-                    menus: {
-                        where: { isPublished: true },
-                        orderBy: { updatedAt: "desc" },
-                        select: {
-                            priceYen: true,
-                            allergenLinks: {
-                                select: {
-                                    status: true,
-                                    allergen: { select: { slug: true } },
-                                },
-                            },
-                        },
-                    },
-                    _count: {
-                        select: {
+    // 公開メニューを持つ店舗と、検索画面で使うアレルゲン設定用マスタを 60 秒単位で取得します。
+    const { data: publicShopListData, isDatabaseAvailable } =
+        await readPublicDataOrFallback(
+            async () => {
+                const [shops, allergenMaster] = await Promise.all([
+                    prisma.shop.findMany({
+                        where: {
+                            isActive: true,
                             menus: {
-                                where: {
+                                some: {
                                     isPublished: true,
                                 },
                             },
                         },
-                    },
-                },
-            }),
-        [],
-        { context: "public-shops:list" },
-    );
+                        orderBy: { updatedAt: "desc" },
+                        select: {
+                            id: true,
+                            name: true,
+                            description: true,
+                            address: true,
+                            prefecture: true,
+                            city: true,
+                            nearestStation: true,
+                            category: true,
+                            latitude: true,
+                            longitude: true,
+                            googlePlaceId: true,
+                            averageBudgetYen: true,
+                            coverImageUrl: true,
+                            coverImageFit: true,
+                            coverImageZoom: true,
+                            coverImagePositionX: true,
+                            coverImagePositionY: true,
+                            updatedAt: true,
+                            menus: {
+                                where: { isPublished: true },
+                                orderBy: { updatedAt: "desc" },
+                                select: {
+                                    priceYen: true,
+                                    allergenLinks: {
+                                        select: {
+                                            status: true,
+                                            allergen: {
+                                                select: { slug: true },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            _count: {
+                                select: {
+                                    menus: {
+                                        where: {
+                                            isPublished: true,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    }),
+                    prisma.allergen.findMany({
+                        orderBy: { sortOrder: "asc" },
+                        select: { slug: true, nameJa: true },
+                    }),
+                ]);
+
+                return { shops, allergenMaster };
+            },
+            {
+                shops: [],
+                allergenMaster: [],
+            },
+            { context: "public-shops:list" },
+        );
+
+    const { shops, allergenMaster } = publicShopListData;
 
     const initialShops = shops.map((shop) => ({
         ...shop,
         updatedAt: shop.updatedAt.toISOString(),
+    }));
+    const allergensForClient = allergenMaster.map((allergen) => ({
+        slug: allergen.slug,
+        nameJa: allergen.nameJa,
     }));
 
     return (
@@ -77,6 +105,7 @@ export default async function PublicShopListPage() {
         >
             <PublicShopListClient
                 initialShops={initialShops}
+                allergens={allergensForClient}
                 isDatabaseAvailable={isDatabaseAvailable}
             />
         </Suspense>

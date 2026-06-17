@@ -6,9 +6,13 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { type AllergenStatus } from "@/lib/allergens";
+import {
+    getUnknownAllergenNames,
+    type AllergenStatus,
+} from "@/lib/allergens";
 import { createMenuButtonClassName } from "@/features/admin/menus/components/CreateMenuButton";
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
+import MenuPublishReadinessNotice from "@/features/admin/menus/components/MenuPublishReadinessNotice";
 import {
     getApiErrorMessage,
     getThrownErrorMessage,
@@ -136,7 +140,13 @@ export default function MenuEditClient(props: {
         null,
     );
 
-    const [isPublished, setIsPublished] = React.useState(initialIsPublished);
+    const initialUnknownAllergenNames = getUnknownAllergenNames({
+        allergens,
+        statusBySlug: initialStatusBySlug,
+    });
+    const [isPublished, setIsPublished] = React.useState(
+        initialIsPublished && initialUnknownAllergenNames.length === 0,
+    );
     const [statusBySlug, setStatusBySlug] =
         React.useState<Record<string, AllergenStatus>>(initialStatusBySlug);
 
@@ -145,6 +155,11 @@ export default function MenuEditClient(props: {
     const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [saved, setSaved] = React.useState(false);
+    const unknownAllergenNames = React.useMemo(
+        () => getUnknownAllergenNames({ allergens, statusBySlug }),
+        [allergens, statusBySlug],
+    );
+    const canPublish = unknownAllergenNames.length === 0;
 
     React.useEffect(() => {
         // 作成した Object URL は不要になったら解放し、メモリリークを防ぎます。
@@ -157,6 +172,23 @@ export default function MenuEditClient(props: {
 
     function setOne(slug: string, status: AllergenStatus) {
         setStatusBySlug((prev) => ({ ...prev, [slug]: status }));
+        if (status === "UNKNOWN") {
+            setIsPublished(false);
+        }
+    }
+
+    function togglePublished() {
+        setError(null);
+        setSaved(false);
+        if (!isPublished && !canPublish) {
+            setIsPublished(false);
+            setError(
+                `公開するにはアレルゲン29品目を確定してください。未設定: ${unknownAllergenNames.length}件`,
+            );
+            return;
+        }
+
+        setIsPublished((prev) => !prev);
     }
 
     function buildPriceYen(): number | null {
@@ -287,7 +319,7 @@ export default function MenuEditClient(props: {
                 imageZoom,
                 imagePositionX,
                 imagePositionY,
-                isPublished,
+                isPublished: canPublish ? isPublished : false,
                 allergenStatusBySlug: statusBySlug,
             };
 
@@ -396,7 +428,7 @@ export default function MenuEditClient(props: {
 
                         <button
                             type="button"
-                            onClick={() => setIsPublished((prev) => !prev)}
+                            onClick={togglePublished}
                             disabled={
                                 (readOnly && !readOnlyPreview) ||
                                 creating ||
@@ -404,16 +436,24 @@ export default function MenuEditClient(props: {
                                 uploading
                             }
                             className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${
-                                isPublished ? "bg-green-600" : "bg-gray-900"
+                                isPublished
+                                    ? "bg-green-600"
+                                    : canPublish
+                                      ? "bg-gray-900"
+                                      : "bg-amber-600"
                             }`}
                         >
                             {readOnly
                                 ? isPublished
                                     ? "公開中（デモ）"
-                                    : "非公開（デモ）"
+                                    : canPublish
+                                      ? "非公開（デモ）"
+                                      : "公開不可（デモ）"
                                 : isPublished
                                   ? "公開中"
-                                  : "非公開"}
+                                  : canPublish
+                                    ? "非公開"
+                                    : "公開不可"}
                         </button>
 
                         <button
@@ -451,6 +491,10 @@ export default function MenuEditClient(props: {
                         保存しました。
                     </div>
                 )}
+
+                <MenuPublishReadinessNotice
+                    unknownAllergenNames={unknownAllergenNames}
+                />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
@@ -623,6 +667,10 @@ export default function MenuEditClient(props: {
                     各品目について「未設定 / 含む / 含まない /
                     含む可能性があります」を選択してください。
                 </p>
+
+                <MenuPublishReadinessNotice
+                    unknownAllergenNames={unknownAllergenNames}
+                />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     {allergens.map((a) => {
