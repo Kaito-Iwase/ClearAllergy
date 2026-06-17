@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { type AllergenStatus } from "@/lib/allergens";
 import { PREFECTURES } from "@/lib/constants/prefectures";
 import {
     loadUserAllergenPreferences,
@@ -11,7 +12,6 @@ import {
 import PublicShopMap from "@/features/public/shops/components/PublicShopMap";
 import UserAllergenPreferenceClient from "@/features/public/shops/components/UserAllergenPreferenceClient";
 
-type AllergenStatus = "CONTAINS" | "FREE" | "MAY_CONTAIN" | "UNKNOWN";
 type CurrentLocation = { latitude: number; longitude: number };
 type LocationStatus = "idle" | "loading" | "active" | "error";
 type PublicAllergen = { slug: string; nameJa: string };
@@ -66,20 +66,53 @@ function getShopCity(shop: PublicShopListShop) {
     );
 }
 
-function matchesSafeMenu(shop: PublicShopListShop, excludedSlugs: string[]) {
-    if (excludedSlugs.length === 0) return true;
-    return shop.menus.some((menu) => {
-        const statusBySlug = new Map(
-            menu.allergenLinks.map((link) => [link.allergen.slug, link.status]),
+function isMenuExcludedByPreference(
+    menu: PublicShopListShop["menus"][number],
+    excludedSlugs: string[],
+    includeMayContain: boolean,
+) {
+    if (excludedSlugs.length === 0) {
+        return false;
+    }
+
+    const statusByExcludedSlug = new Map(
+        menu.allergenLinks
+            .filter((link) => excludedSlugs.includes(link.allergen.slug))
+            .map((link) => [link.allergen.slug, link.status]),
+    );
+
+    return excludedSlugs.some((slug) => {
+        const status = statusByExcludedSlug.get(slug);
+        return (
+            status === "CONTAINS" ||
+            (includeMayContain && status === "MAY_CONTAIN")
         );
-        return excludedSlugs.every((slug) => statusBySlug.get(slug) === "FREE");
     });
 }
 
-function getDistanceKm(
-    first: CurrentLocation,
-    second: CurrentLocation,
-) {
+function isShopExcludedByPreference(args: {
+    shop: PublicShopListShop;
+    excludedSlugs: string[];
+    includeMayContain: boolean;
+    loadedPreferences: boolean;
+}) {
+    if (!args.loadedPreferences || args.excludedSlugs.length === 0) {
+        return false;
+    }
+
+    return (
+        args.shop.menus.length > 0 &&
+        args.shop.menus.every((menu) =>
+            isMenuExcludedByPreference(
+                menu,
+                args.excludedSlugs,
+                args.includeMayContain,
+            ),
+        )
+    );
+}
+
+function getDistanceKm(first: CurrentLocation, second: CurrentLocation) {
     const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
     const earthRadiusKm = 6371;
     const latitudeDifference = toRadians(second.latitude - first.latitude);
@@ -150,7 +183,9 @@ function ShopCards({
                                 <p className="text-xs font-bold text-green-700">
                                     {shop.category || "カテゴリ未設定"}
                                 </p>
-                                <h3 className="mt-1 text-xl font-black text-neutral-900">{shop.name}</h3>
+                                <h3 className="mt-1 text-xl font-black text-neutral-900">
+                                    {shop.name}
+                                </h3>
                             </div>
                             <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-800">
                                 アレルゲン情報あり
@@ -170,7 +205,11 @@ function ShopCards({
                             ) : null}
                             {distance !== null ? (
                                 <span className="rounded-full bg-green-50 px-3 py-1.5 font-bold text-green-800">
-                                    現在地から約{distance < 10 ? distance.toFixed(1) : Math.round(distance)}km
+                                    現在地から約
+                                    {distance < 10
+                                        ? distance.toFixed(1)
+                                        : Math.round(distance)}
+                                    km
                                 </span>
                             ) : null}
                             <span className="rounded-full bg-neutral-100 px-3 py-1.5">
@@ -199,11 +238,17 @@ export default function PublicShopListClient({
     const [keyword, setKeyword] = React.useState(
         searchParams.get("keyword") ?? searchParams.get("q") ?? "",
     );
-    const [prefecture, setPrefecture] = React.useState(searchParams.get("prefecture") ?? "");
+    const [prefecture, setPrefecture] = React.useState(
+        searchParams.get("prefecture") ?? "",
+    );
     const [city, setCity] = React.useState(searchParams.get("city") ?? "");
     const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [currentLocation, setCurrentLocation] = React.useState<CurrentLocation | null>(null);
-    const [locationStatus, setLocationStatus] = React.useState<LocationStatus>("idle");
+    const [includeMayContain, setIncludeMayContain] = React.useState(false);
+    const [loadedPreferences, setLoadedPreferences] = React.useState(false);
+    const [currentLocation, setCurrentLocation] =
+        React.useState<CurrentLocation | null>(null);
+    const [locationStatus, setLocationStatus] =
+        React.useState<LocationStatus>("idle");
     const [locationMessage, setLocationMessage] = React.useState("");
 
     React.useEffect(() => {
@@ -214,43 +259,79 @@ export default function PublicShopListClient({
     }, [searchParams]);
 
     React.useEffect(() => {
-        const sync = () => setExcludedSlugs(loadUserAllergenPreferences().excludedSlugs);
-        sync();
-        window.addEventListener(USER_ALLERGENS_UPDATED_EVENT, sync as EventListener);
-        window.addEventListener("storage", sync);
+        function syncPreferences() {
+            const next = loadUserAllergenPreferences();
+            setExcludedSlugs(next.excludedSlugs);
+            setIncludeMayContain(next.includeMayContain);
+            setLoadedPreferences(true);
+        }
+
+        syncPreferences();
+        window.addEventListener(USER_ALLERGENS_UPDATED_EVENT, syncPreferences);
+        window.addEventListener("storage", syncPreferences);
+        window.addEventListener("focus", syncPreferences);
         return () => {
-            window.removeEventListener(USER_ALLERGENS_UPDATED_EVENT, sync as EventListener);
-            window.removeEventListener("storage", sync);
+            window.removeEventListener(
+                USER_ALLERGENS_UPDATED_EVENT,
+                syncPreferences,
+            );
+            window.removeEventListener("storage", syncPreferences);
+            window.removeEventListener("focus", syncPreferences);
         };
     }, []);
 
     const cityOptions = React.useMemo(
-        () => Array.from(new Set(initialShops
-            .filter((shop) => !prefecture || getShopPrefecture(shop) === prefecture)
-            .map(getShopCity)
-            .filter((value): value is string => Boolean(value)))).sort(),
+        () =>
+            Array.from(
+                new Set(
+                    initialShops
+                        .filter(
+                            (shop) =>
+                                !prefecture ||
+                                getShopPrefecture(shop) === prefecture,
+                        )
+                        .map(getShopCity)
+                        .filter((value): value is string => Boolean(value)),
+                ),
+            ).sort(),
         [initialShops, prefecture],
     );
 
     const filtered = React.useMemo(() => {
         const areaTerms = area.trim().split(/\s+/).filter(Boolean).map(normalize);
-        const keywordTerms = keyword.trim().split(/\s+/).filter(Boolean).map(normalize);
+        const keywordTerms = keyword
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean)
+            .map(normalize);
         const searchTermCount = areaTerms.length + keywordTerms.length;
-        const results = initialShops
+        const candidates = initialShops
             .filter((shop) => !prefecture || getShopPrefecture(shop) === prefecture)
             .filter((shop) => !city || getShopCity(shop) === city)
-            .filter((shop) => matchesSafeMenu(shop, excludedSlugs))
             .map((shop) => {
                 const areaHaystack = [
-                    shop.address, shop.prefecture, getShopPrefecture(shop),
-                    getShopCity(shop), shop.city, shop.nearestStation,
-                ].map(normalize).join(" ");
+                    shop.address,
+                    shop.prefecture,
+                    getShopPrefecture(shop),
+                    getShopCity(shop),
+                    shop.city,
+                    shop.nearestStation,
+                ]
+                    .map(normalize)
+                    .join(" ");
                 const keywordHaystack = [
-                    shop.name, shop.description, shop.category,
-                ].map(normalize).join(" ");
+                    shop.name,
+                    shop.description,
+                    shop.category,
+                ]
+                    .map(normalize)
+                    .join(" ");
                 const matched =
-                    areaTerms.filter((term) => areaHaystack.includes(term)).length +
-                    keywordTerms.filter((term) => keywordHaystack.includes(term)).length;
+                    areaTerms.filter((term) => areaHaystack.includes(term))
+                        .length +
+                    keywordTerms.filter((term) =>
+                        keywordHaystack.includes(term),
+                    ).length;
                 return {
                     shop,
                     matched,
@@ -258,22 +339,50 @@ export default function PublicShopListClient({
                 };
             })
             .filter((result) => searchTermCount === 0 || result.matched > 0);
+        const visibleResults = candidates.filter(
+            (result) =>
+                !isShopExcludedByPreference({
+                    shop: result.shop,
+                    excludedSlugs,
+                    includeMayContain,
+                    loadedPreferences,
+                }),
+        );
+
         return {
             exact: sortByDistance(
-                results.filter((result) => result.all).map((result) => result.shop),
+                visibleResults
+                    .filter((result) => result.all)
+                    .map((result) => result.shop),
                 currentLocation,
             ),
             related: sortByDistance(
-                results.filter((result) => !result.all).sort((a, b) => b.matched - a.matched).map((result) => result.shop),
+                visibleResults
+                    .filter((result) => !result.all)
+                    .sort((a, b) => b.matched - a.matched)
+                    .map((result) => result.shop),
                 currentLocation,
             ),
+            excludedCount: candidates.length - visibleResults.length,
         };
-    }, [area, city, currentLocation, excludedSlugs, initialShops, keyword, prefecture]);
+    }, [
+        area,
+        city,
+        currentLocation,
+        excludedSlugs,
+        includeMayContain,
+        initialShops,
+        keyword,
+        loadedPreferences,
+        prefecture,
+    ]);
 
     const visibleShops = [...filtered.exact, ...filtered.related];
     const coordinateShopCount = visibleShops.filter(
         (shop) => shop.latitude !== null && shop.longitude !== null,
     ).length;
+    const hasExclusionPreference =
+        loadedPreferences && excludedSlugs.length > 0;
 
     function submitSearch(event: React.FormEvent) {
         event.preventDefault();
@@ -289,7 +398,9 @@ export default function PublicShopListClient({
         setLocationMessage("");
         if (!navigator.geolocation) {
             setLocationStatus("error");
-            setLocationMessage("このブラウザでは現在地を取得できません。通常の店舗検索をご利用ください。");
+            setLocationMessage(
+                "このブラウザでは現在地を取得できません。通常の店舗検索をご利用ください。",
+            );
             return;
         }
 
@@ -310,7 +421,9 @@ export default function PublicShopListClient({
             () => {
                 setCurrentLocation(null);
                 setLocationStatus("error");
-                setLocationMessage("現在地を取得できませんでした。位置情報の許可設定を確認してください。");
+                setLocationMessage(
+                    "現在地を取得できませんでした。位置情報の許可設定を確認してください。",
+                );
             },
             { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
         );
@@ -326,22 +439,60 @@ export default function PublicShopListClient({
             </section>
 
             <section className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
-                <h1 className="text-2xl font-black text-neutral-900">エリア・キーワードから店舗を探す</h1>
+                <h1 className="text-2xl font-black text-neutral-900">
+                    エリア・キーワードから店舗を探す
+                </h1>
                 <p className="mt-2 text-sm leading-6 text-neutral-600">
-                    例: エリアに「栄」、キーワードに「居酒屋」。ClearAllergy登録済み店舗から検索します。
+                    例:
+                    エリアに「栄」、キーワードに「居酒屋」。ClearAllergy登録済み店舗から検索します。
                 </p>
-                <form onSubmit={submitSearch} className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_180px_180px_auto]">
-                    <input value={area} onChange={(e) => setArea(e.target.value)} placeholder="エリア・駅名" className="rounded-xl border border-neutral-300 px-4 py-3" />
-                    <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="店舗名・ジャンル・キーワード" className="rounded-xl border border-neutral-300 px-4 py-3" />
-                    <select value={prefecture} onChange={(e) => { setPrefecture(e.target.value); setCity(""); }} className="rounded-xl border border-neutral-300 px-3 py-3">
+                <form
+                    onSubmit={submitSearch}
+                    className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_180px_180px_auto]"
+                >
+                    <input
+                        value={area}
+                        onChange={(e) => setArea(e.target.value)}
+                        placeholder="エリア・駅名"
+                        className="rounded-xl border border-neutral-300 px-4 py-3"
+                    />
+                    <input
+                        value={keyword}
+                        onChange={(e) => setKeyword(e.target.value)}
+                        placeholder="店舗名・ジャンル・キーワード"
+                        className="rounded-xl border border-neutral-300 px-4 py-3"
+                    />
+                    <select
+                        value={prefecture}
+                        onChange={(e) => {
+                            setPrefecture(e.target.value);
+                            setCity("");
+                        }}
+                        className="rounded-xl border border-neutral-300 px-3 py-3"
+                    >
                         <option value="">すべての都道府県</option>
-                        {PREFECTURES.map((value) => <option key={value} value={value}>{value}</option>)}
+                        {PREFECTURES.map((value) => (
+                            <option key={value} value={value}>
+                                {value}
+                            </option>
+                        ))}
                     </select>
-                    <select value={city} onChange={(e) => setCity(e.target.value)} className="rounded-xl border border-neutral-300 px-3 py-3">
+                    <select
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="rounded-xl border border-neutral-300 px-3 py-3"
+                    >
                         <option value="">すべての市区町村</option>
-                        {cityOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                        {cityOptions.map((value) => (
+                            <option key={value} value={value}>
+                                {value}
+                            </option>
+                        ))}
                     </select>
-                    <button type="submit" className="rounded-xl bg-[#13ec13] px-5 py-3 font-extrabold text-black">
+                    <button
+                        type="submit"
+                        className="rounded-xl bg-[#13ec13] px-5 py-3 font-extrabold text-black"
+                    >
                         検索
                     </button>
                 </form>
@@ -352,7 +503,9 @@ export default function PublicShopListClient({
                         disabled={locationStatus === "loading"}
                         className="rounded-xl border border-green-300 bg-green-50 px-4 py-2.5 text-sm font-extrabold text-green-900 disabled:cursor-wait disabled:opacity-60"
                     >
-                        {locationStatus === "loading" ? "現在地を取得中..." : "現在地から探す"}
+                        {locationStatus === "loading"
+                            ? "現在地を取得中..."
+                            : "現在地から探す"}
                     </button>
                     {currentLocation ? (
                         <button
@@ -369,11 +522,13 @@ export default function PublicShopListClient({
                     ) : null}
                 </div>
                 {locationMessage ? (
-                    <p className={`mt-3 rounded-xl px-4 py-3 text-xs font-bold ${
-                        locationStatus === "error"
-                            ? "bg-amber-50 text-amber-900"
-                            : "bg-green-50 text-green-900"
-                    }`}>
+                    <p
+                        className={`mt-3 rounded-xl px-4 py-3 text-xs font-bold ${
+                            locationStatus === "error"
+                                ? "bg-amber-50 text-amber-900"
+                                : "bg-green-50 text-green-900"
+                        }`}
+                    >
                         {locationMessage}
                     </p>
                 ) : null}
@@ -382,9 +537,16 @@ export default function PublicShopListClient({
                         <UserAllergenPreferenceClient allergens={allergens} />
                     </div>
                 ) : null}
-                {excludedSlugs.length > 0 ? (
+                {hasExclusionPreference ? (
                     <p className="mt-3 rounded-xl bg-green-50 px-4 py-3 text-xs font-bold text-green-900">
-                        保存済み除外設定に対して、すべてFREEの公開メニューがある店舗だけを表示中です。
+                        除外設定に一致するメニューしかない店舗は非表示になります
+                        {includeMayContain
+                            ? "（含む可能性ありも対象）"
+                            : "（含む可能性ありは対象外）"}
+                        。
+                        {filtered.excludedCount > 0
+                            ? `${filtered.excludedCount}件を非表示にしています。`
+                            : ""}
                     </p>
                 ) : null}
             </section>
@@ -403,18 +565,40 @@ export default function PublicShopListClient({
             ) : null}
 
             <section className="mt-8">
-                <h2 className="text-xl font-black text-neutral-900">条件に一致するClearAllergy登録済み店舗</h2>
-                <p className="mt-1 text-sm text-neutral-500">{filtered.exact.length}件</p>
+                <h2 className="text-xl font-black text-neutral-900">
+                    条件に一致するClearAllergy登録済み店舗
+                </h2>
+                <p className="mt-1 text-sm text-neutral-500">
+                    {filtered.exact.length}件
+                </p>
                 <div className="mt-4">
-                    {filtered.exact.length ? <ShopCards shops={filtered.exact} currentLocation={currentLocation} /> : <p className="rounded-xl border border-dashed p-5 text-sm text-neutral-600">完全一致する登録済み店舗はありません。</p>}
+                    {filtered.exact.length ? (
+                        <ShopCards
+                            shops={filtered.exact}
+                            currentLocation={currentLocation}
+                        />
+                    ) : (
+                        <p className="rounded-xl border border-dashed p-5 text-sm text-neutral-600">
+                            完全一致する登録済み店舗はありません。
+                        </p>
+                    )}
                 </div>
             </section>
 
             {filtered.related.length > 0 ? (
                 <section className="mt-10">
-                    <h2 className="text-xl font-black text-neutral-900">条件の一部に一致する店舗</h2>
-                    <p className="mt-1 text-sm text-neutral-500">{filtered.related.length}件</p>
-                    <div className="mt-4"><ShopCards shops={filtered.related} currentLocation={currentLocation} /></div>
+                    <h2 className="text-xl font-black text-neutral-900">
+                        条件の一部に一致する店舗
+                    </h2>
+                    <p className="mt-1 text-sm text-neutral-500">
+                        {filtered.related.length}件
+                    </p>
+                    <div className="mt-4">
+                        <ShopCards
+                            shops={filtered.related}
+                            currentLocation={currentLocation}
+                        />
+                    </div>
                 </section>
             ) : null}
         </main>
