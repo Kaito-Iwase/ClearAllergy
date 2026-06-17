@@ -35,9 +35,14 @@ export default async function PublicShopListPage() {
                     menus: {
                         where: { isPublished: true },
                         orderBy: { updatedAt: "desc" },
-                        take: 1,
                         select: {
                             priceYen: true,
+                            allergenLinks: {
+                                select: {
+                                    status: true,
+                                    allergen: { select: { slug: true } },
+                                },
+                            },
                         },
                     },
                     _count: {
