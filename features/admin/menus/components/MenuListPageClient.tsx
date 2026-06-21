@@ -62,10 +62,12 @@ function buildUnknownPreview(names: string[]) {
 
 export default function MenuListPageClient({
     initialMenus,
+    totalAllergenCount,
     readOnly = false,
     readOnlyEditHrefBase,
 }: {
     initialMenus: MenuRow[];
+    totalAllergenCount: number;
     readOnly?: boolean;
     readOnlyEditHrefBase?: string;
 }) {
@@ -180,7 +182,7 @@ export default function MenuListPageClient({
                                 アレルゲン未設定のメニューが {stats.needsAllergen} 件あります
                             </p>
                             <p className="mt-1 leading-6 text-amber-900">
-                                未設定が残っているメニューは、カード内に注意表示します。編集画面でアレルゲン29品目を設定すると公開準備が完了します。
+                                未設定が残っているメニューは、カード内に注意表示します。編集画面でアレルゲン{totalAllergenCount}品目を設定すると公開準備が完了します。
                             </p>
                         </div>
                     </div>
@@ -343,7 +345,7 @@ export default function MenuListPageClient({
                                             <p className="mt-1 leading-6">
                                                 {menu.isPublished
                                                     ? "公開中ですが未設定があります。利用者に正確に伝えるため設定を完了してください。"
-                                                    : "アレルゲン29品目を設定すると公開準備が完了します。"}
+                                                    : `アレルゲン${totalAllergenCount}品目を設定すると公開準備が完了します。`}
                                             </p>
                                         </div>
                                     )}

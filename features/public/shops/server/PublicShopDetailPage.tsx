@@ -147,7 +147,7 @@ export default async function PublicShopDetailPage({
         notFound();
     }
 
-    // 公開フラグだけでなく、29 品目がすべて確定済みかを公開時にも再確認します。
+    // 公開フラグだけでなく、現行マスタの全品目が確定済みかを公開時にも再確認します。
     const publishableMenus = shop.menus.filter((menu) =>
         isMenuPublishable({
             name: menu.name,
@@ -299,7 +299,7 @@ export default async function PublicShopDetailPage({
                                     平均予算 {averageBudgetLabel}
                                 </span>
                                 <span className="rounded-full bg-gray-100 px-2 py-1">
-                                    アレルゲン29品目を表示
+                                    アレルゲン{allergenMaster.length}品目を表示
                                 </span>
                                 <span className="rounded-full bg-gray-100 px-2 py-1">
                                     価格表示あり

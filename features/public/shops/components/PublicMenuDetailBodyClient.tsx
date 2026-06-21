@@ -266,7 +266,7 @@ export default function PublicMenuDetailBodyClient(props: {
                         <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                             <span className="text-[#13ec13]">🧾</span>
                             <h3 className="text-xl font-bold">
-                                アレルゲン（29品目）
+                                アレルゲン（{rows.length}品目）
                             </h3>
                         </div>
 

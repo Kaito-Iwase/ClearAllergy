@@ -75,7 +75,8 @@ export default async function AdminMenusPage() {
                             メニュー管理
                         </h1>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-                            公開状態、価格、アレルゲン29品目の設定状況を一覧で確認できます。未設定があるメニューはカード上で注意表示します。
+                            公開状態、価格、アレルゲン{allergens.length}
+                            品目の設定状況を一覧で確認できます。未設定があるメニューはカード上で注意表示します。
                         </p>
                     </div>
 
@@ -83,7 +84,10 @@ export default async function AdminMenusPage() {
                 </div>
 
                 <div className="mt-6">
-                    <MenuListPageClient initialMenus={initialMenus} />
+                    <MenuListPageClient
+                        initialMenus={initialMenus}
+                        totalAllergenCount={allergens.length}
+                    />
                 </div>
             </div>
         </div>

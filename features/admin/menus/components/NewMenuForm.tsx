@@ -155,7 +155,7 @@ export default function NewMenuForm({
         if (!isPublished && !canPublish) {
             setIsPublished(false);
             setError(
-                `公開するにはアレルゲン29品目を確定してください。未設定: ${unknownAllergenNames.length}件`,
+                `公開するにはアレルゲン${allergens.length}品目を確定してください。未設定: ${unknownAllergenNames.length}件`,
             );
             return;
         }
@@ -375,6 +375,7 @@ export default function NewMenuForm({
 
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}
+                    totalAllergenCount={allergens.length}
                 />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -538,13 +539,16 @@ export default function NewMenuForm({
             </div>
 
             <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <div className="font-bold text-gray-900">アレルゲン29品目</div>
+                <div className="font-bold text-gray-900">
+                    アレルゲン{allergens.length}品目
+                </div>
                 <p className="mt-1 text-sm text-gray-600">
                     各品目について「未設定 / 含む / 含まない / 含む可能性があります」を選択してください。
                 </p>
 
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}
+                    totalAllergenCount={allergens.length}
                 />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
