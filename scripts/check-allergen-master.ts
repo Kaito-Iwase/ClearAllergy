@@ -7,6 +7,8 @@ import {
 import {
     buildRecommendedIngredientNotice,
     buildSpecifiedIngredientNotice,
+    createStatusBySlug,
+    isMenuPublishable,
     RECOMMENDED_INGREDIENT_SLUGS,
     SPECIFIED_INGREDIENT_SLUGS,
 } from "../lib/allergens";
@@ -26,8 +28,8 @@ async function main() {
         fail("Pistachio is missing from ALLERGEN_MASTER.");
     }
 
-    if (ALLERGEN_MASTER.length !== 29) {
-        fail(`ALLERGEN_MASTER must contain 29 items, got ${ALLERGEN_MASTER.length}.`);
+    if (ALLERGEN_MASTER.length === 0) {
+        fail("ALLERGEN_MASTER must not be empty.");
     }
 
     const slugs = ALLERGEN_MASTER.map((allergen) => allergen.slug);
@@ -37,18 +39,6 @@ async function main() {
 
     if (duplicateSlugs.length > 0) {
         fail(`Duplicate allergen slug(s): ${duplicateSlugs.join(", ")}`);
-    }
-
-    if (SPECIFIED_INGREDIENT_SLUGS.length !== 9) {
-        fail(
-            `SPECIFIED_INGREDIENT_SLUGS must contain 9 items, got ${SPECIFIED_INGREDIENT_SLUGS.length}.`,
-        );
-    }
-
-    if (RECOMMENDED_INGREDIENT_SLUGS.length !== 20) {
-        fail(
-            `RECOMMENDED_INGREDIENT_SLUGS must contain 20 items, got ${RECOMMENDED_INGREDIENT_SLUGS.length}.`,
-        );
     }
 
     const classifiedSlugs: string[] = [
@@ -146,11 +136,16 @@ async function main() {
             nameJa: true,
             nameEn: true,
             sortOrder: true,
+            _count: {
+                select: { menuLinks: true },
+            },
         },
     });
 
-    if (dbAllergens.length !== 29) {
-        fail(`DB Allergen must contain 29 rows, got ${dbAllergens.length}.`);
+    if (dbAllergens.length !== ALLERGEN_MASTER.length) {
+        fail(
+            `DB Allergen rows must match ALLERGEN_MASTER: expected ${ALLERGEN_MASTER.length}, got ${dbAllergens.length}.`,
+        );
     }
 
     for (const expected of ALLERGEN_MASTER) {
@@ -183,26 +178,56 @@ async function main() {
         fail("DB Allergen is missing pistachio.");
     }
 
-    const [menuCount, pistachioLinkCount] = await Promise.all([
+    const [menuCount, publishedMenus] = await Promise.all([
         prisma.menuItem.count(),
-        prisma.menuItemAllergen.count({
-            where: { allergenId: pistachio.id },
+        prisma.menuItem.findMany({
+            where: { isPublished: true },
+            select: {
+                id: true,
+                name: true,
+                allergenLinks: {
+                    select: {
+                        status: true,
+                        allergen: { select: { slug: true } },
+                    },
+                },
+            },
         }),
     ]);
 
-    if (pistachioLinkCount !== menuCount) {
+    const allergensWithMissingMenuLinks = dbAllergens.filter(
+        (allergen) => allergen._count.menuLinks !== menuCount,
+    );
+    if (allergensWithMissingMenuLinks.length > 0) {
         fail(
-            `Pistachio MenuItemAllergen rows must match MenuItem count: menus=${menuCount}, pistachioRows=${pistachioLinkCount}.`,
+            `Every allergen must have one row per menu: menus=${menuCount}, mismatches=${allergensWithMissingMenuLinks
+                .map(
+                    (allergen) =>
+                        `${allergen.slug}:${allergen._count.menuLinks}`,
+                )
+                .join(", ")}.`,
         );
     }
 
-    const pistachioStatusCounts = await prisma.menuItemAllergen.groupBy({
-        by: ["status"],
-        where: { allergenId: pistachio.id },
-        _count: {
-            status: true,
-        },
-    });
+    const invalidPublishedMenuIds = publishedMenus
+        .filter(
+            (menu) =>
+                !isMenuPublishable({
+                    name: menu.name,
+                    allergens: dbAllergens,
+                    statusBySlug: createStatusBySlug(
+                        dbAllergens,
+                        menu.allergenLinks,
+                    ),
+                }),
+        )
+        .map((menu) => menu.id);
+
+    if (invalidPublishedMenuIds.length > 0) {
+        fail(
+            `Published menus must have complete allergen settings: ${invalidPublishedMenuIds.join(", ")}.`,
+        );
+    }
 
     console.log("Allergen master check passed.");
     console.log(
@@ -210,12 +235,7 @@ async function main() {
     );
     console.log(`DB allergens: ${dbAllergens.length}`);
     console.log(`Menu items: ${menuCount}`);
-    console.log(`Pistachio menu rows: ${pistachioLinkCount}`);
-    console.log(
-        `Pistachio statuses: ${pistachioStatusCounts
-            .map((row) => `${row.status}=${row._count.status}`)
-            .join(", ")}`,
-    );
+    console.log(`Published menus with complete settings: ${publishedMenus.length}`);
 }
 
 main()

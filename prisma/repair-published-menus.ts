@@ -4,7 +4,7 @@ import { createStatusBySlug, getMenuPublishValidationErrors } from "../lib/aller
 const prisma = new PrismaClient();
 
 // このスクリプトは、本番反映時に 1 回だけ実行する既存データ是正用です。
-// 過去データには 29 品目の欠損や、不完全なのに公開中のメニューがあり得るため、
+// 過去データには現行マスタ品目の欠損や、不完全なのに公開中のメニューがあり得るため、
 // ここで UNKNOWN 補完と公開解除をまとめて行います。
 async function main() {
     const allergens = await prisma.allergen.findMany({
@@ -42,7 +42,7 @@ async function main() {
             (allergen) => !existingAllergenIds.has(allergen.id),
         );
 
-        // 既存リンクが一部しか無い場合でも、公開判定は 29 品目そろった前提で見たいので
+        // 既存リンクが一部しか無い場合でも、公開判定は現行マスタがそろった前提で見たいので
         // まず UNKNOWN 補完つきの状態マップを作ります。
         const statusBySlug = createStatusBySlug(allergens, menu.allergenLinks);
         const publishErrors = menu.isPublished

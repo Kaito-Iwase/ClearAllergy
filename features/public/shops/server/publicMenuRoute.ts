@@ -141,7 +141,7 @@ app.get("/api/menus/:menuId", async (c) => {
                 .filter((slug): slug is string => Boolean(slug)),
         );
 
-        // 29 品目を基準に正規化し、欠損しているリンクも UNKNOWN として返します。
+        // 現行マスタを基準に正規化し、欠損しているリンクも UNKNOWN として返します。
         const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
         const allergenDisplayItems = buildAllergenDisplayItems(
             allergens,

@@ -123,7 +123,7 @@ app.get("/api/admin/menus/:menuId", async (c) => {
             },
         });
 
-        // 管理 API でも 29 品目を欠損なく返し、画面や外部クライアントの解釈差をなくします。
+        // 管理 API でも現行マスタの全品目を欠損なく返し、画面や外部クライアントの解釈差をなくします。
         const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
         const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
             kind: "menu",
@@ -558,13 +558,16 @@ app.delete("/api/admin/menus/:menuId", async (c) => {
             );
         }
 
-        // 中間テーブルが残ると外部キー制約で本体を消せないため、先に削除します。
-        await prisma.menuItemAllergen.deleteMany({
-            where: { menuItemId: menuId },
-        });
+        // 設定行削除の遅延公開チェックが、削除予定のメニューを途中状態で判定しないよう
+        // 本体削除までを同じ transaction で完了します。
+        await prisma.$transaction(async (tx) => {
+            await tx.menuItemAllergen.deleteMany({
+                where: { menuItemId: menuId },
+            });
 
-        await prisma.menuItem.delete({
-            where: { id: menuId },
+            await tx.menuItem.delete({
+                where: { id: menuId },
+            });
         });
 
         await writeAdminAuditLog({

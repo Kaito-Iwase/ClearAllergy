@@ -1,6 +1,6 @@
 // GET /api/allergens
-// アレルゲン29品目の一覧（日本語/英語）を表示順つきで返すAPI。
-// 管理画面の「29品目三択UI」を作るための基盤。
+// 現行アレルゲン品目の一覧（日本語/英語）を表示順つきで返すAPI。
+// 管理画面の品目別設定UIを作るための基盤。
 
 import { Hono } from "hono";
 import { NextResponse } from "next/server";

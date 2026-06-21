@@ -108,6 +108,7 @@ export default async function AdminDemoMenusPage() {
                     <div className="mt-6">
                         <MenuListPageClient
                             initialMenus={initialMenus}
+                            totalAllergenCount={allergens.length}
                             readOnly
                             readOnlyEditHrefBase="/admin/demo/menus"
                         />

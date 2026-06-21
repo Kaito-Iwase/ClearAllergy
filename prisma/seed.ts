@@ -27,7 +27,7 @@ type DemoMenuSeed = {
     allergenStatusBySlug: Record<string, AllergenStatus>;
 };
 
-// 公開デモメニューは 29 品目を必ず持つ形にそろえます。
+// 公開デモメニューは現行マスタの全品目を必ず持つ形にそろえます。
 // seed に欠損データがあると、開発中に「これで正しい」と誤解しやすいためです。
 function buildPublishedSeedStatusMap(
     allergens: AllergenMasterSeed[],
@@ -37,8 +37,7 @@ function buildPublishedSeedStatusMap(
 
     for (const allergen of allergens) {
         completeStatusBySlug[allergen.slug] =
-            partialStatusBySlug[allergen.slug] ??
-            (allergen.slug === "pistachio" ? "UNKNOWN" : "FREE");
+            partialStatusBySlug[allergen.slug] ?? "FREE";
     }
 
     return completeStatusBySlug;
@@ -62,7 +61,7 @@ const DEMO_MENUS: DemoMenuSeed[] = [
     {
         name: "豆乳ベジカレー",
         description:
-            "野菜を中心にしたやさしい辛さのカレー。メニュー詳細で29品目を確認できます。",
+            `野菜を中心にしたやさしい辛さのカレー。メニュー詳細で${ALLERGENS.length}品目を確認できます。`,
         category: "メイン",
         priceYen: 1280,
         ingredients:
@@ -101,12 +100,14 @@ async function seedAllergenMaster() {
     });
 
     if (oldMatsutake) {
-        await prisma.menuItemAllergen.deleteMany({
-            where: { allergenId: oldMatsutake.id },
-        });
+        await prisma.$transaction(async (tx) => {
+            await tx.menuItemAllergen.deleteMany({
+                where: { allergenId: oldMatsutake.id },
+            });
 
-        await prisma.allergen.delete({
-            where: { slug: "matsutake" },
+            await tx.allergen.delete({
+                where: { slug: "matsutake" },
+            });
         });
     }
 
@@ -200,59 +201,65 @@ async function seedDemoShop() {
             select: { id: true },
         });
 
-        const savedMenu = existing
-            ? await prisma.menuItem.update({
-                  where: { id: existing.id },
-                  data: {
-                      name: menu.name,
-                      description: menu.description,
-                      category: menu.category,
-                      priceYen: menu.priceYen,
-                      ingredients: menu.ingredients,
-                      precaution: menu.precaution,
-                      imageUrl: null,
-                      isPublished: true,
-                  },
-                  select: { id: true },
-              })
-            : await prisma.menuItem.create({
-                  data: {
-                      shopId: shop.id,
-                      name: menu.name,
-                      description: menu.description,
-                      category: menu.category,
-                      priceYen: menu.priceYen,
-                      ingredients: menu.ingredients,
-                      precaution: menu.precaution,
-                      imageUrl: null,
-                      isPublished: true,
-                  },
-                  select: { id: true },
-              });
-
-        await prisma.menuItemAllergen.deleteMany({
-            where: { menuItemId: savedMenu.id },
-        });
-
-        // ここで 29 品目を全部作っておくことで、
-        // 公開 API や画面が「欠損なし前提」で安全に確認できます。
         const statuses = Object.entries(
             buildPublishedSeedStatusMap(ALLERGENS, menu.allergenStatusBySlug),
         );
 
-        await prisma.menuItemAllergen.createMany({
-            data: statuses.map(([slug, status]) => {
-                const allergenId = allergenBySlug.get(slug);
-                if (!allergenId) {
-                    throw new Error(`Unknown allergen slug in seed: ${slug}`);
-                }
+        // 公開状態の更新と全設定行の作り直しを同じ transaction に入れ、
+        // 遅延公開チェックが完成後の状態だけを判定できるようにします。
+        await prisma.$transaction(async (tx) => {
+            const savedMenu = existing
+                ? await tx.menuItem.update({
+                      where: { id: existing.id },
+                      data: {
+                          name: menu.name,
+                          description: menu.description,
+                          category: menu.category,
+                          priceYen: menu.priceYen,
+                          ingredients: menu.ingredients,
+                          precaution: menu.precaution,
+                          imageUrl: null,
+                          isPublished: true,
+                      },
+                      select: { id: true },
+                  })
+                : await tx.menuItem.create({
+                      data: {
+                          shopId: shop.id,
+                          name: menu.name,
+                          description: menu.description,
+                          category: menu.category,
+                          priceYen: menu.priceYen,
+                          ingredients: menu.ingredients,
+                          precaution: menu.precaution,
+                          imageUrl: null,
+                          isPublished: true,
+                      },
+                      select: { id: true },
+                  });
 
-                return {
-                    menuItemId: savedMenu.id,
-                    allergenId,
-                    status,
-                };
-            }),
+            await tx.menuItemAllergen.deleteMany({
+                where: { menuItemId: savedMenu.id },
+            });
+
+            // ここで現行マスタの全品目を作っておくことで、
+            // 公開 API や画面が「欠損なし前提」で安全に確認できます。
+            await tx.menuItemAllergen.createMany({
+                data: statuses.map(([slug, status]) => {
+                    const allergenId = allergenBySlug.get(slug);
+                    if (!allergenId) {
+                        throw new Error(
+                            `Unknown allergen slug in seed: ${slug}`,
+                        );
+                    }
+
+                    return {
+                        menuItemId: savedMenu.id,
+                        allergenId,
+                        status,
+                    };
+                }),
+            });
         });
     }
 
