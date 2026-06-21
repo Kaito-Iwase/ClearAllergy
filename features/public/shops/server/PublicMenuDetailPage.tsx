@@ -12,6 +12,7 @@ import {
     buildSpecifiedIngredientNotice,
     buildAllergenRows,
     createStatusBySlug,
+    isMenuPublishable,
 } from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYen } from "@/lib/utils/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
@@ -114,6 +115,20 @@ export default async function PublicMenuDetailPage({
         notFound();
     }
 
+    const statusBySlug = createStatusBySlug(
+        allergenMaster,
+        menu.allergenLinks,
+    );
+    if (
+        !isMenuPublishable({
+            name: menu.name,
+            allergens: allergenMaster,
+            statusBySlug,
+        })
+    ) {
+        notFound();
+    }
+
     // マスタ 29 品目を基準に rows を作り、未登録項目も UNKNOWN として常に表示します。
     const rows = buildAllergenRows(allergenMaster, menu.allergenLinks);
 
@@ -137,10 +152,7 @@ export default async function PublicMenuDetailPage({
     }));
 
     // localStorage の個人設定と突き合わせるため、slug をキーにした状態表も作ります。
-    const statusBySlugForClient = createStatusBySlug(
-        allergenMaster,
-        menu.allergenLinks,
-    );
+    const statusBySlugForClient = statusBySlug;
 
     return (
         <main className="flex justify-center px-4 py-6 md:px-8">

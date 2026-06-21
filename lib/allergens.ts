@@ -274,6 +274,14 @@ export function getMenuPublishValidationErrors(args: {
     return errors;
 }
 
+export function isMenuPublishable(args: {
+    name: string;
+    allergens: Array<{ slug: string; nameJa: string }>;
+    statusBySlug: Record<string, AllergenStatus>;
+}) {
+    return getMenuPublishValidationErrors(args).length === 0;
+}
+
 export type AllergenClassificationNotice = {
     kind: "danger" | "caution" | "unknown" | "safe";
     title: string;
