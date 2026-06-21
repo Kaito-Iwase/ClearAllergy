@@ -47,7 +47,7 @@ export const SPECIFIED_INGREDIENT_SLUGS = [
 export const SPECIFIED_INGREDIENT_LABEL =
     "対象：えび・かに・くるみ・小麦・そば・卵・乳・落花生（ピーナッツ）・カシューナッツ";
 
-// 特定原材料9品目以外は「特定原材料に準ずるもの」として別の注意表示に使います。
+// 特定原材料以外は「特定原材料に準ずるもの」として別の注意表示に使います。
 // ピスタチオはこの分類に含め、特定原材料側には含めません。
 export const RECOMMENDED_INGREDIENT_SLUGS = [
     "almond",
@@ -116,7 +116,7 @@ export function buildAllergenRows(
     allergens: AllergenWithNamesLike[],
     links: AllergenLinkLike[],
 ) {
-    // API や画面で 29 品目を毎回同じ順・同じ件数で扱えるよう、
+    // API や画面で現行マスタの全品目を毎回同じ順・同じ件数で扱えるよう、
     // マスタ基準で配列を組み直します。
     const statusBySlug = createStatusBySlug(allergens, links);
 
@@ -267,7 +267,7 @@ export function getMenuPublishValidationErrors(args: {
         // ここで UNKNOWN を止めるのは、
         // 未設定のまま公開されると利用者が安全性を誤解する危険があるためです。
         errors.push(
-            `公開するにはアレルゲン29品目を確定してください。未設定: ${unknownAllergens.join("・")}`,
+            `公開するにはアレルゲン${args.allergens.length}品目を確定してください。未設定: ${unknownAllergens.join("・")}`,
         );
     }
 

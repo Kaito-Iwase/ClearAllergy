@@ -87,7 +87,7 @@ export default async function PublicShopListPage() {
     const { shops, allergenMaster } = publicShopListData;
 
     // isPublished が古いデータに残っていても、未設定を含むメニューは公開側へ渡しません。
-    // 29 品目のリンク欠損も createStatusBySlug が UNKNOWN として扱います。
+    // 現行マスタに対するリンク欠損も createStatusBySlug が UNKNOWN として扱います。
     const shopsWithPublishableMenus = shops.flatMap((shop) => {
         const publishableMenus = shop.menus.filter((menu) =>
             isMenuPublishable({
