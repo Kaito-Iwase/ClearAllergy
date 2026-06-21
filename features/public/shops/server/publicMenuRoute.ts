@@ -5,7 +5,12 @@
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { buildAllergenDisplayItems, buildAllergenRows } from "@/lib/allergens";
+import {
+    buildAllergenDisplayItems,
+    buildAllergenRows,
+    createStatusBySlug,
+    isMenuPublishable,
+} from "@/lib/allergens";
 import { validateStoredImageUrl } from "@/lib/storage/image-url-policy";
 import {
     parseMenuImageFit,
@@ -93,6 +98,22 @@ app.get("/api/menus/:menuId", async (c) => {
                 sortOrder: true,
             },
         });
+
+        if (
+            !isMenuPublishable({
+                name: menu.name,
+                allergens: allergenMaster,
+                statusBySlug: createStatusBySlug(
+                    allergenMaster,
+                    menu.allergenLinks,
+                ),
+            })
+        ) {
+            return NextResponse.json(
+                { error: "menu not found" },
+                { status: 404 },
+            );
+        }
 
         const shopAllergenLinks = await prisma.menuItemAllergen.findMany({
             where: {

@@ -21,6 +21,7 @@
     "@googlemaps/js-api-loader": "^2.1.1",
     "@next/env": "^16.2.3",
     "@prisma/client": "^6.19.2",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.3.1",
     "bcrypt": "^6.0.0",
     "hono": "^4.12.23",

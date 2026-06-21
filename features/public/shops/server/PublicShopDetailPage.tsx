@@ -17,6 +17,10 @@ import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
 import { readPublicDataOrFallback } from "@/lib/public-db";
 import {
+    createStatusBySlug,
+    isMenuPublishable,
+} from "@/lib/allergens";
+import {
     parseMenuImageFit,
     parseMenuImagePositionPercent,
     parseMenuImageZoom,
@@ -143,8 +147,24 @@ export default async function PublicShopDetailPage({
         notFound();
     }
 
+    // 公開フラグだけでなく、29 品目がすべて確定済みかを公開時にも再確認します。
+    const publishableMenus = shop.menus.filter((menu) =>
+        isMenuPublishable({
+            name: menu.name,
+            allergens: allergenMaster,
+            statusBySlug: createStatusBySlug(
+                allergenMaster,
+                menu.allergenLinks,
+            ),
+        }),
+    );
+
+    if (publishableMenus.length === 0) {
+        notFound();
+    }
+
     // Server Component で取った Date や relation を、Client Component が扱いやすい形へ変換します。
-    const menusForClient = shop.menus.map((menu) => ({
+    const menusForClient = publishableMenus.map((menu) => ({
         id: menu.id,
         name: menu.name,
         description: menu.description,
@@ -165,8 +185,8 @@ export default async function PublicShopDetailPage({
         nameJa: allergen.nameJa,
     }));
 
-    const firstPublishedMenuId = shop.menus[0]?.id ?? null;
-    const publishedMenuCount = shop._count.menus;
+    const firstPublishedMenuId = publishableMenus[0]?.id ?? null;
+    const publishedMenuCount = publishableMenus.length;
     const averageBudgetLabel =
         typeof shop.averageBudgetYen === "number"
             ? `${formatPriceYenLabel(shop.averageBudgetYen)}前後`
