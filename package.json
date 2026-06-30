@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit --incremental false",
     "seed": "tsx prisma/seed.ts",
     "allergens:backfill:pistachio": "tsx scripts/backfill-pistachio-allergen.ts",
     "allergens:check": "tsx scripts/check-allergen-master.ts",
