@@ -301,12 +301,38 @@ npm run dev
 
 ローカルで画像アップロードまで確認する場合は、`BLOB_READ_WRITE_TOKEN` も設定してください。
 
+### GitHub Actions CI
+
+`.github/workflows/ci.yml` は、`pull_request` と `main` への `push` で以下を実行します。
+
+```bash
+npm ci
+npx prisma generate
+npm run lint
+npm run typecheck
+npm run build
+```
+
+CI では Vercel の Git 連携による Preview Deployment / Production Deployment を前提とし、独自の Vercel deploy や `prisma migrate deploy` は実行しません。
+
+GitHub Secrets には、CI の `prisma generate` と `next build` に必要な以下の変数名だけを登録します。秘密情報の値は README に記載しません。
+
+| Secret 名 | 用途 |
+| --- | --- |
+| `DATABASE_URL` | Prisma / PostgreSQL 接続先。CI用またはPreview用DBを推奨し、本番DBを直接使う場合は読み取りや実行内容に注意する |
+| `DIRECT_URL` | Prisma schema の `directUrl` 用。CIでは migrate を実行しない |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk の公開キー |
+| `CLERK_SECRET_KEY` | Clerk のサーバー側キー |
+
+`PORTFOLIO_MODE`、`ADMIN_REGISTRATION_MODE`、`ENABLE_CLERK_ADMIN_AUTH`、`NEXT_PUBLIC_APP_URL` は CI workflow 内で固定値を設定しています。`BLOB_READ_WRITE_TOKEN`、`GOOGLE_MAPS_SERVER_API_KEY`、Google Maps の公開キーは、現時点の CI build では必須にしていません。
+
 ## 動作確認方法
 
 ### 基本確認
 
 ```bash
 npm run lint
+npm run typecheck
 npm run build
 ```
 
@@ -329,6 +355,7 @@ npm run build
 | `npm run build` | 本番ビルド |
 | `npm run start` | ビルド後の起動 |
 | `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript 型チェック |
 | `npm run seed` | 初期データ投入 |
 | `npm run auth:migrate:clerk` | 既存ユーザーの Clerk 移行 |
 | `npm run auth:create:test-user` | テストユーザー作成 |
