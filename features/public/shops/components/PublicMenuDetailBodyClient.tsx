@@ -3,8 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import MenuAllergenAlertClient from "@/features/public/shops/components/MenuAllergenAlertClient";
-import SelectedFreeAllergenCardsClient from "@/features/public/shops/components/SelectedFreeAllergenCardsClient";
+import SelectedAllergenResultCardsClient from "@/features/public/shops/components/SelectedAllergenResultCardsClient";
 import {
     UserAllergenPreferencePanel,
     type UserAllergenPreferenceAllergen,
@@ -13,7 +12,6 @@ import {
 import {
     statusBadgeClass,
     statusLabelJa,
-    type AllergenClassificationNotice,
     type AllergenStatus,
 } from "@/lib/allergens";
 import {
@@ -48,8 +46,6 @@ export default function PublicMenuDetailBodyClient(props: {
     imagePositionY: number | null;
     ingredients: string | null;
     precaution: string | null;
-    specifiedIngredientNotice: AllergenClassificationNotice;
-    recommendedIngredientNotice: AllergenClassificationNotice;
     allergensForClient: UserAllergenPreferenceAllergen[];
     statusBySlugForClient: Record<string, AllergenStatus>;
     rows: AllergenRow[];
@@ -70,8 +66,6 @@ export default function PublicMenuDetailBodyClient(props: {
         imagePositionY,
         ingredients,
         precaution,
-        specifiedIngredientNotice,
-        recommendedIngredientNotice,
         allergensForClient,
         statusBySlugForClient,
         rows,
@@ -117,20 +111,6 @@ export default function PublicMenuDetailBodyClient(props: {
     return (
         <>
             <div className="lg:hidden">{preferencePanel}</div>
-
-            <MenuAllergenAlertClient
-                allergens={allergensForClient}
-                statusBySlug={statusBySlugForClient}
-            />
-
-            <div className="space-y-4">
-                <AllergenClassificationNoticeCard
-                    notice={specifiedIngredientNotice}
-                />
-                <AllergenClassificationNoticeCard
-                    notice={recommendedIngredientNotice}
-                />
-            </div>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:items-start">
                 <div className="space-y-8 lg:col-span-2">
@@ -232,7 +212,7 @@ export default function PublicMenuDetailBodyClient(props: {
                         </div>
 
                         <div className="md:col-span-2">
-                            <SelectedFreeAllergenCardsClient
+                            <SelectedAllergenResultCardsClient
                                 allergens={allergensForClient}
                                 statusBySlug={statusBySlugForClient}
                             />
@@ -328,34 +308,5 @@ export default function PublicMenuDetailBodyClient(props: {
                 </div>
             </div>
         </>
-    );
-}
-
-function AllergenClassificationNoticeCard({
-    notice,
-}: {
-    notice: AllergenClassificationNotice;
-}) {
-    return (
-        <div className={`rounded-xl p-6 shadow-sm ${notice.boxClass}`}>
-            <h2
-                className={`text-xl font-extrabold md:text-2xl ${notice.titleClass}`}
-            >
-                {notice.title}
-            </h2>
-
-            <p className={`mt-2 text-sm font-medium ${notice.textClass}`}>
-                {notice.desc}
-            </p>
-
-            <p className={`mt-2 text-sm ${notice.textClass}`}>
-                判定結果：{notice.resultText}
-            </p>
-            {notice.unknownText ? (
-                <p className={`mt-2 text-sm ${notice.textClass}`}>
-                    {notice.unknownText}
-                </p>
-            ) : null}
-        </div>
     );
 }
