@@ -145,8 +145,8 @@ export default function SelectedAllergenResultCardsClient({
         <div className="space-y-3">
             {containsAllergens.length > 0 ? (
                 <AllergenInfoCard
-                    title="あなた向け警告"
-                    description="選択中アレルゲンのうち、このメニューで「含む」と登録されている項目です。必要に応じて店舗へ確認してください。"
+                    title="選択中アレルゲンを含みます"
+                    description="選択中アレルゲンのうち、このメニューで「含む」と登録されている項目です。最終判断は店舗表示・スタッフ確認を含めて行ってください。"
                     className="border-red-200 bg-red-50"
                     titleClassName="text-red-800"
                 >
@@ -160,8 +160,8 @@ export default function SelectedAllergenResultCardsClient({
 
             {mayContainAllergens.length > 0 ? (
                 <AllergenInfoCard
-                    title="選択中アレルゲンの確認項目"
-                    description="選択中アレルゲンのうち、このメニューで「含む可能性あり」と登録されている項目です。必要に応じて店舗へ確認してください。"
+                    title="選択中アレルゲンを含む可能性があります"
+                    description="選択中アレルゲンのうち、このメニューで「含む可能性あり」と登録されている項目です。最終判断は店舗表示・スタッフ確認を含めて行ってください。"
                     className="border-amber-200 bg-amber-50"
                     titleClassName="text-amber-900"
                 >
@@ -176,13 +176,13 @@ export default function SelectedAllergenResultCardsClient({
             {!hasRiskResults && freeAllergens.length > 0 ? (
                 <AllergenInfoCard
                     title="選択中アレルゲンの登録上の判定"
-                    description="選択中アレルゲンについて、このメニューでは「含まない」と登録されています。表示内容は判断材料として確認してください。"
+                    description="登録上、このメニューでは選択中アレルゲンは不使用です。ただし最終判断は店舗表示・スタッフ確認を含めて行ってください。"
                     className="border-emerald-100 bg-emerald-50"
                     titleClassName="text-emerald-800"
                 >
                     <AllergenChips
                         allergens={freeAllergens}
-                        label="含まない"
+                        label="不使用登録"
                         className="border-emerald-100 bg-white text-emerald-800"
                     />
                 </AllergenInfoCard>
