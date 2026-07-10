@@ -50,3 +50,5 @@ next-env.d.ts
 # local documentation directories
 docs/
 document/
+
+.codex
