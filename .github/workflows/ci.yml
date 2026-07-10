@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Lint, typecheck, and build
+    name: Test, lint, typecheck, and build
     runs-on: ubuntu-latest
 
     env:
@@ -41,6 +41,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+
+      - name: Test
+        run: npm test
 
       - name: Lint
         run: npm run lint

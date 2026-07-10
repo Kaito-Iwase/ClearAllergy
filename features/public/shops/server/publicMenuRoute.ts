@@ -48,6 +48,9 @@ app.get("/api/menus/:menuId", async (c) => {
             where: {
                 id: menuId,
                 isPublished: true,
+                shop: {
+                    isActive: true,
+                },
             },
             select: {
                 id: true,
@@ -119,6 +122,10 @@ app.get("/api/menus/:menuId", async (c) => {
             where: {
                 menuItem: {
                     shopId: menu.shopId,
+                    isPublished: true,
+                    shop: {
+                        isActive: true,
+                    },
                 },
             },
             select: {

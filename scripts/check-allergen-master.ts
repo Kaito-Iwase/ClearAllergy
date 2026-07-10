@@ -8,6 +8,7 @@ import {
     buildRecommendedIngredientNotice,
     buildSpecifiedIngredientNotice,
     createStatusBySlug,
+    getAllergenMasterValidationErrors,
     isMenuPublishable,
     RECOMMENDED_INGREDIENT_SLUGS,
     SPECIFIED_INGREDIENT_SLUGS,
@@ -142,9 +143,10 @@ async function main() {
         },
     });
 
-    if (dbAllergens.length !== ALLERGEN_MASTER.length) {
+    const dbMasterErrors = getAllergenMasterValidationErrors(dbAllergens);
+    if (dbMasterErrors.length > 0) {
         fail(
-            `DB Allergen rows must match ALLERGEN_MASTER: expected ${ALLERGEN_MASTER.length}, got ${dbAllergens.length}.`,
+            `DB Allergen rows must match ALLERGEN_MASTER: ${dbMasterErrors.join(" ")}`,
         );
     }
 

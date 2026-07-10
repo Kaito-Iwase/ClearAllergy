@@ -6,7 +6,11 @@
 
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createStatusBySlug, type AllergenStatus } from "@/lib/allergens";
+import {
+    buildSelectedAllergenSummary,
+    createStatusBySlug,
+    type AllergenStatus,
+} from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import {
     loadUserAllergenPreferences,
@@ -137,93 +141,6 @@ function buildOverallSummary(args: {
     };
 }
 
-function buildPersonalizedSummary(args: {
-    statusBySlug: Record<string, AllergenStatus>;
-    selectedSlugs: string[];
-    includeMayContain: boolean;
-    nameJaBySlug: Map<string, string>;
-    rankBySlug: Map<string, number>;
-}): {
-    summaryText: string;
-    badge: BadgeKind;
-    containsCount: number;
-    mayCount: number;
-    unknownCount: number;
-} {
-    // こちらは、利用者が自分で選んだアレルゲンだけを見た要約です。
-    // 全体表示と同じく UNKNOWN を数えないと、重要な未確認項目が消えてしまいます。
-    const {
-        statusBySlug,
-        selectedSlugs,
-        includeMayContain,
-        nameJaBySlug,
-        rankBySlug,
-    } = args;
-
-    const containsSlugs: string[] = [];
-    const maySlugs: string[] = [];
-    const unknownSlugs: string[] = [];
-
-    for (const slug of selectedSlugs) {
-        const status = statusBySlug[slug] ?? "UNKNOWN";
-        if (status === "CONTAINS") {
-            containsSlugs.push(slug);
-        } else if (includeMayContain && status === "MAY_CONTAIN") {
-            maySlugs.push(slug);
-        } else if (status === "UNKNOWN") {
-            unknownSlugs.push(slug);
-        }
-    }
-
-    const badge: BadgeKind =
-        containsSlugs.length > 0
-            ? "danger"
-            : maySlugs.length > 0
-              ? "caution"
-              : unknownSlugs.length > 0
-                ? "unknown"
-              : "safe";
-
-    const byRank = (a: string, b: string) =>
-        (rankBySlug.get(a) ?? 9999) - (rankBySlug.get(b) ?? 9999);
-
-    containsSlugs.sort(byRank);
-    maySlugs.sort(byRank);
-    unknownSlugs.sort(byRank);
-
-    const toName = (slug: string) => nameJaBySlug.get(slug) ?? slug;
-    const containsNames = containsSlugs.map(toName);
-    const mayNames = maySlugs.map(toName);
-    const unknownNames = unknownSlugs.map(toName);
-
-    const pickedContains = containsNames.slice(0, 3);
-    const remain = 3 - pickedContains.length;
-    const pickedMay = remain > 0 ? mayNames.slice(0, remain) : [];
-
-    const parts: string[] = [];
-    if (pickedContains.length > 0) {
-        parts.push(`${pickedContains.join("・")}（含む）`);
-    }
-    if (pickedMay.length > 0) {
-        parts.push(`${pickedMay.join("・")}（含む可能性があります）`);
-    }
-    if (parts.length === 0 && unknownNames.length > 0) {
-        parts.push(`${unknownNames.slice(0, 3).join("・")}（未設定）`);
-    } else if (unknownNames.length > 0) {
-        parts.push(`未設定 ${unknownNames.length}件`);
-    }
-
-    return {
-        summaryText:
-            parts.length > 0
-                ? parts.join(" / ")
-                : "あなたの設定項目との一致なし",
-        badge,
-        containsCount: containsSlugs.length,
-        mayCount: maySlugs.length,
-        unknownCount: unknownSlugs.length,
-    };
-}
 
 export default function ShopMenuListClient({
     shopId,
@@ -381,7 +298,7 @@ export default function ShopMenuListClient({
                             rankBySlug,
                         });
 
-                        const personalizedSummary = buildPersonalizedSummary({
+                        const personalizedSummary = buildSelectedAllergenSummary({
                             statusBySlug,
                             selectedSlugs: highlightSlugs,
                             includeMayContain,
