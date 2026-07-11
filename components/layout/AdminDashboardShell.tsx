@@ -20,7 +20,6 @@ export default function AdminDashboardShell({
 }) {
     return (
         <div className="relative flex min-h-screen w-full flex-row overflow-hidden bg-background-light text-text-main">
-            {/* PC では左サイドバーを固定表示し、主要な管理導線をまとめます。 */}
             <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-gray-100 bg-surface-light lg:sticky lg:top-0 lg:flex">
                 <div className="p-6">
                     <Link href="/" className="flex items-center">
@@ -71,9 +70,7 @@ export default function AdminDashboardShell({
                 </div>
             </aside>
 
-            {/* メイン領域ではページごとの内容を表示します。 */}
             <main className="flex h-screen flex-1 flex-col overflow-y-auto bg-background-light">
-                {/* スマホではサイドバーを出さず、ヘッダーに最小限の操作だけ置きます。 */}
                 <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-surface-light p-4 lg:hidden">
                     <Link href="/" className="flex items-center">
                         <BrandLogo variant="compact" priority />
