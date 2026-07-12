@@ -3,7 +3,10 @@
 // このコンポーネントは、選択中アレルゲンとメニューの登録上の判定結果だけを表示します。
 
 import React from "react";
-import { type AllergenStatus } from "@/lib/allergens";
+import {
+    classifySelectedAllergenStatuses,
+    type AllergenStatus,
+} from "@/lib/allergens";
 import {
     loadUserAllergenPreferences,
     USER_ALLERGENS_UPDATED_EVENT,
@@ -129,17 +132,25 @@ export default function SelectedAllergenResultCardsClient({
             status: statusBySlug[allergen.slug] ?? "UNKNOWN",
         }));
 
-    const containsAllergens = selectedAllergens.filter(
-        (allergen) => allergen.status === "CONTAINS",
+    const selectedAllergenBySlug = new Map(
+        selectedAllergens.map((allergen) => [allergen.slug, allergen]),
     );
-    const mayContainAllergens = selectedAllergens.filter(
-        (allergen) => allergen.status === "MAY_CONTAIN",
-    );
-    const freeAllergens = selectedAllergens.filter(
-        (allergen) => allergen.status === "FREE",
-    );
+    const groups = classifySelectedAllergenStatuses({
+        statusBySlug,
+        selectedSlugs: selectedAllergens.map((allergen) => allergen.slug),
+    });
+    const toAllergens = (slugs: string[]) =>
+        slugs
+            .map((slug) => selectedAllergenBySlug.get(slug))
+            .filter(
+                (allergen): allergen is SelectedAllergen => Boolean(allergen),
+            );
+    const containsAllergens = toAllergens(groups.containsSlugs);
+    const mayContainAllergens = toAllergens(groups.mayContainSlugs);
+    const freeAllergens = toAllergens(groups.freeSlugs);
     const hasRiskResults =
         containsAllergens.length > 0 || mayContainAllergens.length > 0;
+    const hasUnknownResults = groups.unknownSlugs.length > 0;
 
     return (
         <div className="space-y-3">
@@ -173,7 +184,9 @@ export default function SelectedAllergenResultCardsClient({
                 </AllergenInfoCard>
             ) : null}
 
-            {!hasRiskResults && freeAllergens.length > 0 ? (
+            {!hasRiskResults &&
+            !hasUnknownResults &&
+            freeAllergens.length > 0 ? (
                 <AllergenInfoCard
                     title="選択中アレルゲンの登録上の判定"
                     description="登録上、このメニューでは選択中アレルゲンは不使用です。ただし最終判断は店舗表示・スタッフ確認を含めて行ってください。"

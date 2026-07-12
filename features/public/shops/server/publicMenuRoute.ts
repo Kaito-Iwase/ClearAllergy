@@ -25,17 +25,15 @@ const app = new Hono();
 app.get("/api/menus/:menuId", async (c) => {
     const req = c.req.raw;
     try {
-        // まずは Hono の動的ルートから menuId を取ります。
         let menuId = c.req.param("menuId");
 
-        // 一部環境で params が入らない時に備え、URL 末尾からも取得できるようにします。
+        // Hono から動的パラメータを取得できない場合も既存 API を維持するため、URL 末尾へフォールバックします。
         if (!menuId) {
             const url = new URL(req.url);
             const parts = url.pathname.split("/").filter(Boolean);
             menuId = parts[parts.length - 1];
         }
 
-        // menuId が決まらなければリクエスト不正です。
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },
@@ -48,6 +46,9 @@ app.get("/api/menus/:menuId", async (c) => {
             where: {
                 id: menuId,
                 isPublished: true,
+                shop: {
+                    isActive: true,
+                },
             },
             select: {
                 id: true,
@@ -119,6 +120,10 @@ app.get("/api/menus/:menuId", async (c) => {
             where: {
                 menuItem: {
                     shopId: menu.shopId,
+                    isPublished: true,
+                    shop: {
+                        isActive: true,
+                    },
                 },
             },
             select: {

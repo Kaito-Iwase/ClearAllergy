@@ -1,7 +1,3 @@
-// このファイルは 1 件のメニューに対する取得・更新・削除 API です。
-// /api/admin/menus/[menuId] の GET / PUT / DELETE をまとめています。
-// 毎回 shopId で絞り込み、「自分の店舗のメニューだけ触れる」ことを保証します。
-
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -28,6 +24,11 @@ import { validateStoredImageUrl } from "@/lib/storage/image-url-policy";
 import { requirePortfolioMutationAccessApi } from "@/lib/auth/portfolio-mode";
 import { revalidatePublicMenuPaths } from "@/lib/public-cache";
 import {
+    getMenuMutationAuditAction,
+    mergeIncomingAllergenStatuses,
+    type MenuMutationAuditAction,
+} from "@/features/admin/menus/server/menu-update-helpers";
+import {
     parseMenuImageFit,
     parseMenuImageFrame,
     parseMenuImagePosition,
@@ -37,8 +38,7 @@ import {
 
 const app = new Hono();
 
-// 更新用の request body です。
-// shopId はクライアントから受け取らず、必ず session 側の shopId を使います。
+// 所有店舗は Clerk 認証と DB の関連から解決するため、request body に shopId を持たせません。
 type UpdateMenuBody = {
     name?: unknown;
     description?: unknown;
@@ -168,18 +168,14 @@ app.put("/api/admin/menus/:menuId", async (c) => {
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
     let auditTargetId: string | null = null;
-    let auditAction:
-        | "menu_update"
-        | "menu_publish"
-        | "menu_unpublish" = "menu_update";
+    let auditAction: MenuMutationAuditAction = "menu_update";
     try {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
             return originError;
         }
 
-        // PUT は既存メニューの保存です。
-        // まず本人の店舗かどうか判定するため、認証と shopId 確認を行います。
+        // クライアントの所有権情報を信用せず、現在の Clerk 利用者から店舗を解決します。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
         auditActorUserId = auth.appUser.id;
@@ -190,7 +186,6 @@ app.put("/api/admin/menus/:menuId", async (c) => {
             return portfolioAccess.res;
         }
 
-        // 対象メニュー ID は URL から取り出します。
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },
@@ -361,18 +356,16 @@ app.put("/api/admin/menus/:menuId", async (c) => {
         let nextIsPublished = requestedIsPublished;
         let forcedUnpublishReason: string | null = null;
 
-        const nextStatusBySlug = createStatusBySlug(
-            allergens,
-            existing.allergenLinks,
-        );
         // 更新 API は「来た項目だけ差し替える」ので、
         // 既存状態を土台にしてから入力分だけ上書きします。
-        for (const allergen of allergens) {
-            const incomingStatus = incomingAllergenMap[allergen.slug];
-            if (incomingStatus) {
-                nextStatusBySlug[allergen.slug] = incomingStatus;
-            }
-        }
+        const nextStatusBySlug = mergeIncomingAllergenStatuses({
+            allergens,
+            currentStatusBySlug: createStatusBySlug(
+                allergens,
+                existing.allergenLinks,
+            ),
+            incomingStatusBySlug: incomingAllergenMap,
+        });
 
         // 編集保存でも公開条件は毎回サーバーで確認します。
         // 明示的な公開要求は拒否し、既存公開メニューが不完全になった保存は
@@ -387,10 +380,10 @@ app.put("/api/admin/menus/:menuId", async (c) => {
             const publishErrorMessage = publishErrors.join(" ");
 
             if (body.isPublished !== undefined && requestedIsPublished) {
-                auditAction =
-                    existing.isPublished === requestedIsPublished
-                        ? "menu_update"
-                        : "menu_publish";
+                auditAction = getMenuMutationAuditAction(
+                    existing.isPublished,
+                    requestedIsPublished,
+                );
                 await writeAdminAuditLog({
                     req,
                     actorUserId: auditActorUserId,
@@ -416,12 +409,10 @@ app.put("/api/admin/menus/:menuId", async (c) => {
             }
         }
 
-        auditAction =
-            existing.isPublished !== nextIsPublished
-                ? nextIsPublished
-                    ? "menu_publish"
-                    : "menu_unpublish"
-                : "menu_update";
+        auditAction = getMenuMutationAuditAction(
+            existing.isPublished,
+            nextIsPublished,
+        );
 
         const updatedMenu = await prisma.$transaction(async (tx) => {
             const updated = await tx.menuItem.update({
@@ -526,7 +517,7 @@ app.delete("/api/admin/menus/:menuId", async (c) => {
             return originError;
         }
 
-        // DELETE でも shopId を確認し、自店舗メニュー以外は削除できないようにします。
+        // 削除時もクライアントの所有権情報を信用せず、現在の Clerk 利用者から店舗を解決します。
         const auth = await requireShopId();
         if (!auth.ok) return auth.res;
         auditActorUserId = auth.appUser.id;
@@ -537,7 +528,6 @@ app.delete("/api/admin/menus/:menuId", async (c) => {
             return portfolioAccess.res;
         }
 
-        // 対象メニュー ID は URL から取り出します。
         if (!menuId) {
             return NextResponse.json(
                 { error: "menuId is required" },

@@ -20,7 +20,6 @@ export default function AdminDashboardShell({
 }) {
     return (
         <div className="relative flex min-h-screen w-full flex-row overflow-hidden bg-background-light text-text-main">
-            {/* PC では左サイドバーを固定表示し、主要な管理導線をまとめます。 */}
             <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-gray-100 bg-surface-light lg:sticky lg:top-0 lg:flex">
                 <div className="p-6">
                     <Link href="/" className="flex items-center">
@@ -34,10 +33,13 @@ export default function AdminDashboardShell({
                             href={shopHref}
                             className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50"
                         >
-                            <span className="material-symbols-outlined text-text-sub group-hover:text-primary">
+                            <span
+                                className="material-symbols-outlined shrink-0 text-text-sub group-hover:text-primary"
+                                aria-hidden="true"
+                            >
                                 storefront
                             </span>
-                            <span className="text-sm font-medium">
+                            <span className="whitespace-nowrap text-sm font-medium">
                                 店舗情報
                             </span>
                         </Link>
@@ -46,10 +48,13 @@ export default function AdminDashboardShell({
                             href={menusHref}
                             className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50"
                         >
-                            <span className="material-symbols-outlined text-text-sub group-hover:text-primary">
+                            <span
+                                className="material-symbols-outlined shrink-0 text-text-sub group-hover:text-primary"
+                                aria-hidden="true"
+                            >
                                 menu_book
                             </span>
-                            <span className="text-sm font-medium">
+                            <span className="whitespace-nowrap text-sm font-medium">
                                 メニュー管理
                             </span>
                         </Link>
@@ -71,9 +76,7 @@ export default function AdminDashboardShell({
                 </div>
             </aside>
 
-            {/* メイン領域ではページごとの内容を表示します。 */}
-            <main className="flex h-screen flex-1 flex-col overflow-y-auto bg-background-light">
-                {/* スマホではサイドバーを出さず、ヘッダーに最小限の操作だけ置きます。 */}
+            <main className="flex h-screen min-w-0 flex-1 flex-col overflow-y-auto bg-background-light">
                 <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-surface-light p-4 lg:hidden">
                     <Link href="/" className="flex items-center">
                         <BrandLogo variant="compact" priority />
@@ -103,9 +106,12 @@ export default function AdminDashboardShell({
                 <div className="mx-auto grid max-w-md grid-cols-2 gap-2">
                     <Link
                         href={shopHref}
-                        className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-gray-50"
+                        className="flex min-h-14 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-gray-50"
                     >
-                        <span className="material-symbols-outlined text-[22px] text-[#0f4c2f]">
+                        <span
+                            className="material-symbols-outlined shrink-0 text-[22px] text-[#0f4c2f]"
+                            aria-hidden="true"
+                        >
                             storefront
                         </span>
                         店舗情報
@@ -113,9 +119,12 @@ export default function AdminDashboardShell({
 
                     <Link
                         href={menusHref}
-                        className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-gray-50"
+                        className="flex min-h-14 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-gray-50"
                     >
-                        <span className="material-symbols-outlined text-[22px] text-[#0f4c2f]">
+                        <span
+                            className="material-symbols-outlined shrink-0 text-[22px] text-[#0f4c2f]"
+                            aria-hidden="true"
+                        >
                             menu_book
                         </span>
                         メニュー管理

@@ -2,6 +2,8 @@
 // 管理画面と公開画面の両方から使い、状態ラベルや色、特定原材料の注意文を共通化します。
 // UI ごとに判定ロジックがずれないよう、なるべくここへ集めています。
 
+import { ALLERGEN_MASTER } from "@/lib/constants/allergen-master";
+
 export const ALLERGEN_STATUS_VALUES = [
     "UNKNOWN",
     "CONTAINS",
@@ -29,6 +31,19 @@ export type AllergenDisplayItem = {
     storeHandlesAllergen: boolean;
     effectiveRisk: AllergenEffectiveRisk;
 };
+
+export type SelectedAllergenStatusGroups = {
+    containsSlugs: string[];
+    mayContainSlugs: string[];
+    freeSlugs: string[];
+    unknownSlugs: string[];
+};
+
+export type SelectedAllergenSummaryKind =
+    | "danger"
+    | "caution"
+    | "safe"
+    | "unknown";
 
 // えび・かに・くるみ・小麦・そば・卵・乳・落花生・カシューナッツは、
 // 公開画面で特に強調して見せたい「特定原材料」として別扱いしています。
@@ -110,6 +125,102 @@ export function createStatusBySlug(
     }
 
     return statusBySlug;
+}
+
+export function classifySelectedAllergenStatuses(args: {
+    statusBySlug: Record<string, AllergenStatus>;
+    selectedSlugs: readonly string[];
+}): SelectedAllergenStatusGroups {
+    const groups: SelectedAllergenStatusGroups = {
+        containsSlugs: [],
+        mayContainSlugs: [],
+        freeSlugs: [],
+        unknownSlugs: [],
+    };
+
+    for (const slug of args.selectedSlugs) {
+        const status = args.statusBySlug[slug] ?? "UNKNOWN";
+
+        if (status === "CONTAINS") {
+            groups.containsSlugs.push(slug);
+        } else if (status === "MAY_CONTAIN") {
+            groups.mayContainSlugs.push(slug);
+        } else if (status === "FREE") {
+            groups.freeSlugs.push(slug);
+        } else {
+            groups.unknownSlugs.push(slug);
+        }
+    }
+
+    return groups;
+}
+
+export function buildSelectedAllergenSummary(args: {
+    statusBySlug: Record<string, AllergenStatus>;
+    selectedSlugs: readonly string[];
+    includeMayContain: boolean;
+    nameJaBySlug: ReadonlyMap<string, string>;
+    rankBySlug: ReadonlyMap<string, number>;
+}): {
+    summaryText: string;
+    badge: SelectedAllergenSummaryKind;
+    containsCount: number;
+    mayCount: number;
+    unknownCount: number;
+} {
+    // includeMayContain は除外検索の設定であり、登録済みの状態自体は変えません。
+    // この引数の値にかかわらず MAY_CONTAIN は常に注意側へ分類します。
+    const groups = classifySelectedAllergenStatuses({
+        statusBySlug: args.statusBySlug,
+        selectedSlugs: args.selectedSlugs,
+    });
+    const byRank = (a: string, b: string) =>
+        (args.rankBySlug.get(a) ?? 9999) -
+        (args.rankBySlug.get(b) ?? 9999);
+    const containsSlugs = [...groups.containsSlugs].sort(byRank);
+    const mayContainSlugs = [...groups.mayContainSlugs].sort(byRank);
+    const unknownSlugs = [...groups.unknownSlugs].sort(byRank);
+    const toName = (slug: string) => args.nameJaBySlug.get(slug) ?? slug;
+    const containsNames = containsSlugs.map(toName);
+    const mayContainNames = mayContainSlugs.map(toName);
+    const unknownNames = unknownSlugs.map(toName);
+    const pickedContains = containsNames.slice(0, 3);
+    const remain = 3 - pickedContains.length;
+    const pickedMayContain =
+        remain > 0 ? mayContainNames.slice(0, remain) : [];
+    const parts: string[] = [];
+
+    if (pickedContains.length > 0) {
+        parts.push(`${pickedContains.join("・")}（含む）`);
+    }
+    if (pickedMayContain.length > 0) {
+        parts.push(
+            `${pickedMayContain.join("・")}（含む可能性があります）`,
+        );
+    }
+    if (parts.length === 0 && unknownNames.length > 0) {
+        parts.push(`${unknownNames.slice(0, 3).join("・")}（未設定）`);
+    } else if (unknownNames.length > 0) {
+        parts.push(`未設定 ${unknownNames.length}件`);
+    }
+
+    return {
+        summaryText:
+            parts.length > 0
+                ? parts.join(" / ")
+                : "あなたの設定項目との一致なし",
+        badge:
+            containsSlugs.length > 0
+                ? "danger"
+                : mayContainSlugs.length > 0
+                  ? "caution"
+                  : unknownSlugs.length > 0
+                    ? "unknown"
+                    : "safe",
+        containsCount: containsSlugs.length,
+        mayCount: mayContainSlugs.length,
+        unknownCount: unknownSlugs.length,
+    };
 }
 
 export function buildAllergenRows(
@@ -245,6 +356,49 @@ export function getUnknownAllergenNames(args: {
         .map((allergen) => allergen.nameJa);
 }
 
+export function getAllergenMasterValidationErrors(
+    allergens: Array<{ slug: string }>,
+): string[] {
+    const expectedSlugs = ALLERGEN_MASTER.map((allergen) => allergen.slug);
+    const expectedSlugSet = new Set(expectedSlugs);
+    const actualSlugs = allergens.map((allergen) => allergen.slug);
+    const actualSlugSet = new Set(actualSlugs);
+    const seenSlugs = new Set<string>();
+    const duplicateSlugSet = new Set<string>();
+
+    for (const slug of actualSlugs) {
+        if (seenSlugs.has(slug)) {
+            duplicateSlugSet.add(slug);
+        }
+        seenSlugs.add(slug);
+    }
+
+    const missingSlugs = expectedSlugs.filter(
+        (slug) => !actualSlugSet.has(slug),
+    );
+    const extraSlugs = [...actualSlugSet].filter(
+        (slug) => !expectedSlugSet.has(slug),
+    );
+    const errors: string[] = [];
+
+    if (actualSlugs.length !== 29) {
+        errors.push(
+            `アレルゲンマスタは29件必要です（現在${actualSlugs.length}件）。`,
+        );
+    }
+    if (duplicateSlugSet.size > 0) {
+        errors.push(`重複slug: ${[...duplicateSlugSet].join("・")}`);
+    }
+    if (missingSlugs.length > 0) {
+        errors.push(`不足slug: ${missingSlugs.join("・")}`);
+    }
+    if (extraSlugs.length > 0) {
+        errors.push(`余分なslug: ${extraSlugs.join("・")}`);
+    }
+
+    return errors;
+}
+
 export function getMenuPublishValidationErrors(args: {
     name: string;
     allergens: Array<{ slug: string; nameJa: string }>;
@@ -256,6 +410,15 @@ export function getMenuPublishValidationErrors(args: {
 
     if (args.name.trim() === "") {
         errors.push("公開するにはメニュー名が必要です。");
+    }
+
+    const allergenMasterErrors = getAllergenMasterValidationErrors(
+        args.allergens,
+    );
+    if (allergenMasterErrors.length > 0) {
+        errors.push(
+            `アレルゲンマスタがコード上の29品目と一致しないため公開できません。${allergenMasterErrors.join(" ")}`,
+        );
     }
 
     const unknownAllergens = getUnknownAllergenNames({
