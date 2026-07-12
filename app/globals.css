@@ -1,8 +1,5 @@
-@config "../tailwind.config.ts";
-
-/* app/globals.css */
-/* Tailwind v4 は @config を先頭に置き、@import は 1 回だけにします。 */
 @import "tailwindcss";
+@config "../tailwind.config.ts";
 
 @plugin "@tailwindcss/forms";
 
