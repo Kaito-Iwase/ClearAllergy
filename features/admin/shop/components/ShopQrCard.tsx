@@ -32,6 +32,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
         const envBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
 
         if (envBaseUrl) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- server/clientの初期描画を揃えた後、公開URLの基準だけを確定します。
             setOrigin(envBaseUrl.replace(/\/$/, ""));
             return;
         }

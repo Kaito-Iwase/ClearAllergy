@@ -42,6 +42,7 @@ export function useUserAllergenPreferenceState() {
 
     React.useEffect(() => {
         const stored = loadUserAllergenPreferences();
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorageはhydration後に読み、保存済み設定を初期状態へ反映します。
         setHighlightSlugs(stored.highlightSlugs);
         setExcludedSlugs(stored.excludedSlugs);
         setTargetSlugs([]);

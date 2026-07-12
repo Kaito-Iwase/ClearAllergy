@@ -124,6 +124,7 @@ export default function PublicShopListClient({
     const [locationMessage, setLocationMessage] = React.useState("");
 
     React.useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 戻る・進む操作後もURLの検索条件をフォームへ同期します。
         setArea(searchParams.get("area") ?? "");
         setKeyword(searchParams.get("keyword") ?? searchParams.get("q") ?? "");
         setPrefecture(searchParams.get("prefecture") ?? "");

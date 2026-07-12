@@ -15,6 +15,7 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
     // ブラウザでしか origin が取れないため、マウント後に公開 URL を組み立てます。
     React.useEffect(() => {
         const origin = window.location.origin;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- server/clientの初期描画を揃え、hydration後に実URLを設定します。
         setShopUrl(`${origin}/shops/${shopId}`);
     }, [shopId]);
 
