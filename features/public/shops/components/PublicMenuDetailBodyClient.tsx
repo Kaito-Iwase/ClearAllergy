@@ -219,7 +219,7 @@ export default function PublicMenuDetailBodyClient(props: {
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                             <span className="text-[#13ec13]">🧺</span>
                             <h3 className="text-xl font-bold">原材料名</h3>
@@ -242,7 +242,7 @@ export default function PublicMenuDetailBodyClient(props: {
                         ) : null}
                     </div>
 
-                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                             <span className="text-[#13ec13]">🧾</span>
                             <h3 className="text-xl font-bold">
@@ -274,7 +274,7 @@ export default function PublicMenuDetailBodyClient(props: {
                 </div>
 
                 <div className="flex flex-col gap-6">
-                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2">
                             <span className="text-orange-500">ℹ️</span>
                             <h3 className="text-lg font-bold">注意事項</h3>
@@ -291,7 +291,7 @@ export default function PublicMenuDetailBodyClient(props: {
                         </ul>
                     </div>
 
-                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <h3 className="text-lg font-bold">店舗</h3>
                         <p className="mt-2 text-sm text-gray-600">
                             {shopName}

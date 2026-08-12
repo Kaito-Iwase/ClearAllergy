@@ -246,7 +246,7 @@ export default async function PublicShopDetailPage({
                         ) : null}
                         <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-black/15 to-transparent" />
 
-                        <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
+                        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 md:p-8">
                             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                 <div className="relative z-10">
                                     <p className="text-sm font-semibold text-white/90 drop-shadow">
@@ -284,7 +284,7 @@ export default async function PublicShopDetailPage({
 
                 <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <div className="order-1 flex flex-col gap-6 lg:col-span-2">
-                        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                             <h2 className="text-base font-extrabold">
                                 お店の説明
                             </h2>
@@ -320,7 +320,7 @@ export default async function PublicShopDetailPage({
 
                         <Suspense
                             fallback={
-                                <div className="rounded-xl border border-gray-100 bg-white p-6 text-sm text-gray-600 shadow-sm">
+                                <div className="rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-600 shadow-sm sm:p-6">
                                     公開メニューを読み込み中です。
                                 </div>
                             }
@@ -337,7 +337,7 @@ export default async function PublicShopDetailPage({
                         id="shop-info"
                         className="order-3 flex flex-col gap-6"
                     >
-                        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                             <h2 className="text-base font-extrabold">
                                 店舗情報
                             </h2>

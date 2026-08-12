@@ -24,7 +24,7 @@ export default async function AdminMenuNewPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <div className="mx-auto max-w-6xl px-4 py-6">
+            <div className="mx-auto max-w-6xl px-0 py-6 sm:px-4">
                 <nav className="mb-4 text-sm text-gray-500">
                     <Link href="/admin/menus" className="hover:text-gray-900">
                         メニュー一覧

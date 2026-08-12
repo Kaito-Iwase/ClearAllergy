@@ -76,7 +76,9 @@ export default function AdminDashboardShell({
                 </div>
             </aside>
 
-            <main className="flex h-screen min-w-0 flex-1 flex-col overflow-y-auto bg-background-light">
+            {/* メイン領域ではページごとの内容を表示します。 */}
+            <main className="flex h-dvh flex-1 flex-col overflow-y-auto bg-background-light">
+                {/* スマホではサイドバーを出さず、ヘッダーに最小限の操作だけ置きます。 */}
                 <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-surface-light p-4 lg:hidden">
                     <Link href="/" className="flex items-center">
                         <BrandLogo variant="compact" priority />
@@ -97,12 +99,12 @@ export default function AdminDashboardShell({
                     </div>
                 </header>
 
-                <div className="mx-auto flex w-full max-w-6xl flex-1 p-4 pb-24 md:p-8">
+                <div className="mx-auto flex w-full max-w-6xl flex-1 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:p-8">
                     <div className="w-full">{children}</div>
                 </div>
             </main>
 
-            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
                 <div className="mx-auto grid max-w-md grid-cols-2 gap-2">
                     <Link
                         href={shopHref}

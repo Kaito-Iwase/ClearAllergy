@@ -278,11 +278,11 @@ export default function NewMenuForm({
                 </div>
             )}
 
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="rounded-2xl bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="font-bold text-gray-900">基本情報</div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
                         <button
                             type="button"
                             onClick={togglePublished}
@@ -291,9 +291,13 @@ export default function NewMenuForm({
                                 isSubmitting ||
                                 uploading
                             }
-                            className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${getMenuPublishButtonColorClass(
-                                { isPublished, canPublish },
-                            )}`}
+                            className={`min-h-11 w-full rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto ${
+                                isPublished
+                                    ? "bg-green-600"
+                                    : canPublish
+                                      ? "bg-gray-900"
+                                      : "bg-amber-600"
+                            }`}
                         >
                             {getMenuPublishButtonLabel({
                                 readOnly,
@@ -309,7 +313,7 @@ export default function NewMenuForm({
                                 isSubmitting ||
                                 uploading
                             }
-                            className={createMenuButtonClassName}
+                            className={`${createMenuButtonClassName} min-h-11 w-full sm:w-auto`}
                         >
                             {readOnly && !readOnlyPreview
                                 ? "閲覧専用"
@@ -325,7 +329,7 @@ export default function NewMenuForm({
                         <button
                             type="button"
                             onClick={() => router.push(backHref)}
-                            className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                            className="min-h-11 w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 sm:w-auto"
                         >
                             一覧に戻る
                         </button>
@@ -503,7 +507,7 @@ export default function NewMenuForm({
                 )}
             </div>
 
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
+            <div className="rounded-2xl bg-white p-4 shadow-sm sm:p-5">
                 <div className="font-bold text-gray-900">
                     アレルゲン{allergens.length}品目
                 </div>
@@ -524,7 +528,7 @@ export default function NewMenuForm({
                         return (
                             <div
                                 key={allergen.slug}
-                                className="rounded-2xl border border-gray-200 p-4"
+                                className="rounded-2xl border border-gray-200 p-3 sm:p-4"
                             >
                                 <div className="mb-3">
                                     <div className="font-semibold text-gray-900">
@@ -535,13 +539,13 @@ export default function NewMenuForm({
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2">
+                                <div className="grid grid-cols-2 gap-2">
                                     <button
                                         type="button"
                                         onClick={() =>
                                             setOne(allergen.slug, "UNKNOWN")
                                         }
-                                        className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                                        className={`min-h-11 w-full rounded-xl px-3 py-2 text-sm font-medium ${
                                             current === "UNKNOWN"
                                                 ? "bg-gray-700 text-white"
                                                 : "bg-gray-100 text-gray-700"
@@ -555,7 +559,7 @@ export default function NewMenuForm({
                                         onClick={() =>
                                             setOne(allergen.slug, "CONTAINS")
                                         }
-                                        className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                                        className={`min-h-11 w-full rounded-xl px-3 py-2 text-sm font-medium ${
                                             current === "CONTAINS"
                                                 ? "bg-red-600 text-white"
                                                 : "bg-gray-100 text-gray-700"
@@ -569,7 +573,7 @@ export default function NewMenuForm({
                                         onClick={() =>
                                             setOne(allergen.slug, "FREE")
                                         }
-                                        className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                                        className={`min-h-11 w-full rounded-xl px-3 py-2 text-sm font-medium ${
                                             current === "FREE"
                                                 ? "bg-green-600 text-white"
                                                 : "bg-gray-100 text-gray-700"
@@ -586,7 +590,7 @@ export default function NewMenuForm({
                                                 "MAY_CONTAIN",
                                             )
                                         }
-                                        className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                                        className={`min-h-11 w-full rounded-xl px-3 py-2 text-sm font-medium ${
                                             current === "MAY_CONTAIN"
                                                 ? "bg-yellow-500 text-white"
                                                 : "bg-gray-100 text-gray-700"
@@ -599,6 +603,28 @@ export default function NewMenuForm({
                         );
                     })}
                 </div>
+            </div>
+
+            <div className="flex justify-end">
+                <button
+                    type="submit"
+                    disabled={
+                        (readOnly && !readOnlyPreview) ||
+                        isSubmitting ||
+                        uploading
+                    }
+                    className={`${createMenuButtonClassName} min-h-11 w-full sm:w-auto`}
+                >
+                    {readOnly && !readOnlyPreview
+                        ? "閲覧専用"
+                        : readOnly
+                          ? "保存されないデモ操作"
+                          : isSubmitting
+                            ? "登録中..."
+                            : uploading
+                              ? "画像アップロード中..."
+                              : "この内容で登録する"}
+                </button>
             </div>
         </form>
     );

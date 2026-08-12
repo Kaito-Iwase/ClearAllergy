@@ -512,11 +512,11 @@ export default function ImageCompositionEditor({
     const surfaceClass =
         surface === "plain"
             ? "mt-4"
-            : "mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm";
+            : "mt-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4";
 
     return (
         <section className={surfaceClass}>
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] xl:gap-5">
                 <div className="order-1">
                     <div className="mb-3">
                         <div>
@@ -569,7 +569,7 @@ export default function ImageCompositionEditor({
                                     key={preset.id}
                                     type="button"
                                     onClick={() => applyPreset(preset.values)}
-                                    className="rounded-xl border border-gray-200 bg-white p-3 text-left transition hover:border-green-300 hover:bg-green-50"
+                                    className="min-h-11 rounded-xl border border-gray-200 bg-white p-3 text-left transition hover:border-green-300 hover:bg-green-50"
                                 >
                                     <span className="block text-sm font-extrabold text-gray-950">
                                         {preset.title}
@@ -586,13 +586,13 @@ export default function ImageCompositionEditor({
                         <p className="text-sm font-extrabold text-gray-950">
                             プレビュー切替
                         </p>
-                        <div className="mt-2 inline-flex rounded-xl bg-gray-100 p-1">
+                        <div className="mt-2 grid w-full grid-cols-2 rounded-xl bg-gray-100 p-1 sm:inline-flex sm:w-auto">
                             {PREVIEW_OPTIONS.map((option) => (
                                 <button
                                     key={option.value}
                                     type="button"
                                     onClick={() => setPreviewMode(option.value)}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                                    className={`min-h-11 rounded-lg px-3 py-1.5 text-xs font-bold ${
                                         previewMode === option.value
                                             ? "bg-white text-gray-950 shadow-sm"
                                             : "text-gray-600"
@@ -604,11 +604,11 @@ export default function ImageCompositionEditor({
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                         <button
                             type="button"
                             onClick={() => setCompareOriginal((prev) => !prev)}
-                            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+                            className={`min-h-11 w-full rounded-xl px-3 py-2 text-sm font-bold sm:w-auto ${
                                 compareOriginal
                                     ? "bg-gray-900 text-white"
                                     : "bg-gray-100 text-gray-800"
@@ -619,14 +619,14 @@ export default function ImageCompositionEditor({
                         <button
                             type="button"
                             onClick={resetCenter}
-                            className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-800"
+                            className="min-h-11 w-full rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-800 sm:w-auto"
                         >
                             中央に戻す
                         </button>
                         <button
                             type="button"
                             onClick={resetToInitial}
-                            className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-800"
+                            className="min-h-11 w-full rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-800 sm:w-auto"
                         >
                             リセット
                         </button>
@@ -636,7 +636,7 @@ export default function ImageCompositionEditor({
                         <button
                             type="button"
                             onClick={() => setDetailsOpen((prev) => !prev)}
-                            className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-sm font-extrabold text-gray-950"
+                            className="flex min-h-11 w-full items-center justify-between gap-4 px-4 py-3 text-left text-sm font-extrabold text-gray-950"
                             aria-expanded={detailsOpen}
                         >
                             詳細調整
@@ -662,7 +662,7 @@ export default function ImageCompositionEditor({
                                                             option.value,
                                                     })
                                                 }
-                                                className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                                                className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold ${
                                                     values.imageFrame ===
                                                     option.value
                                                         ? "bg-green-600 text-white"
@@ -689,7 +689,7 @@ export default function ImageCompositionEditor({
                                                         imageFit: option.value,
                                                     })
                                                 }
-                                                className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                                                className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold ${
                                                     values.imageFit ===
                                                     option.value
                                                         ? "bg-green-600 text-white"
@@ -716,7 +716,7 @@ export default function ImageCompositionEditor({
                                                         option.value,
                                                     )
                                                 }
-                                                className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                                                className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold ${
                                                     values.imagePosition ===
                                                     option.value
                                                         ? "bg-green-600 text-white"
@@ -747,7 +747,7 @@ export default function ImageCompositionEditor({
                                                     ),
                                                 })
                                             }
-                                            className="mt-2 w-full accent-green-600"
+                                            className="mt-2 h-11 w-full accent-green-600"
                                         />
                                     </label>
 
@@ -765,7 +765,7 @@ export default function ImageCompositionEditor({
                                                     values.imagePositionY,
                                                 )
                                             }
-                                            className="mt-2 w-full accent-green-600"
+                                            className="mt-2 h-11 w-full accent-green-600"
                                         />
                                     </label>
 
@@ -783,7 +783,7 @@ export default function ImageCompositionEditor({
                                                     Number(event.target.value),
                                                 )
                                             }
-                                            className="mt-2 w-full accent-green-600"
+                                            className="mt-2 h-11 w-full accent-green-600"
                                         />
                                     </label>
                                 </div>

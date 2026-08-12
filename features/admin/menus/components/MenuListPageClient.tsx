@@ -190,14 +190,14 @@ export default function MenuListPageClient({
                         search
                     </span>
                     <input
-                        className="h-12 w-full rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-3 text-sm outline-none transition focus:border-[#0f4c2f] focus:bg-white focus:ring-2 focus:ring-[#0f4c2f]/10"
+                        className="h-12 w-full rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-3 text-base outline-none transition focus:border-[#0f4c2f] focus:bg-white focus:ring-2 focus:ring-[#0f4c2f]/10 sm:text-sm"
                         placeholder="検索（メニュー名・カテゴリ・未設定アレルゲン）"
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
                     />
                 </div>
 
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:overflow-x-auto sm:pb-1">
                     {filterItems.map((item) => {
                         const selected = filter === item.key;
 
@@ -206,7 +206,7 @@ export default function MenuListPageClient({
                                 key={item.key}
                                 type="button"
                                 onClick={() => setFilter(item.key)}
-                                className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                                className={`inline-flex min-h-11 w-full shrink-0 items-center justify-between gap-2 rounded-xl px-4 py-2 text-sm font-bold transition sm:w-auto sm:rounded-full ${
                                     selected
                                         ? "bg-[#0f4c2f] text-white shadow-sm"
                                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -346,10 +346,10 @@ export default function MenuListPageClient({
                                     )}
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                                <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap sm:justify-end">
                                     {readOnly && !readOnlyEditHrefBase ? (
                                         <span
-                                            className="inline-flex h-10 cursor-not-allowed items-center justify-center gap-1 rounded-lg bg-gray-100 px-3 text-sm font-bold text-gray-500 opacity-70"
+                                            className="inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-1 rounded-lg bg-gray-100 px-3 text-sm font-bold text-gray-500 opacity-70 sm:w-auto"
                                             aria-disabled="true"
                                         >
                                             <span className="material-symbols-outlined text-[18px]">
@@ -360,7 +360,7 @@ export default function MenuListPageClient({
                                     ) : (
                                         <Link
                                             href={editHref}
-                                            className={`inline-flex h-10 items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold transition ${
+                                            className={`inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold transition sm:w-auto ${
                                                 hasUnknown
                                                     ? "bg-amber-600 text-white hover:bg-amber-700"
                                                     : "bg-[#0f4c2f] text-white hover:bg-[#0b3d25]"
@@ -381,7 +381,7 @@ export default function MenuListPageClient({
                                             onDelete(menu.id, menu.name)
                                         }
                                         disabled={readOnly}
-                                        className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                                         aria-label={`${menu.name}を削除`}
                                     >
                                         <span className="material-symbols-outlined text-[20px]">

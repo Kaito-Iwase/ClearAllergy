@@ -65,7 +65,7 @@ export default async function AdminMenusPage() {
 
     return (
         <div className="min-h-screen bg-[#f5f7f4]">
-            <div className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:pb-8">
+            <div className="mx-auto max-w-6xl px-0 py-6 sm:px-4 sm:pb-8">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p className="text-xs font-semibold text-[#0f4c2f]">
