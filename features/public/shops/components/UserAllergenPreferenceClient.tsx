@@ -207,10 +207,10 @@ export function UserAllergenPreferencePanel({
             <button
                 type="button"
                 onClick={onToggleOpen}
-                className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
+                className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-4 text-left sm:gap-4 sm:px-6 sm:py-5"
                 aria-expanded={isOpen}
             >
-                <div>
+                <div className="min-w-0">
                     <h2 className="text-lg font-bold text-gray-900">
                         あなた向けのアレルゲン設定
                     </h2>
@@ -221,13 +221,13 @@ export function UserAllergenPreferencePanel({
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                     {selectedCount > 0 ? (
-                        <span className="rounded-full bg-[#13ec13]/15 px-3 py-1 text-xs font-bold text-green-800">
+                        <span className="whitespace-nowrap rounded-full bg-[#13ec13]/15 px-3 py-1 text-xs font-bold text-green-800">
                             保存済み {selectedCount}件
                         </span>
                     ) : (
-                        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600">
+                        <span className="whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600">
                             未設定
                         </span>
                     )}
@@ -239,7 +239,7 @@ export function UserAllergenPreferencePanel({
             </button>
 
             {isOpen ? (
-                <div className="border-t border-gray-100 px-6 pb-6 pt-4">
+                <div className="border-t border-gray-100 px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
                     <p className="text-sm text-gray-600">
                         アレルゲンを選んでから、下のボタンで強調表示または除外に設定します。
                     </p>
@@ -258,7 +258,7 @@ export function UserAllergenPreferencePanel({
                                 type="checkbox"
                                 checked={includeMayContain}
                                 onChange={onToggleIncludeMayContain}
-                                className="mt-1 h-5 w-5 rounded border-gray-300 text-[#13ec13] focus:ring-[#13ec13]"
+                                className="mt-1 h-6 w-6 shrink-0 rounded border-gray-300 text-[#13ec13] focus:ring-[#13ec13]"
                             />
                         </label>
                     </div>
@@ -276,7 +276,7 @@ export function UserAllergenPreferencePanel({
                                     key={allergen.slug}
                                     type="button"
                                     onClick={() => onToggleTargetSlug(allergen.slug)}
-                                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition ${
+                                    className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition ${
                                         selected
                                             ? "border-gray-900 bg-gray-900 text-white"
                                             : excluded
@@ -301,11 +301,11 @@ export function UserAllergenPreferencePanel({
                         })}
                     </div>
 
-                    <div className="mt-5 flex flex-wrap gap-2">
+                    <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                         <button
                             type="button"
                             onClick={onApplyHighlight}
-                            className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-extrabold text-black transition hover:bg-amber-500"
+                            className="min-h-11 rounded-lg bg-amber-400 px-4 py-2 text-sm font-extrabold text-black transition hover:bg-amber-500"
                         >
                             強調する
                             {targetCount > 0 ? `（${targetCount}件）` : ""}
@@ -314,7 +314,7 @@ export function UserAllergenPreferencePanel({
                         <button
                             type="button"
                             onClick={onApplyExclude}
-                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-red-700"
+                            className="min-h-11 rounded-lg bg-red-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-red-700"
                         >
                             除外する
                             {targetCount > 0 ? `（${targetCount}件）` : ""}
@@ -323,7 +323,7 @@ export function UserAllergenPreferencePanel({
                         <button
                             type="button"
                             onClick={onClear}
-                            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
+                            className="col-span-2 min-h-11 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-gray-50 sm:col-span-1"
                         >
                             リセット
                         </button>

@@ -82,7 +82,7 @@ export default async function AdminDemoMenuEditPage({ params }: PageProps) {
             showAuthControls={false}
         >
             <div className="min-h-screen bg-gray-50">
-                <div className="mx-auto max-w-6xl px-4 py-6">
+                <div className="mx-auto max-w-6xl px-0 py-6 sm:px-4">
                     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
                         ポートフォリオ公開版のため、この画面は操作プレビューです。保存・公開・削除は実行されず、DB・画像ストレージには反映されません。
                     </div>

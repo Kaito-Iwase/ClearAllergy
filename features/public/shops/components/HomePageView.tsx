@@ -66,25 +66,25 @@ export default function HomePageView({
             </header>
 
             <section className="bg-white">
-                <div className="mx-auto max-w-[1200px] px-6 py-12 lg:py-16">
+                <div className="mx-auto max-w-[1200px] px-4 py-10 sm:px-6 sm:py-12 lg:py-16">
                     <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-8">
                         <div className="flex flex-col gap-5">
                             <h1 className="text-neutral-900">
-                                <span className="block text-[44px] font-black leading-[1.02] tracking-[-0.05em] sm:text-[56px] lg:text-[54px] xl:text-[62px]">
+                                <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
                                     外食前に、
                                 </span>
-                                <span className="block text-[44px] font-black leading-[1.02] tracking-[-0.05em] sm:text-[56px] lg:text-[54px] xl:text-[62px]">
+                                <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
                                     安心を確認できる。
                                 </span>
-                                <span className="block text-[44px] font-black leading-[1.02] tracking-[-0.05em] sm:text-[56px] lg:text-[54px] xl:text-[62px]">
+                                <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
                                     アレルゲン情報を
                                 </span>
-                                <span className="block text-[44px] font-black leading-[1.02] tracking-[-0.05em] sm:text-[56px] lg:text-[54px] xl:text-[62px]">
+                                <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
                                     見やすく届ける。
                                 </span>
                             </h1>
 
-                            <p className="text-lg leading-8 text-neutral-600">
+                            <p className="text-base leading-7 text-neutral-600 sm:text-lg sm:leading-8">
                                 食物アレルギーを持つ人と、それに応えたい飲食店をつなぐサービスです。
                                 店舗ごとのメニュー情報とアレルゲン情報を見やすく整理し、
                                 外食前の確認を少しでもしやすくすることを目指しています。
@@ -100,10 +100,10 @@ export default function HomePageView({
                                 </p>
                             </div>
 
-                            <div className="mt-2 flex flex-wrap gap-4">
+                            <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
                                 <Link
                                     href="/shops"
-                                    className="flex h-12 items-center justify-center rounded-lg bg-[#13ec13] px-8 text-base font-bold text-neutral-900 shadow-lg shadow-[#13ec13]/20 transition-transform hover:-translate-y-0.5"
+                                    className="flex h-12 w-full items-center justify-center rounded-lg bg-[#13ec13] px-4 text-base font-bold text-neutral-900 shadow-lg shadow-[#13ec13]/20 transition-transform hover:-translate-y-0.5 sm:w-auto sm:px-8"
                                 >
                                     <span className="mr-2">🔎</span>
                                     店舗を探す
@@ -111,7 +111,7 @@ export default function HomePageView({
 
                                 <Link
                                     href="/admin/login"
-                                    className="flex h-12 items-center justify-center rounded-lg bg-neutral-100 px-8 text-base font-bold text-neutral-900 transition-colors hover:bg-neutral-200"
+                                    className="flex h-12 w-full items-center justify-center rounded-lg bg-neutral-100 px-4 text-base font-bold text-neutral-900 transition-colors hover:bg-neutral-200 sm:w-auto sm:px-8"
                                 >
                                     <span className="mr-2">🏪</span>
                                     店舗の方はこちら
@@ -121,8 +121,8 @@ export default function HomePageView({
 
                         <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-neutral-100 shadow-2xl">
                             <div className="absolute inset-0 bg-gradient-to-tr from-[#13ec13]/25 to-transparent" />
-                            <div className="absolute inset-0 grid place-items-center p-8">
-                                <div className="w-full max-w-sm rounded-2xl bg-white/80 p-6 backdrop-blur">
+                            <div className="absolute inset-0 grid place-items-center p-4 sm:p-8">
+                                <div className="w-full max-w-sm rounded-2xl bg-white/80 p-4 backdrop-blur sm:p-6">
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-3">
                                             <Image

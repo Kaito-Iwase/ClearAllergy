@@ -10,6 +10,15 @@ body {
     font-family: "Manrope", "Noto Sans JP", sans-serif;
 }
 
+/* iOS Safari でフォーム入力時に意図しない拡大が起きないよう、スマホ幅では 16px を下限にします。 */
+@media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+        font-size: 16px;
+    }
+}
+
 @media print {
     body.printing-shop-qr * {
         visibility: hidden !important;

@@ -84,7 +84,7 @@ export default async function AdminDemoMenusPage() {
             showAuthControls={false}
         >
             <div className="min-h-screen bg-[#f5f7f4]">
-                <div className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:pb-8">
+                <div className="mx-auto max-w-6xl px-0 py-6 sm:px-4 sm:pb-8">
                     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
                         ポートフォリオ公開版のため、この管理画面は閲覧専用です。作成・編集・削除ボタンを操作しても保存されません。
                     </div>

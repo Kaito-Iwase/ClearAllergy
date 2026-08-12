@@ -523,7 +523,7 @@ export default function ShopEditClient({
         <div className="space-y-6">
             <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
                 <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
-                    <div className="relative min-h-[360px] overflow-hidden bg-gradient-to-r from-green-200 via-green-100 to-gray-50 p-8 md:p-10">
+                    <div className="relative min-h-[300px] overflow-hidden bg-gradient-to-r from-green-200 via-green-100 to-gray-50 p-5 sm:min-h-[360px] sm:p-8 md:p-10">
                         {previewImageUrl ? (
                             <Image
                                 src={previewImageUrl}
@@ -544,7 +544,7 @@ export default function ShopEditClient({
                                 <p className="text-sm font-semibold text-white/90 drop-shadow">
                                     公開プレビュー
                                 </p>
-                                <h2 className="mt-6 text-4xl font-extrabold tracking-tight text-white drop-shadow md:text-5xl">
+                                <h2 className="mt-5 text-3xl font-extrabold tracking-tight text-white drop-shadow sm:mt-6 sm:text-4xl md:text-5xl">
                                     {name.trim() || "店舗名未設定"}
                                 </h2>
                                 <p className="mt-4 max-w-xl text-base font-medium text-white/90 md:text-lg">
@@ -555,7 +555,7 @@ export default function ShopEditClient({
                         </div>
                     </div>
 
-                    <div className="border-t border-gray-200 bg-white p-6 lg:border-l lg:border-t-0">
+                    <div className="border-t border-gray-200 bg-white p-4 sm:p-6 lg:border-l lg:border-t-0">
                         <h3 className="text-2xl font-extrabold text-gray-900">
                             店舗情報
                         </h3>
