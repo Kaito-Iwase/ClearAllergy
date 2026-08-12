@@ -55,8 +55,10 @@ type AdminContext = {
     authProvider: "clerk";
 };
 
-// 既存のコードが session.user.shopId 前提で書かれているため、
-// できるだけ近い形の値を返して移行コストを下げます。
+/**
+ * Clerk から解決した管理者情報を、旧来の session 互換形状で返します。
+ * 独自 session を作る関数ではなく、認証の正本は常に Clerk です。
+ */
 export async function getAdminSession(): Promise<AdminSessionLike | null> {
     const context = await getCurrentAdminContext();
 
@@ -74,8 +76,7 @@ export async function getAdminSession(): Promise<AdminSessionLike | null> {
     };
 }
 
-// 管理画面で必要な「アプリ内 User」と「紐づく Shop」をまとめて返します。
-// 認証は Clerk セッションだけを正本にし、local DB は clerkUserId で引き直します。
+// 認証は Clerk を正本とし、店舗所有権はローカル DB の ownerClerkUserId で引き直します。
 export const getCurrentAdminContext = cache(
     async function getCurrentAdminContext(): Promise<AdminContext | null> {
         const clerkAppUser = await getCurrentAppUser();
@@ -139,8 +140,10 @@ export async function requireCurrentAdminContextOrRedirect(): Promise<{
     };
 }
 
+/**
+ * 互換性のため関数名を維持していますが、shopId は現在の Clerk 認証情報から解決します。
+ */
 export async function getSessionShopId(): Promise<string | null> {
-    // API などで shopId だけあればよい時の軽量 helper です。
     const context = await getCurrentAdminContext();
     return context?.shop?.id ?? null;
 }

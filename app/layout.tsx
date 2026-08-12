@@ -31,10 +31,11 @@ export default function RootLayout({
     return (
         <html lang="ja">
             <head>
-                {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+                {/* リガチャ文字をアイコンへ置き換えるフォントのため、読込中にアイコン名を表示しないようdisplay=blockを指定する。 */}
+                {/* eslint-disable-next-line @next/next/no-page-custom-font, @next/next/google-font-display */}
                 <link
                     rel="stylesheet"
-                    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=optional"
+                    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=content_copy,delete,draft,edit,logout,menu_book,notification_important,open_in_new,print,priority_high,restaurant,search,search_off,storefront,task_alt,visibility,visibility_off,warning&display=block"
                 />
             </head>
             <body

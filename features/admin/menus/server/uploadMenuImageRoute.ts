@@ -1,7 +1,3 @@
-// このファイルはメニュー画像アップロード API です。
-// 管理画面の新規作成 / 編集フォームから呼ばれ、画像を Vercel Blob に保存します。
-// 店舗画像と同様に shopId で認可し、他店舗の保存先を使えないようにします。
-
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { requireShopId } from "@/lib/auth/admin-api-utils";
@@ -26,7 +22,7 @@ app.post("/api/admin/upload-menu-image", async (c) => {
             return originError;
         }
 
-        // アップロード権限は管理者の shopId にひも付けます。
+        // 保存パス内の shopId は認可根拠にせず、アップロード前に Clerk と DB で所有店舗を確認します。
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
@@ -39,7 +35,6 @@ app.post("/api/admin/upload-menu-image", async (c) => {
             return portfolioAccess.res;
         }
 
-        // formData から File を取り出します。
         const formData = await req.formData();
         const file = formData.get("file");
 

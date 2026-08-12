@@ -1,7 +1,3 @@
-// このファイルは店舗画像アップロード API です。
-// 管理画面の店舗編集フォームから呼ばれ、画像を Vercel Blob に保存します。
-// 保存先パスに shopId を含めることで、店舗ごとに画像を整理しやすくしています。
-
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { requireShopId } from "@/lib/auth/admin-api-utils";
@@ -26,7 +22,7 @@ app.post("/api/admin/upload-shop-image", async (c) => {
             return originError;
         }
 
-        // 画像アップロードも管理画面の操作なので、まず認証と shopId を確認します。
+        // 保存パス内の shopId は認可根拠にせず、アップロード前に Clerk と DB で所有店舗を確認します。
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
@@ -39,7 +35,6 @@ app.post("/api/admin/upload-shop-image", async (c) => {
             return portfolioAccess.res;
         }
 
-        // formData はファイル送信に向いた形式です。
         const formData = await req.formData();
         const file = formData.get("file");
 

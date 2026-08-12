@@ -30,6 +30,7 @@ export default function PublicSearchBox({ placeholder }: Props) {
 
     // 戻る / 進む などで URL の q が変わった時も入力欄を同期します。
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- ブラウザ履歴で変化したURLを入力欄の正本として反映します。
         setQ(initialQ);
     }, [initialQ]);
 

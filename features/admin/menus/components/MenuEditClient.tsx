@@ -1,6 +1,5 @@
 "use client";
 
-// このコンポーネントは既存メニューの編集フォームです。
 // Server Component から受け取った初期値を state に展開し、保存と画像アップロードを担当します。
 // menuId を使って「どのメニューを更新するか」を API に伝えます。
 
@@ -13,6 +12,12 @@ import {
 import { createMenuButtonClassName } from "@/features/admin/menus/components/CreateMenuButton";
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
 import MenuPublishReadinessNotice from "@/features/admin/menus/components/MenuPublishReadinessNotice";
+import {
+    getMenuPublishButtonColorClass,
+    getMenuPublishButtonLabel,
+    normalizeOptionalMenuText,
+    parseMenuPriceYenInput,
+} from "@/features/admin/menus/components/menu-form-values";
 import {
     getApiErrorMessage,
     getThrownErrorMessage,
@@ -191,37 +196,6 @@ export default function MenuEditClient(props: {
         setIsPublished((prev) => !prev);
     }
 
-    function buildPriceYen(): number | null {
-        // 入力欄は文字列なので、保存前に数値へ変換してルールを確認します。
-        const trimmed = priceYenInput.trim();
-
-        if (trimmed === "") {
-            return null;
-        }
-
-        const parsed = Number(trimmed);
-
-        if (!Number.isFinite(parsed) || Number.isNaN(parsed)) {
-            throw new Error("価格は数字で入力してください。");
-        }
-
-        if (!Number.isInteger(parsed)) {
-            throw new Error("価格は整数（円）で入力してください。");
-        }
-
-        if (parsed < 0) {
-            throw new Error("価格は0円以上で入力してください。");
-        }
-
-        return parsed;
-    }
-
-    function normalizeOptionalText(value: string): string | null {
-        // 空文字を null に寄せ、未入力項目を分かりやすく扱います。
-        const trimmed = value.trim();
-        return trimmed === "" ? null : trimmed;
-    }
-
     function onSelectImage(e: React.ChangeEvent<HTMLInputElement>) {
         // 保存前に画像を確認できるよう、ローカルプレビューを作ります。
         const file = e.target.files?.[0];
@@ -247,7 +221,7 @@ export default function MenuEditClient(props: {
     async function uploadSelectedImage(): Promise<string | null> {
         // 新しい画像が選ばれていない場合は、既存 URL をそのまま使います。
         if (!selectedFile) {
-            return normalizeOptionalText(imageUrl);
+            return normalizeOptionalMenuText(imageUrl);
         }
 
         setUploading(true);
@@ -302,16 +276,16 @@ export default function MenuEditClient(props: {
                 throw new Error("メニュー名は必須です。");
             }
 
-            const priceYen = buildPriceYen();
+            const priceYen = parseMenuPriceYenInput(priceYenInput);
             const uploadedImageUrl = await uploadSelectedImage();
 
             const body = {
                 name: trimmedName,
-                description: normalizeOptionalText(description),
+                description: normalizeOptionalMenuText(description),
                 priceYen,
-                category: normalizeOptionalText(category),
-                ingredients: normalizeOptionalText(ingredients),
-                precaution: normalizeOptionalText(precaution),
+                category: normalizeOptionalMenuText(category),
+                ingredients: normalizeOptionalMenuText(ingredients),
+                precaution: normalizeOptionalMenuText(precaution),
                 imageUrl: uploadedImageUrl,
                 imageFrame,
                 imageFit,
@@ -443,17 +417,11 @@ export default function MenuEditClient(props: {
                                       : "bg-amber-600"
                             }`}
                         >
-                            {readOnly
-                                ? isPublished
-                                    ? "公開中（デモ）"
-                                    : canPublish
-                                      ? "非公開（デモ）"
-                                      : "公開不可（デモ）"
-                                : isPublished
-                                  ? "公開中"
-                                  : canPublish
-                                    ? "非公開"
-                                    : "公開不可"}
+                            {getMenuPublishButtonLabel({
+                                readOnly,
+                                isPublished,
+                                canPublish,
+                            })}
                         </button>
 
                         <button

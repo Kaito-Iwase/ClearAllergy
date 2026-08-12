@@ -65,13 +65,43 @@ function parseCoordinate(
     return value >= min && value <= max ? value : undefined;
 }
 
-function hasTooLongValue(values: Array<[string | null, number]>) {
-    return values.some(([value, max]) => value !== null && value.length > max);
+function hasInputExceedingMaximumLength(
+    values: Array<[value: string | null, maximumLength: number]>,
+): boolean {
+    return values.some(
+        ([value, maximumLength]) =>
+            value !== null && value.length > maximumLength,
+    );
+}
+
+function hasInvalidGooglePlaceLocation(args: {
+    latitude: number | null | undefined;
+    longitude: number | null | undefined;
+    googlePlaceId: string | null;
+    prefecture: string | null;
+}): boolean {
+    const hasInvalidCoordinate =
+        args.latitude === undefined || args.longitude === undefined;
+    const hasOnlyOneCoordinate =
+        (args.latitude === null) !== (args.longitude === null);
+    const hasIncompletePlaceLink =
+        (args.googlePlaceId === null) !== (args.latitude === null);
+    const hasUnknownPrefecture =
+        args.prefecture !== null &&
+        !PREFECTURES.includes(
+            args.prefecture as (typeof PREFECTURES)[number],
+        );
+
+    return (
+        hasInvalidCoordinate ||
+        hasOnlyOneCoordinate ||
+        hasIncompletePlaceLink ||
+        hasUnknownPrefecture
+    );
 }
 
 app.get("/api/admin/shop", async () => {
     try {
-        // GET は現在ログイン中の店舗情報を取得します。
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
@@ -145,7 +175,6 @@ app.put("/api/admin/shop", async (c) => {
             return originError;
         }
 
-        // PUT は編集フォームから送られた店舗情報の保存です。
         const auth = await requireShopId();
         if (!auth.ok) {
             return auth.res;
@@ -267,7 +296,7 @@ app.put("/api/admin/shop", async (c) => {
                 : parseMenuImagePositionPercent(body.coverImagePositionY);
 
         if (
-            hasTooLongValue([
+            hasInputExceedingMaximumLength([
                 [name, 120],
                 [description, 2000],
                 [address, 500],
@@ -289,12 +318,12 @@ app.put("/api/admin/shop", async (c) => {
         }
 
         if (
-            latitude === undefined ||
-            longitude === undefined ||
-            (latitude === null) !== (longitude === null) ||
-            (googlePlaceId === null) !== (latitude === null) ||
-            (prefecture !== null &&
-                !PREFECTURES.includes(prefecture as (typeof PREFECTURES)[number]))
+            hasInvalidGooglePlaceLocation({
+                latitude,
+                longitude,
+                googlePlaceId,
+                prefecture,
+            })
         ) {
             return NextResponse.json(
                 { error: "bad request: invalid Google place location" },

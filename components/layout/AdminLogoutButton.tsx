@@ -33,9 +33,14 @@ export default function AdminLogoutButton() {
             type="button"
             onClick={() => void handleLogout()}
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-            <span className="material-symbols-outlined text-lg">logout</span>
+            <span
+                className="material-symbols-outlined shrink-0 text-lg"
+                aria-hidden="true"
+            >
+                logout
+            </span>
             {loading ? "ログアウト中..." : "ログアウト"}
         </button>
     );
