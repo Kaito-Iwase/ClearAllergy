@@ -1,6 +1,5 @@
 "use client";
 
-// このコンポーネントは新規メニュー作成フォームです。
 // app/admin/(dashboard)/menus/new/page.tsx からアレルゲンマスタを受け取り、
 // 入力値の state 管理、画像アップロード、作成 API 呼び出しまでを担当します。
 
@@ -14,6 +13,10 @@ import {
 import { createMenuButtonClassName } from "@/features/admin/menus/components/CreateMenuButton";
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
 import MenuPublishReadinessNotice from "@/features/admin/menus/components/MenuPublishReadinessNotice";
+import {
+    normalizeOptionalMenuText,
+    parseMenuPriceYenInput,
+} from "@/features/admin/menus/components/menu-form-values";
 import {
     getApiErrorMessage,
     getThrownErrorMessage,
@@ -114,36 +117,6 @@ export default function NewMenuForm({
         };
     }, [localPreviewUrl]);
 
-    function normalizeOptionalText(value: string): string | null {
-        // 空欄を null に寄せ、DB で「未入力」として扱いやすくします。
-        const trimmed = value.trim();
-        return trimmed === "" ? null : trimmed;
-    }
-
-    function buildPriceYen(): number | null {
-        // price の入力は文字列で来るので、保存前に数値ルールを確認します。
-        const trimmed = priceYenInput.trim();
-        if (trimmed === "") {
-            return null;
-        }
-
-        const parsed = Number(trimmed);
-
-        if (!Number.isFinite(parsed) || Number.isNaN(parsed)) {
-            throw new Error("価格は数字で入力してください。");
-        }
-
-        if (!Number.isInteger(parsed)) {
-            throw new Error("価格は整数（円）で入力してください。");
-        }
-
-        if (parsed < 0) {
-            throw new Error("価格は0円以上で入力してください。");
-        }
-
-        return parsed;
-    }
-
     function setOne(slug: string, status: AllergenStatus) {
         setStatusBySlug((prev) => ({ ...prev, [slug]: status }));
         if (status === "UNKNOWN") {
@@ -189,7 +162,7 @@ export default function NewMenuForm({
     async function uploadSelectedImage(): Promise<string | null> {
         // 画像未選択なら URL 入力欄の値だけを使います。
         if (!selectedFile) {
-            return normalizeOptionalText(imageUrl);
+            return normalizeOptionalMenuText(imageUrl);
         }
 
         setUploading(true);
@@ -248,16 +221,16 @@ export default function NewMenuForm({
         setIsSubmitting(true);
 
         try {
-            const priceYen = buildPriceYen();
+            const priceYen = parseMenuPriceYenInput(priceYenInput);
             const uploadedImageUrl = await uploadSelectedImage();
 
             const body = {
                 name: trimmed,
-                description: normalizeOptionalText(description),
+                description: normalizeOptionalMenuText(description),
                 priceYen,
-                category: normalizeOptionalText(category),
-                ingredients: normalizeOptionalText(ingredients),
-                precaution: normalizeOptionalText(precaution),
+                category: normalizeOptionalMenuText(category),
+                ingredients: normalizeOptionalMenuText(ingredients),
+                precaution: normalizeOptionalMenuText(precaution),
                 isPublished: canPublish ? isPublished : false,
                 imageUrl: uploadedImageUrl,
                 imageFrame,

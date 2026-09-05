@@ -3,150 +3,22 @@
 import Link from "next/link";
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type AllergenStatus } from "@/lib/allergens";
 import { PREFECTURES } from "@/lib/constants/prefectures";
 import { useUserAllergenPreferences } from "@/features/public/shops/components/UserAllergenPreferenceClient";
 import PublicShopMap from "@/features/public/shops/components/PublicShopMap";
 import UserAllergenPreferenceClient from "@/features/public/shops/components/UserAllergenPreferenceClient";
+import {
+    filterAndRankShops,
+    getCityOptions,
+    getDistanceKm,
+    type CurrentLocation,
+    type PublicShopListShop,
+} from "@/features/public/shops/components/public-shop-search";
 
-type CurrentLocation = { latitude: number; longitude: number };
+export type { PublicShopListShop } from "@/features/public/shops/components/public-shop-search";
+
 type LocationStatus = "idle" | "loading" | "active" | "error";
 type PublicAllergen = { slug: string; nameJa: string };
-
-export type PublicShopListShop = {
-    id: string;
-    name: string;
-    description: string | null;
-    address: string | null;
-    prefecture: string | null;
-    city: string | null;
-    nearestStation: string | null;
-    category: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    googlePlaceId: string | null;
-    averageBudgetYen: number | null;
-    updatedAt: string;
-    menus: Array<{
-        priceYen: number | null;
-        allergenLinks: Array<{
-            status: AllergenStatus;
-            allergen: { slug: string };
-        }>;
-    }>;
-    _count: { menus: number };
-};
-
-function normalize(value: string | null | undefined) {
-    return (value ?? "").toLocaleLowerCase("ja-JP");
-}
-
-function getShopPrefecture(shop: PublicShopListShop) {
-    if (shop.prefecture?.trim()) return shop.prefecture.trim();
-    return PREFECTURES.find((value) => shop.address?.includes(value)) ?? null;
-}
-
-function getShopCity(shop: PublicShopListShop) {
-    if (shop.city?.trim()) return shop.city.trim();
-    const address = shop.address?.trim();
-    const prefecture = getShopPrefecture(shop);
-    if (!address) return null;
-
-    const areaText =
-        prefecture && address.startsWith(prefecture)
-            ? address.slice(prefecture.length)
-            : address;
-    return (
-        areaText.match(/^(.+?市.+?区)/)?.[1] ??
-        areaText.match(/^(.+?(?:市|区|町|村))/)?.[1] ??
-        null
-    );
-}
-
-function isMenuExcludedByPreference(
-    menu: PublicShopListShop["menus"][number],
-    excludedSlugs: string[],
-    includeMayContain: boolean,
-) {
-    if (excludedSlugs.length === 0) {
-        return false;
-    }
-
-    const statusByExcludedSlug = new Map(
-        menu.allergenLinks
-            .filter((link) => excludedSlugs.includes(link.allergen.slug))
-            .map((link) => [link.allergen.slug, link.status]),
-    );
-
-    return excludedSlugs.some((slug) => {
-        const status = statusByExcludedSlug.get(slug);
-        return (
-            status === "CONTAINS" ||
-            (includeMayContain && status === "MAY_CONTAIN")
-        );
-    });
-}
-
-function isShopExcludedByPreference(args: {
-    shop: PublicShopListShop;
-    excludedSlugs: string[];
-    includeMayContain: boolean;
-    loadedPreferences: boolean;
-}) {
-    if (!args.loadedPreferences || args.excludedSlugs.length === 0) {
-        return false;
-    }
-
-    return (
-        args.shop.menus.length > 0 &&
-        args.shop.menus.every((menu) =>
-            isMenuExcludedByPreference(
-                menu,
-                args.excludedSlugs,
-                args.includeMayContain,
-            ),
-        )
-    );
-}
-
-function getDistanceKm(first: CurrentLocation, second: CurrentLocation) {
-    const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-    const earthRadiusKm = 6371;
-    const latitudeDifference = toRadians(second.latitude - first.latitude);
-    const longitudeDifference = toRadians(second.longitude - first.longitude);
-    const firstLatitude = toRadians(first.latitude);
-    const secondLatitude = toRadians(second.latitude);
-    const value =
-        Math.sin(latitudeDifference / 2) ** 2 +
-        Math.cos(firstLatitude) *
-            Math.cos(secondLatitude) *
-            Math.sin(longitudeDifference / 2) ** 2;
-    return earthRadiusKm * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
-}
-
-function sortByDistance(
-    shops: PublicShopListShop[],
-    currentLocation: CurrentLocation | null,
-) {
-    if (!currentLocation) return shops;
-    return [...shops].sort((first, second) => {
-        const firstDistance =
-            first.latitude === null || first.longitude === null
-                ? Number.POSITIVE_INFINITY
-                : getDistanceKm(currentLocation, {
-                      latitude: first.latitude,
-                      longitude: first.longitude,
-                  });
-        const secondDistance =
-            second.latitude === null || second.longitude === null
-                ? Number.POSITIVE_INFINITY
-                : getDistanceKm(currentLocation, {
-                      latitude: second.latitude,
-                      longitude: second.longitude,
-                  });
-        return firstDistance - secondDistance;
-    });
-}
 
 function ShopCards({
     shops,
@@ -256,104 +128,36 @@ export default function PublicShopListClient({
         setCity(searchParams.get("city") ?? "");
     }
 
-
-
     const cityOptions = React.useMemo(
-        () =>
-            Array.from(
-                new Set(
-                    initialShops
-                        .filter(
-                            (shop) =>
-                                !prefecture ||
-                                getShopPrefecture(shop) === prefecture,
-                        )
-                        .map(getShopCity)
-                        .filter((value): value is string => Boolean(value)),
-                ),
-            ).sort(),
+        () => getCityOptions(initialShops, prefecture),
         [initialShops, prefecture],
     );
 
-    const filtered = React.useMemo(() => {
-        const areaTerms = area.trim().split(/\s+/).filter(Boolean).map(normalize);
-        const keywordTerms = keyword
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean)
-            .map(normalize);
-        const searchTermCount = areaTerms.length + keywordTerms.length;
-        const candidates = initialShops
-            .filter((shop) => !prefecture || getShopPrefecture(shop) === prefecture)
-            .filter((shop) => !city || getShopCity(shop) === city)
-            .map((shop) => {
-                const areaHaystack = [
-                    shop.address,
-                    shop.prefecture,
-                    getShopPrefecture(shop),
-                    getShopCity(shop),
-                    shop.city,
-                    shop.nearestStation,
-                ]
-                    .map(normalize)
-                    .join(" ");
-                const keywordHaystack = [
-                    shop.name,
-                    shop.description,
-                    shop.category,
-                ]
-                    .map(normalize)
-                    .join(" ");
-                const matched =
-                    areaTerms.filter((term) => areaHaystack.includes(term))
-                        .length +
-                    keywordTerms.filter((term) =>
-                        keywordHaystack.includes(term),
-                    ).length;
-                return {
-                    shop,
-                    matched,
-                    all: searchTermCount === 0 || matched === searchTermCount,
-                };
-            })
-            .filter((result) => searchTermCount === 0 || result.matched > 0);
-        const visibleResults = candidates.filter(
-            (result) =>
-                !isShopExcludedByPreference({
-                    shop: result.shop,
-                    excludedSlugs,
-                    includeMayContain,
-                    loadedPreferences,
-                }),
-        );
-
-        return {
-            exact: sortByDistance(
-                visibleResults
-                    .filter((result) => result.all)
-                    .map((result) => result.shop),
+    const filtered = React.useMemo(
+        () =>
+            filterAndRankShops({
+                shops: initialShops,
+                area,
+                keyword,
+                prefecture,
+                city,
+                excludedSlugs,
+                includeMayContain,
+                loadedPreferences,
                 currentLocation,
-            ),
-            related: sortByDistance(
-                visibleResults
-                    .filter((result) => !result.all)
-                    .sort((a, b) => b.matched - a.matched)
-                    .map((result) => result.shop),
-                currentLocation,
-            ),
-            excludedCount: candidates.length - visibleResults.length,
-        };
-    }, [
-        area,
-        city,
-        currentLocation,
-        excludedSlugs,
-        includeMayContain,
-        initialShops,
-        keyword,
-        loadedPreferences,
-        prefecture,
-    ]);
+            }),
+        [
+            area,
+            city,
+            currentLocation,
+            excludedSlugs,
+            includeMayContain,
+            initialShops,
+            keyword,
+            loadedPreferences,
+            prefecture,
+        ],
+    );
 
     const visibleShops = [...filtered.exact, ...filtered.related];
     const coordinateShopCount = visibleShops.filter(
@@ -372,6 +176,7 @@ export default function PublicShopListClient({
         router.replace(params.size ? `/shops?${params}` : "/shops");
     }
 
+    // 現在地は並び替えにだけ使い、API や localStorage へ保存・送信しません。
     function findFromCurrentLocation() {
         setLocationMessage("");
         if (!navigator.geolocation) {

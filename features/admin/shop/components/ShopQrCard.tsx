@@ -1,6 +1,5 @@
 "use client";
 
-// このコンポーネントは店舗公開ページ用の QR コード表示カードです。
 // 店舗編集画面から呼ばれ、公開 URL の生成・コピー・QR 表示をまとめて担当します。
 // Client Component なのは、window / clipboard / QR 表示まわりをブラウザ側で扱うためです。
 
@@ -35,14 +34,12 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
     );
     const [qrSizeMm, setQrSizeMm] = React.useState(60);
 
-    // コピー・印刷の結果メッセージ表示用の状態
     const [copiedMessage, setCopiedMessage] = React.useState("");
 
     // origin が決まってから店舗公開 URL を組み立てます。
     const publicShopUrl = origin ? `${origin}/shops/${shopId}` : "";
     const qrSizePx = Math.round(qrSizeMm * 3.78);
 
-    // 共有しやすいよう、まずはクリップボードへコピーする導線を用意します。
     async function handleCopyUrl() {
         if (!publicShopUrl) {
             setCopiedMessage("公開URLをまだ作成できていません。");
