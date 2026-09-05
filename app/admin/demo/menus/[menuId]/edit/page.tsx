@@ -1,3 +1,4 @@
+import { DEMO_SHOP_WHERE } from "@/lib/auth/demo-shop";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import MenuEditClient from "@/features/admin/menus/components/MenuEditClient";
@@ -36,10 +37,7 @@ export default async function AdminDemoMenuEditPage({ params }: PageProps) {
             where: {
                 id: menuId,
                 shop: {
-                    OR: [
-                        { name: { contains: "デモ" } },
-                        { name: { contains: "Cafe Hibi" } },
-                    ],
+                    ...DEMO_SHOP_WHERE,
                 },
             },
             select: {

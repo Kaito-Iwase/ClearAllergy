@@ -1,3 +1,4 @@
+import { loadStoreAllergenSupplement } from "./storeAllergenSupplement";
 // このファイルは公開側のメニュー詳細取得 API です。
 // /api/menus/[menuId] の GET だけを担当し、公開中メニューのみ返します。
 // 公開画面から読まれるため、非公開メニューは存在していても 404 扱いにします。
@@ -118,35 +119,7 @@ app.get("/api/menus/:menuId", async (c) => {
             );
         }
 
-        const shopAllergenLinks = await prisma.menuItemAllergen.findMany({
-            where: {
-                menuItem: {
-                    shopId: menu.shopId,
-                    isPublished: true,
-                    shop: {
-                        isActive: true,
-                    },
-                },
-            },
-            select: {
-                allergenId: true,
-                status: true,
-            },
-        });
-
-        const storeContainsAllergenIds = new Set(
-            shopAllergenLinks
-                .filter((link) => link.status === "CONTAINS")
-                .map((link) => link.allergenId),
-        );
-        const allergenSlugById = new Map(
-            allergenMaster.map((allergen) => [allergen.id, allergen.slug]),
-        );
-        const storeHandledAllergenSlugs = new Set(
-            [...storeContainsAllergenIds]
-                .map((allergenId) => allergenSlugById.get(allergenId))
-                .filter((slug): slug is string => Boolean(slug)),
-        );
+        const storeHandledAllergenSlugs = await loadStoreAllergenSupplement(menu.shopId, allergenMaster);
 
         // 現行マスタを基準に正規化し、欠損しているリンクも UNKNOWN として返します。
         const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);

@@ -1,5 +1,8 @@
 "use client";
 
+import { STORE_ALLERGEN_NOTE } from "@/lib/public-prototype";
+import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
+
 // このコンポーネントは店舗詳細画面の公開メニュー一覧です。
 // localStorage に保存された「避けたいアレルゲン設定」を読み、
 // 通常表示と個人向け表示を切り替えてカード一覧を描画します。
@@ -12,10 +15,7 @@ import {
     type AllergenStatus,
 } from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
-import {
-    loadUserAllergenPreferences,
-    USER_ALLERGENS_UPDATED_EVENT,
-} from "@/lib/public-allergen-preferences";
+import { useUserAllergenPreferences } from "@/features/public/shops/components/UserAllergenPreferenceClient";
 
 type BadgeKind = "danger" | "caution" | "safe" | "unknown";
 
@@ -60,135 +60,30 @@ function badgeClass(kind: BadgeKind): string {
 
 function badgeLabel(kind: BadgeKind): string {
     if (kind === "danger") return "含む";
-    if (kind === "caution") return "含む可能性があります";
+    if (kind === "caution") return "要確認の情報あり";
     if (kind === "unknown") return "未設定あり";
-    return "含まない";
+    return "原材料に含まない登録";
 }
-
-function buildOverallSummary(args: {
-    statusBySlug: Record<string, AllergenStatus>;
-    nameJaBySlug: Map<string, string>;
-    rankBySlug: Map<string, number>;
-}): {
-    summaryText: string;
-    badge: BadgeKind;
-    containsCount: number;
-    mayCount: number;
-    unknownCount: number;
-} {
-    // この関数は、そのメニュー全体としての見え方を 1 行にまとめます。
-    // UNKNOWN をここで落とさず残すのは、未設定なのに安全と誤解されるのを防ぐためです。
-    const { statusBySlug, nameJaBySlug, rankBySlug } = args;
-
-    const containsSlugs: string[] = [];
-    const maySlugs: string[] = [];
-    const unknownSlugs: string[] = [];
-
-    for (const [slug, status] of Object.entries(statusBySlug)) {
-        if (status === "CONTAINS") {
-            containsSlugs.push(slug);
-        } else if (status === "MAY_CONTAIN") {
-            maySlugs.push(slug);
-        } else if (status === "UNKNOWN") {
-            unknownSlugs.push(slug);
-        }
-    }
-
-    const badge: BadgeKind =
-        containsSlugs.length > 0
-            ? "danger"
-            : maySlugs.length > 0
-              ? "caution"
-              : unknownSlugs.length > 0
-                ? "unknown"
-              : "safe";
-
-    const byRank = (a: string, b: string) =>
-        (rankBySlug.get(a) ?? 9999) - (rankBySlug.get(b) ?? 9999);
-
-    containsSlugs.sort(byRank);
-    maySlugs.sort(byRank);
-    unknownSlugs.sort(byRank);
-
-    const toName = (slug: string) => nameJaBySlug.get(slug) ?? slug;
-    const containsNames = containsSlugs.map(toName);
-    const mayNames = maySlugs.map(toName);
-    const unknownNames = unknownSlugs.map(toName);
-
-    const pickedContains = containsNames.slice(0, 3);
-    const remain = 3 - pickedContains.length;
-    const pickedMay = remain > 0 ? mayNames.slice(0, remain) : [];
-
-    const parts: string[] = [];
-    if (pickedContains.length > 0) {
-        parts.push(`${pickedContains.join("・")}（含む）`);
-    }
-    if (pickedMay.length > 0) {
-        parts.push(`${pickedMay.join("・")}（含む可能性があります）`);
-    }
-    if (parts.length === 0 && unknownNames.length > 0) {
-        parts.push(`${unknownNames.slice(0, 3).join("・")}（未設定）`);
-    } else if (unknownNames.length > 0) {
-        parts.push(`未設定 ${unknownNames.length}件`);
-    }
-
-    return {
-        summaryText: parts.length > 0 ? parts.join(" / ") : "該当なし",
-        badge,
-        containsCount: containsSlugs.length,
-        mayCount: maySlugs.length,
-        unknownCount: unknownSlugs.length,
-    };
-}
-
 
 export default function ShopMenuListClient({
     shopId,
     menus,
     allergenMaster,
+    storeHandledAllergenSlugs = [],
 }: {
     shopId: string;
     menus: MenuItemCard[];
     allergenMaster: AllergenMasterItem[];
+    storeHandledAllergenSlugs?: string[];
 }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const q = (searchParams.get("q") ?? "").trim();
 
     // 端末に保存されたアレルゲン設定を読み込み、画面に反映します。
-    const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
-    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [includeMayContain, setIncludeMayContain] = React.useState(false);
-    const [loaded, setLoaded] = React.useState(false);
+    const { preferences: { highlightSlugs, excludedSlugs, includeMayContain }, loaded } = useUserAllergenPreferences();
 
-    React.useEffect(() => {
-        function syncPreferences() {
-            const next = loadUserAllergenPreferences();
-            setHighlightSlugs(next.highlightSlugs);
-            setExcludedSlugs(next.excludedSlugs);
-            setIncludeMayContain(next.includeMayContain);
-            setLoaded(true);
-        }
 
-        // 初回読み込みだけでなく、別タブ変更や保存イベントにも追従します。
-        syncPreferences();
-
-        window.addEventListener("storage", syncPreferences);
-        window.addEventListener("focus", syncPreferences);
-        window.addEventListener(
-            USER_ALLERGENS_UPDATED_EVENT,
-            syncPreferences as EventListener,
-        );
-
-        return () => {
-            window.removeEventListener("storage", syncPreferences);
-            window.removeEventListener("focus", syncPreferences);
-            window.removeEventListener(
-                USER_ALLERGENS_UPDATED_EVENT,
-                syncPreferences as EventListener,
-            );
-        };
-    }, []);
 
     // slug から日本語名や並び順をすぐ引けるよう、Map にしておきます。
     const nameJaBySlug = React.useMemo(() => {
@@ -205,7 +100,7 @@ export default function ShopMenuListClient({
 
     const hasPreference =
         loaded && (highlightSlugs.length > 0 || excludedSlugs.length > 0);
-    const hasHighlightPreference = loaded && highlightSlugs.length > 0;
+    const selectedSlugs = getSelectedAllergenSlugs({ highlightSlugs, excludedSlugs });
 
     const isExcludedByPreference = React.useCallback((statusBySlug: Record<string, AllergenStatus>) => {
         return excludedSlugs.some((slug) => {
@@ -289,24 +184,32 @@ export default function ShopMenuListClient({
                         必要に応じて、あなた向けのアレルゲン設定で「除外」を外してください。
                     </p>
                 </div>
+            ) : visibleMenuItems.length === 0 ? (
+                <div role="status" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-700">
+                    検索に一致したメニューはすべて除外設定により非表示です。アレルゲン設定で除外条件を確認・変更できます。
+                </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {visibleMenuItems.map(({ menu, statusBySlug }) => {
-                        const overallSummary = buildOverallSummary({
+                        const overallSummary = buildSelectedAllergenSummary({
+                            selectedSlugs: allergenMaster.map((allergen) => allergen.slug),
+                            includeMayContain: false,
+                            storeHandledAllergenSlugs: new Set(storeHandledAllergenSlugs),
                             statusBySlug,
                             nameJaBySlug,
                             rankBySlug,
                         });
 
                         const personalizedSummary = buildSelectedAllergenSummary({
+                            storeHandledAllergenSlugs: new Set(storeHandledAllergenSlugs),
                             statusBySlug,
-                            selectedSlugs: highlightSlugs,
+                            selectedSlugs,
                             includeMayContain,
                             nameJaBySlug,
                             rankBySlug,
                         });
 
-                        const activeSummary = hasHighlightPreference
+                        const activeSummary = hasPreference
                             ? personalizedSummary
                             : overallSummary;
 
@@ -369,9 +272,12 @@ export default function ShopMenuListClient({
                                     {activeSummary.summaryText}
                                 </p>
 
-                                {hasHighlightPreference ? (
+                                {activeSummary.storeHandledCount > 0 ? (
+                                    <p className="mt-2 text-xs leading-5 text-amber-900">{STORE_ALLERGEN_NOTE}</p>
+                                ) : null}
+                                {hasPreference ? (
                                     <p className="mt-2 text-[11px] text-gray-400">
-                                        強調表示の設定に基づく表示
+                                        強調・除外の設定に基づく表示
                                     </p>
                                 ) : null}
                             </article>

@@ -2,6 +2,7 @@
 // /api/admin/shop の GET は表示用取得、PUT は更新を担当します。
 // 認証済み管理者の shopId を使い、他店舗の情報が触れないようにします。
 
+import { z } from "zod";
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -30,30 +31,23 @@ import { PREFECTURES } from "@/lib/constants/prefectures";
 
 const app = new Hono();
 
-type ShopUpdateBody = {
-    name?: unknown;
-    description?: unknown;
-    address?: unknown;
-    prefecture?: unknown;
-    city?: unknown;
-    nearestStation?: unknown;
-    category?: unknown;
-    latitude?: unknown;
-    longitude?: unknown;
-    googlePlaceId?: unknown;
-    hours?: unknown;
-    regularHoliday?: unknown;
-    phoneNumber?: unknown;
-    note?: unknown;
-    averageBudgetYen?: unknown;
-    coverImageUrl?: unknown;
-    coverImageFrame?: unknown;
-    coverImageFit?: unknown;
-    coverImagePosition?: unknown;
-    coverImageZoom?: unknown;
-    coverImagePositionX?: unknown;
-    coverImagePositionY?: unknown;
-};
+const optionalText = z.string().nullable().optional();
+const shopUpdateSchema = z.object({
+    name: z.string(), description: optionalText, address: optionalText,
+    prefecture: optionalText, city: optionalText, nearestStation: optionalText,
+    category: optionalText, googlePlaceId: optionalText, hours: optionalText,
+    regularHoliday: optionalText, phoneNumber: optionalText, note: optionalText,
+    coverImageUrl: z.string().max(2048).nullable().optional(),
+    latitude: z.number().finite().nullable().optional(),
+    longitude: z.number().finite().nullable().optional(),
+    averageBudgetYen: z.union([z.number().finite(), z.string().max(32)]).nullable().optional(),
+    coverImageFrame: z.enum(["square", "wide"]).optional(),
+    coverImageFit: z.enum(["cover", "contain"]).optional(),
+    coverImagePosition: z.enum(["center", "top", "bottom", "left", "right"]).optional(),
+    coverImageZoom: z.number().int().min(50).max(250).optional(),
+    coverImagePositionX: z.number().int().min(0).max(100).optional(),
+    coverImagePositionY: z.number().int().min(0).max(100).optional(),
+});
 
 function parseCoordinate(
     value: unknown,
@@ -159,14 +153,15 @@ app.put("/api/admin/shop", async (c) => {
         }
 
         // JSON が壊れている場合は 400 を返し、DB 更新まで進ませません。
-        const body = await readJson<ShopUpdateBody>(req);
-        if (!body) {
+        const parsedBody = shopUpdateSchema.safeParse(await readJson<unknown>(req));
+        if (!parsedBody.success) {
             return NextResponse.json(
                 { error: "bad request: invalid json" },
                 { status: 400 },
             );
         }
 
+        const body = parsedBody.data;
         const existing = await prisma.shop.findUnique({
             where: { id: auth.shopId },
             select: {

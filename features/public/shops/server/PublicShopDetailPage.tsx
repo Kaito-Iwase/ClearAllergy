@@ -18,6 +18,7 @@ import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
 import { readPublicDataOrFallback } from "@/lib/public-db";
 import {
     createStatusBySlug,
+    getStoreContainsAllergenSlugs,
     isMenuPublishable,
 } from "@/lib/allergens";
 import {
@@ -162,6 +163,8 @@ export default async function PublicShopDetailPage({
     if (publishableMenus.length === 0) {
         notFound();
     }
+
+    const storeHandledAllergenSlugs = [...getStoreContainsAllergenSlugs(publishableMenus, allergenMaster)];
 
     // Server Component で取った Date や relation を、Client Component が扱いやすい形へ変換します。
     const menusForClient = publishableMenus.map((menu) => ({
@@ -326,6 +329,7 @@ export default async function PublicShopDetailPage({
                             }
                         >
                             <ShopMenuListClient
+                                storeHandledAllergenSlugs={storeHandledAllergenSlugs}
                                 shopId={shop.id}
                                 menus={menusForClient}
                                 allergenMaster={allergenMaster}

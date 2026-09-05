@@ -51,7 +51,7 @@ function stubPrisma(
     handlers: {
         findMenu: QueryMethod;
         findAllergens?: QueryMethod;
-        findStoreLinks?: QueryMethod;
+        findStoreMenus?: QueryMethod;
     },
 ) {
     const menuDelegate = prisma.menuItem as unknown as {
@@ -60,24 +60,24 @@ function stubPrisma(
     const allergenDelegate = prisma.allergen as unknown as {
         findMany: QueryMethod;
     };
-    const linkDelegate = prisma.menuItemAllergen as unknown as {
+    const linkDelegate = prisma.menuItem as unknown as {
         findMany: QueryMethod;
     };
     const originals = {
         findMenu: menuDelegate.findFirst,
         findAllergens: allergenDelegate.findMany,
-        findStoreLinks: linkDelegate.findMany,
+        findStoreMenus: linkDelegate.findMany,
     };
 
     menuDelegate.findFirst = handlers.findMenu;
     allergenDelegate.findMany =
         handlers.findAllergens ?? (async () => allergenRows);
-    linkDelegate.findMany = handlers.findStoreLinks ?? (async () => []);
+    linkDelegate.findMany = handlers.findStoreMenus ?? (async () => []);
 
     t.after(() => {
         menuDelegate.findFirst = originals.findMenu;
         allergenDelegate.findMany = originals.findAllergens;
-        linkDelegate.findMany = originals.findStoreLinks;
+        linkDelegate.findMany = originals.findStoreMenus;
     });
 }
 
@@ -94,12 +94,11 @@ test("公開APIは稼働店舗の公開可能メニューだけを返す", async
             assert.deepEqual(where.shop, { isActive: true });
             return makeMenu();
         },
-        findStoreLinks: async (args) => {
+        findStoreMenus: async (args) => {
             const where = asRecord(args.where);
-            const menuItem = asRecord(where.menuItem);
-            assert.equal(menuItem.shopId, "shop-1");
-            assert.equal(menuItem.isPublished, true);
-            assert.deepEqual(menuItem.shop, { isActive: true });
+            assert.equal(where.shopId, "shop-1");
+            assert.equal(where.isPublished, true);
+            assert.deepEqual(where.shop, { isActive: true });
             return [];
         },
     });
@@ -156,4 +155,33 @@ test("公開APIはDBマスタが29品目と一致しない場合404にする", a
     });
 
     assert.equal((await requestMenu()).status, 404);
+});
+
+
+test("公開APIは別の公開可能メニューの含む登録を補足し、FREE自体は変更しない", async (t) => {
+    const slug = allergenRows[0].slug;
+    stubPrisma(t, {
+        findMenu: async () => makeMenu(),
+        findStoreMenus: async () => [makeMenu({ allergenLinks: makeMenu().allergenLinks.map((link) => ({
+            ...link, status: link.allergen.slug === slug ? "CONTAINS" : "FREE",
+        })) })],
+    });
+    const response = await requestMenu();
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    const item = body.menu.allergenDisplayItems.find((item: {slug: string}) => item.slug === slug);
+    assert.equal(item.status, "FREE");
+    assert.equal(item.effectiveRisk, "STORE_HANDLED");
+    assert.equal(item.storeHandlesAllergen, true);
+});
+
+test("公開APIは不完全な公開メニューを補足情報の根拠にしない", async (t) => {
+    stubPrisma(t, {
+        findMenu: async () => makeMenu(),
+        findStoreMenus: async () => [makeMenu({ allergenLinks: [
+            { status: "CONTAINS", allergen: { slug: allergenRows[0].slug } },
+        ] })],
+    });
+    const body = await (await requestMenu()).json();
+    assert.ok(body.menu.allergenDisplayItems.every((item: {storeHandlesAllergen: boolean}) => !item.storeHandlesAllergen));
 });

@@ -755,8 +755,11 @@ export default function ShopEditClient({
             <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <form
                     onSubmit={onSubmit}
+                    onChangeCapture={() => setSavedMessage("")}
                     className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
                 >
+                    <fieldset disabled={saving || uploading} className="min-w-0">
+                        <legend className="sr-only">店舗情報編集</legend>
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <h3 className="text-2xl font-extrabold text-gray-900">
@@ -783,13 +786,13 @@ export default function ShopEditClient({
                     </div>
 
                     {error ? (
-                        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                             {error}
                         </div>
                     ) : null}
 
                     {savedMessage ? (
-                        <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                        <div role="status" className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                             {savedMessage}
                         </div>
                     ) : null}
@@ -1197,6 +1200,7 @@ export default function ShopEditClient({
                             メニュー管理へ戻る
                         </Link>
                     </div>
+                    </fieldset>
                 </form>
 
                 <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">

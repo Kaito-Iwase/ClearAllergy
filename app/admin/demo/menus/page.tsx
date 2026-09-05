@@ -1,3 +1,4 @@
+import { DEMO_SHOP_WHERE } from "@/lib/auth/demo-shop";
 import CreateMenuButton from "@/features/admin/menus/components/CreateMenuButton";
 import MenuListPageClient from "@/features/admin/menus/components/MenuListPageClient";
 import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
@@ -12,10 +13,7 @@ export const dynamic = "force-dynamic";
 async function getDemoShopMenus() {
     return prisma.shop.findFirst({
         where: {
-            OR: [
-                { name: { contains: "デモ" } },
-                { name: { contains: "Cafe Hibi" } },
-            ],
+            ...DEMO_SHOP_WHERE,
             menus: {
                 some: {},
             },

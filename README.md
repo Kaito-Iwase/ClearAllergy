@@ -1,8 +1,8 @@
 # ClearAllergy
 
-飲食店がメニューごとのアレルゲン情報を登録・公開し、利用者が来店前や注文前に確認できる Web アプリです。
+架空店舗・架空メニューを使い、店舗が管理するアレルゲン情報を誤認されにくく提示するUI・情報設計を検証する、実運用前のプロトタイプです。
 
-ClearAllergy は、食物アレルギーを持つ人が外食時に感じる「このメニューは自分が食べても大丈夫だろうか」という不安を減らすことを目指した、ポートフォリオ用の個人開発プロジェクトです。
+実際の飲食判断には使用しないでください。食品の安全性や摂取可否を判定・保証するものではありません。就職活動でのデモと、複数人による操作レビューを目的にしています。
 
 ## 概要
 
@@ -32,12 +32,11 @@ ClearAllergy は、食物アレルギーを持つ人が外食時に感じる「�
 - 公開中の店舗一覧の閲覧
 - 店舗名・説明文による店舗検索
 - 都道府県・市区町村・駅名・住所・カテゴリによるエリア検索
-- Google Maps表示と、Google Places由来の未登録周辺店舗候補表示
+- 登録済み店舗だけを対象とした検索（公開画面の地図表示・外部店舗候補表示は未提供）
 - 店舗ページでの公開メニュー一覧表示
 - メニュー名・説明・カテゴリによるメニュー検索
 - メニュー詳細での価格、カテゴリ、原材料、注意書きの確認
 - アレルゲン29品目の状態表示
-- 特定原材料9品目と特定原材料に準ずるもの20品目の注意表示
 - 利用者自身の気になるアレルゲンを `localStorage` に保存し、公開画面で注意表示
 - 店舗公開 URL の共有
 
@@ -89,7 +88,7 @@ ClearAllergy は、食物アレルギーを持つ人が外食時に感じる「�
 | Clerk | 認証・セッション管理を外部サービスに任せ、アプリ側では店舗権限の管理に集中するため |
 | Vercel Blob | 店舗画像・メニュー画像をアプリ本体とは分けて保存し、Vercel 環境で扱いやすくするため |
 | Vercel | Next.js アプリをデプロイしやすく、Neon や Blob との組み合わせを想定しやすいため |
-| Google Maps Platform | 登録済み店舗の地図表示と、周辺の未登録店舗候補を補助的に表示するため |
+| Google Places API | 管理者が店舗候補を入力する既存の補助機能。公開検索からは呼び出さない |
 
 ## システム構成
 
@@ -130,7 +129,7 @@ flowchart LR
 | --- | --- |
 | `/api/allergens` | アレルゲン29品目一覧 |
 | `/api/menus/[menuId]` | 公開メニュー取得 |
-| `/api/admin/register` | 店舗アカウント登録 |
+| `/api/admin/register` | 旧自己登録API。現在は自己登録停止 |
 | `/api/admin/onboarding` | Clerk ログイン後の初回店舗作成 |
 | `/api/admin/auth/login` | 管理ログイン時の事前確認・監査ログ |
 | `/api/admin/auth/sso` | Google / SSO 導線の監査ログ |
@@ -154,16 +153,14 @@ ClearAllergy/
 │  ├─ api/                    # Route Handler
 │  ├─ sign-in/                # Clerk サインイン導線
 │  └─ sign-up/                # Clerk サインアップ導線
-├─ components/
-│  ├─ admin/                  # 管理画面コンポーネント
-│  ├─ public/                 # 公開画面コンポーネント
-│  └─ layout/                 # 共通レイアウト
+├─ features/                  # 機能別の画面・API・スキーマ
+├─ components/                # 共通UI・レイアウト
 ├─ lib/
 │  ├─ auth/                   # Clerk 連携
 │  ├─ validators/             # 入力検証
-│  ├─ admin-auth.ts           # 管理画面の認証・店舗解決
-│  ├─ upload-images.ts        # 画像アップロード検証
-│  ├─ image-url-policy.ts     # 保存済み画像URLの検証
+│  ├─ auth/admin-auth.ts      # 管理画面の認証・店舗解決
+│  ├─ storage/upload-images.ts # 画像アップロード検証
+│  ├─ storage/image-url-policy.ts # 保存済み画像URLの検証
 │  └─ allergens.ts            # アレルゲン共通ロジック
 ├─ prisma/
 │  ├─ schema.prisma           # DB スキーマ
@@ -200,15 +197,15 @@ ClearAllergy/
 | 状態 | 表示上の意味 |
 | --- | --- |
 | `CONTAINS` | 含む |
-| `FREE` | 含まない |
-| `MAY_CONTAIN` | 含む可能性があります |
+| `FREE` | 原材料に含まない登録（食品安全の保証ではない） |
+| `MAY_CONTAIN` | 含む可能性あり・要確認。コンタミだけを意味しない |
 | `UNKNOWN` | 未設定 / 未確認 |
 
 新規作成時や欠損時は `UNKNOWN` を基準にし、公開時には 29 品目が未設定のままにならないようサーバー側でも確認しています。
 
 ## 認証・権限管理
 
-認証の正本は Clerk です。`proxy.ts` で Clerk middleware を通し、`lib/auth/getCurrentAppUser.ts` と `lib/admin-auth.ts` で Clerk ユーザーとアプリ内の `User` / `Shop` を結びつけています。
+認証の正本は Clerk です。`proxy.ts` で Clerk middleware を通し、`lib/auth/getCurrentAppUser.ts` と `lib/auth/admin-auth.ts` で Clerk ユーザーとアプリ内の `User` / `Shop` を結びつけています。
 
 管理画面では、ログイン中の Clerk ユーザー ID と `Shop.ownerClerkUserId` を照合し、認証済みユーザーの店舗データだけを取得・更新します。API 側でも `requireShopId()` を通して `shopId` を確定し、クライアントから渡された店舗 ID を信用しない設計にしています。
 
@@ -218,15 +215,15 @@ ClearAllergy/
 
 アレルゲンは 29 品目をマスタデータとして保持し、各メニューに対して `CONTAINS` / `FREE` / `MAY_CONTAIN` / `UNKNOWN` の状態を登録します。
 
-公開画面では、29 品目の状態を一覧で表示し、特定原材料9品目と特定原材料に準ずるもの20品目は上部で分類別に目立つように表示します。利用者が選択した気になるアレルゲンは `localStorage` に保存し、端末内の設定として表示に反映します。
+公開画面では、現行マスタの品目ごとの状態を表示します。分類別の強調表示は実装していません。利用者が選択した気になるアレルゲンは `localStorage` に保存し、端末内の設定として表示に反映します。
 
-この情報は利用者の確認を支援するためのものであり、医療的な正確性を保証するものではありません。最終的な判断が必要な場合は、店舗への確認を前提としています。
+他の公開可能なメニューのCONTAINSは、公開登録から得た補足として一覧・詳細・APIに反映します。FREE自体は変更せず、実際の厨房の取扱いを確認した情報とは扱いません。公開前・原材料変更時はUIで確認を求めますが、APIの公開条件は従来どおりです。
 
 ## セットアップ方法
 
 ### 前提条件
 
-- Node.js 20 以上
+- Node.js 22.23.1（ローカル検証済み。Next.jsの最低要件は20.9以上）
 - PostgreSQL または Neon のデータベース
 - Clerk アプリケーション
 - 画像アップロードを確認する場合は Vercel Blob
@@ -255,7 +252,7 @@ Copy-Item .env.example .env
 npx prisma generate
 ```
 
-### 4. DB マイグレーションを実行
+### 4. 新規のデモ専用DBだけにマイグレーションを実行
 
 ```bash
 npx prisma migrate dev
@@ -267,7 +264,11 @@ npx prisma migrate dev
 npm run seed
 ```
 
-`seed` では、アレルゲン29品目、デモ店舗、公開メニューが作成されます。Clerk のキーを設定している場合は、デモユーザーの Clerk 同期も試みます。
+`seed` はデータの追加専用ではありません。既存アレルゲンマスタや同名デモメニューの更新・削除を行い、Clerk のキーがある場合はデモユーザーの外部同期も試みます。既存・共有DBや実データのあるDBには実行しないでください。既存・共有DBへのマイグレーションや、このseedの実行はしていません。保存の検証には、後述の独立テスト環境と専用の初期化スクリプトを使用します。
+
+`/admin/demo` は専用ユーザー `demo@clearallergy.local` に属する店舗を表示します。店舗名の「デモ」文字列では判定しません。対象がなければ未準備の案内になります。匿名のデモ画面では入力しても保存されません。
+
+保存・再読込・公開までの操作レビューには、別途デモ専用環境でClerkにログインでき、稼働店舗の `ownerClerkUserId` が一致する管理者が必要です。`PORTFOLIO_MODE=true` の場合は、さらにアプリ管理者ロールまたは編集許可の条件を満たす必要があります。自己登録の環境変数を `open` に変えても登録は開きません。専用アカウント・デモDBは、後述の `compose.test.yaml` と `scripts/setup-test-env.ts` で準備できます。
 
 ### 6. 開発サーバーを起動
 
@@ -287,27 +288,28 @@ npm run dev
 | `DIRECT_URL` | 必須 | Prisma Migrate 用の直接接続先 |
 | `PORTFOLIO_MODE` | 任意 | ポートフォリオ公開時に一般ユーザーの更新を閲覧専用にする |
 | `PORTFOLIO_EDITOR_APP_USER_IDS` | 任意 | `PORTFOLIO_MODE=true` でも更新を許可するアプリ内 `User.id`。カンマ区切り |
-| `ADMIN_REGISTRATION_MODE` | 推奨 | 管理者自己登録の制御。`disabled` / `invite_only` / `open` |
-| `ADMIN_REGISTRATION_INVITE_TOKEN` | 条件付き | `invite_only` の招待トークン |
+| `ADMIN_REGISTRATION_MODE` | 旧設定 | 現在はコードで常に `disabled`。値を変えても自己登録は開かない |
+| `ADMIN_REGISTRATION_INVITE_TOKEN` | 旧設定 | 現在のClerk招待受諾フローでは使わない |
 | `ENABLE_CLERK_ADMIN_AUTH` | 任意 | Google / Clerk SSO 導線の表示制御 |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | 必須 | Clerk の公開キー |
 | `CLERK_SECRET_KEY` | 必須 | Clerk のサーバー側キー |
 | `NEXT_PUBLIC_APP_URL` | 任意 | QR コードや公開 URL 生成に使うベース URL |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | 地図利用時 | Maps JavaScript API用。HTTPリファラー制限を設定 |
-| `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | 地図利用時 | Advanced Marker用のJavaScript Map ID |
-| `GOOGLE_MAPS_SERVER_API_KEY` | Places利用時 | Places API (New) Text Search用。サーバー専用 |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | 旧画面用 | 公開画面は現在地図の案内表示のみ |
+| `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | 旧画面用 | 公開画面では現在使わない |
+| `GOOGLE_MAPS_SERVER_API_KEY` | 管理者の店舗候補検索時 | サーバー専用。公開 `/api/places/search` は常に利用不可応答 |
 | `BLOB_READ_WRITE_TOKEN` | 画像アップロード時に必要 | Vercel Blob の読み書きトークン |
-| `ALLOWED_IMAGE_URL_PREFIXES` | 任意 | 許可する画像 URL prefix |
+| `ALLOWED_IMAGE_URL_PREFIXES` | 任意 | 許可する自分のBlobストアのHTTPS URL prefix。未設定時はBlobトークンからストアを限定 |
 
 ローカルで画像アップロードまで確認する場合は、`BLOB_READ_WRITE_TOKEN` も設定してください。
 
 ### GitHub Actions CI
 
-`.github/workflows/ci.yml` は、`pull_request` と `main` への `push` で以下を実行します。
+`.github/workflows/ci.yml` は、`main` 向けの `pull_request` と `main` への `push` で以下を実行します。
 
 ```bash
 npm ci
 npx prisma generate
+npm test
 npm run lint
 npm run typecheck
 npm run build
@@ -331,6 +333,7 @@ GitHub Secrets には、CI の `prisma generate` と `next build` に必要な�
 ### 基本確認
 
 ```bash
+npm test
 npm run lint
 npm run typecheck
 npm run build
@@ -406,3 +409,84 @@ npm run build
 
 Kaito Iwase
 食物アレルギーの当事者としての経験をもとに、外食時の情報確認をしやすくすることを目指して制作しました。
+
+## Dockerでの開発・検証
+
+Docker DesktopのLinuxコンテナを使用します。WSLで作業する場合は、対象ディストリビューションのWSL integrationが必要です。Node.jsと依存ライブラリはコンテナ内で動作し、ホストのnode_modules・.nextとは別の名前付きボリュームを使います。
+
+```bash
+docker compose up --build -d
+docker compose exec app npm test
+docker compose exec app npm run lint
+docker compose exec app npm run typecheck
+```
+
+ブラウザでは `http://localhost:3100` を開きます。ビルドを確認するときは開発サーバーを停止して実行します。
+
+```bash
+docker compose stop app
+docker compose run --rm --no-deps app npm run build
+docker compose up -d
+```
+
+`.env` と `.env.local` は実行時に読み込みます。Dockerイメージには含めません。Composeはアプリコンテナだけを起動し、DBの作成・初期化、migration、seed、Clerk設定変更を自動実行しません。既存のDB接続先はそのまま使用するため、操作レビューで実際に保存する前にデモ専用DBであることを確認してください。
+
+## 保存・公開を試せる独立テスト環境
+
+`compose.test.yaml` は、通常の開発環境とは別のPostgreSQL・ボリューム・ポートを使用します。アプリは `http://localhost:3101`、DBはCompose内部の `test-db/clearallergy_test` です。DBのポートはホストへ公開しません。既存の `.env` / `.env.local` のDB接続先は、テストCompose内だけで専用DBへ上書きします。
+
+Clerkは既存の**開発用**キーを使用し、専用の管理者2アカウントを作成します。既存アカウントのパスワードや権限は変更しません。画像アップロードは既存のVercel Blob接続を使用し、テスト用店舗IDのパスへだけ新規保存します。DBは独立していますが、ClerkアプリとBlobストア自体を新規作成する構成ではありません。
+
+```bash
+docker compose -f compose.test.yaml build app
+docker compose -f compose.test.yaml up -d test-db
+docker compose -f compose.test.yaml run --rm --no-deps --user "$(id -u):$(id -g)" app node --import tsx scripts/setup-test-env.ts
+docker compose -f compose.test.yaml up -d app
+```
+
+初期化スクリプトは、接続先が専用DBであることとClerkキーが開発用であることを確認してから、既存マイグレーションを適用します。架空のデモカフェ1件・管理者の店舗2件と、各店舗の架空メニュー3件を用意します。再実行時は既存のテストデータを上書きしません。
+
+ログイン情報は `.clerk/clearallergy-test-accounts.json` に保存します。`accounts[0]` が店舗A、`accounts[1]` が店舗Bです。Git・Dockerイメージには含まれず、パスワードはログへ表示しません。このファイルを共有・コミットしないでください。メールアドレスにはClerk開発環境の `+clerk_test` 形式を使用し、実メール配送を抑止します。この開発用テストアカウントで確認コードを求められた場合は、Clerkのテストコード `424242` を使用します。
+
+- 管理者ログイン：`http://localhost:3101/admin/login`
+- 保存しない管理デモ：`http://localhost:3101/admin/demo`
+- 公開側：`http://localhost:3101/shops`
+
+```bash
+docker compose -f compose.test.yaml exec app npm test
+docker compose -f compose.test.yaml exec app npm run typecheck
+docker compose -f compose.test.yaml exec app npm run lint
+docker compose -f compose.test.yaml exec app node --import tsx scripts/check-test-database.ts
+```
+
+DB検証はその実行で作った架空店舗だけを片付けます。メニューの欠損・UNKNOWNによる自動非公開、MAY_CONTAINの公開維持、ロールバックを実際のPostgreSQLで確認します。
+
+ブラウザ自動検証は既存のPlaywrightランナーを使う `scripts/check-test-browser.mjs` です。Playwrightを外部ランタイムから使う場合は `PLAYWRIGHT_MODULE_PATH`、Chromiumの場所を指定する場合は `BROWSER_EXECUTABLE` を設定して、ホストのNode.js 22で実行します。アプリにPlaywright依存を追加することは必須にしていません。
+
+```bash
+node scripts/check-test-browser.mjs
+docker compose -f compose.test.yaml exec app node --import tsx scripts/cleanup-test-images.ts
+```
+
+このブラウザ検証は実際に専用店舗の説明を保存し、メニューを作成・公開・編集・削除し、Blobへ画像をアップロードします。メニューはテスト終了時に削除します。画像の片付けは記録ファイルにある今回のテスト画像だけが対象です。ClerkのTesting Tokenはbot検出対策に使い、管理APIの認証・店舗所有権確認はそのまま通します。
+
+ビルドを再確認するときは、開発サーバーと `.next` が競合しないよう停止してから実行します。
+
+```bash
+docker compose -f compose.test.yaml stop app
+docker compose -f compose.test.yaml run --rm --no-deps app npm run build
+docker compose -f compose.test.yaml up -d app
+```
+
+依存更新後はイメージのビルドだけで既存の依存ボリュームが入れ替わるわけではありません。対象のComposeでアプリを停止し、`run --rm --no-deps app npm ci` と `run --rm --no-deps app npx prisma generate` を実行してから再起動してください。`down -v` はDBデータも消すため、通常の起動・停止では使いません。
+
+
+## Prisma設定依存の限定更新
+
+`@prisma/config@6.19.3` が使う `deepmerge-ts` に対してだけ、`package.json` の `overrides` で `8.0.0` を指定しています。Prisma／Prisma Clientは6.19.3のままです。循環参照の結合でスタック上限超過になる [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) に対応するためで、監査対象から除外しているわけではありません。
+
+8.0.0にはMapの結合動作などの変更があるため、Prisma側が元々指定していた範囲を越える更新として検証しています。`tests/prisma-config-compat.test.ts` はPrismaから解決される実際の依存を使い、循環参照入力、型付き設定の読込・相対パス・migration設定、設定なし・不正設定の扱いを確認します。修正前は循環参照テストが失敗し、修正後は成功することを確認しました。
+
+2026-09-06時点で、Dockerのテスト・型チェック・lint・Prisma検証／生成・専用DBの整合性／トランザクション・ビルドと、`npm audit`／`npm audit --omit=dev` の0件を確認しています。実運用の安全性を保証するものではありません。
+
+Prismaが修正版の依存を正式に取り込んだ際に限定指定の解除を検討します。Prisma更新時には依存ツリーとauditを確認し、上記の回帰テストとDB・ビルド検証を再実行してください。解除が必要になった場合は限定overrideだけを削除してlockfileを再生成できますが、上流が未修正なら脆弱性が再び残ります。`npm audit fix --force` は使用していません。

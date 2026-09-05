@@ -5,10 +5,7 @@ import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type AllergenStatus } from "@/lib/allergens";
 import { PREFECTURES } from "@/lib/constants/prefectures";
-import {
-    loadUserAllergenPreferences,
-    USER_ALLERGENS_UPDATED_EVENT,
-} from "@/lib/public-allergen-preferences";
+import { useUserAllergenPreferences } from "@/features/public/shops/components/UserAllergenPreferenceClient";
 import PublicShopMap from "@/features/public/shops/components/PublicShopMap";
 import UserAllergenPreferenceClient from "@/features/public/shops/components/UserAllergenPreferenceClient";
 
@@ -242,43 +239,24 @@ export default function PublicShopListClient({
         searchParams.get("prefecture") ?? "",
     );
     const [city, setCity] = React.useState(searchParams.get("city") ?? "");
-    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [includeMayContain, setIncludeMayContain] = React.useState(false);
-    const [loadedPreferences, setLoadedPreferences] = React.useState(false);
+    const { preferences: { excludedSlugs, includeMayContain }, loaded: loadedPreferences } = useUserAllergenPreferences();
     const [currentLocation, setCurrentLocation] =
         React.useState<CurrentLocation | null>(null);
     const [locationStatus, setLocationStatus] =
         React.useState<LocationStatus>("idle");
     const [locationMessage, setLocationMessage] = React.useState("");
 
-    React.useEffect(() => {
+    const searchKey = searchParams.toString();
+    const [previousSearchKey, setPreviousSearchKey] = React.useState(searchKey);
+    if (previousSearchKey !== searchKey) {
+        setPreviousSearchKey(searchKey);
         setArea(searchParams.get("area") ?? "");
         setKeyword(searchParams.get("keyword") ?? searchParams.get("q") ?? "");
         setPrefecture(searchParams.get("prefecture") ?? "");
         setCity(searchParams.get("city") ?? "");
-    }, [searchParams]);
+    }
 
-    React.useEffect(() => {
-        function syncPreferences() {
-            const next = loadUserAllergenPreferences();
-            setExcludedSlugs(next.excludedSlugs);
-            setIncludeMayContain(next.includeMayContain);
-            setLoadedPreferences(true);
-        }
 
-        syncPreferences();
-        window.addEventListener(USER_ALLERGENS_UPDATED_EVENT, syncPreferences);
-        window.addEventListener("storage", syncPreferences);
-        window.addEventListener("focus", syncPreferences);
-        return () => {
-            window.removeEventListener(
-                USER_ALLERGENS_UPDATED_EVENT,
-                syncPreferences,
-            );
-            window.removeEventListener("storage", syncPreferences);
-            window.removeEventListener("focus", syncPreferences);
-        };
-    }, []);
 
     const cityOptions = React.useMemo(
         () =>
@@ -432,9 +410,9 @@ export default function PublicShopListClient({
     return (
         <main className="mx-auto max-w-6xl px-4 py-8">
             <section className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950">
-                <p className="font-extrabold">判定結果は目安です</p>
+                <p className="font-extrabold">登録情報の表示を検証するデモです</p>
                 <p className="mt-1 leading-6">
-                    調理環境によってはコンタミネーションの可能性があります。必要に応じて、ご利用前に店舗へ直接ご確認ください。
+                    「原材料に含まない登録」は食品安全の保証ではありません。「含む可能性あり」は、確認が必要な状態です。
                 </p>
             </section>
 

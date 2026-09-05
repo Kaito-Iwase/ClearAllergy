@@ -7,16 +7,7 @@
 import React from "react";
 
 export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
-    // 初回は server / client で同じ描画にしたいので、URL は null から始めます。
-    const [shopUrl, setShopUrl] = React.useState<string | null>(null);
-
     const [message, setMessage] = React.useState("");
-
-    // ブラウザでしか origin が取れないため、マウント後に公開 URL を組み立てます。
-    React.useEffect(() => {
-        const origin = window.location.origin;
-        setShopUrl(`${origin}/shops/${shopId}`);
-    }, [shopId]);
 
     function showMessage(text: string) {
         setMessage(text);
@@ -28,9 +19,7 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
 
     // 共有 API が使える端末ではそれを優先し、無ければコピーに切り替えます。
     async function onClick() {
-        if (!shopUrl) {
-            return;
-        }
+        const shopUrl = `${window.location.origin}/shops/${shopId}`;
 
         try {
             if (navigator.share) {
@@ -55,23 +44,18 @@ export default function ShareShopUrlButton({ shopId }: { shopId: string }) {
         }
     }
 
-    const disabled = shopUrl === null;
-    const title = shopUrl ?? "URL取得中...";
-
     return (
         <div className="space-y-2">
             <button
                 type="button"
                 onClick={onClick}
-                disabled={disabled}
-                title={title}
                 className="w-full rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:cursor-not-allowed disabled:opacity-60"
             >
                 この店舗のURLを共有
             </button>
 
             {message ? (
-                <p className="text-xs text-gray-600">{message}</p>
+                <p role="status" className="text-xs text-gray-600">{message}</p>
             ) : null}
         </div>
     );

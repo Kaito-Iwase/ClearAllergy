@@ -5,7 +5,9 @@ import {
     clearUserAllergenPreferences,
     loadUserAllergenPreferences,
     saveUserAllergenPreferences,
-    USER_ALLERGENS_UPDATED_EVENT,
+    getUserAllergenPreferenceSnapshot,
+    SERVER_PREFERENCE_SNAPSHOT,
+    subscribeUserAllergenPreferences,
 } from "@/lib/public-allergen-preferences";
 
 export type UserAllergenPreferenceAllergen = {
@@ -31,145 +33,77 @@ type UserAllergenPreferencePanelProps = {
     className?: string;
 };
 
+export function useUserAllergenPreferences() {
+    return React.useSyncExternalStore(
+        subscribeUserAllergenPreferences,
+        getUserAllergenPreferenceSnapshot,
+        () => SERVER_PREFERENCE_SNAPSHOT,
+    );
+}
+
 export function useUserAllergenPreferenceState() {
+    const snapshot = useUserAllergenPreferences();
+    const { highlightSlugs, excludedSlugs, includeMayContain } = snapshot.preferences;
     const [targetSlugs, setTargetSlugs] = React.useState<string[]>([]);
-    const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
-    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [includeMayContain, setIncludeMayContain] = React.useState(false);
-    const [loaded, setLoaded] = React.useState(false);
     const [message, setMessage] = React.useState("");
     const [isOpen, setIsOpen] = React.useState(false);
 
-    React.useEffect(() => {
-        const stored = loadUserAllergenPreferences();
-        setHighlightSlugs(stored.highlightSlugs);
-        setExcludedSlugs(stored.excludedSlugs);
-        setTargetSlugs([]);
-        setIncludeMayContain(stored.includeMayContain);
-        setLoaded(true);
-    }, []);
-
     function toggleTargetSlug(slug: string) {
-        setTargetSlugs((prev) => {
-            if (prev.includes(slug)) {
-                return prev.filter((value) => value !== slug);
-            }
-            return [...prev, slug];
-        });
+        setTargetSlugs((prev) => prev.includes(slug)
+            ? prev.filter((value) => value !== slug) : [...prev, slug]);
     }
 
-    function showMessage(text: string) {
-        setMessage(text);
-
-        window.setTimeout(() => {
-            setMessage("");
-        }, 2500);
-    }
-
-    function notifyUpdated() {
-        window.dispatchEvent(new CustomEvent(USER_ALLERGENS_UPDATED_EVENT));
-    }
-
-    function persistPreferences(args: {
-        nextHighlightSlugs: string[];
-        nextExcludedSlugs: string[];
-        nextIncludeMayContain: boolean;
-    }) {
-        saveUserAllergenPreferences({
-            highlightSlugs: args.nextHighlightSlugs,
-            excludedSlugs: args.nextExcludedSlugs,
-            includeMayContain: args.nextIncludeMayContain,
-            selectedSlugs: [
-                ...new Set([
-                    ...args.nextHighlightSlugs,
-                    ...args.nextExcludedSlugs,
-                ]),
-            ],
-        });
-        notifyUpdated();
-    }
-
-    function applyHighlight() {
+    function applySelection(mode: "highlight" | "exclude") {
         if (targetSlugs.length === 0) {
-            showMessage("先にアレルゲンを選択してください。");
+            setMessage("先にアレルゲンを選択してください。");
             return;
         }
-
-        const nextHighlightSlugs = [...new Set([...highlightSlugs, ...targetSlugs])];
-        const nextExcludedSlugs = excludedSlugs.filter(
-            (slug) => !targetSlugs.includes(slug),
-        );
-
-        setHighlightSlugs(nextHighlightSlugs);
-        setExcludedSlugs(nextExcludedSlugs);
-        setTargetSlugs([]);
-        persistPreferences({
-            nextHighlightSlugs,
-            nextExcludedSlugs,
-            nextIncludeMayContain: includeMayContain,
-        });
-        showMessage("選択した項目を強調表示として保存しました。");
-    }
-
-    function applyExclude() {
-        if (targetSlugs.length === 0) {
-            showMessage("先にアレルゲンを選択してください。");
+        // 別タブ等で更新された最新状態を基準に追加する。
+        const current = loadUserAllergenPreferences();
+        const next = {
+            ...current,
+            highlightSlugs: mode === "highlight"
+                ? [...new Set([...current.highlightSlugs, ...targetSlugs])]
+                : current.highlightSlugs.filter((slug) => !targetSlugs.includes(slug)),
+            excludedSlugs: mode === "exclude"
+                ? [...new Set([...current.excludedSlugs, ...targetSlugs])]
+                : current.excludedSlugs.filter((slug) => !targetSlugs.includes(slug)),
+        };
+        const result = saveUserAllergenPreferences(next);
+        if (!result.ok) {
+            setMessage(result.message);
             return;
         }
-
-        const nextHighlightSlugs = highlightSlugs.filter(
-            (slug) => !targetSlugs.includes(slug),
-        );
-        const nextExcludedSlugs = [...new Set([...excludedSlugs, ...targetSlugs])];
-
-        setHighlightSlugs(nextHighlightSlugs);
-        setExcludedSlugs(nextExcludedSlugs);
         setTargetSlugs([]);
-        persistPreferences({
-            nextHighlightSlugs,
-            nextExcludedSlugs,
-            nextIncludeMayContain: includeMayContain,
-        });
-        showMessage("選択した項目を除外として保存しました。");
+        setMessage(mode === "highlight"
+            ? "選択した項目を強調表示として保存しました。"
+            : "選択した項目を除外として保存しました。");
     }
 
     function onClear() {
-        clearUserAllergenPreferences();
+        const result = clearUserAllergenPreferences();
+        if (!result.ok) {
+            setMessage(result.message);
+            return;
+        }
         setTargetSlugs([]);
-        setHighlightSlugs([]);
-        setExcludedSlugs([]);
-        setIncludeMayContain(false);
-        notifyUpdated();
-        showMessage("保存済み設定を削除しました。");
+        setMessage("保存済み設定を削除しました。");
     }
 
     return {
-        targetSlugs,
-        highlightSlugs,
-        excludedSlugs,
-        includeMayContain,
-        loaded,
-        message,
-        isOpen,
-        setIsOpen,
-        toggleTargetSlug,
+        targetSlugs, highlightSlugs, excludedSlugs, includeMayContain,
+        loaded: snapshot.loaded,
+        message: snapshot.storageError || message,
+        isOpen, setIsOpen, toggleTargetSlug,
         toggleIncludeMayContain: () => {
-            const nextIncludeMayContain = !includeMayContain;
-
-            setIncludeMayContain(nextIncludeMayContain);
-            persistPreferences({
-                nextHighlightSlugs: highlightSlugs,
-                nextExcludedSlugs: excludedSlugs,
-                nextIncludeMayContain,
+            const current = loadUserAllergenPreferences();
+            const result = saveUserAllergenPreferences({
+                ...current, includeMayContain: !current.includeMayContain,
             });
-            showMessage(
-                nextIncludeMayContain
-                    ? "コンタミも対象にしました。"
-                    : "コンタミを対象外にしました。",
-            );
+            setMessage(result.ok ? "除外の設定を保存しました。" : result.message);
         },
-        applyHighlight,
-        applyExclude,
+        applyHighlight: () => applySelection("highlight"),
+        applyExclude: () => applySelection("exclude"),
         onClear,
     };
 }
@@ -237,6 +171,11 @@ export function UserAllergenPreferencePanel({
                     </span>
                 </div>
             </button>
+            {message ? (
+                <p role="status" className="mx-4 mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+                    {message}
+                </p>
+            ) : null}
 
             {isOpen ? (
                 <div className="border-t border-gray-100 px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
@@ -248,10 +187,10 @@ export function UserAllergenPreferencePanel({
                         <label className="flex cursor-pointer items-start justify-between gap-4">
                             <div>
                                 <span className="text-sm font-extrabold text-gray-900">
-                                    コンタミも対象にする
+                                    「含む可能性あり」も除外する
                                 </span>
                                 <p className="mt-1 text-xs leading-5 text-gray-600">
-                                    「含む可能性があります」も強調・除外の対象にします。
+                                    オンにすると「含む可能性あり」と登録されたメニューも除外します。オフでも注意表示は残ります。
                                 </p>
                             </div>
                             <input
@@ -276,6 +215,7 @@ export function UserAllergenPreferencePanel({
                                     key={allergen.slug}
                                     type="button"
                                     onClick={() => onToggleTargetSlug(allergen.slug)}
+                                    aria-pressed={selected}
                                     className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition ${
                                         selected
                                             ? "border-gray-900 bg-gray-900 text-white"
@@ -329,11 +269,7 @@ export function UserAllergenPreferencePanel({
                         </button>
                     </div>
 
-                    {message ? (
-                        <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                            {message}
-                        </div>
-                    ) : null}
+
 
                     <p className="mt-4 text-xs text-gray-500">
                         この設定はログイン不要で、このブラウザ内だけに保存されます。

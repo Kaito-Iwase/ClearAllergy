@@ -1,21 +1,14 @@
+import { getAllowedImageOrigins } from "./lib/storage/image-url-policy";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
     images: {
-        remotePatterns: [
-            {
-                protocol: "https",
-                hostname: "blob.vercel-storage.com",
-            },
-            {
-                protocol: "https",
-                hostname: "*.blob.vercel-storage.com",
-            },
-            {
-                protocol: "https",
-                hostname: "*.public.blob.vercel-storage.com",
-            },
-        ],
+        remotePatterns: getAllowedImageOrigins().map((origin) => ({
+            protocol: "https" as const,
+            hostname: new URL(origin).hostname,
+            port: "",
+            search: "",
+        })),
     },
 };
 

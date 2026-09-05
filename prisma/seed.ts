@@ -1,10 +1,11 @@
+import { DEMO_USER_EMAIL } from "../lib/auth/demo-shop";
+import { DEMO_MENUS, validateDemoMenuFixtures } from "./demo-menus";
 import { loadEnvConfig } from "@next/env";
 import bcrypt from "bcrypt";
-import { PrismaClient, type AllergenStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminCore";
 import {
     ALLERGEN_MASTER,
-    type AllergenMasterSeed,
 } from "../lib/constants/allergen-master";
 
 loadEnvConfig(process.cwd());
@@ -13,85 +14,8 @@ const prisma = new PrismaClient();
 
 const ALLERGENS = ALLERGEN_MASTER;
 
-const DEMO_USER_EMAIL = "demo@clearallergy.local";
 const DEMO_USER_PASSWORD = "demo1234";
 const DEMO_SHOP_NAME = "[デモ店舗]Cafe Hibi（カフェ ヒビ）";
-
-type DemoMenuSeed = {
-    name: string;
-    description: string;
-    category: string;
-    priceYen: number;
-    ingredients: string;
-    precaution: string | null;
-    allergenStatusBySlug: Record<string, AllergenStatus>;
-};
-
-// 公開デモメニューは現行マスタの全品目を必ず持つ形にそろえます。
-// seed に欠損データがあると、開発中に「これで正しい」と誤解しやすいためです。
-function buildPublishedSeedStatusMap(
-    allergens: AllergenMasterSeed[],
-    partialStatusBySlug: Record<string, AllergenStatus>,
-) {
-    const completeStatusBySlug: Record<string, AllergenStatus> = {};
-
-    for (const allergen of allergens) {
-        completeStatusBySlug[allergen.slug] =
-            partialStatusBySlug[allergen.slug] ?? "FREE";
-    }
-
-    return completeStatusBySlug;
-}
-
-const DEMO_MENUS: DemoMenuSeed[] = [
-    {
-        name: "米粉パンケーキ",
-        description:
-            "米粉を使ったふんわり食感のパンケーキ。朝食や軽食向けの定番メニューです。",
-        category: "デザート",
-        priceYen: 980,
-        ingredients:
-            "米粉、豆乳、砂糖、菜種油、ベーキングパウダー、いちごソース",
-        precaution: "同一厨房で小麦・卵・乳を含むメニューを調理しています。",
-        allergenStatusBySlug: {
-            soybean: "CONTAINS",
-            apple: "MAY_CONTAIN",
-        },
-    },
-    {
-        name: "豆乳ベジカレー",
-        description:
-            `野菜を中心にしたやさしい辛さのカレー。メニュー詳細で${ALLERGENS.length}品目を確認できます。`,
-        category: "メイン",
-        priceYen: 1280,
-        ingredients:
-            "米、豆乳、玉ねぎ、にんじん、じゃがいも、トマト、カレースパイス、ごま",
-        precaution: "同一フライヤーでえび・かにを使用する場合があります。",
-        allergenStatusBySlug: {
-            soybean: "CONTAINS",
-            sesame: "CONTAINS",
-            shrimp: "MAY_CONTAIN",
-            crab: "MAY_CONTAIN",
-        },
-    },
-    {
-        name: "照り焼きチキンプレート",
-        description:
-            "人気の定食メニュー。価格・原材料・アレルゲンの見え方を確認するデモ用サンプルです。",
-        category: "メイン",
-        priceYen: 1420,
-        ingredients: "鶏肉、しょうゆ、みりん、砂糖、ごはん、温野菜、卵黄ソース",
-        precaution: "同一厨房で乳・小麦・ごまを使用しています。",
-        allergenStatusBySlug: {
-            chicken: "CONTAINS",
-            soybean: "CONTAINS",
-            egg: "CONTAINS",
-            wheat: "MAY_CONTAIN",
-            milk: "MAY_CONTAIN",
-            sesame: "MAY_CONTAIN",
-        },
-    },
-];
 
 async function seedAllergenMaster() {
     const oldMatsutake = await prisma.allergen.findUnique({
@@ -202,7 +126,7 @@ async function seedDemoShop() {
         });
 
         const statuses = Object.entries(
-            buildPublishedSeedStatusMap(ALLERGENS, menu.allergenStatusBySlug),
+            menu.allergenStatusBySlug,
         );
 
         // 公開状態の更新と全設定行の作り直しを同じ transaction に入れ、
@@ -281,6 +205,8 @@ async function seedDemoShop() {
 }
 
 async function main() {
+    // 不完全な架空データは、DBの変更に入る前に拒否する。
+    validateDemoMenuFixtures();
     await seedAllergenMaster();
     await seedDemoShop();
 }

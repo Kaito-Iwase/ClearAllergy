@@ -22,27 +22,21 @@ function formatQrSize(sizeMm: number) {
     return `約${(sizeMm / 10).toFixed(1)}cm`;
 }
 
+function subscribeOrigin() {
+    return () => {};
+}
+
 export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
     // state（画面の状態）として、公開 URL とコピー結果メッセージを持ちます。
-    const [origin, setOrigin] = React.useState("");
+    const origin = React.useSyncExternalStore(
+        subscribeOrigin,
+        () => process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") || window.location.origin,
+        () => "",
+    );
     const [qrSizeMm, setQrSizeMm] = React.useState(60);
 
     // コピー・印刷の結果メッセージ表示用の状態
     const [copiedMessage, setCopiedMessage] = React.useState("");
-
-    // 本番 URL が環境変数にあればそれを優先し、無ければ今のブラウザ origin を使います。
-    React.useEffect(() => {
-        const envBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-
-        if (envBaseUrl) {
-            setOrigin(envBaseUrl.replace(/\/$/, ""));
-            return;
-        }
-
-        if (typeof window !== "undefined") {
-            setOrigin(window.location.origin);
-        }
-    }, []);
 
     // origin が決まってから店舗公開 URL を組み立てます。
     const publicShopUrl = origin ? `${origin}/shops/${shopId}` : "";

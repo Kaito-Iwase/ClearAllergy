@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env
+.env.*
+.clerk
+.codex
+.vercel
+coverage
+out
+build
+docs
+document
+*.log
+*.tsbuildinfo

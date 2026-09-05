@@ -33,26 +33,9 @@ import {
     parseMenuImageZoom,
 } from "@/lib/utils/menu-image-display";
 
-const app = new Hono();
+import { menuInputSchema } from "@/features/admin/menus/schemas/menu-input";
 
-// request.json() の結果は unknown に近いので、まず期待する形を宣言しておきます。
-type MenuCreateBody = {
-    name?: unknown;
-    description?: unknown;
-    priceYen?: unknown;
-    category?: unknown;
-    ingredients?: unknown;
-    precaution?: unknown;
-    isPublished?: unknown;
-    imageUrl?: unknown;
-    imageFrame?: unknown;
-    imageFit?: unknown;
-    imagePosition?: unknown;
-    imageZoom?: unknown;
-    imagePositionX?: unknown;
-    imagePositionY?: unknown;
-    allergenStatusBySlug?: unknown;
-};
+const app = new Hono();
 
 // GET は保存済みメニュー一覧の取得です。
 // 管理画面トップで表示するため、必要な列だけ絞って返します。
@@ -127,7 +110,15 @@ app.post("/api/admin/menus", async (c) => {
             return portfolioAccess.res;
         }
 
-        const body = await readJson<MenuCreateBody>(req);
+        const parsedBody = menuInputSchema.safeParse(await readJson<unknown>(req));
+        if (!parsedBody.success) {
+            return NextResponse.json(
+                { error: "入力内容の形式・文字数を確認してください。" },
+                { status: 400 },
+            );
+        }
+        const body = parsedBody.data;
+
 
         // 下書き作成では、名前未入力でも既定タイトルで進められるようにします。
         const name = toRequiredTrimmedString(body?.name) ?? "新しいメニュー";

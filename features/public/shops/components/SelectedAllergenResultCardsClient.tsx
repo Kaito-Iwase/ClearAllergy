@@ -1,5 +1,8 @@
 "use client";
 
+import { STORE_ALLERGEN_NOTE } from "@/lib/public-prototype";
+import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
+
 // このコンポーネントは、選択中アレルゲンとメニューの登録上の判定結果だけを表示します。
 
 import React from "react";
@@ -7,10 +10,7 @@ import {
     classifySelectedAllergenStatuses,
     type AllergenStatus,
 } from "@/lib/allergens";
-import {
-    loadUserAllergenPreferences,
-    USER_ALLERGENS_UPDATED_EVENT,
-} from "@/lib/public-allergen-preferences";
+import { useUserAllergenPreferences } from "@/features/public/shops/components/UserAllergenPreferenceClient";
 
 type Allergen = {
     slug: string;
@@ -80,46 +80,21 @@ function AllergenChips({
 export default function SelectedAllergenResultCardsClient({
     allergens,
     statusBySlug,
+    storeHandledAllergenSlugs = [],
 }: {
     allergens: Allergen[];
     statusBySlug: Record<string, AllergenStatus>;
+    storeHandledAllergenSlugs?: string[];
 }) {
-    const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
-    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [loaded, setLoaded] = React.useState(false);
+    const { preferences: { highlightSlugs, excludedSlugs }, loaded } = useUserAllergenPreferences();
 
-    React.useEffect(() => {
-        function syncPreferences() {
-            const stored = loadUserAllergenPreferences();
-            setHighlightSlugs(stored.highlightSlugs);
-            setExcludedSlugs(stored.excludedSlugs);
-            setLoaded(true);
-        }
 
-        syncPreferences();
-
-        window.addEventListener("storage", syncPreferences);
-        window.addEventListener("focus", syncPreferences);
-        window.addEventListener(
-            USER_ALLERGENS_UPDATED_EVENT,
-            syncPreferences as EventListener,
-        );
-
-        return () => {
-            window.removeEventListener("storage", syncPreferences);
-            window.removeEventListener("focus", syncPreferences);
-            window.removeEventListener(
-                USER_ALLERGENS_UPDATED_EVENT,
-                syncPreferences as EventListener,
-            );
-        };
-    }, []);
 
     if (!loaded) {
         return null;
     }
 
-    const selectedSlugs = [...new Set([...highlightSlugs, ...excludedSlugs])];
+    const selectedSlugs = getSelectedAllergenSlugs({ highlightSlugs, excludedSlugs });
 
     if (selectedSlugs.length === 0) {
         return null;
@@ -148,8 +123,10 @@ export default function SelectedAllergenResultCardsClient({
     const containsAllergens = toAllergens(groups.containsSlugs);
     const mayContainAllergens = toAllergens(groups.mayContainSlugs);
     const freeAllergens = toAllergens(groups.freeSlugs);
+    const storeHandledAllergens = freeAllergens.filter((allergen) => storeHandledAllergenSlugs.includes(allergen.slug));
+    const unknownAllergens = toAllergens(groups.unknownSlugs);
     const hasRiskResults =
-        containsAllergens.length > 0 || mayContainAllergens.length > 0;
+        containsAllergens.length > 0 || mayContainAllergens.length > 0 || storeHandledAllergens.length > 0;
     const hasUnknownResults = groups.unknownSlugs.length > 0;
 
     return (
@@ -157,7 +134,7 @@ export default function SelectedAllergenResultCardsClient({
             {containsAllergens.length > 0 ? (
                 <AllergenInfoCard
                     title="選択中アレルゲンを含みます"
-                    description="選択中アレルゲンのうち、このメニューで「含む」と登録されている項目です。最終判断は店舗表示・スタッフ確認を含めて行ってください。"
+                    description="選択中アレルゲンのうち、このメニューで「含む」と登録されている項目です。架空の登録情報であり、実際の飲食判断には使用できません。"
                     className="border-red-200 bg-red-50"
                     titleClassName="text-red-800"
                 >
@@ -171,8 +148,8 @@ export default function SelectedAllergenResultCardsClient({
 
             {mayContainAllergens.length > 0 ? (
                 <AllergenInfoCard
-                    title="選択中アレルゲンを含む可能性があります"
-                    description="選択中アレルゲンのうち、このメニューで「含む可能性あり」と登録されている項目です。最終判断は店舗表示・スタッフ確認を含めて行ってください。"
+                    title="選択中アレルゲンは含む可能性あり・要確認"
+                    description="選択中アレルゲンのうち、このメニューで「含む可能性あり」と登録されている項目です。架空の登録情報であり、実際の飲食判断には使用できません。"
                     className="border-amber-200 bg-amber-50"
                     titleClassName="text-amber-900"
                 >
@@ -184,18 +161,29 @@ export default function SelectedAllergenResultCardsClient({
                 </AllergenInfoCard>
             ) : null}
 
+            {storeHandledAllergens.length > 0 ? (
+                <AllergenInfoCard title="同店舗の別の公開登録に含む情報あり" description={STORE_ALLERGEN_NOTE}
+                    className="border-amber-200 bg-amber-50" titleClassName="text-amber-900">
+                    <AllergenChips allergens={storeHandledAllergens} label="別の公開登録に含む" className="border-amber-200 bg-white text-amber-900" />
+                </AllergenInfoCard>
+            ) : null}
+            {hasUnknownResults ? (
+                <AllergenInfoCard title="選択中アレルゲンに未入力・未確認の情報があります" description="含まないことを示す状態ではありません。" className="border-gray-300 bg-gray-50" titleClassName="text-gray-900">
+                    <AllergenChips allergens={unknownAllergens} label="未入力・未確認" className="border-gray-300 bg-white text-gray-900" />
+                </AllergenInfoCard>
+            ) : null}
             {!hasRiskResults &&
             !hasUnknownResults &&
             freeAllergens.length > 0 ? (
                 <AllergenInfoCard
-                    title="選択中アレルゲンの登録上の判定"
-                    description="登録上、このメニューでは選択中アレルゲンは不使用です。ただし最終判断は店舗表示・スタッフ確認を含めて行ってください。"
+                    title="選択中アレルゲンは原材料に含まない登録"
+                    description="このメニューの原材料に含まないという架空の登録情報です。食品の安全性や摂取可否を保証するものではありません。"
                     className="border-emerald-100 bg-emerald-50"
                     titleClassName="text-emerald-800"
                 >
                     <AllergenChips
                         allergens={freeAllergens}
-                        label="不使用登録"
+                        label="原材料に含まない登録"
                         className="border-emerald-100 bg-white text-emerald-800"
                     />
                 </AllergenInfoCard>

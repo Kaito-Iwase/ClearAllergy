@@ -1,5 +1,6 @@
 "use client";
 
+import { STORE_ALLERGEN_NOTE } from "@/lib/public-prototype";
 import Link from "next/link";
 import Image from "next/image";
 import type { CSSProperties } from "react";
@@ -13,6 +14,7 @@ import {
     statusBadgeClass,
     statusLabelJa,
     type AllergenStatus,
+    type AllergenDisplayItem,
 } from "@/lib/allergens";
 import {
     parseMenuImageFit,
@@ -22,12 +24,6 @@ import {
     type MenuImageFit,
     type MenuImageFrame,
 } from "@/lib/utils/menu-image-display";
-
-type AllergenRow = {
-    slug: string;
-    nameJa: string;
-    status: AllergenStatus;
-};
 
 export default function PublicMenuDetailBodyClient(props: {
     shopId: string;
@@ -48,7 +44,8 @@ export default function PublicMenuDetailBodyClient(props: {
     precaution: string | null;
     allergensForClient: UserAllergenPreferenceAllergen[];
     statusBySlugForClient: Record<string, AllergenStatus>;
-    rows: AllergenRow[];
+    rows: AllergenDisplayItem[];
+    storeHandledAllergenSlugs: string[];
 }) {
     const {
         shopId,
@@ -69,6 +66,7 @@ export default function PublicMenuDetailBodyClient(props: {
         allergensForClient,
         statusBySlugForClient,
         rows,
+        storeHandledAllergenSlugs,
     } = props;
 
     const preferenceState = useUserAllergenPreferenceState();
@@ -122,21 +120,6 @@ export default function PublicMenuDetailBodyClient(props: {
                                     : "aspect-square"
                             }`}
                         >
-                            <div className="absolute right-4 top-4 z-10 flex gap-2">
-                                <button
-                                    type="button"
-                                    className="rounded-full bg-white/90 p-2 shadow-sm hover:text-[#13ec13]"
-                                >
-                                    ♡
-                                </button>
-                                <button
-                                    type="button"
-                                    className="rounded-full bg-white/90 p-2 shadow-sm hover:text-[#13ec13]"
-                                >
-                                    ↗
-                                </button>
-                            </div>
-
                             {safeImageUrl ? (
                                 <Image
                                     src={safeImageUrl}
@@ -215,6 +198,7 @@ export default function PublicMenuDetailBodyClient(props: {
                             <SelectedAllergenResultCardsClient
                                 allergens={allergensForClient}
                                 statusBySlug={statusBySlugForClient}
+                                storeHandledAllergenSlugs={storeHandledAllergenSlugs}
                             />
                         </div>
                     </div>
@@ -250,23 +234,30 @@ export default function PublicMenuDetailBodyClient(props: {
                             </h3>
                         </div>
 
+                        <p className="mb-4 text-sm leading-6 text-gray-700">「原材料に含まない登録」は食品安全の保証ではありません。「含む可能性あり・要確認」は、含む可能性があり、確認が必要な状態です。</p>
+                        {rows.some((row) => row.effectiveRisk === "STORE_HANDLED") ? (
+                            <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-950">{STORE_ALLERGEN_NOTE}</p>
+                        ) : null}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {rows.map((row) => (
                                 <div
                                     key={row.slug}
-                                    className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50"
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50"
                                 >
                                     <span className="text-sm font-medium text-gray-700">
                                         {row.nameJa}
                                     </span>
                                     <span
                                         className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusBadgeClass(
-                                            row.status,
+                                            row.effectiveRisk === "STORE_HANDLED" ? "MAY_CONTAIN" : row.status,
                                         )}`}
                                         title={row.slug}
                                     >
                                         {statusLabelJa(row.status)}
                                     </span>
+                                    {row.effectiveRisk === "STORE_HANDLED" ? (
+                                        <p className="w-full text-xs leading-5 text-amber-900">同店舗の別の公開登録に「含む」情報あり</p>
+                                    ) : null}
                                 </div>
                             ))}
                         </div>
@@ -281,9 +272,9 @@ export default function PublicMenuDetailBodyClient(props: {
                         </div>
 
                         <ul className="list-disc space-y-2 pl-4 text-sm text-gray-600">
-                            <li>体調や個人差により反応が異なる場合があります。</li>
+                            <li>架空の登録情報を使った表示の検証用です。実際の飲食判断には使用しないでください。</li>
                             <li>
-                                コンタミネーションの可能性がある場合は店舗へ確認してください。
+                                「含む可能性あり・要確認」は、含む可能性があり確認が必要な状態です。
                             </li>
                             <li>
                                 表示内容は更新されることがあります。最終更新日時も確認してください。

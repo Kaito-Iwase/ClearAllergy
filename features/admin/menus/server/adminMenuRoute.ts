@@ -35,27 +35,9 @@ import {
     parseMenuImageZoom,
 } from "@/lib/utils/menu-image-display";
 
-const app = new Hono();
+import { menuInputSchema } from "@/features/admin/menus/schemas/menu-input";
 
-// 更新用の request body です。
-// shopId はクライアントから受け取らず、必ず session 側の shopId を使います。
-type UpdateMenuBody = {
-    name?: unknown;
-    description?: unknown;
-    priceYen?: unknown;
-    category?: unknown;
-    ingredients?: unknown;
-    precaution?: unknown;
-    isPublished?: unknown;
-    imageUrl?: unknown;
-    imageFrame?: unknown;
-    imageFit?: unknown;
-    imagePosition?: unknown;
-    imageZoom?: unknown;
-    imagePositionX?: unknown;
-    imagePositionY?: unknown;
-    allergenStatusBySlug?: unknown;
-};
+const app = new Hono();
 
 app.get("/api/admin/menus/:menuId", async (c) => {
     const menuId = c.req.param("menuId");
@@ -198,13 +180,14 @@ app.put("/api/admin/menus/:menuId", async (c) => {
             );
         }
 
-        const body = await readJson<UpdateMenuBody>(req);
-        if (!body) {
+        const parsedBody = menuInputSchema.safeParse(await readJson<unknown>(req));
+        if (!parsedBody.success) {
             return NextResponse.json(
-                { error: "bad request: invalid json" },
+                { error: "入力内容の形式・文字数を確認してください。" },
                 { status: 400 },
             );
         }
+        const body = parsedBody.data;
 
         const existing = await prisma.menuItem.findFirst({
             where: { id: menuId, shopId: auth.shopId },

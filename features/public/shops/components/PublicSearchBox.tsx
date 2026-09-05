@@ -1,10 +1,10 @@
 "use client";
 
 // このコンポーネントは公開画面共通の検索ボックスです。
-// URL クエリ (?q=...) を更新し、その結果を Server Component 側の絞り込みに反映させます。
+// 検索送信で一覧は keyword、店舗内は q を更新し、Client Component の絞り込みへ反映します。
 // Client Component なのは、入力イベントと router.replace を使うためです。
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Props = {
@@ -22,56 +22,47 @@ export default function PublicSearchBox({ placeholder }: Props) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    const initialQ = useMemo(() => {
-        return searchParams.get("q") ?? "";
-    }, [searchParams]);
-
+    const isShopList = pathname === "/shops" || !pathname.startsWith("/shops/");
+    const targetPath = isShopList ? "/shops" : pathname.split("/").slice(0, 3).join("/");
+    const initialQ = isShopList
+        ? searchParams.get("keyword") ?? searchParams.get("q") ?? ""
+        : searchParams.get("q") ?? "";
     const [q, setQ] = useState(initialQ);
-
-    // 戻る / 進む などで URL の q が変わった時も入力欄を同期します。
-    useEffect(() => {
+    const [previousQ, setPreviousQ] = useState(initialQ);
+    if (previousQ !== initialQ) {
+        setPreviousQ(initialQ);
         setQ(initialQ);
-    }, [initialQ]);
+    }
+    const resolvedPlaceholder = placeholder ?? autoPlaceholder(targetPath);
 
-    const resolvedPlaceholder = useMemo(() => {
-        return placeholder ?? autoPlaceholder(pathname);
-    }, [placeholder, pathname]);
-
-    // 入力のたびに URL の q を更新し、Server Component 側の検索結果も変わるようにします。
-    const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const next = e.target.value;
-        setQ(next);
-
-        const sp = new URLSearchParams(searchParams.toString());
-
-        if (next.trim() === "") sp.delete("q");
-        else sp.set("q", next);
+    function search(value: string) {
+        const sp = new URLSearchParams(targetPath === pathname ? searchParams.toString() : "");
+        sp.delete("q");
+        sp.delete("keyword");
         sp.delete("places");
-
+        if (value.trim()) sp.set(isShopList ? "keyword" : "q", value.trim());
         const queryString = sp.toString();
-        router.replace(queryString ? `${pathname}?${queryString}` : pathname);
-    };
+        router.replace(queryString ? `${targetPath}?${queryString}` : targetPath);
+    }
 
     const onClear = () => {
         setQ("");
-        const sp = new URLSearchParams(searchParams.toString());
-        sp.delete("q");
-        const queryString = sp.toString();
-        router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+        search("");
     };
 
     return (
-        <div className="relative">
-            <span className="absolute inset-y-0 left-0 grid place-items-center pl-3 text-gray-500">
+        <form role="search" className="relative" onSubmit={(event) => { event.preventDefault(); search(q); }}>
+            <button type="submit" aria-label={resolvedPlaceholder} className="absolute inset-y-0 left-0 grid place-items-center pl-3 text-gray-500">
                 🔎
-            </span>
+            </button>
 
             <input
                 className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-9 text-sm placeholder:text-gray-400 focus:border-[#13ec13] focus:outline-none focus:ring-2 focus:ring-[#13ec13]/30"
                 placeholder={resolvedPlaceholder}
                 type="search"
                 value={q}
-                onChange={onChange}
+                onChange={(event) => setQ(event.target.value)}
+                aria-label={resolvedPlaceholder}
             />
 
             {q.trim() !== "" ? (
@@ -85,6 +76,6 @@ export default function PublicSearchBox({ placeholder }: Props) {
                     ✕
                 </button>
             ) : null}
-        </div>
+        </form>
     );
 }

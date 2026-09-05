@@ -33,6 +33,7 @@ function formatUpdatedAt(value: string) {
     }
 
     return new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
