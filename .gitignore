@@ -47,8 +47,11 @@ next-env.d.ts
 # clerk configuration (can include secrets)
 /.clerk/
 
-# local documentation directories
-docs/
+# Track maintained guides; keep local historical audits and assets ignored.
+docs/*
+!docs/guide/
+docs/guide/*
+!docs/guide/*.md
 document/
 
 .codex
