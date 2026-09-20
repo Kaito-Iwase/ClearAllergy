@@ -161,12 +161,14 @@ export function buildSelectedAllergenSummary(args: {
     includeMayContain: boolean;
     nameJaBySlug: ReadonlyMap<string, string>;
     rankBySlug: ReadonlyMap<string, number>;
+    storeHandledAllergenSlugs?: ReadonlySet<string>;
 }): {
     summaryText: string;
     badge: SelectedAllergenSummaryKind;
     containsCount: number;
     mayCount: number;
     unknownCount: number;
+    storeHandledCount: number;
 } {
     // includeMayContain は除外検索の設定であり、登録済みの状態自体は変えません。
     // この引数の値にかかわらず MAY_CONTAIN は常に注意側へ分類します。
@@ -174,6 +176,7 @@ export function buildSelectedAllergenSummary(args: {
         statusBySlug: args.statusBySlug,
         selectedSlugs: args.selectedSlugs,
     });
+    const storeHandledSlugs = groups.freeSlugs.filter((slug) => args.storeHandledAllergenSlugs?.has(slug));
     const byRank = (a: string, b: string) =>
         (args.rankBySlug.get(a) ?? 9999) -
         (args.rankBySlug.get(b) ?? 9999);
@@ -184,42 +187,42 @@ export function buildSelectedAllergenSummary(args: {
     const containsNames = containsSlugs.map(toName);
     const mayContainNames = mayContainSlugs.map(toName);
     const unknownNames = unknownSlugs.map(toName);
-    const pickedContains = containsNames.slice(0, 3);
-    const remain = 3 - pickedContains.length;
-    const pickedMayContain =
-        remain > 0 ? mayContainNames.slice(0, remain) : [];
     const parts: string[] = [];
 
-    if (pickedContains.length > 0) {
-        parts.push(`${pickedContains.join("・")}（含む）`);
+    if (containsNames.length > 0) {
+        parts.push(`${containsNames.join("・")}（含む）`);
     }
-    if (pickedMayContain.length > 0) {
+    if (mayContainNames.length > 0) {
         parts.push(
-            `${pickedMayContain.join("・")}（含む可能性があります）`,
+            `${mayContainNames.join("・")}（含む可能性あり・要確認）`,
         );
     }
     if (parts.length === 0 && unknownNames.length > 0) {
-        parts.push(`${unknownNames.slice(0, 3).join("・")}（未設定）`);
+        parts.push(`${unknownNames.join("・")}（未設定）`);
     } else if (unknownNames.length > 0) {
         parts.push(`未設定 ${unknownNames.length}件`);
     }
 
+    if (storeHandledSlugs.length > 0) {
+        parts.push(`${storeHandledSlugs.sort(byRank).map(toName).join("・")}（同店舗の別の公開登録に含む情報あり）`);
+    }
     return {
         summaryText:
             parts.length > 0
                 ? parts.join(" / ")
-                : "あなたの設定項目との一致なし",
+                : args.selectedSlugs.length > 0 ? "確認対象は原材料に含まない登録です。食品安全の保証ではありません。" : "確認対象が未設定です",
         badge:
             containsSlugs.length > 0
                 ? "danger"
-                : mayContainSlugs.length > 0
+                : mayContainSlugs.length > 0 || storeHandledSlugs.length > 0
                   ? "caution"
-                  : unknownSlugs.length > 0
+                  : unknownSlugs.length > 0 || args.selectedSlugs.length === 0
                     ? "unknown"
                     : "safe",
         containsCount: containsSlugs.length,
         mayCount: mayContainSlugs.length,
         unknownCount: unknownSlugs.length,
+        storeHandledCount: storeHandledSlugs.length,
     };
 }
 
@@ -276,21 +279,21 @@ export function buildAllergenDisplayItems(
 
 export function statusLabelJa(status: AllergenStatus): string {
     if (status === "CONTAINS") return "含む";
-    if (status === "MAY_CONTAIN") return "含む可能性があります";
+    if (status === "MAY_CONTAIN") return "含む可能性あり・要確認";
     if (status === "UNKNOWN") return "未設定";
-    return "含まない";
+    return "原材料に含まない登録";
 }
 
 export function effectiveRiskLabelJa(
     effectiveRisk: AllergenEffectiveRisk,
 ): string {
     if (effectiveRisk === "CONTAINS") return "含む";
-    if (effectiveRisk === "MAY_CONTAIN") return "コンタミの可能性あり";
+    if (effectiveRisk === "MAY_CONTAIN") return "含む可能性あり・要確認";
     if (effectiveRisk === "STORE_HANDLED") {
-        return "原材料には含まないが、同一店舗内で取扱いあり";
+        return "原材料に含まない登録・同店舗の別の公開登録に含む情報あり";
     }
     if (effectiveRisk === "UNKNOWN") return "未確認";
-    return "含まない";
+    return "原材料に含まない登録";
 }
 
 export function statusBadgeClass(status: AllergenStatus): string {
@@ -551,4 +554,20 @@ export function buildRecommendedIngredientNotice(args: {
         classificationName: "特定原材料に準ずるもの",
         label: RECOMMENDED_INGREDIENT_LABEL,
     });
+}
+
+// 実際に公開可能なメニューの登録だけを補足情報に使用する。
+// 不完全な公開フラグ付きデータは、公開UIと同じ条件で除外する。
+export function getStoreContainsAllergenSlugs(
+    menus: Array<{ name: string; allergenLinks: AllergenLinkLike[] }>,
+    allergens: AllergenWithNamesLike[],
+): Set<string> {
+    const slugs = new Set<string>();
+    for (const menu of menus) {
+        if (!isMenuPublishable({ name: menu.name, allergens, statusBySlug: createStatusBySlug(allergens, menu.allergenLinks) })) continue;
+        for (const link of menu.allergenLinks) {
+            if (link.status === "CONTAINS") slugs.add(link.allergen.slug);
+        }
+    }
+    return slugs;
 }

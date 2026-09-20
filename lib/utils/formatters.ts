@@ -1,6 +1,6 @@
 export function formatDateTimeJa(value: Date | string): string {
     const date = value instanceof Date ? value : new Date(value);
-    return date.toLocaleString("ja-JP");
+    return date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
 export function formatPriceYen(priceYen: number | null): string {

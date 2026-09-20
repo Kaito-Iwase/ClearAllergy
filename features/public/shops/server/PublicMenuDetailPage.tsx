@@ -1,3 +1,4 @@
+import { loadStoreAllergenSupplement } from "./storeAllergenSupplement";
 // このページは公開側のメニュー詳細画面です。
 // 1 件のメニューについて、価格・原材料・現行マスタのアレルゲンをまとめて表示します。
 // Server Component で DB 取得を行い、localStorage を使う個人向け警告だけ Client Component に任せます。
@@ -9,6 +10,7 @@ import PublicDataUnavailable from "@/features/public/shops/components/PublicData
 import PublicMenuDetailBodyClient from "@/features/public/shops/components/PublicMenuDetailBodyClient";
 import {
     buildAllergenRows,
+    buildAllergenDisplayItems,
     createStatusBySlug,
     isMenuPublishable,
 } from "@/lib/allergens";
@@ -84,14 +86,13 @@ export default async function PublicMenuDetailPage({
                 }),
             ]);
 
-            return {
-                allergenMaster,
-                menu,
-            };
+            const storeHandledAllergenSlugs = menu ? [...await loadStoreAllergenSupplement(shopId, allergenMaster)] : [];
+            return { allergenMaster, menu, storeHandledAllergenSlugs };
         },
         {
             allergenMaster: [],
             menu: null,
+            storeHandledAllergenSlugs: [] as string[],
         },
         { context: `public-menu-detail:${shopId}:${menuId}` },
     );
@@ -107,7 +108,7 @@ export default async function PublicMenuDetailPage({
         );
     }
 
-    const { allergenMaster, menu } = publicMenuData;
+    const { allergenMaster, menu, storeHandledAllergenSlugs } = publicMenuData;
 
     if (!menu) {
         notFound();
@@ -128,7 +129,7 @@ export default async function PublicMenuDetailPage({
     }
 
     // 現行マスタを基準に rows を作り、未登録項目も UNKNOWN として常に表示します。
-    const rows = buildAllergenRows(allergenMaster, menu.allergenLinks);
+    const rows = buildAllergenDisplayItems(buildAllergenRows(allergenMaster, menu.allergenLinks), new Set(storeHandledAllergenSlugs));
 
 
     const priceText = formatPriceYen(menu.priceYen);
@@ -188,6 +189,7 @@ export default async function PublicMenuDetailPage({
                     allergensForClient={allergensForClient}
                     statusBySlugForClient={statusBySlugForClient}
                     rows={rows}
+                    storeHandledAllergenSlugs={storeHandledAllergenSlugs}
                 />
 
                 <footer className="mt-8 border-t border-gray-200 py-10 text-center text-xs text-gray-500">

@@ -3,8 +3,10 @@
 // Server Component から受け取った初期値を state に展開し、保存と画像アップロードを担当します。
 // menuId を使って「どのメニューを更新するか」を API に伝えます。
 
+import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
 import {
     getUnknownAllergenNames,
     type AllergenStatus,
@@ -13,8 +15,6 @@ import { createMenuButtonClassName } from "@/features/admin/menus/components/Cre
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
 import MenuPublishReadinessNotice from "@/features/admin/menus/components/MenuPublishReadinessNotice";
 import {
-    getMenuPublishButtonColorClass,
-    getMenuPublishButtonLabel,
     normalizeOptionalMenuText,
     parseMenuPriceYenInput,
 } from "@/features/admin/menus/components/menu-form-values";
@@ -165,6 +165,25 @@ export default function MenuEditClient(props: {
         [allergens, statusBySlug],
     );
     const canPublish = unknownAllergenNames.length === 0;
+    const allergenRows = React.useRef(new Map<string, HTMLDivElement>());
+    function findNextUnknown() {
+        const next = allergens.find((allergen) => (statusBySlug[allergen.slug] ?? "UNKNOWN") === "UNKNOWN");
+        if (next) {
+            const row = allergenRows.current.get(next.slug);
+            row?.scrollIntoView({ block: "center" });
+            row?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+        }
+    }
+    const draftValues = { name, description, priceYenInput, category, ingredients, precaution,
+        imageUrl, imageFrame, imageFit, imagePosition, imageZoom, imagePositionX, imagePositionY,
+        isPublished, statusBySlug };
+    const currentDraft = JSON.stringify(draftValues);
+    const [savedDraft, setSavedDraft] = React.useState(currentDraft);
+    const [savedIsPublished, setSavedIsPublished] = React.useState(initialIsPublished);
+    const [savedIngredients, setSavedIngredients] = React.useState((initialIngredients ?? "").trim());
+    const hasUnsavedChanges = currentDraft !== savedDraft || selectedFile !== null;
+    useUnsavedMenuChanges(hasUnsavedChanges);
+
 
     React.useEffect(() => {
         // 作成した Object URL は不要になったら解放し、メモリリークを防ぎます。
@@ -176,6 +195,7 @@ export default function MenuEditClient(props: {
     }, [localPreviewUrl]);
 
     function setOne(slug: string, status: AllergenStatus) {
+        setSaved(false);
         setStatusBySlug((prev) => ({ ...prev, [slug]: status }));
         if (status === "UNKNOWN") {
             setIsPublished(false);
@@ -258,7 +278,7 @@ export default function MenuEditClient(props: {
     }
 
     async function onSave() {
-        setSaving(true);
+        if (saving || uploading || creating) return;
         setError(null);
         setSaved(false);
 
@@ -270,6 +290,17 @@ export default function MenuEditClient(props: {
             return;
         }
 
+        if (!name.trim()) {
+            setError("メニュー名は必須です。");
+            return;
+        }
+        const reviewMessage = getMenuReviewMessage({
+            name,
+            willPublish: isPublished,
+            ingredientsChanged: ingredients.trim() !== savedIngredients,
+        });
+        if (reviewMessage && !window.confirm(reviewMessage)) return;
+        setSaving(true);
         try {
             const trimmedName = name.trim();
             if (!trimmedName) {
@@ -310,7 +341,19 @@ export default function MenuEditClient(props: {
                 );
             }
 
-            // 保存後は server 側のデータを再取得し、最新表示へそろえます。
+            const data = await res.json().catch(() => null);
+            if (!data?.menu || data.menu.id !== menuId || typeof data.menu.isPublished !== "boolean") {
+                throw new Error("保存結果を確認できませんでした。再読み込みして保存状態を確認してください。");
+            }
+            setIsPublished(data.menu.isPublished);
+            setSavedIsPublished(data.menu.isPublished);
+            setSavedIngredients(ingredients.trim());
+            setSavedDraft(JSON.stringify({ ...draftValues, isPublished: data.menu.isPublished,
+                imageUrl: typeof data.menu.imageUrl === "string" ? data.menu.imageUrl : "" }));
+            if (typeof data.menu.imageUrl === "string" || data.menu.imageUrl === null) {
+                setImageUrl(data.menu.imageUrl ?? "");
+            }
+            // 成功レスポンスを確認してから保存済み表示にします。
             setSaved(true);
             setSelectedFile(null);
             router.refresh();
@@ -322,6 +365,7 @@ export default function MenuEditClient(props: {
     }
 
     async function handleCreateMenu() {
+        if (hasUnsavedChanges && !window.confirm("未保存の変更があります。変更を保存せず、新しいメニューの作成へ進みますか？")) return;
         // 編集中でも「次の新規メニューを作る」導線を置き、入力作業を続けやすくします。
         setCreating(true);
         setError(null);
@@ -374,7 +418,9 @@ export default function MenuEditClient(props: {
     }
 
     return (
-        <div className="space-y-6">
+        <fieldset disabled={saving || uploading || creating} className="min-w-0 space-y-6"
+            onChangeCapture={() => setSaved(false)}>
+            <legend className="sr-only">メニュー編集</legend>
             <div className="rounded-2xl bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="font-bold text-gray-900">基本情報</div>
@@ -403,6 +449,7 @@ export default function MenuEditClient(props: {
                         <button
                             type="button"
                             onClick={togglePublished}
+                            aria-pressed={isPublished}
                             disabled={
                                 (readOnly && !readOnlyPreview) ||
                                 creating ||
@@ -417,11 +464,8 @@ export default function MenuEditClient(props: {
                                       : "bg-amber-600"
                             }`}
                         >
-                            {getMenuPublishButtonLabel({
-                                readOnly,
-                                isPublished,
-                                canPublish,
-                            })}
+                            {isPublished ? "保存時に公開する" : canPublish ? "保存時に非公開にする" : "未設定があるため公開不可"}
+                            {readOnly ? "（デモ）" : ""}
                         </button>
 
                         <button
@@ -448,14 +492,18 @@ export default function MenuEditClient(props: {
                     </div>
                 </div>
 
+                <p role="status" className="mt-3 text-sm font-semibold text-gray-800">
+                    保存済みの公開設定：{savedIsPublished ? "公開" : "非公開"}
+                    {hasUnsavedChanges ? " ／ 未保存の変更があります" : ""}
+                </p>
                 {error && (
-                    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                         {error}
                     </div>
                 )}
 
-                {saved && (
-                    <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                {saved && !hasUnsavedChanges && (
+                    <div role="status" className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
                         保存しました。
                     </div>
                 )}
@@ -463,14 +511,16 @@ export default function MenuEditClient(props: {
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}
                     totalAllergenCount={allergens.length}
+                    onFindUnknown={findNextUnknown}
                 />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="edit-menu-field-1" className="mb-1 block text-sm font-medium text-gray-700">
                             メニュー名
                         </label>
-                        <input
+                        <input id="edit-menu-field-1"
+                            maxLength={120}
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -479,10 +529,10 @@ export default function MenuEditClient(props: {
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="edit-menu-field-2" className="mb-1 block text-sm font-medium text-gray-700">
                             価格（税込・円）
                         </label>
-                        <input
+                        <input id="edit-menu-field-2"
                             type="number"
                             inputMode="numeric"
                             min={0}
@@ -499,11 +549,12 @@ export default function MenuEditClient(props: {
                 </div>
 
                 <div className="mt-4">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="edit-menu-field-3" className="mb-1 block text-sm font-medium text-gray-700">
                         説明
                     </label>
-                    <textarea
-                        value={description}
+                    <textarea id="edit-menu-field-3"
+                        maxLength={2000}
+                            value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={4}
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -513,10 +564,11 @@ export default function MenuEditClient(props: {
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="edit-menu-field-4" className="mb-1 block text-sm font-medium text-gray-700">
                             カテゴリ
                         </label>
-                        <input
+                        <input id="edit-menu-field-4"
+                            maxLength={120}
                             value={category}
                             onChange={(e) => setCategory(e.target.value)}
                             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -526,11 +578,12 @@ export default function MenuEditClient(props: {
                 </div>
 
                 <div className="mt-4">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="edit-menu-field-5" className="mb-1 block text-sm font-medium text-gray-700">
                         🧺 原材料名
                     </label>
-                    <textarea
-                        value={ingredients}
+                    <textarea id="edit-menu-field-5"
+                        maxLength={5000}
+                            value={ingredients}
                         onChange={(e) => setIngredients(e.target.value)}
                         rows={5}
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -542,11 +595,12 @@ export default function MenuEditClient(props: {
                 </div>
 
                 <div className="mt-4">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="edit-menu-field-6" className="mb-1 block text-sm font-medium text-gray-700">
                         注意書き
                     </label>
-                    <textarea
-                        value={precaution}
+                    <textarea id="edit-menu-field-6"
+                        maxLength={2000}
+                            value={precaution}
                         onChange={(e) => setPrecaution(e.target.value)}
                         rows={3}
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -559,10 +613,10 @@ export default function MenuEditClient(props: {
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="edit-menu-field-7" className="mb-1 block text-sm font-medium text-gray-700">
                             食品画像ファイル
                         </label>
-                        <input
+                        <input id="edit-menu-field-7"
                             type="file"
                             accept="image/*"
                             onChange={onSelectImage}
@@ -574,11 +628,12 @@ export default function MenuEditClient(props: {
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="edit-menu-field-8" className="mb-1 block text-sm font-medium text-gray-700">
                             画像URL
                         </label>
-                        <input
+                        <input id="edit-menu-field-8"
                             type="url"
+                            maxLength={2048}
                             value={imageUrl}
                             onChange={(e) => setImageUrl(e.target.value)}
                             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -610,6 +665,7 @@ export default function MenuEditClient(props: {
                             imagePositionY: initialImagePositionY,
                         }}
                         onChange={(next) => {
+                            setSaved(false);
                             if (next.imageFrame) setImageFrame(next.imageFrame);
                             if (next.imageFit) setImageFit(next.imageFit);
                             if (next.imagePosition) {
@@ -642,6 +698,7 @@ export default function MenuEditClient(props: {
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}
                     totalAllergenCount={allergens.length}
+                    onFindUnknown={findNextUnknown}
                 />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -651,6 +708,9 @@ export default function MenuEditClient(props: {
                         return (
                             <div
                                 key={a.slug}
+                                ref={(element) => { if (element) allergenRows.current.set(a.slug, element); else allergenRows.current.delete(a.slug); }}
+                                role="group"
+                                aria-label={a.nameJa}
                                 className="rounded-2xl border border-gray-200 p-3 sm:p-4"
                             >
                                 <div className="mb-3">
@@ -664,7 +724,7 @@ export default function MenuEditClient(props: {
 
                                 <div className="grid grid-cols-2 gap-2">
                                     <button
-                                        type="button"
+                                        type="button" aria-pressed={current === "UNKNOWN"}
                                         onClick={() => setOne(a.slug, "UNKNOWN")}
                                         className={`min-h-11 w-full rounded-xl px-3 py-2 text-sm font-medium ${
                                             current === "UNKNOWN"
@@ -676,7 +736,7 @@ export default function MenuEditClient(props: {
                                     </button>
 
                                     <button
-                                        type="button"
+                                        type="button" aria-pressed={current === "CONTAINS"}
                                         onClick={() =>
                                             setOne(a.slug, "CONTAINS")
                                         }
@@ -690,7 +750,7 @@ export default function MenuEditClient(props: {
                                     </button>
 
                                     <button
-                                        type="button"
+                                        type="button" aria-pressed={current === "FREE"}
                                         onClick={() => setOne(a.slug, "FREE")}
                                         className={`min-h-11 w-full rounded-xl px-3 py-2 text-sm font-medium ${
                                             current === "FREE"
@@ -698,11 +758,11 @@ export default function MenuEditClient(props: {
                                                 : "bg-gray-100 text-gray-700"
                                         }`}
                                     >
-                                        含まない
+                                        原材料に含まない登録
                                     </button>
 
                                     <button
-                                        type="button"
+                                        type="button" aria-pressed={current === "MAY_CONTAIN"}
                                         onClick={() =>
                                             setOne(a.slug, "MAY_CONTAIN")
                                         }
@@ -712,7 +772,7 @@ export default function MenuEditClient(props: {
                                                 : "bg-gray-100 text-gray-700"
                                         }`}
                                     >
-                                        含む可能性があります
+                                        含む可能性あり・要確認
                                     </button>
                                 </div>
                             </div>
@@ -744,6 +804,6 @@ export default function MenuEditClient(props: {
                     </button>
                 </div>
             </div>
-        </div>
+        </fieldset>
     );
 }

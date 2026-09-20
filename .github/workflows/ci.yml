@@ -2,9 +2,14 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   push:
-    branches: [main]
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -13,14 +18,31 @@ jobs:
   build:
     name: Test, lint, typecheck, and build
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: clearallergy_ci
+          POSTGRES_PASSWORD: local_ci_only
+          POSTGRES_DB: clearallergy_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearallergy_ci -d clearallergy_ci"
+          --health-interval 3s --health-timeout 3s --health-retries 20
 
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DIRECT_URL: ${{ secrets.DIRECT_URL }}
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      # このジョブ内だけで破棄されるDB。既存Secretsや外部サービスは使用しない。
+      DATABASE_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
+      DIRECT_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
+      CLEARALLERGY_CI_FIXTURES: "true"
+      # ビルド用の非実在キー。CIの画面確認は公開ページに限定する。
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlYXJhbGxlcmd5LWNpLmNsZXJrLmFjY291bnRzLmRldiQ
+      CLERK_SECRET_KEY: sk_test_ci_placeholder_not_a_real_key
       PORTFOLIO_MODE: "true"
       ADMIN_REGISTRATION_MODE: "disabled"
       ENABLE_CLERK_ADMIN_AUTH: "false"
@@ -28,13 +50,18 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version-file: .node-version
           cache: npm
+
+      - name: Align npm with Docker
+        run: npm install --global npm@11.18.0
 
       - name: Install dependencies
         run: npm ci
@@ -51,5 +78,35 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Prepare isolated fictional data
+        run: node --import tsx scripts/setup-ci-env.ts
+
       - name: Build
         run: npm run build
+
+      - name: Install isolated browser runner
+        run: |
+          npm install --prefix "$RUNNER_TEMP/clearallergy-browser" --no-package-lock --no-audit --no-fund playwright@1.61.0
+          node "$RUNNER_TEMP/clearallergy-browser/node_modules/playwright/cli.js" install --with-deps chromium
+
+      - name: Check public prototype in Chromium
+        env:
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/clearallergy-browser/node_modules/playwright
+          CLEARALLERGY_BROWSER_BASE_URL: http://localhost:3000
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/clearallergy-browser-results
+          CLEARALLERGY_BROWSER_PUBLIC_ONLY: "true"
+          CLEARALLERGY_BROWSER_BLOCK_EXTERNAL: "true"
+        run: |
+          npm run start > "$RUNNER_TEMP/clearallergy-app.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          node scripts/check-first-use-browser.mjs
+
+      - name: Save browser evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: prototype-browser-${{ github.sha }}
+          path: ${{ runner.temp }}/clearallergy-browser-results
+          if-no-files-found: ignore
+          retention-days: 7

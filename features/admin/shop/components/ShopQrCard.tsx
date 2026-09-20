@@ -21,27 +21,22 @@ function formatQrSize(sizeMm: number) {
     return `約${(sizeMm / 10).toFixed(1)}cm`;
 }
 
+function subscribeOrigin() {
+    return () => {};
+}
+
 export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
-    const [origin, setOrigin] = React.useState("");
+    // state（画面の状態）として、公開 URL とコピー結果メッセージを持ちます。
+    const origin = React.useSyncExternalStore(
+        subscribeOrigin,
+        () => process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") || window.location.origin,
+        () => "",
+    );
     const [qrSizeMm, setQrSizeMm] = React.useState(60);
 
     const [copiedMessage, setCopiedMessage] = React.useState("");
 
-    // 本番 URL が環境変数にあればそれを優先し、無ければ今のブラウザ origin を使います。
-    React.useEffect(() => {
-        const envBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-
-        if (envBaseUrl) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- server/clientの初期描画を揃えた後、公開URLの基準だけを確定します。
-            setOrigin(envBaseUrl.replace(/\/$/, ""));
-            return;
-        }
-
-        if (typeof window !== "undefined") {
-            setOrigin(window.location.origin);
-        }
-    }, []);
-
+    // origin が決まってから店舗公開 URL を組み立てます。
     const publicShopUrl = origin ? `${origin}/shops/${shopId}` : "";
     const qrSizePx = Math.round(qrSizeMm * 3.78);
 

@@ -2,372 +2,156 @@
 
 import React from "react";
 import {
-    clearUserAllergenPreferences,
-    loadUserAllergenPreferences,
+    areAllergenPreferencesEqual,
+    getAllergenPreferenceMode,
+    getUserAllergenPreferenceSnapshot,
+    normalizeUserAllergenPreferences,
     saveUserAllergenPreferences,
-    USER_ALLERGENS_UPDATED_EVENT,
+    SERVER_PREFERENCE_SNAPSHOT,
+    setAllergenPreferenceMode,
+    subscribeUserAllergenPreferences,
+    type AllergenPreferenceMode,
+    type UserAllergenPreferences,
 } from "@/lib/public-allergen-preferences";
+import { useUnsavedMenuChanges } from "@/features/admin/menus/components/useUnsavedMenuChanges";
 
-export type UserAllergenPreferenceAllergen = {
-    slug: string;
-    nameJa: string;
-};
+export type UserAllergenPreferenceAllergen = { slug: string; nameJa: string };
 
-type UserAllergenPreferencePanelProps = {
-    allergens: UserAllergenPreferenceAllergen[];
-    targetSlugs: string[];
-    highlightSlugs: string[];
-    excludedSlugs: string[];
-    includeMayContain: boolean;
-    loaded: boolean;
-    message: string;
-    isOpen: boolean;
-    onToggleOpen: () => void;
-    onToggleTargetSlug: (slug: string) => void;
-    onToggleIncludeMayContain: () => void;
-    onApplyHighlight: () => void;
-    onApplyExclude: () => void;
-    onClear: () => void;
-    className?: string;
-};
+export function useUserAllergenPreferences() {
+    return React.useSyncExternalStore(
+        subscribeUserAllergenPreferences,
+        getUserAllergenPreferenceSnapshot,
+        () => SERVER_PREFERENCE_SNAPSHOT,
+    );
+}
 
 export function useUserAllergenPreferenceState() {
-    const [targetSlugs, setTargetSlugs] = React.useState<string[]>([]);
-    const [highlightSlugs, setHighlightSlugs] = React.useState<string[]>([]);
-    const [excludedSlugs, setExcludedSlugs] = React.useState<string[]>([]);
-    const [includeMayContain, setIncludeMayContain] = React.useState(false);
-    const [loaded, setLoaded] = React.useState(false);
+    const snapshot = useUserAllergenPreferences();
+    const [edit, setEdit] = React.useState<{
+        base: UserAllergenPreferences; value: UserAllergenPreferences;
+    } | null>(null);
     const [message, setMessage] = React.useState("");
     const [isOpen, setIsOpen] = React.useState(false);
+    const draft = edit?.value ?? snapshot.preferences;
+    const dirty = !areAllergenPreferencesEqual(draft, snapshot.preferences);
+    const conflict = edit !== null && dirty && !areAllergenPreferencesEqual(edit.base, snapshot.preferences);
+    useUnsavedMenuChanges(dirty);
 
-    React.useEffect(() => {
-        const stored = loadUserAllergenPreferences();
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorageはhydration後に読み、保存済み設定を初期状態へ反映します。
-        setHighlightSlugs(stored.highlightSlugs);
-        setExcludedSlugs(stored.excludedSlugs);
-        setTargetSlugs([]);
-        setIncludeMayContain(stored.includeMayContain);
-        setLoaded(true);
-    }, []);
-
-    function toggleTargetSlug(slug: string) {
-        setTargetSlugs((prev) => {
-            if (prev.includes(slug)) {
-                return prev.filter((value) => value !== slug);
-            }
-            return [...prev, slug];
-        });
+    function change(update: (value: UserAllergenPreferences) => UserAllergenPreferences) {
+        setEdit((current) => ({
+            base: current && !areAllergenPreferencesEqual(current.value, snapshot.preferences) ? current.base : snapshot.preferences,
+            value: update(current?.value ?? snapshot.preferences),
+        }));
+        setMessage("");
     }
 
-    function showMessage(text: string) {
-        setMessage(text);
-
-        window.setTimeout(() => {
-            setMessage("");
-        }, 2500);
-    }
-
-    function notifyUpdated() {
-        window.dispatchEvent(new CustomEvent(USER_ALLERGENS_UPDATED_EVENT));
-    }
-
-    function persistPreferences(args: {
-        nextHighlightSlugs: string[];
-        nextExcludedSlugs: string[];
-        nextIncludeMayContain: boolean;
-    }) {
-        saveUserAllergenPreferences({
-            highlightSlugs: args.nextHighlightSlugs,
-            excludedSlugs: args.nextExcludedSlugs,
-            includeMayContain: args.nextIncludeMayContain,
-            selectedSlugs: [
-                ...new Set([
-                    ...args.nextHighlightSlugs,
-                    ...args.nextExcludedSlugs,
-                ]),
-            ],
-        });
-        notifyUpdated();
-    }
-
-    function applyHighlight() {
-        if (targetSlugs.length === 0) {
-            showMessage("先にアレルゲンを選択してください。");
+    function apply() {
+        // 保存直前にも再取得し、編集中の別タブ更新や読込失敗を上書きしない。
+        const latest = getUserAllergenPreferenceSnapshot();
+        if (!latest.storageReadable) { setMessage(latest.storageError); return; }
+        if (edit && !areAllergenPreferencesEqual(edit.base, latest.preferences)) {
+            setMessage("別の画面で設定が変更されました。最新の設定を読み直してから編集してください。");
             return;
         }
-
-        const nextHighlightSlugs = [...new Set([...highlightSlugs, ...targetSlugs])];
-        const nextExcludedSlugs = excludedSlugs.filter(
-            (slug) => !targetSlugs.includes(slug),
-        );
-
-        setHighlightSlugs(nextHighlightSlugs);
-        setExcludedSlugs(nextExcludedSlugs);
-        setTargetSlugs([]);
-        persistPreferences({
-            nextHighlightSlugs,
-            nextExcludedSlugs,
-            nextIncludeMayContain: includeMayContain,
-        });
-        showMessage("選択した項目を強調表示として保存しました。");
-    }
-
-    function applyExclude() {
-        if (targetSlugs.length === 0) {
-            showMessage("先にアレルゲンを選択してください。");
-            return;
-        }
-
-        const nextHighlightSlugs = highlightSlugs.filter(
-            (slug) => !targetSlugs.includes(slug),
-        );
-        const nextExcludedSlugs = [...new Set([...excludedSlugs, ...targetSlugs])];
-
-        setHighlightSlugs(nextHighlightSlugs);
-        setExcludedSlugs(nextExcludedSlugs);
-        setTargetSlugs([]);
-        persistPreferences({
-            nextHighlightSlugs,
-            nextExcludedSlugs,
-            nextIncludeMayContain: includeMayContain,
-        });
-        showMessage("選択した項目を除外として保存しました。");
-    }
-
-    function onClear() {
-        clearUserAllergenPreferences();
-        setTargetSlugs([]);
-        setHighlightSlugs([]);
-        setExcludedSlugs([]);
-        setIncludeMayContain(false);
-        notifyUpdated();
-        showMessage("保存済み設定を削除しました。");
+        const result = saveUserAllergenPreferences(draft);
+        if (!result.ok) { setMessage(result.message); return; }
+        setEdit(null);
+        setMessage("変更を適用しました。");
+        setIsOpen(false);
+        return true;
     }
 
     return {
-        targetSlugs,
-        highlightSlugs,
-        excludedSlugs,
-        includeMayContain,
-        loaded,
-        message,
+        saved: snapshot.preferences, draft, dirty, conflict,
+        loaded: snapshot.loaded,
+        message: snapshot.storageError || message,
         isOpen,
-        setIsOpen,
-        toggleTargetSlug,
-        toggleIncludeMayContain: () => {
-            const nextIncludeMayContain = !includeMayContain;
-
-            setIncludeMayContain(nextIncludeMayContain);
-            persistPreferences({
-                nextHighlightSlugs: highlightSlugs,
-                nextExcludedSlugs: excludedSlugs,
-                nextIncludeMayContain,
-            });
-            showMessage(
-                nextIncludeMayContain
-                    ? "コンタミも対象にしました。"
-                    : "コンタミを対象外にしました。",
-            );
-        },
-        applyHighlight,
-        applyExclude,
-        onClear,
+        onToggleOpen: () => setIsOpen((value) => !value),
+        onChangeMode: (slug: string, mode: AllergenPreferenceMode) => change((value) => setAllergenPreferenceMode(value, slug, mode)),
+        onToggleIncludeMayContain: () => change((value) => ({ ...value, includeMayContain: !value.includeMayContain })),
+        onClear: () => change(() => normalizeUserAllergenPreferences(null)),
+        onApply: apply,
+        onCancel: () => { setEdit(null); setMessage(""); setIsOpen(false); },
+        onReload: () => { setEdit(null); setMessage("最新の設定を読み直しました。"); },
     };
 }
 
-export function UserAllergenPreferencePanel({
-    allergens,
-    targetSlugs,
-    highlightSlugs,
-    excludedSlugs,
-    includeMayContain,
-    loaded,
-    message,
-    isOpen,
-    onToggleOpen,
-    onToggleTargetSlug,
-    onToggleIncludeMayContain,
-    onApplyHighlight,
-    onApplyExclude,
-    onClear,
-    className,
-}: UserAllergenPreferencePanelProps) {
-    if (!loaded) {
-        return null;
-    }
-
-    const selectedCount = new Set([...highlightSlugs, ...excludedSlugs]).size;
-    const targetCount = targetSlugs.length;
+export function UserAllergenPreferencePanel({ allergens, state, className = "" }: {
+    allergens: UserAllergenPreferenceAllergen[];
+    state: ReturnType<typeof useUserAllergenPreferenceState>;
+    className?: string;
+}) {
+    const id = React.useId();
+    const trigger = React.useRef<HTMLButtonElement>(null);
+    const [query, setQuery] = React.useState("");
+    if (!state.loaded) return null;
+    const { saved, draft, dirty, conflict } = state;
+    const names = (slugs: string[]) => allergens.filter((a) => slugs.includes(a.slug)).map((a) => a.nameJa).join("・");
+    const visibleAllergens = allergens.filter((a) => a.nameJa.includes(query.trim()));
+    const selectedCount = draft.highlightSlugs.length + draft.excludedSlugs.length;
 
     return (
-        <section
-            className={`rounded-2xl border border-gray-200 bg-white shadow-sm ${
-                className ?? ""
-            }`}
-        >
-            <button
-                type="button"
-                onClick={onToggleOpen}
-                className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-4 text-left sm:gap-4 sm:px-6 sm:py-5"
-                aria-expanded={isOpen}
-            >
-                <div className="min-w-0">
-                    <h2 className="text-lg font-bold text-gray-900">
-                        あなた向けのアレルゲン設定
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-600">
-                        {selectedCount > 0
-                            ? `${selectedCount}件選択中`
-                            : "未設定"}
-                    </p>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                    {selectedCount > 0 ? (
-                        <span className="whitespace-nowrap rounded-full bg-[#13ec13]/15 px-3 py-1 text-xs font-bold text-green-800">
-                            保存済み {selectedCount}件
-                        </span>
-                    ) : (
-                        <span className="whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600">
-                            未設定
-                        </span>
-                    )}
-
-                    <span className="text-xl text-gray-500">
-                        {isOpen ? "▴" : "▾"}
+        <section aria-label="あなた向けのアレルゲン設定" className={`min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm ${className}`}>
+            <button ref={trigger} type="button" onClick={state.onToggleOpen} aria-expanded={state.isOpen} aria-controls={state.isOpen ? `${id}-editor` : undefined}
+                className="flex min-h-11 w-full items-start justify-between gap-3 rounded-2xl p-4 text-left focus-visible:outline-2 focus-visible:outline-green-700 sm:p-5">
+                <span className="min-w-0">
+                    <span className="block text-base font-bold text-gray-900">あなた向けのアレルゲン設定</span>
+                    <span className="mt-2 block text-sm leading-6 text-gray-700">
+                        {saved.selectedSlugs.length === 0 ? "未設定" : <>
+                            {saved.highlightSlugs.length > 0 && <span className="block">注目：{names(saved.highlightSlugs)}</span>}
+                            {saved.excludedSlugs.length > 0 && <span className="block">除外：{names(saved.excludedSlugs)}</span>}
+                        </>}
                     </span>
-                </div>
+                    {dirty && <span className="mt-1 block text-sm font-bold text-amber-900">未適用の変更あり</span>}
+                </span>
+                <span aria-hidden="true" className="shrink-0 text-gray-600">{state.isOpen ? "▴" : "▾"}</span>
             </button>
-
-            {isOpen ? (
-                <div className="border-t border-gray-100 px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
-                    <p className="text-sm text-gray-600">
-                        アレルゲンを選んでから、下のボタンで強調表示または除外に設定します。
-                    </p>
-
-                    <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-3">
-                        <label className="flex cursor-pointer items-start justify-between gap-4">
-                            <div>
-                                <span className="text-sm font-extrabold text-gray-900">
-                                    コンタミも対象にする
-                                </span>
-                                <p className="mt-1 text-xs leading-5 text-gray-600">
-                                    「含む可能性があります」も強調・除外の対象にします。
-                                </p>
-                            </div>
-                            <input
-                                type="checkbox"
-                                checked={includeMayContain}
-                                onChange={onToggleIncludeMayContain}
-                                className="mt-1 h-6 w-6 shrink-0 rounded border-gray-300 text-[#13ec13] focus:ring-[#13ec13]"
-                            />
-                        </label>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        {allergens.map((allergen) => {
-                            const selected = targetSlugs.includes(allergen.slug);
-                            const highlighted = highlightSlugs.includes(
-                                allergen.slug,
-                            );
-                            const excluded = excludedSlugs.includes(allergen.slug);
-
-                            return (
-                                <button
-                                    key={allergen.slug}
-                                    type="button"
-                                    onClick={() => onToggleTargetSlug(allergen.slug)}
-                                    className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition ${
-                                        selected
-                                            ? "border-gray-900 bg-gray-900 text-white"
-                                            : excluded
-                                              ? "border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
-                                              : highlighted
-                                                ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                                                : "border-gray-100 bg-gray-100 text-gray-800 hover:bg-gray-200"
-                                    }`}
-                                >
-                                    {allergen.nameJa}
-                                    {excluded ? (
-                                        <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-red-700">
-                                            除外
-                                        </span>
-                                    ) : highlighted ? (
-                                        <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-amber-800">
-                                            強調
-                                        </span>
-                                    ) : null}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                        <button
-                            type="button"
-                            onClick={onApplyHighlight}
-                            className="min-h-11 rounded-lg bg-amber-400 px-4 py-2 text-sm font-extrabold text-black transition hover:bg-amber-500"
-                        >
-                            強調する
-                            {targetCount > 0 ? `（${targetCount}件）` : ""}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={onApplyExclude}
-                            className="min-h-11 rounded-lg bg-red-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-red-700"
-                        >
-                            除外する
-                            {targetCount > 0 ? `（${targetCount}件）` : ""}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={onClear}
-                            className="col-span-2 min-h-11 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-gray-50 sm:col-span-1"
-                        >
-                            リセット
-                        </button>
-                    </div>
-
-                    {message ? (
-                        <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                            {message}
-                        </div>
-                    ) : null}
-
-                    <p className="mt-4 text-xs text-gray-500">
-                        この設定はログイン不要で、このブラウザ内だけに保存されます。
-                    </p>
+            {state.message && <p role="status" className="mx-4 mb-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-800">{state.message}</p>}
+            {state.isOpen && <div id={`${id}-editor`} className="border-t border-gray-100 p-4 sm:p-5">
+                <p className="text-sm leading-6 text-gray-700">保存済みの設定を編集できます。最後に「変更を適用」を押してください。</p>
+                <p className="mt-2 text-xs leading-5 text-gray-600">「注目して表示」は選んだ項目を確認対象にします。「一覧から除外」は、その項目を「含む」と登録したメニューを非表示にします。</p>
+                <label htmlFor={`${id}-search`} className="mt-4 block text-sm font-bold">アレルゲンを探す</label>
+                <input id={`${id}-search`} type="search" value={query} onChange={(event) => setQuery(event.target.value)}
+                    placeholder="例：卵" className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 text-base focus-visible:outline-2 focus-visible:outline-green-700" />
+                <div className="mt-3 grid max-h-80 overflow-y-auto rounded-xl border border-gray-200 md:grid-cols-2 lg:grid-cols-1">
+                    {visibleAllergens.map((allergen) => <label key={allergen.slug} className="grid min-h-16 grid-cols-[minmax(0,1fr)_9rem] items-center gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
+                        <span className="break-words text-sm font-bold text-gray-900">{allergen.nameJa}</span>
+                        <select aria-label={`${allergen.nameJa}の表示設定`} value={getAllergenPreferenceMode(draft, allergen.slug)}
+                            onChange={(event) => state.onChangeMode(allergen.slug, event.target.value as AllergenPreferenceMode)}
+                            className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm focus-visible:outline-2 focus-visible:outline-green-700">
+                            <option value="none">設定なし</option>
+                            <option value="highlight">注目して表示</option>
+                            <option value="exclude">一覧から除外</option>
+                        </select>
+                    </label>)}
+                    {visibleAllergens.length === 0 && <p className="p-4 text-sm text-gray-600">一致する項目がありません。</p>}
                 </div>
-            ) : null}
+                <label className="mt-4 flex items-start gap-3 rounded-xl bg-gray-50 p-3 text-sm">
+                    <input type="checkbox" checked={draft.includeMayContain} onChange={state.onToggleIncludeMayContain} className="mt-1 h-5 w-5 shrink-0" />
+                    <span><span className="font-bold">「含む可能性あり」も除外する</span>
+                        <span className="mt-1 block text-xs leading-5 text-gray-600">除外に設定した項目に適用します。オフでも注意表示は残ります。</span></span>
+                </label>
+                {conflict && <div role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                    <p>別の画面で設定が変更されました。編集中の内容はまだ保存されていません。</p>
+                    <button type="button" onClick={state.onReload} className="mt-2 min-h-11 font-bold underline">編集を破棄して最新の設定を読み直す</button>
+                </div>}
+                <div className="mt-4 border-t border-gray-200 pt-3">
+                    <p role="status" className="text-sm text-gray-700">{dirty ? `適用後の設定：${selectedCount}件（未適用）` : `保存済み：${selectedCount}件`}</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => { state.onCancel(); setQuery(""); trigger.current?.focus(); }} className="min-h-11 rounded-lg border border-gray-300 px-3 text-sm font-bold">キャンセル</button>
+                        <button type="button" onClick={() => { if (state.onApply()) { setQuery(""); trigger.current?.focus(); } }} disabled={!dirty || conflict}
+                            className="min-h-11 rounded-lg bg-green-700 px-3 text-sm font-bold text-white disabled:opacity-40">変更を適用</button>
+                    </div>
+                    <button type="button" onClick={state.onClear} disabled={selectedCount === 0 && !draft.includeMayContain}
+                        className="mt-2 min-h-11 text-sm text-gray-600 underline disabled:opacity-40">すべて設定なしにする（未適用）</button>
+                    <p className="mt-2 text-xs leading-5 text-gray-500">この設定はログイン不要で、このブラウザ内だけに保存されます。</p>
+                </div>
+            </div>}
         </section>
     );
 }
 
-export default function UserAllergenPreferenceClient({
-    allergens,
-}: {
-    allergens: UserAllergenPreferenceAllergen[];
-}) {
+export default function UserAllergenPreferenceClient({ allergens }: { allergens: UserAllergenPreferenceAllergen[] }) {
     const state = useUserAllergenPreferenceState();
-
-    return (
-        <UserAllergenPreferencePanel
-            allergens={allergens}
-            targetSlugs={state.targetSlugs}
-            highlightSlugs={state.highlightSlugs}
-            excludedSlugs={state.excludedSlugs}
-            includeMayContain={state.includeMayContain}
-            loaded={state.loaded}
-            message={state.message}
-            isOpen={state.isOpen}
-            onToggleOpen={() => state.setIsOpen((prev) => !prev)}
-            onToggleTargetSlug={state.toggleTargetSlug}
-            onToggleIncludeMayContain={state.toggleIncludeMayContain}
-            onApplyHighlight={state.applyHighlight}
-            onApplyExclude={state.applyExclude}
-            onClear={state.onClear}
-        />
-    );
+    return <UserAllergenPreferencePanel allergens={allergens} state={state} />;
 }

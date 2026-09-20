@@ -1,0 +1,42 @@
+name: clearallergy-test
+services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:3101:3000"
+    volumes:
+      - .:/app
+      - test_node_modules:/app/node_modules
+      - test_next:/app/.next
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3101"
+      CLEARALLERGY_TEST_ENV: "true"
+      DATABASE_URL: "postgresql://clearallergy_test:local_test_only@test-db:5432/clearallergy_test"
+      DIRECT_URL: "postgresql://clearallergy_test:local_test_only@test-db:5432/clearallergy_test"
+      PORTFOLIO_MODE: "false"
+    depends_on:
+      test-db:
+        condition: service_healthy
+  test-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: clearallergy_test
+      POSTGRES_PASSWORD: local_test_only
+      POSTGRES_DB: clearallergy_test
+    volumes:
+      - test_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clearallergy_test -d clearallergy_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  test_node_modules:
+  test_next:
+  test_postgres:

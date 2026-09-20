@@ -18,6 +18,7 @@ import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
 import { readPublicDataOrFallback } from "@/lib/public-db";
 import {
     createStatusBySlug,
+    getStoreContainsAllergenSlugs,
     isMenuPublishable,
 } from "@/lib/allergens";
 import {
@@ -163,6 +164,8 @@ export default async function PublicShopDetailPage({
         notFound();
     }
 
+    const storeHandledAllergenSlugs = [...getStoreContainsAllergenSlugs(publishableMenus, allergenMaster)];
+
     // Server Component で取った Date や relation を、Client Component が扱いやすい形へ変換します。
     const menusForClient = publishableMenus.map((menu) => ({
         id: menu.id,
@@ -185,7 +188,6 @@ export default async function PublicShopDetailPage({
         nameJa: allergen.nameJa,
     }));
 
-    const firstPublishedMenuId = publishableMenus[0]?.id ?? null;
     const publishedMenuCount = publishableMenus.length;
     const averageBudgetLabel =
         typeof shop.averageBudgetYen === "number"
@@ -230,7 +232,7 @@ export default async function PublicShopDetailPage({
 
                 <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
                     <div
-                        className="relative h-56 w-full bg-cover bg-center bg-no-repeat md:h-64"
+                        className="relative flex min-h-56 w-full items-end bg-cover bg-center bg-no-repeat md:min-h-64"
                         style={heroStyle}
                     >
                         {safeCoverImageUrl ? (
@@ -244,18 +246,18 @@ export default async function PublicShopDetailPage({
                                 style={heroImageStyle}
                             />
                         ) : null}
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-black/15 to-transparent" />
+                        {safeCoverImageUrl ? <div className="absolute inset-0 bg-black/60" /> : null}
 
-                        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 md:p-8">
+                        <div className="relative w-full p-4 sm:p-6 md:p-8">
                             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                                <div className="relative z-10">
-                                    <p className="text-sm font-semibold text-white/90 drop-shadow">
+                                <div className="relative z-10 min-w-0">
+                                    <p className={`text-sm font-semibold ${safeCoverImageUrl ? "text-white drop-shadow" : "text-gray-800"}`}>
                                         公開メニュー {publishedMenuCount}件
                                     </p>
-                                    <h1 className="text-3xl font-extrabold text-white drop-shadow md:text-4xl">
+                                    <h1 className={`break-words text-3xl font-extrabold md:text-4xl ${safeCoverImageUrl ? "text-white drop-shadow" : "text-gray-950"}`}>
                                         {shop.name}
                                     </h1>
-                                    <p className="mt-1 text-sm font-semibold text-white/90 drop-shadow">
+                                    <p className={`mt-1 break-words text-sm font-semibold ${safeCoverImageUrl ? "text-white drop-shadow" : "text-gray-800"}`}>
                                         {shop.description || "—"}
                                     </p>
                                     <Suspense fallback={null}>
@@ -267,11 +269,7 @@ export default async function PublicShopDetailPage({
 
                                 <div className="relative z-10 flex gap-3">
                                     <Link
-                                        href={
-                                            firstPublishedMenuId
-                                                ? `/shops/${shop.id}/menus/${firstPublishedMenuId}`
-                                                : "#public-menus"
-                                        }
+                                        href="#public-menus"
                                         className="rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-bold text-black shadow-sm transition hover:bg-[#0db80d]"
                                     >
                                         公開メニューを見る
@@ -281,6 +279,8 @@ export default async function PublicShopDetailPage({
                         </div>
                     </div>
                 </section>
+
+                <UserAllergenPreferenceClient allergens={allergensForClient} />
 
                 <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <div className="order-1 flex flex-col gap-6 lg:col-span-2">
@@ -312,12 +312,6 @@ export default async function PublicShopDetailPage({
                             </div>
                         </div>
 
-                        <div className="lg:hidden">
-                            <UserAllergenPreferenceClient
-                                allergens={allergensForClient}
-                            />
-                        </div>
-
                         <Suspense
                             fallback={
                                 <div className="rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-600 shadow-sm sm:p-6">
@@ -326,6 +320,7 @@ export default async function PublicShopDetailPage({
                             }
                         >
                             <ShopMenuListClient
+                                storeHandledAllergenSlugs={storeHandledAllergenSlugs}
                                 shopId={shop.id}
                                 menus={menusForClient}
                                 allergenMaster={allergenMaster}
@@ -457,12 +452,6 @@ export default async function PublicShopDetailPage({
                             <p className="mt-3 text-xs text-gray-500">
                                 店舗ページの共有には上のボタンを利用できます。
                             </p>
-                        </div>
-
-                        <div className="hidden lg:block">
-                            <UserAllergenPreferenceClient
-                                allergens={allergensForClient}
-                            />
                         </div>
                     </aside>
                 </section>

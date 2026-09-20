@@ -74,7 +74,7 @@ export default function HomePageView({
                                     外食前に、
                                 </span>
                                 <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
-                                    安心を確認できる。
+                                    登録情報を確認できる。
                                 </span>
                                 <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
                                     アレルゲン情報を
@@ -96,7 +96,7 @@ export default function HomePageView({
                                     のポートフォリオ公開版です
                                 </p>
                                 <p className="mt-1 leading-6">
-                                    現在はデモ用に公開しており、掲載内容には閲覧体験・UI確認のためのサンプル情報が含まれる場合があります。
+                                    掲載する店舗・メニューは架空です。アレルゲン情報の見え方と操作を検証するためのプロトタイプです。
                                 </p>
                             </div>
 
@@ -304,7 +304,7 @@ export default function HomePageView({
                             見やすく整理
                         </h2>
                         <p className="mt-2 text-sm leading-7 text-neutral-600">
-                            「含む」「含まない」「含む可能性があります」を見分けやすく表示します。
+                            「含む」「原材料に含まない登録」「含む可能性あり・要確認」を見分けやすく表示します。
                         </p>
                     </div>
 
@@ -351,7 +351,7 @@ export default function HomePageView({
                         <p className="mt-4 text-base leading-8 text-neutral-600 md:text-lg">
                             このサービスは、店舗ごとのアレルゲン情報を見やすくするためのものです。
                             <br />
-                            ただし、最終的な判断は必ず店舗での確認も含めて行ってください。
+                            架空情報のため、実際の飲食判断には使用しないでください。
                         </p>
                     </div>
 
@@ -361,29 +361,28 @@ export default function HomePageView({
                                 1. 表示内容について
                             </h3>
                             <p className="mt-2 text-sm leading-7 text-neutral-600">
-                                掲載情報は店舗の登録情報に基づいています。
-                                仕入れやレシピ変更、入力内容の更新タイミングによって、
-                                実際の内容と異なる場合があります。
+                                架空店舗が管理する登録情報を想定したデモです。
+                                表示の分かりやすさと入力・更新操作を確認できます。
                             </p>
                         </div>
 
                         <div className="rounded-2xl border border-neutral-200 bg-white p-5">
                             <h3 className="text-base font-bold text-neutral-900">
-                                2. 混入の可能性について
+                                2. 要確認の表示について
                             </h3>
                             <p className="mt-2 text-sm leading-7 text-neutral-600">
-                                同一厨房、同一器具、同一油などの調理環境によって、
-                                意図しない混入が起こる可能性があります。
+                                「含む可能性あり・要確認」は、含む可能性があり確認が必要な状態です。
+                                他メニューからの補足は厨房での確認結果ではありません。
                             </p>
                         </div>
 
                         <div className="rounded-2xl border border-neutral-200 bg-white p-5">
                             <h3 className="text-base font-bold text-neutral-900">
-                                3. 症状が重い場合
+                                3. 実際の飲食判断には使用しない
                             </h3>
                             <p className="mt-2 text-sm leading-7 text-neutral-600">
-                                重い症状が出る可能性がある方は、
-                                この表示だけで判断せず、必ず店舗へ直接確認してください。
+                                このデモは食品の安全性や摂取可否を判断しません。
+                                架空の登録内容を実際の食品の情報として扱わないでください。
                             </p>
                         </div>
 
@@ -392,8 +391,8 @@ export default function HomePageView({
                                 4. 利用目的について
                             </h3>
                             <p className="mt-2 text-sm leading-7 text-neutral-600">
-                                このサービスは、外食前の確認をしやすくする補助を目的としています。
-                                安全を完全に保証するものではありません。
+                                このプロトタイプは情報の表示・操作を検証するものです。
+                                食品の安全性や摂取可否を判定・保証するものではありません。
                             </p>
                         </div>
                     </div>
@@ -403,7 +402,7 @@ export default function HomePageView({
             <section className="bg-white py-20">
                 <div className="mx-auto max-w-[800px] px-6 text-center">
                     <h2 className="mb-6 text-3xl font-bold text-neutral-900 md:text-4xl">
-                        安心して食事ができる世界へ。
+                        アレルゲン情報を、誤認されにくい表示へ。
                     </h2>
                     <p className="mb-10 text-lg leading-8 text-neutral-600">
                         まずは対応店舗のページで、メニューごとのアレルゲン情報を確認できます。

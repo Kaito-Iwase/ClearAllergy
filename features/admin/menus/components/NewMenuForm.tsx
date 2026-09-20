@@ -3,8 +3,10 @@
 // app/admin/(dashboard)/menus/new/page.tsx からアレルゲンマスタを受け取り、
 // 入力値の state 管理、画像アップロード、作成 API 呼び出しまでを担当します。
 
+import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
 import {
     getUnknownAllergenNames,
     type AllergenStatus,
@@ -13,8 +15,6 @@ import { createMenuButtonClassName } from "@/features/admin/menus/components/Cre
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
 import MenuPublishReadinessNotice from "@/features/admin/menus/components/MenuPublishReadinessNotice";
 import {
-    getMenuPublishButtonColorClass,
-    getMenuPublishButtonLabel,
     normalizeOptionalMenuText,
     parseMenuPriceYenInput,
 } from "@/features/admin/menus/components/menu-form-values";
@@ -108,6 +108,21 @@ export default function NewMenuForm({
         [allergens, statusBySlug],
     );
     const canPublish = unknownAllergenNames.length === 0;
+    const allergenRows = React.useRef(new Map<string, HTMLDivElement>());
+    function findNextUnknown() {
+        const next = allergens.find((allergen) => (statusBySlug[allergen.slug] ?? "UNKNOWN") === "UNKNOWN");
+        if (next) {
+            const row = allergenRows.current.get(next.slug);
+            row?.scrollIntoView({ block: "center" });
+            row?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+        }
+    }
+    const currentDraft = JSON.stringify({ name, description, priceYenInput, category, ingredients, precaution,
+        imageUrl, imageFrame, imageFit, imagePosition, imageZoom, imagePositionX, imagePositionY,
+        isPublished, statusBySlug });
+    const [initialDraft] = React.useState(currentDraft);
+    const [created, setCreated] = React.useState(false);
+    const confirmLeave = useUnsavedMenuChanges(!created && (currentDraft !== initialDraft || selectedFile !== null));
 
     React.useEffect(() => {
         // 画像プレビュー用に作った Object URL は不要になったら解放します。
@@ -201,6 +216,7 @@ export default function NewMenuForm({
 
     const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (isSubmitting || uploading) return;
         setError(null);
 
         if (readOnly) {
@@ -216,6 +232,8 @@ export default function NewMenuForm({
             return;
         }
 
+        const reviewMessage = getMenuReviewMessage({ name, willPublish: isPublished, ingredientsChanged: false });
+        if (reviewMessage && !window.confirm(reviewMessage)) return;
         setIsSubmitting(true);
 
         try {
@@ -262,6 +280,7 @@ export default function NewMenuForm({
             }
 
             // 作成成功後は、そのメニューの編集画面へそのまま移動します。
+            setCreated(true);
             router.push(`/admin/menus/${data.id}/edit`);
         } catch (err) {
             setError(getThrownErrorMessage(err, CREATE_ERROR_MESSAGE));
@@ -271,9 +290,11 @@ export default function NewMenuForm({
     };
 
     return (
-        <form onSubmit={onSubmit} className="space-y-6">
+        <form onSubmit={onSubmit}>
+            <fieldset disabled={isSubmitting || uploading} className="min-w-0 space-y-6">
+                <legend className="sr-only">メニュー作成</legend>
             {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                     {error}
                 </div>
             )}
@@ -286,6 +307,7 @@ export default function NewMenuForm({
                         <button
                             type="button"
                             onClick={togglePublished}
+                            aria-pressed={isPublished}
                             disabled={
                                 (readOnly && !readOnlyPreview) ||
                                 isSubmitting ||
@@ -299,11 +321,8 @@ export default function NewMenuForm({
                                       : "bg-amber-600"
                             }`}
                         >
-                            {getMenuPublishButtonLabel({
-                                readOnly,
-                                isPublished,
-                                canPublish,
-                            })}
+                            {isPublished ? "登録時に公開する" : canPublish ? "非公開の下書きとして登録する" : "未設定があるため公開不可"}
+                            {readOnly ? "（デモ）" : ""}
                         </button>
 
                         <button
@@ -328,7 +347,7 @@ export default function NewMenuForm({
 
                         <button
                             type="button"
-                            onClick={() => router.push(backHref)}
+                            onClick={() => { if (confirmLeave()) router.push(backHref); }}
                             className="min-h-11 w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 sm:w-auto"
                         >
                             一覧に戻る
@@ -342,17 +361,20 @@ export default function NewMenuForm({
                         : "登録後、このメニューの編集画面へ移動します。"}
                 </p>
 
+                <p className="mt-3 text-sm text-gray-700">未保存の新規メニューです。登録が成功するまで公開されません。</p>
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}
                     totalAllergenCount={allergens.length}
+                    onFindUnknown={findNextUnknown}
                 />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="new-menu-field-1" className="mb-1 block text-sm font-medium text-gray-700">
                             メニュー名
                         </label>
-                        <input
+                        <input id="new-menu-field-1"
+                            maxLength={120}
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -361,10 +383,10 @@ export default function NewMenuForm({
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="new-menu-field-2" className="mb-1 block text-sm font-medium text-gray-700">
                             価格（税込・円）
                         </label>
-                        <input
+                        <input id="new-menu-field-2"
                             type="number"
                             inputMode="numeric"
                             min={0}
@@ -383,11 +405,12 @@ export default function NewMenuForm({
                 </div>
 
                 <div className="mt-4">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="new-menu-field-3" className="mb-1 block text-sm font-medium text-gray-700">
                         説明
                     </label>
-                    <textarea
-                        value={description}
+                    <textarea id="new-menu-field-3"
+                        maxLength={2000}
+                            value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={4}
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -397,10 +420,11 @@ export default function NewMenuForm({
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="new-menu-field-4" className="mb-1 block text-sm font-medium text-gray-700">
                             カテゴリ
                         </label>
-                        <input
+                        <input id="new-menu-field-4"
+                            maxLength={120}
                             value={category}
                             onChange={(e) => setCategory(e.target.value)}
                             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -410,11 +434,12 @@ export default function NewMenuForm({
                 </div>
 
                 <div className="mt-4">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="new-menu-field-5" className="mb-1 block text-sm font-medium text-gray-700">
                         🧺 原材料名
                     </label>
-                    <textarea
-                        value={ingredients}
+                    <textarea id="new-menu-field-5"
+                        maxLength={5000}
+                            value={ingredients}
                         onChange={(e) => setIngredients(e.target.value)}
                         rows={5}
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -426,11 +451,12 @@ export default function NewMenuForm({
                 </div>
 
                 <div className="mt-4">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="new-menu-field-6" className="mb-1 block text-sm font-medium text-gray-700">
                         注意書き
                     </label>
-                    <textarea
-                        value={precaution}
+                    <textarea id="new-menu-field-6"
+                        maxLength={2000}
+                            value={precaution}
                         onChange={(e) => setPrecaution(e.target.value)}
                         rows={3}
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -443,10 +469,10 @@ export default function NewMenuForm({
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="new-menu-field-7" className="mb-1 block text-sm font-medium text-gray-700">
                             食品画像ファイル
                         </label>
-                        <input
+                        <input id="new-menu-field-7"
                             type="file"
                             accept="image/*"
                             onChange={onSelectImage}
@@ -460,11 +486,12 @@ export default function NewMenuForm({
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="new-menu-field-8" className="mb-1 block text-sm font-medium text-gray-700">
                             画像URL
                         </label>
-                        <input
+                        <input id="new-menu-field-8"
                             type="url"
+                            maxLength={2048}
                             value={imageUrl}
                             onChange={(e) => setImageUrl(e.target.value)}
                             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
@@ -512,12 +539,13 @@ export default function NewMenuForm({
                     アレルゲン{allergens.length}品目
                 </div>
                 <p className="mt-1 text-sm text-gray-600">
-                    各品目について「未設定 / 含む / 含まない / 含む可能性があります」を選択してください。
+                    各品目について「未設定 / 含む / 原材料に含まない登録 / 含む可能性あり・要確認」を選択してください。
                 </p>
 
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}
                     totalAllergenCount={allergens.length}
+                    onFindUnknown={findNextUnknown}
                 />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -528,6 +556,9 @@ export default function NewMenuForm({
                         return (
                             <div
                                 key={allergen.slug}
+                                ref={(element) => { if (element) allergenRows.current.set(allergen.slug, element); else allergenRows.current.delete(allergen.slug); }}
+                                role="group"
+                                aria-label={allergen.nameJa}
                                 className="rounded-2xl border border-gray-200 p-3 sm:p-4"
                             >
                                 <div className="mb-3">
@@ -541,7 +572,7 @@ export default function NewMenuForm({
 
                                 <div className="grid grid-cols-2 gap-2">
                                     <button
-                                        type="button"
+                                        type="button" aria-pressed={current === "UNKNOWN"}
                                         onClick={() =>
                                             setOne(allergen.slug, "UNKNOWN")
                                         }
@@ -555,7 +586,7 @@ export default function NewMenuForm({
                                     </button>
 
                                     <button
-                                        type="button"
+                                        type="button" aria-pressed={current === "CONTAINS"}
                                         onClick={() =>
                                             setOne(allergen.slug, "CONTAINS")
                                         }
@@ -569,7 +600,7 @@ export default function NewMenuForm({
                                     </button>
 
                                     <button
-                                        type="button"
+                                        type="button" aria-pressed={current === "FREE"}
                                         onClick={() =>
                                             setOne(allergen.slug, "FREE")
                                         }
@@ -579,11 +610,11 @@ export default function NewMenuForm({
                                                 : "bg-gray-100 text-gray-700"
                                         }`}
                                     >
-                                        含まない
+                                        原材料に含まない登録
                                     </button>
 
                                     <button
-                                        type="button"
+                                        type="button" aria-pressed={current === "MAY_CONTAIN"}
                                         onClick={() =>
                                             setOne(
                                                 allergen.slug,
@@ -596,7 +627,7 @@ export default function NewMenuForm({
                                                 : "bg-gray-100 text-gray-700"
                                         }`}
                                     >
-                                        含む可能性があります
+                                        含む可能性あり・要確認
                                     </button>
                                 </div>
                             </div>
@@ -626,6 +657,7 @@ export default function NewMenuForm({
                               : "この内容で登録する"}
                 </button>
             </div>
+            </fieldset>
         </form>
     );
 }
