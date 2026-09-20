@@ -29,6 +29,7 @@ type UserAllergenPreferencePanelProps = {
     onToggleIncludeMayContain: () => void;
     onApplyHighlight: () => void;
     onApplyExclude: () => void;
+    onRemoveSelection: () => void;
     onClear: () => void;
     className?: string;
 };
@@ -53,7 +54,7 @@ export function useUserAllergenPreferenceState() {
             ? prev.filter((value) => value !== slug) : [...prev, slug]);
     }
 
-    function applySelection(mode: "highlight" | "exclude") {
+    function applySelection(mode: "highlight" | "exclude" | "remove") {
         if (targetSlugs.length === 0) {
             setMessage("先にアレルゲンを選択してください。");
             return;
@@ -77,7 +78,9 @@ export function useUserAllergenPreferenceState() {
         setTargetSlugs([]);
         setMessage(mode === "highlight"
             ? "選択した項目を強調表示として保存しました。"
-            : "選択した項目を除外として保存しました。");
+            : mode === "exclude"
+              ? "選択した項目を除外として保存しました。"
+              : "選択した項目の設定を解除しました。");
     }
 
     function onClear() {
@@ -104,6 +107,7 @@ export function useUserAllergenPreferenceState() {
         },
         applyHighlight: () => applySelection("highlight"),
         applyExclude: () => applySelection("exclude"),
+        removeSelection: () => applySelection("remove"),
         onClear,
     };
 }
@@ -122,6 +126,7 @@ export function UserAllergenPreferencePanel({
     onToggleIncludeMayContain,
     onApplyHighlight,
     onApplyExclude,
+    onRemoveSelection,
     onClear,
     className,
 }: UserAllergenPreferencePanelProps) {
@@ -241,6 +246,12 @@ export function UserAllergenPreferencePanel({
                         })}
                     </div>
 
+                    {targetCount > 0 ? (
+                        <p role="status" className="mt-4 text-sm font-semibold text-gray-700">
+                            操作対象 {targetCount}件（未適用）。下のボタンで設定を変更できます。
+                        </p>
+                    ) : null}
+
                     <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                         <button
                             type="button"
@@ -258,6 +269,15 @@ export function UserAllergenPreferencePanel({
                         >
                             除外する
                             {targetCount > 0 ? `（${targetCount}件）` : ""}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={onRemoveSelection}
+                            disabled={!targetSlugs.some((slug) => highlightSlugs.includes(slug) || excludedSlugs.includes(slug))}
+                            className="col-span-2 min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-green-700 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-1"
+                        >
+                            選択した設定を解除
                         </button>
 
                         <button
@@ -302,6 +322,7 @@ export default function UserAllergenPreferenceClient({
             onToggleIncludeMayContain={state.toggleIncludeMayContain}
             onApplyHighlight={state.applyHighlight}
             onApplyExclude={state.applyExclude}
+            onRemoveSelection={state.removeSelection}
             onClear={state.onClear}
         />
     );

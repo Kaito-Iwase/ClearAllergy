@@ -6,6 +6,7 @@
 import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
 import {
     getUnknownAllergenNames,
     type AllergenStatus,
@@ -172,6 +173,7 @@ export default function MenuEditClient(props: {
     const [savedIsPublished, setSavedIsPublished] = React.useState(initialIsPublished);
     const [savedIngredients, setSavedIngredients] = React.useState((initialIngredients ?? "").trim());
     const hasUnsavedChanges = currentDraft !== savedDraft || selectedFile !== null;
+    useUnsavedMenuChanges(hasUnsavedChanges);
 
 
     React.useEffect(() => {

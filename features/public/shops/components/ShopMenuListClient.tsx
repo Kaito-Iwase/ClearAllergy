@@ -155,6 +155,13 @@ export default function ShopMenuListClient({
 
     const excludedMenuCount = menuItems.length - visibleMenuItems.length;
 
+    function clearSearch() {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("q");
+        const query = params.toString();
+        router.replace(`/shops/${shopId}${query ? `?${query}` : ""}`);
+    }
+
     return (
         <div
             id="public-menus"
@@ -174,6 +181,12 @@ export default function ShopMenuListClient({
                             ? "検索条件に一致する公開メニューがありません。"
                             : "現在公開中のメニューはありません。"}
                     </p>
+                    {q !== "" ? (
+                        <button type="button" onClick={clearSearch}
+                            className="mt-3 min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-green-700">
+                            メニュー検索を解除
+                        </button>
+                    ) : null}
                 </div>
             ) : visibleMenuItems.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-red-200 bg-red-50 p-6">

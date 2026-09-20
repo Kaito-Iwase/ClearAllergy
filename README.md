@@ -339,6 +339,18 @@ npm run typecheck
 npm run build
 ```
 
+### 初回利用フローのブラウザ回帰
+
+`scripts/check-first-use-browser.mjs` は、既存のPlaywrightとChromiumを指定して実行します。アプリに追加の依存は不要です。既定の接続先は専用テスト環境 `http://localhost:3101` です。公開済みの架空メニュー（豆乳ベジカレーを含む）と匿名デモがある環境を使ってください。
+
+```bash
+PLAYWRIGHT_MODULE_PATH=/absolute/path/to/playwright BROWSER_EXECUTABLE=/absolute/path/to/chromium node scripts/check-first-use-browser.mjs
+```
+
+接続先は `CLEARALLERGY_BROWSER_BASE_URL`、スクリーンショットの出力先は `CLEARALLERGY_BROWSER_OUTPUT` で指定できます。日本語フォントがない実行環境では、既存フォントを使うFontconfig設定を `FONTCONFIG_FILE` で指定してください。テストはブラウザ内の設定を操作し、DBへの更新はしません。
+
+スマホの店舗内検索と検索解除、設定の選択解除・別タブ同期・保存失敗、メニュー詳細、URLコピー、未保存入力の移動／再読込確認、匿名管理APIの拒否を確認します。メニューフォームの保護はページ内リンク・一覧へ戻る操作・再読込を対象とし、ブラウザの「戻る／進む」によるアプリ内遷移は対象外です。
+
 ### 画面での確認例
 
 1. `/shops` を開き、公開店舗一覧が表示されることを確認する

@@ -102,6 +102,7 @@ export default function PublicMenuDetailBodyClient(props: {
             onToggleIncludeMayContain={preferenceState.toggleIncludeMayContain}
             onApplyHighlight={preferenceState.applyHighlight}
             onApplyExclude={preferenceState.applyExclude}
+            onRemoveSelection={preferenceState.removeSelection}
             onClear={preferenceState.onClear}
         />
     );

@@ -52,12 +52,12 @@ export default function PublicSearchBox({ placeholder }: Props) {
 
     return (
         <form role="search" className="relative" onSubmit={(event) => { event.preventDefault(); search(q); }}>
-            <button type="submit" aria-label={resolvedPlaceholder} className="absolute inset-y-0 left-0 grid place-items-center pl-3 text-gray-500">
+            <button type="submit" aria-label={resolvedPlaceholder} className="absolute inset-y-0 left-0 grid w-11 place-items-center rounded-lg text-gray-500 focus-visible:outline-2 focus-visible:outline-green-700">
                 🔎
             </button>
 
             <input
-                className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-9 text-sm placeholder:text-gray-400 focus:border-[#13ec13] focus:outline-none focus:ring-2 focus:ring-[#13ec13]/30"
+                className="block min-h-11 w-full rounded-lg border border-gray-200 bg-white py-2 pl-11 pr-11 text-base md:text-sm placeholder:text-gray-400 focus:border-[#13ec13] focus:outline-none focus:ring-2 focus:ring-[#13ec13]/30"
                 placeholder={resolvedPlaceholder}
                 type="search"
                 value={q}
@@ -69,7 +69,7 @@ export default function PublicSearchBox({ placeholder }: Props) {
                 <button
                     type="button"
                     onClick={onClear}
-                    className="absolute inset-y-0 right-0 grid place-items-center pr-3 text-gray-500 hover:text-gray-700"
+                    className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-lg text-gray-500 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-green-700"
                     aria-label="検索をクリア"
                     title="クリア"
                 >

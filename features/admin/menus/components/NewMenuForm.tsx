@@ -6,6 +6,7 @@
 import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
 import {
     getUnknownAllergenNames,
     type AllergenStatus,
@@ -107,6 +108,12 @@ export default function NewMenuForm({
         [allergens, statusBySlug],
     );
     const canPublish = unknownAllergenNames.length === 0;
+    const currentDraft = JSON.stringify({ name, description, priceYenInput, category, ingredients, precaution,
+        imageUrl, imageFrame, imageFit, imagePosition, imageZoom, imagePositionX, imagePositionY,
+        isPublished, statusBySlug });
+    const [initialDraft] = React.useState(currentDraft);
+    const [created, setCreated] = React.useState(false);
+    const confirmLeave = useUnsavedMenuChanges(!created && (currentDraft !== initialDraft || selectedFile !== null));
 
     React.useEffect(() => {
         // 画像プレビュー用に作った Object URL は不要になったら解放します。
@@ -264,6 +271,7 @@ export default function NewMenuForm({
             }
 
             // 作成成功後は、そのメニューの編集画面へそのまま移動します。
+            setCreated(true);
             router.push(`/admin/menus/${data.id}/edit`);
         } catch (err) {
             setError(getThrownErrorMessage(err, CREATE_ERROR_MESSAGE));
@@ -330,7 +338,7 @@ export default function NewMenuForm({
 
                         <button
                             type="button"
-                            onClick={() => router.push(backHref)}
+                            onClick={() => { if (confirmLeave()) router.push(backHref); }}
                             className="min-h-11 w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 sm:w-auto"
                         >
                             一覧に戻る
