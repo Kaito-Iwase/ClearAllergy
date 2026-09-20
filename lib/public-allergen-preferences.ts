@@ -16,7 +16,7 @@ const emptyPreferences: UserAllergenPreferences = {
     highlightSlugs: [], excludedSlugs: [], includeMayContain: false, selectedSlugs: [],
 };
 export const SERVER_PREFERENCE_SNAPSHOT = {
-    loaded: false, preferences: emptyPreferences, storageError: "",
+    loaded: false, preferences: emptyPreferences, storageError: "", storageReadable: false,
 };
 let cachedReadable = false;
 let cachedRaw: string | null | undefined;
@@ -64,13 +64,13 @@ export function getUserAllergenPreferenceSnapshot() {
             }
             cachedReadable = true;
             cachedRaw = raw;
-            cachedSnapshot = { loaded: true, preferences, storageError };
+            cachedSnapshot = { loaded: true, preferences, storageError, storageReadable: true };
         }
     } catch {
         cachedReadable = false;
         const storageError = "ブラウザ内の設定を読み書きできません。保存済みの設定を確認できないため、一覧・詳細で各項目を確認してください。";
         if (!cachedSnapshot.loaded || cachedSnapshot.storageError !== storageError) {
-            cachedSnapshot = { loaded: true, preferences: emptyPreferences, storageError };
+            cachedSnapshot = { loaded: true, preferences: emptyPreferences, storageError, storageReadable: false };
         }
     }
     return cachedSnapshot;
@@ -112,6 +112,28 @@ export function saveUserAllergenPreferences(preferences: UserAllergenPreferences
 
 export function clearUserAllergenPreferences(): PreferenceWriteResult {
     return writePreferences(null);
+}
+
+export type AllergenPreferenceMode = "none" | "highlight" | "exclude";
+
+export function getAllergenPreferenceMode(preferences: UserAllergenPreferences, slug: string): AllergenPreferenceMode {
+    return preferences.excludedSlugs.includes(slug) ? "exclude"
+        : preferences.highlightSlugs.includes(slug) ? "highlight" : "none";
+}
+
+export function setAllergenPreferenceMode(preferences: UserAllergenPreferences, slug: string, mode: AllergenPreferenceMode) {
+    return normalizeUserAllergenPreferences({
+        ...preferences,
+        highlightSlugs: [...preferences.highlightSlugs.filter((value) => value !== slug), ...(mode === "highlight" ? [slug] : [])],
+        excludedSlugs: [...preferences.excludedSlugs.filter((value) => value !== slug), ...(mode === "exclude" ? [slug] : [])],
+    });
+}
+
+// 並び順だけの差で未適用・別タブとの競合にしない。
+export function areAllergenPreferencesEqual(a: UserAllergenPreferences, b: UserAllergenPreferences) {
+    return a.includeMayContain === b.includeMayContain
+        && JSON.stringify([...a.highlightSlugs].sort()) === JSON.stringify([...b.highlightSlugs].sort())
+        && JSON.stringify([...a.excludedSlugs].sort()) === JSON.stringify([...b.excludedSlugs].sort());
 }
 
 // 強調と除外は表示方法の設定であり、確認対象から注意情報を落とす理由にしない。

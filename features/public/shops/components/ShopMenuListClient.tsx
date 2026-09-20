@@ -165,12 +165,12 @@ export default function ShopMenuListClient({
     return (
         <div
             id="public-menus"
-            className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm"
+            className="scroll-mt-32 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6"
         >
             <div className="mb-4 flex items-end justify-between">
                 <h2 className="text-base font-extrabold">公開メニュー</h2>
                 <p className="text-xs text-gray-500">
-                    {searchedMenus.length} 件
+                    表示 {visibleMenuItems.length}件 / 検索対象 {searchedMenus.length}件
                 </p>
             </div>
 

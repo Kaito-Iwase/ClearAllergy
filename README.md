@@ -215,7 +215,7 @@ ClearAllergy/
 
 アレルゲンは 29 品目をマスタデータとして保持し、各メニューに対して `CONTAINS` / `FREE` / `MAY_CONTAIN` / `UNKNOWN` の状態を登録します。
 
-公開画面では、現行マスタの品目ごとの状態を表示します。分類別の強調表示は実装していません。利用者が選択した気になるアレルゲンは `localStorage` に保存し、端末内の設定として表示に反映します。
+公開画面では、現行マスタの品目ごとの状態を表示します。分類別の強調表示は実装していません。利用者は各品目を「設定なし／注目して表示／一覧から除外」で編集し、除外オプションも含めて「変更を適用」でまとめて保存します。適用前は一覧・詳細に反映せず、キャンセルで保存済み設定に戻せます。設定は `localStorage` に保存し、ログイン不要・同じブラウザ内で共有します。編集中の別タブ更新は上書きせず、最新の設定を読み直す導線を表示します。詳細では注意情報を先に示し、選択した全品目の登録状態を確認できます。
 
 他の公開可能なメニューのCONTAINSは、公開登録から得た補足として一覧・詳細・APIに反映します。FREE自体は変更せず、実際の厨房の取扱いを確認した情報とは扱いません。公開前・原材料変更時はUIで確認を求めますが、APIの公開条件は従来どおりです。
 
@@ -304,29 +304,26 @@ npm run dev
 
 ### GitHub Actions CI
 
-`.github/workflows/ci.yml` は、`main` 向けの `pull_request` と `main` への `push` で以下を実行します。
+`.github/workflows/ci.yml` は、`main`・`develop` 向けのPRと両ブランチへのpush、および手動実行で動きます。同じブランチの古い実行はキャンセルします。
 
-```bash
-npm ci
-npx prisma generate
-npm test
-npm run lint
-npm run typecheck
-npm run build
-```
+Node.jsは `.node-version` の22.23.1、npmはDockerと同じ11.18.0です。CIは `npm ci` → Prisma Client生成 → test → lint → typecheck → 専用DB準備 → build → 公開画面のブラウザ回帰を実行します。
 
-CI では Vercel の Git 連携による Preview Deployment / Production Deployment を前提とし、独自の Vercel deploy や `prisma migrate deploy` は実行しません。
+CIはGitHub Secretsを使用しません。ジョブ内のPostgreSQL 17に既存migrationを適用し、`scripts/setup-ci-env.ts` が架空店舗・3メニューを作成します。接続先は `scripts/ci-environment.ts` でCI専用DBに限定し、既存の店舗・ユーザー・メニューがある場合はデータ投入を拒否します。通常のseedやClerkユーザー作成、Blobへの書き込みは行いません。Clerkキーはビルド用の非実在値です。
 
-GitHub Secrets には、CI の `prisma generate` と `next build` に必要な以下の変数名だけを登録します。秘密情報の値は README に記載しません。
+ブラウザランナーはジョブの一時ディレクトリに固定バージョンのPlaywrightを入れ、公開画面だけをChromiumで検証します。外部通信を遮断し、検索・複数設定の追加／解除・キャンセル・保存失敗・別タブ競合・一覧から詳細までを確認します。HTTP 200だけでなく、架空店舗とメニューの内容を検証します。スクリーンショットはコミットSHA付きのArtifactとして7日間保存します。Clerkを使う管理画面の実認証・保存テストはこのCIには含みません。
 
-| Secret 名 | 用途 |
-| --- | --- |
-| `DATABASE_URL` | Prisma / PostgreSQL 接続先。CI用またはPreview用DBを推奨し、本番DBを直接使う場合は読み取りや実行内容に注意する |
-| `DIRECT_URL` | Prisma schema の `directUrl` 用。CIでは migrate を実行しない |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk の公開キー |
-| `CLERK_SECRET_KEY` | Clerk のサーバー側キー |
+VercelのGit連携は維持し、CIから独自のdeployや本番DBのmigrationは実行しません。Previewの成功だけではCI成功を意味しません。
 
-`PORTFOLIO_MODE`、`ADMIN_REGISTRATION_MODE`、`ENABLE_CLERK_ADMIN_AUTH`、`NEXT_PUBLIC_APP_URL` は CI workflow 内で固定値を設定しています。`BLOB_READ_WRITE_TOKEN`、`GOOGLE_MAPS_SERVER_API_KEY`、Google Maps の公開キーは、現時点の CI build では必須にしていません。
+### GitHub・Vercel側での反映手順
+
+以下はリポジトリのファイル変更だけでは適用されない管理設定です。
+
+1. このCI定義を反映したPRで `Test, lint, typecheck, and build` が成功することを確認する。
+2. `main` のブランチルールでPR経由の変更と上記チェックの成功を必須にする。最新のmainに対して確認する設定も有効にする。単独開発でも使えるよう必須レビュー人数は追加しない。
+3. 失敗・未実行のチェックではマージできず、成功後にマージ可能なことを確認する。ルールの適用対象・管理者のバイパス設定も確認する。
+4. VercelのProduction Branchが `main`、Node.jsが22系であることを確認する。Preview・ProductionのDB／Clerk／Blobの接続先をそれぞれ確認する。CI用の非実在キーをVercelには設定しない。
+5. 人に渡すPreviewのコミットSHAとCI成功SHAが一致することを確認する。VercelのProduction反映後は、公開店舗・メニューの表示を確認する。
+
 
 ## 動作確認方法
 
@@ -349,7 +346,7 @@ PLAYWRIGHT_MODULE_PATH=/absolute/path/to/playwright BROWSER_EXECUTABLE=/absolute
 
 接続先は `CLEARALLERGY_BROWSER_BASE_URL`、スクリーンショットの出力先は `CLEARALLERGY_BROWSER_OUTPUT` で指定できます。日本語フォントがない実行環境では、既存フォントを使うFontconfig設定を `FONTCONFIG_FILE` で指定してください。テストはブラウザ内の設定を操作し、DBへの更新はしません。
 
-スマホの店舗内検索と検索解除、設定の選択解除・別タブ同期・保存失敗、メニュー詳細、URLコピー、未保存入力の移動／再読込確認、匿名管理APIの拒否を確認します。メニューフォームの保護はページ内リンク・一覧へ戻る操作・再読込を対象とし、ブラウザの「戻る／進む」によるアプリ内遷移は対象外です。
+スマホの店舗内検索と検索解除、設定の後からの複数追加・一部解除・キャンセル・別タブ競合・保存失敗、全選択項目の結果、URLコピーを確認します。`CLEARALLERGY_BROWSER_PUBLIC_ONLY=true` では公開画面のみ確認し、`CLEARALLERGY_BROWSER_BLOCK_EXTERNAL=true` ではブラウザの外部通信を遮断します。通常実行では店舗・メニューの未保存入力の移動／再読込確認、デモ内の戻り先、次の未設定項目への移動、匿名管理APIの拒否も確認します。店舗・メニューフォームの保護はページ内リンク・一覧へ戻る操作・再読込を対象とし、ブラウザの「戻る／進む」によるアプリ内遷移は対象外です。
 
 ### 画面での確認例
 

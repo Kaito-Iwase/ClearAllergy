@@ -2,9 +2,20 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
 const base = process.env.CLEARALLERGY_BROWSER_BASE_URL || "http://localhost:3101";
-const output = process.env.CLEARALLERGY_BROWSER_OUTPUT || "/tmp/clearallergy-first-use-20260912";
+const output = process.env.CLEARALLERGY_BROWSER_OUTPUT || join(tmpdir(), "clearallergy-first-use");
+const baseUrl = new URL(base);
+assert.ok(baseUrl.protocol === "http:" && ["localhost", "127.0.0.1"].includes(baseUrl.hostname), "ブラウザ回帰はローカルの架空データ環境だけで実行してください");
+// next startの起動を待つ。店舗データの成否はこの後の画面内容で確認する。
+let ready = false;
+for (let attempt = 0; attempt < 60; attempt++) {
+    try { if ((await fetch(base + "/shops", { signal: AbortSignal.timeout(3000) })).ok) { ready = true; break; } } catch {}
+    await new Promise(resolve => setTimeout(resolve, 1000));
+}
+assert.ok(ready, "ローカルアプリが起動しませんでした");
 mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ headless: true,
     ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
@@ -19,6 +30,9 @@ async function screenshot(page, name) {
 }
 try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    if (process.env.CLEARALLERGY_BROWSER_BLOCK_EXTERNAL === "true") {
+        await context.route("**/*", route => new URL(route.request().url()).origin === baseUrl.origin ? route.continue() : route.abort());
+    }
     const page = await context.newPage();
     activePage = page;
     page.setDefaultTimeout(20000);
@@ -50,43 +64,82 @@ try {
     await page.waitForURL(base + shopHref, { waitUntil: "domcontentloaded" });
     pass("390pxの店舗内検索・Enter送信・0件からの解除・通常検索からの解除");
 
-    await visible(page.getByRole("button", { name: /あなた向けのアレルゲン設定/ })).click();
-    await visible(page.getByRole("button", { name: "卵", exact: true })).click();
-    await visible(page.getByRole("button", { name: /^強調する/ })).click();
-    await visible(page.getByRole("button", { name: "えび", exact: true })).click();
-    await visible(page.getByRole("button", { name: /^除外する/ })).click();
-    await visible(page.getByRole("button", { name: "卵 強調", exact: true })).click();
-    await visible(page.getByRole("button", { name: "選択した設定を解除", exact: true })).click();
+    const panelButton = () => visible(page.getByRole("button", { name: /あなた向けのアレルゲン設定/ }));
+    const openPreferences = async () => { if (await panelButton().getAttribute("aria-expanded") !== "true") await panelButton().click(); };
+    const setMode = (name, mode) => visible(page.getByRole("combobox", { name: name + "の表示設定", exact: true })).selectOption(mode);
+    const apply = () => visible(page.getByRole("button", { name: "変更を適用", exact: true })).click();
     const preferences = () => page.evaluate(() => JSON.parse(localStorage.getItem("clearallergy:user-allergens")));
-    assert.deepEqual((await preferences()).highlightSlugs, []);
+    await openPreferences();
+    await setMode("卵", "highlight");
+    await apply();
+    assert.deepEqual((await preferences()).highlightSlugs, ["egg"]);
+    await openPreferences();
+    await setMode("乳", "highlight");
+    await setMode("えび", "exclude");
+    await visible(page.getByRole("checkbox", { name: /「含む可能性あり」も除外する/ })).check();
+    assert.deepEqual((await preferences()).highlightSlugs, ["egg"]);
+    assert.equal((await preferences()).includeMayContain, false);
+    assert.equal(await page.getByText("変更を適用しました。", { exact: true }).count(), 0);
+    await panelButton().click();
+    await page.getByText("未適用の変更あり", { exact: true }).waitFor();
+    await openPreferences();
+    await visible(page.getByRole("button", { name: "キャンセル", exact: true })).click();
+    assert.deepEqual((await preferences()).highlightSlugs, ["egg"]);
+    await openPreferences();
+    await setMode("乳", "highlight");
+    await setMode("えび", "exclude");
+    await apply();
+    assert.deepEqual((await preferences()).highlightSlugs, ["egg", "milk"]);
     assert.deepEqual((await preferences()).excludedSlugs, ["shrimp"]);
-    await screenshot(page, "05-preferences-after-mobile");
+    await openPreferences();
+    await setMode("卵", "none");
+    await apply();
+    assert.deepEqual((await preferences()).highlightSlugs, ["milk"]);
     await page.reload();
-    await visible(page.getByRole("button", { name: /あなた向けのアレルゲン設定/ })).click();
-    await visible(page.getByRole("button", { name: "えび 除外", exact: true })).waitFor();
-    pass("選択した設定だけ解除し、他の除外設定を保持して再読込に反映");
+    await openPreferences();
+    assert.equal(await visible(page.getByRole("combobox", { name: "えびの表示設定", exact: true })).inputValue(), "exclude");
+    await screenshot(page, "05-preferences-after-mobile");
+    pass("1件保存後の複数追加・一部解除・オプションも一括適用・折りたたみ中の未適用表示・キャンセル・再読み込み");
 
     const second = await context.newPage();
     await second.goto(base + shopHref);
     await second.evaluate(() => localStorage.setItem("clearallergy:user-allergens", JSON.stringify({
-        highlightSlugs: ["milk"], excludedSlugs: ["shrimp"], includeMayContain: true })));
-    await visible(page.getByRole("button", { name: "乳 強調", exact: true })).waitFor();
-    await visible(page.getByRole("button", { name: "えび 除外", exact: true })).click();
+        highlightSlugs: ["milk", "walnut"], excludedSlugs: ["shrimp"], includeMayContain: true })));
+    await page.waitForFunction(() => document.querySelector('select[aria-label="くるみの表示設定"]')?.value === "highlight");
+    await setMode("えび", "none");
+    await second.evaluate(() => localStorage.setItem("clearallergy:user-allergens", JSON.stringify({
+        highlightSlugs: ["milk", "walnut", "egg"], excludedSlugs: ["shrimp"], includeMayContain: true })));
+    await visible(page.getByRole("alert").filter({ hasText: "別の画面で設定が変更されました" })).waitFor();
+    assert.equal(await visible(page.getByRole("button", { name: "変更を適用", exact: true })).isDisabled(), true);
+    await visible(page.getByRole("button", { name: "編集を破棄して最新の設定を読み直す", exact: true })).click();
+    await setMode("えび", "none");
     await page.evaluate(() => {
         window.__originalSetItem = Storage.prototype.setItem;
         Storage.prototype.setItem = () => { throw new DOMException("disabled", "QuotaExceededError"); };
     });
-    await visible(page.getByRole("button", { name: "選択した設定を解除", exact: true })).click();
+    await apply();
     await visible(page.getByRole("status").filter({ hasText: "設定を保存できませんでした" })).waitFor();
     assert.deepEqual((await preferences()).excludedSlugs, ["shrimp"]);
-    assert.equal(await visible(page.getByRole("button", { name: "えび 除外", exact: true })).getAttribute("aria-pressed"), "true");
+    assert.equal(await visible(page.getByRole("combobox", { name: "えびの表示設定", exact: true })).inputValue(), "none");
     await page.evaluate(() => { Storage.prototype.setItem = window.__originalSetItem; });
-    await visible(page.getByRole("button", { name: "選択した設定を解除", exact: true })).click();
-    assert.deepEqual((await preferences()).highlightSlugs, ["milk"]);
+    await apply();
+    assert.deepEqual((await preferences()).highlightSlugs, ["milk", "walnut", "egg"]);
     assert.deepEqual((await preferences()).excludedSlugs, []);
     assert.equal((await preferences()).includeMayContain, true);
     await second.close();
-    pass("別タブの最新設定を保持し、保存失敗時は未適用・選択保持、再試行で復帰");
+    pass("別タブ同期・編集中の競合による上書き防止・保存失敗で入力保持・再試行");
+
+    // 除外設定中もヒーロー導線は現在の一覧を指し、表示件数は実カード数に一致する。
+    await openPreferences();
+    await setMode("卵", "exclude");
+    await apply();
+    await page.getByRole("link", { name: "公開メニューを見る", exact: true }).click();
+    await page.waitForURL(base + shopHref + "#public-menus");
+    assert.equal(new URL(page.url()).pathname, shopHref);
+    assert.equal(new URL(page.url()).hash, "#public-menus");
+    await page.getByText("表示 2件 / 検索対象 3件", { exact: true }).waitFor();
+    assert.equal(await page.locator('article[role="button"]').count(), 2);
+    pass("除外後の公開メニュー導線と表示件数が現在の一覧に一致");
 
     for (const width of [390, 1440]) {
         await page.setViewportSize({ width, height: 900 });
@@ -96,10 +149,12 @@ try {
     }
     await page.locator('article[role="button"]').first().press("Enter");
     await page.waitForURL(/\/menus\//, { waitUntil: "domcontentloaded" });
-    await visible(page.getByRole("button", { name: /あなた向けのアレルゲン設定/ })).click();
-    await visible(page.getByRole("button", { name: "乳 強調", exact: true })).click();
-    await visible(page.getByRole("button", { name: "選択した設定を解除", exact: true })).press("Enter");
-    assert.deepEqual((await preferences()).highlightSlugs, []);
+    await page.getByText("確認対象 3件：くるみ・卵・乳", { exact: true }).waitFor();
+    await page.getByText("選択中アレルゲンの登録状態", { exact: true }).waitFor();
+    await openPreferences();
+    await setMode("乳", "none");
+    await visible(page.getByRole("button", { name: "変更を適用", exact: true })).press("Enter");
+    assert.deepEqual((await preferences()).highlightSlugs, ["walnut"]);
     await screenshot(page, "05-detail-preferences-after");
     await visible(page.getByRole("searchbox", { name: "この店舗のメニューを検索", exact: true })).fill("カレー");
     await visible(page.getByRole("searchbox", { name: "この店舗のメニューを検索", exact: true })).press("Enter");
@@ -109,10 +164,14 @@ try {
 
     await page.goto(base + shopHref);
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    // OSの共有ダイアログを開かず、コピーへのフォールバックを検証する。
+    await page.evaluate(() => Object.defineProperty(navigator, "share", { value: undefined, configurable: true }));
     await page.getByRole("button", { name: "この店舗のURLを共有", exact: true }).click();
+    await page.getByRole("status").filter({ hasText: "店舗URLをコピーしました。" }).waitFor();
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), base + shopHref);
     pass("店舗URLの共有ボタンから正しい公開URLをコピー");
 
+    if (process.env.CLEARALLERGY_BROWSER_PUBLIC_ONLY !== "true") {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(base + "/admin/demo/menus/new");
     const name = page.getByLabel("メニュー名", { exact: true });
@@ -159,6 +218,28 @@ try {
     page.off("dialog", reject);
     assert.equal((await context.request.get(base + "/api/admin/menus")).status(), 401);
     pass("既存メニュー編集の入力保持・元の値に戻すと警告解除・匿名管理APIは401");
+    // 店舗編集もデモ内に戻り、未保存入力を保護する。
+    await page.goto(base + "/admin/demo");
+    const shopName = page.getByLabel("店舗名（必須）", { exact: true });
+    const originalShopName = await shopName.inputValue();
+    await shopName.fill(originalShopName + "変更");
+    page.on("dialog", reject);
+    const beforeShop = confirmations;
+    await page.getByRole("link", { name: "メニュー管理へ戻る", exact: true }).click();
+    assert.equal(confirmations, beforeShop + 1);
+    assert.equal(await shopName.inputValue(), originalShopName + "変更");
+    await shopName.fill(originalShopName);
+    await page.getByRole("link", { name: "メニュー管理へ戻る", exact: true }).click();
+    await page.waitForURL(base + "/admin/demo/menus");
+    page.off("dialog", reject);
+    await page.goto(base + "/admin/demo/menus/new");
+    await page.getByRole("button", { name: "次の未設定項目へ", exact: true }).first().click();
+    assert.equal(await page.evaluate(() => document.activeElement?.closest('[role="group"]')?.getAttribute("aria-label")), "えび");
+    await page.getByRole("group", { name: "えび", exact: true }).getByRole("button", { name: "含む", exact: true }).click();
+    await page.getByRole("button", { name: "次の未設定項目へ", exact: true }).first().click();
+    assert.equal(await page.evaluate(() => document.activeElement?.closest('[role="group"]')?.getAttribute("aria-label")), "かに");
+    pass("店舗の未保存保護・デモへの戻り先・未設定の次項目へのフォーカス");
+    }
     assert.deepEqual(errors, []);
     pass("全フローでクライアント例外なし");
     await context.close();

@@ -108,6 +108,15 @@ export default function NewMenuForm({
         [allergens, statusBySlug],
     );
     const canPublish = unknownAllergenNames.length === 0;
+    const allergenRows = React.useRef(new Map<string, HTMLDivElement>());
+    function findNextUnknown() {
+        const next = allergens.find((allergen) => (statusBySlug[allergen.slug] ?? "UNKNOWN") === "UNKNOWN");
+        if (next) {
+            const row = allergenRows.current.get(next.slug);
+            row?.scrollIntoView({ block: "center" });
+            row?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+        }
+    }
     const currentDraft = JSON.stringify({ name, description, priceYenInput, category, ingredients, precaution,
         imageUrl, imageFrame, imageFit, imagePosition, imageZoom, imagePositionX, imagePositionY,
         isPublished, statusBySlug });
@@ -356,6 +365,7 @@ export default function NewMenuForm({
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}
                     totalAllergenCount={allergens.length}
+                    onFindUnknown={findNextUnknown}
                 />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -535,6 +545,7 @@ export default function NewMenuForm({
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}
                     totalAllergenCount={allergens.length}
+                    onFindUnknown={findNextUnknown}
                 />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -545,6 +556,7 @@ export default function NewMenuForm({
                         return (
                             <div
                                 key={allergen.slug}
+                                ref={(element) => { if (element) allergenRows.current.set(allergen.slug, element); else allergenRows.current.delete(allergen.slug); }}
                                 role="group"
                                 aria-label={allergen.nameJa}
                                 className="rounded-2xl border border-gray-200 p-3 sm:p-4"

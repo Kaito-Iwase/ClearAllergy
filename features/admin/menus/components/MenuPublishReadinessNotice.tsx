@@ -9,9 +9,11 @@ function formatUnknownAllergenSummary(names: string[]) {
 export default function MenuPublishReadinessNotice({
     unknownAllergenNames,
     totalAllergenCount,
+    onFindUnknown,
 }: {
     unknownAllergenNames: string[];
     totalAllergenCount: number;
+    onFindUnknown?: () => void;
 }) {
     if (unknownAllergenNames.length === 0) {
         return null;
@@ -27,6 +29,10 @@ export default function MenuPublishReadinessNotice({
             <p className="mt-1 text-xs leading-5">
                 {formatUnknownAllergenSummary(unknownAllergenNames)}
             </p>
+            {onFindUnknown && <button type="button" onClick={onFindUnknown}
+                className="mt-2 min-h-11 rounded-lg border border-amber-400 bg-white px-3 font-bold focus-visible:outline-2 focus-visible:outline-amber-900">
+                次の未設定項目へ
+            </button>}
         </div>
     );
 }

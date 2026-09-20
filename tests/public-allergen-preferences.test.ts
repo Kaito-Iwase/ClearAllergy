@@ -4,7 +4,23 @@ import {
     clearUserAllergenPreferences, getUserAllergenPreferenceSnapshot,
     loadUserAllergenPreferences, normalizeUserAllergenPreferences,
     saveUserAllergenPreferences, subscribeUserAllergenPreferences,
+    setAllergenPreferenceMode, getAllergenPreferenceMode, areAllergenPreferencesEqual,
 } from "../lib/public-allergen-preferences";
+
+test("保存済み1項目へ複数追加し、一部の変更・解除でも他の設定を保持する", () => {
+    const first = setAllergenPreferenceMode(normalizeUserAllergenPreferences(null), "egg", "highlight");
+    const added = setAllergenPreferenceMode(setAllergenPreferenceMode(first, "milk", "highlight"), "shrimp", "exclude");
+    assert.deepEqual(first.highlightSlugs, ["egg"], "編集中に元の設定を変更しない");
+    assert.deepEqual(added.selectedSlugs, ["egg", "milk", "shrimp"]);
+    const switched = setAllergenPreferenceMode(added, "egg", "exclude");
+    assert.equal(getAllergenPreferenceMode(switched, "egg"), "exclude");
+    assert.deepEqual(switched.highlightSlugs, ["milk"]);
+    const removed = setAllergenPreferenceMode(switched, "egg", "none");
+    assert.deepEqual(removed.excludedSlugs, ["shrimp"]);
+    assert.deepEqual(removed.highlightSlugs, ["milk"]);
+    assert.equal(areAllergenPreferencesEqual(added, { ...added, highlightSlugs: ["milk", "egg"] }), true);
+    assert.equal(areAllergenPreferencesEqual(added, { ...added, includeMayContain: true }), false);
+});
 
 test("端末設定の旧形式・不正slug・重複を正規化する", () => {
     assert.deepEqual(normalizeUserAllergenPreferences({ selectedSlugs: ["egg", "egg", "not-an-allergen", 1] }).highlightSlugs, ["egg"]);

@@ -7,6 +7,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import React from "react";
+import { useUnsavedMenuChanges } from "@/features/admin/menus/components/useUnsavedMenuChanges";
 import ShareShopUrlButton from "@/features/public/shops/components/ShareShopUrlButton";
 import ShopQrCard from "@/features/admin/shop/components/ShopQrCard";
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
@@ -193,6 +194,20 @@ export default function ShopEditClient({
         formatDateTimeJa(initialShop.updatedAt),
     );
 
+    const formValues = {
+        name: name.trim(), description: description.trim(), address: address.trim(),
+        prefecture: prefecture.trim(), city: city.trim(), nearestStation: nearestStation.trim(),
+        category: category.trim(), latitude, longitude, googlePlaceId,
+        hours: buildBusinessHoursText({ mode: hoursMode, single: hoursSingle, weekday: hoursWeekday, holiday: hoursHoliday }),
+        regularHoliday: regularHoliday.trim(), phoneNumber: phoneNumber.trim(), note: note.trim(),
+        averageBudgetYen: averageBudgetYen.trim(), coverImageUrl: coverImageUrl.trim(),
+        coverImageFrame, coverImageFit, coverImagePosition, coverImageZoom, coverImagePositionX, coverImagePositionY,
+    };
+    const currentForm = JSON.stringify(formValues);
+    const [savedForm, setSavedForm] = React.useState(currentForm);
+    const hasUnsavedChanges = currentForm !== savedForm || selectedFile !== null;
+    useUnsavedMenuChanges(hasUnsavedChanges);
+
     React.useEffect(() => {
         // プレビュー用 Object URL は不要になったら解放し、メモリを圧迫しないようにします。
         return () => {
@@ -329,6 +344,7 @@ export default function ShopEditClient({
     }
 
     async function saveShop() {
+        if (saving || uploading) return;
         setError(null);
         setSavedMessage("");
 
@@ -357,35 +373,7 @@ export default function ShopEditClient({
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    name: trimmedName,
-                    description: description.trim(),
-                    address: address.trim(),
-                    prefecture: prefecture.trim(),
-                    city: city.trim(),
-                    nearestStation: nearestStation.trim(),
-                    category: category.trim(),
-                    latitude,
-                    longitude,
-                    googlePlaceId,
-                    hours: buildBusinessHoursText({
-                        mode: hoursMode,
-                        single: hoursSingle,
-                        weekday: hoursWeekday,
-                        holiday: hoursHoliday,
-                    }),
-                    regularHoliday: regularHoliday.trim(),
-                    phoneNumber: phoneNumber.trim(),
-                    note: note.trim(),
-                    averageBudgetYen: averageBudgetYen.trim(),
-                    coverImageUrl: uploadedCoverImageUrl,
-                    coverImageFrame,
-                    coverImageFit,
-                    coverImagePosition,
-                    coverImageZoom,
-                    coverImagePositionX,
-                    coverImagePositionY,
-                }),
+                body: JSON.stringify({ ...formValues, coverImageUrl: uploadedCoverImageUrl }),
             });
 
             const data = (await res.json().catch(() => null)) as {
@@ -482,6 +470,17 @@ export default function ShopEditClient({
                 );
             }
 
+            // 保存された値を基準にし、成功後の不要な離脱確認を解除する。
+            const savedValues = { ...formValues, coverImageUrl: uploadedCoverImageUrl ?? "" };
+            for (const key of Object.keys(savedValues) as (keyof typeof savedValues)[]) {
+                const returned = data?.shop as Record<string, unknown> | undefined;
+                if (returned?.[key] !== undefined) {
+                    Object.assign(savedValues, { [key]: typeof savedValues[key] === "string"
+                        ? String(returned[key] ?? "") : returned[key] });
+                }
+            }
+            setSavedForm(JSON.stringify(savedValues));
+
             setSelectedFile(null);
             if (localPreviewUrl) {
                 URL.revokeObjectURL(localPreviewUrl);
@@ -520,7 +519,7 @@ export default function ShopEditClient({
             : formatPriceYenLabel(Number(averageBudgetYen));
 
     return (
-        <div className="space-y-6">
+        <fieldset disabled={saving || uploading} className="min-w-0 space-y-6">
             <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
                 <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
                     <div className="relative min-h-[300px] overflow-hidden bg-gradient-to-r from-green-200 via-green-100 to-gray-50 p-5 sm:min-h-[360px] sm:p-8 md:p-10">
@@ -686,7 +685,7 @@ export default function ShopEditClient({
                                 店舗画像の見え方調整
                             </h3>
                             <p className="mt-1 text-sm leading-6 text-gray-600">
-                                公開店舗ページや一覧カードで、カバー写真がどう見えるかを大きく確認できます。
+                                カバー写真の見え方を調整できます。保存は、下の店舗情報フォームの変更も含みます。
                             </p>
                         </div>
                         <button
@@ -701,7 +700,7 @@ export default function ShopEditClient({
                                 ? "画像アップロード中..."
                                 : saving
                                   ? "保存中..."
-                                  : "この画像設定を保存"}
+                                  : "店舗情報と画像設定を保存"}
                         </button>
                     </div>
 
@@ -732,7 +731,7 @@ export default function ShopEditClient({
 
                     <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-5">
                         <p className="text-xs leading-5 text-gray-500">
-                            画像の位置・ズーム・表示方法は、保存すると公開ページにも反映されます。
+                            保存すると、画像設定と編集中の店舗情報がまとめて公開ページに反映されます。
                         </p>
                         <button
                             type="button"
@@ -784,6 +783,8 @@ export default function ShopEditClient({
                                   : "保存する"}
                         </button>
                     </div>
+
+                    {hasUnsavedChanges && <p role="status" className="mt-4 text-sm font-bold text-amber-900">未保存の変更があります。</p>}
 
                     {error ? (
                         <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -1194,7 +1195,7 @@ export default function ShopEditClient({
                         </button>
 
                         <Link
-                            href="/admin/menus"
+                            href={readOnly ? "/admin/demo/menus" : "/admin/menus"}
                             className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 hover:text-gray-900"
                         >
                             メニュー管理へ戻る
@@ -1259,6 +1260,6 @@ export default function ShopEditClient({
                     </div>
                 </section>
             </section>
-        </div>
+        </fieldset>
     );
 }

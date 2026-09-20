@@ -90,20 +90,7 @@ export default function PublicMenuDetailBodyClient(props: {
     const preferencePanel = (
         <UserAllergenPreferencePanel
             allergens={allergensForClient}
-            targetSlugs={preferenceState.targetSlugs}
-            highlightSlugs={preferenceState.highlightSlugs}
-            excludedSlugs={preferenceState.excludedSlugs}
-            includeMayContain={preferenceState.includeMayContain}
-            loaded={preferenceState.loaded}
-            message={preferenceState.message}
-            isOpen={preferenceState.isOpen}
-            onToggleOpen={() => preferenceState.setIsOpen((prev) => !prev)}
-            onToggleTargetSlug={preferenceState.toggleTargetSlug}
-            onToggleIncludeMayContain={preferenceState.toggleIncludeMayContain}
-            onApplyHighlight={preferenceState.applyHighlight}
-            onApplyExclude={preferenceState.applyExclude}
-            onRemoveSelection={preferenceState.removeSelection}
-            onClear={preferenceState.onClear}
+            state={preferenceState}
         />
     );
 

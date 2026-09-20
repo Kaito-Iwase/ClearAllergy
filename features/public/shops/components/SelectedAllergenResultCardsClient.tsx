@@ -131,6 +131,9 @@ export default function SelectedAllergenResultCardsClient({
 
     return (
         <div className="space-y-3">
+            <p className="text-sm font-semibold text-gray-700">
+                確認対象 {selectedAllergens.length}件：{selectedAllergens.map((allergen) => allergen.nameJa).join("・")}
+            </p>
             {containsAllergens.length > 0 ? (
                 <AllergenInfoCard
                     title="選択中アレルゲンを含みます"
@@ -187,6 +190,18 @@ export default function SelectedAllergenResultCardsClient({
                         className="border-emerald-100 bg-white text-emerald-800"
                     />
                 </AllergenInfoCard>
+            ) : null}
+            {(hasRiskResults || hasUnknownResults) && freeAllergens.length > 0 ? (
+                <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+                    <p className="font-bold">選択中アレルゲンの登録状態</p>
+                    <p className="mt-1 text-xs leading-5">原材料に含まない登録は食品安全の保証ではありません。上の注意・補足情報も確認してください。</p>
+                    <ul className="mt-3 space-y-2">
+                        {freeAllergens.map((allergen) => <li key={allergen.slug}>
+                            <span className="font-semibold">{allergen.nameJa}</span>：原材料に含まない登録
+                            {storeHandledAllergenSlugs.includes(allergen.slug) && <span className="block text-xs text-amber-900">同店舗の別の公開登録に「含む」情報あり</span>}
+                        </li>)}
+                    </ul>
+                </div>
             ) : null}
         </div>
     );
