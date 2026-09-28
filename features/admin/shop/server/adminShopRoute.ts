@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { Hono } from "hono";
+import { handleUnhandledApiError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/lib/auth/admin-api-utils";
@@ -30,6 +31,7 @@ import {
 import { PREFECTURES } from "@/lib/constants/prefectures";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 const optionalText = z.string().nullable().optional();
 const shopUpdateSchema = z.object({

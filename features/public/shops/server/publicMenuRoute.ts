@@ -5,6 +5,7 @@ import { loadStoreAllergenSupplement } from "./storeAllergenSupplement";
 
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 import { prisma } from "@/lib/db";
 import {
     buildAllergenDisplayItems,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/utils/menu-image-display";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.get("/api/menus/:menuId", async (c) => {
     const req = c.req.raw;
@@ -161,14 +163,7 @@ app.get("/api/menus/:menuId", async (c) => {
             },
         });
     } catch (e) {
-        console.error(e);
-        if (process.env.NODE_ENV !== "production") {
-            const msg = e instanceof Error ? e.message : String(e);
-            return NextResponse.json(
-                { error: "Internal Server Error", message: msg },
-                { status: 500 },
-            );
-        }
+        logOperationalError(e, { operation: "public_menu_read" });
         return NextResponse.json(
             { error: "Internal Server Error" },
             { status: 500 },

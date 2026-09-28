@@ -7,8 +7,11 @@ import {
 } from "@/lib/auth/admin-api-security";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import { getIpFromHeaders } from "@/lib/utils/request-ip";
+import { enforceAuthAuditRateLimit, recordVerifiedAuthSession } from "@/lib/auth/auth-audit";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.post("/api/admin/auth/sso", async (c) => {
     const req = c.req.raw;
@@ -16,6 +19,8 @@ app.post("/api/admin/auth/sso", async (c) => {
     if (originError) {
         return originError;
     }
+    const requestLimit = enforceAuthAuditRateLimit(req);
+    if (requestLimit) return requestLimit;
 
     try {
         const body = await req.json().catch(() => null);
@@ -32,27 +37,13 @@ app.post("/api/admin/auth/sso", async (c) => {
             const limit = consumeIpAndIdentifierRateLimit({
                 scope: "admin-google-sso",
                 ip: getIpFromHeaders(req.headers),
-                identifier: "google",
+                identifier: getIpFromHeaders(req.headers),
                 ipLimit: 10,
                 identifierLimit: 10,
                 windowMs: 10 * 60 * 1000,
             });
 
             if (!limit.allowed) {
-                await writeAdminAuditLog({
-                    req,
-                    actorUserId: null,
-                    actorShopId: null,
-                    action: "auth_google_login_failure",
-                    targetType: "auth",
-                    targetId: null,
-                    success: false,
-                    metadata: {
-                        provider: "google",
-                        reason: "rate_limited",
-                    },
-                });
-
                 return NextResponse.json(
                     {
                         message:
@@ -68,12 +59,12 @@ app.post("/api/admin/auth/sso", async (c) => {
             }
         }
 
+        if (parsed.data.stage === "success") return await recordVerifiedAuthSession(req, "google");
+
         const action =
             parsed.data.stage === "start"
                 ? "auth_google_login_start"
-                : parsed.data.stage === "success"
-                  ? "auth_google_login_success"
-                  : "auth_google_login_failure";
+                : "auth_google_login_failure";
 
         await writeAdminAuditLog({
             req,
@@ -82,15 +73,16 @@ app.post("/api/admin/auth/sso", async (c) => {
             action,
             targetType: "auth",
             targetId: null,
-            success: parsed.data.stage !== "failure",
+            success: false,
             metadata: {
-                provider: "google",
-                reason: parsed.data.reason ?? null,
+                source: "client_report",
+                entrypoint: "google",
             },
         });
 
         return new NextResponse(null, { status: 204 });
-    } catch {
+    } catch (error) {
+        logOperationalError(error, { operation: "auth.sso.audit" });
         return NextResponse.json(
             { message: "Google ログイン監査の記録に失敗しました。" },
             { status: 500 },

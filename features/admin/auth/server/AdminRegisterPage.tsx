@@ -47,7 +47,7 @@ function buildSignUpUrl(searchParams: RegisterSearchParams) {
 export default async function AdminRegisterPage({
     searchParams,
 }: {
-    searchParams?: Promise<RegisterSearchParams> | RegisterSearchParams;
+    searchParams?: Promise<RegisterSearchParams>;
 }) {
     const resolvedSearchParams = (await searchParams) ?? {};
     const inviteToken =

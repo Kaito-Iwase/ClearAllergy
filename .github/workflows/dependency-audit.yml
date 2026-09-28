@@ -1,0 +1,36 @@
+name: Dependency audit
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/dependency-audit.yml
+  schedule:
+    - cron: "27 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - name: Align npm with application CI
+        run: npm install --global npm@11.18.0
+      # Read the locked dependency graph. No install, lifecycle scripts or fix.
+      - name: Check known vulnerabilities
+        run: npm audit --ignore-scripts --audit-level=high

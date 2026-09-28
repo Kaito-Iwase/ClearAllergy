@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 type HeaderLike =
     | Headers
     | HeadersInit
@@ -12,7 +14,7 @@ function firstForwardedIp(value: string | null) {
     }
 
     const first = value.split(",")[0]?.trim();
-    return first || null;
+    return first && isIP(first) ? first : null;
 }
 
 // 呼び出し元によって headers の型が違うので、
@@ -26,15 +28,11 @@ function toHeaders(headers: HeaderLike) {
 }
 
 // この関数は、レート制限や監査ログで使う送信元 IP を取得します。
-// 本番では CDN / リバースプロキシ配下になることが多いため、
-// 代表的なヘッダーを順番に見て、最後まで取れなければ "unknown" にします。
+// Vercel が上書きする x-forwarded-for だけを信頼します。他の配備環境は
+// proxyの信頼設定を確認するまでは共通の unknown バケットへ安全側に倒します。
 export function getIpFromHeaders(headers: HeaderLike) {
+    if (process.env.VERCEL !== "1") return "unknown";
     const safeHeaders = toHeaders(headers);
 
-    return (
-        firstForwardedIp(safeHeaders.get("x-forwarded-for")) ??
-        firstForwardedIp(safeHeaders.get("cf-connecting-ip")) ??
-        firstForwardedIp(safeHeaders.get("x-real-ip")) ??
-        "unknown"
-    );
+    return firstForwardedIp(safeHeaders.get("x-forwarded-for")) ?? "unknown";
 }

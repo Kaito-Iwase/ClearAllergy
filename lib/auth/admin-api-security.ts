@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { consumeRateLimit } from "@/lib/utils/rate-limit";
-
-function firstHeaderValue(value: string | null) {
-    return value?.split(",")[0]?.trim() || null;
-}
 
 export function enforceSameOriginAdminMutation(req: Request) {
     const method = req.method.toUpperCase();
@@ -20,44 +17,25 @@ export function enforceSameOriginAdminMutation(req: Request) {
         );
     }
 
-    let origin: URL;
-
     try {
-        origin = new URL(originHeader);
+        const origin = new URL(originHeader);
+        const requestUrl = new URL(req.url);
+        // Next.js can use the bind hostname in req.url. Host is the public request
+        // authority; the deployment proxy must preserve it and normalize the
+        // protocol before Next.js constructs the Request URL. Forwarded headers
+        // are not additional allowed origins.
+        const host = req.headers.get("host") ?? requestUrl.host;
+        const target = new URL(`${requestUrl.protocol}//${host}`);
+        if (
+            !["http:", "https:"].includes(requestUrl.protocol) ||
+            !/^[a-z0-9.[\]:-]+$/i.test(host) ||
+            originHeader !== origin.origin ||
+            origin.origin !== target.origin
+        ) {
+            return NextResponse.json({ error: "forbidden" }, { status: 403 });
+        }
     } catch {
-        return NextResponse.json(
-            { error: "forbidden" },
-            { status: 403 },
-        );
-    }
-
-    const requestUrl = new URL(req.url);
-    const forwardedHost = firstHeaderValue(req.headers.get("x-forwarded-host"));
-    const forwardedProto = firstHeaderValue(req.headers.get("x-forwarded-proto"));
-    const hostHeader = firstHeaderValue(req.headers.get("host"));
-    const allowedHosts = new Set(
-        [requestUrl.host, forwardedHost, hostHeader].filter(Boolean),
-    );
-    const allowedProtocols = new Set(
-        [
-            requestUrl.protocol.replace(":", ""),
-            forwardedProto,
-            origin.protocol.replace(":", ""),
-        ].filter(Boolean),
-    );
-
-    if (!allowedHosts.has(origin.host)) {
-        return NextResponse.json(
-            { error: "forbidden" },
-            { status: 403 },
-        );
-    }
-
-    if (!allowedProtocols.has(origin.protocol.replace(":", ""))) {
-        return NextResponse.json(
-            { error: "forbidden" },
-            { status: 403 },
-        );
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
     return null;
@@ -72,13 +50,13 @@ export function consumeIpAndIdentifierRateLimit(args: {
     windowMs: number;
 }) {
     const ipResult = consumeRateLimit({
-        key: `${args.scope}:ip:${args.ip}`,
+        key: `${args.scope}:ip:${createHash("sha256").update(args.ip).digest("hex")}`,
         limit: args.ipLimit,
         windowMs: args.windowMs,
     });
 
     const identifierResult = consumeRateLimit({
-        key: `${args.scope}:identifier:${args.identifier}`,
+        key: `${args.scope}:identifier:${createHash("sha256").update(args.identifier).digest("hex")}`,
         limit: args.identifierLimit,
         windowMs: args.windowMs,
     });

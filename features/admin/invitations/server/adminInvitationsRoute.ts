@@ -21,8 +21,9 @@ import {
     findClerkUserByEmail,
     revokeClerkApplicationInvitation,
 } from "@/lib/auth/clerkAdminServer";
-import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
 import { isDatabaseUnavailableError } from "@/lib/db/errors";
+import { writeAdminAuditLog } from "@/lib/audit-log";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 
 type InviteCreateBody = {
     email?: unknown;
@@ -32,6 +33,7 @@ type InviteCreateBody = {
 };
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 function isUniqueConstraintError(error: unknown) {
     return (
@@ -67,13 +69,14 @@ app.get("/api/admin/invitations", async () => {
         });
     } catch (error) {
         if (isDatabaseUnavailableError(error)) {
+            logOperationalError(error, { operation: "invitation.list", category: "database" });
             return NextResponse.json(
                 { message: "現在データベースへ接続できません。" },
                 { status: 503 },
             );
         }
 
-        console.error(error);
+        logOperationalError(error, { operation: "invitation.list", category: "unexpected" });
         return NextResponse.json(
             { message: "招待一覧の取得に失敗しました。" },
             { status: 500 },
@@ -84,6 +87,7 @@ app.get("/api/admin/invitations", async () => {
 app.post("/api/admin/invitations", async (c) => {
     const req = c.req.raw;
     let clerkInvitationId: string | null = null;
+    let failureCategory: "database" | "external_service" | "unexpected" = "unexpected";
 
     try {
         const originError = enforceSameOriginAdminMutation(req);
@@ -126,6 +130,7 @@ app.post("/api/admin/invitations", async (c) => {
         }
 
         const { email, shopId, shopName, expiresInDays } = parsed.data;
+        failureCategory = "database";
         await expirePendingInvitesForEmail(email);
         if (shopId) {
             await expirePendingInvitesForShop(shopId);
@@ -146,6 +151,7 @@ app.post("/api/admin/invitations", async (c) => {
             );
         }
 
+        failureCategory = "external_service";
         const existingClerkUser = await findClerkUserByEmail(email);
         if (existingClerkUser) {
             return NextResponse.json(
@@ -158,6 +164,7 @@ app.post("/api/admin/invitations", async (c) => {
         }
 
         if (shopId) {
+            failureCategory = "database";
             const existingShop = await prisma.shop.findUnique({
                 where: { id: shopId },
                 select: {
@@ -194,6 +201,7 @@ app.post("/api/admin/invitations", async (c) => {
             }
         }
 
+        failureCategory = "external_service";
         const clerkInvitation = await createClerkApplicationInvitation({
             email,
             expiresInDays,
@@ -205,6 +213,7 @@ app.post("/api/admin/invitations", async (c) => {
         clerkInvitationId = clerkInvitation.id;
 
         const expiresAt = getInvitationExpiresAt(expiresInDays);
+        failureCategory = "database";
         const invite = await prisma.$transaction(async (tx) => {
             const shop = shopId
                 ? await tx.shop.findUniqueOrThrow({
@@ -252,6 +261,19 @@ app.post("/api/admin/invitations", async (c) => {
             });
         });
 
+        clerkInvitationId = null;
+        failureCategory = "unexpected";
+        await writeAdminAuditLog({
+            req,
+            actorUserId: null,
+            actorShopId: invite.shopId,
+            action: "invitation_create",
+            targetType: "invitation",
+            targetId: invite.id,
+            success: true,
+            metadata: { actorClerkUserId: admin.clerkUserId },
+        });
+
         return NextResponse.json(
             {
                 message: "招待を作成しました。",
@@ -263,7 +285,12 @@ app.post("/api/admin/invitations", async (c) => {
     } catch (error) {
         if (clerkInvitationId) {
             await revokeClerkApplicationInvitation(clerkInvitationId).catch(
-                () => undefined,
+                (cleanupError: unknown) => {
+                    logOperationalError(cleanupError, {
+                        operation: "invitation.create.compensate",
+                        category: "external_service",
+                    });
+                },
             );
         }
 
@@ -275,6 +302,7 @@ app.post("/api/admin/invitations", async (c) => {
         }
 
         if (isDatabaseUnavailableError(error)) {
+            logOperationalError(error, { operation: "invitation.create", category: "database" });
             return NextResponse.json(
                 { message: "現在データベースへ接続できません。" },
                 { status: 503 },
@@ -288,13 +316,9 @@ app.post("/api/admin/invitations", async (c) => {
             );
         }
 
+        logOperationalError(error, { operation: "invitation.create", category: failureCategory });
         return NextResponse.json(
-            {
-                message: extractClerkErrorMessage(
-                    error,
-                    "招待の作成に失敗しました。",
-                ),
-            },
+            { message: "招待の作成に失敗しました。" },
             { status: 500 },
         );
     }

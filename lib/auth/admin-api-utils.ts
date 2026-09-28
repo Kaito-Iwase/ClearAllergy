@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentAdminContext } from "@/lib/auth/admin-auth";
 import { isDatabaseUnavailableError } from "@/lib/db/errors";
+import { logOperationalError } from "@/lib/observability";
 
 // request.json() は壊れた JSON で例外を投げるので、
 // 各 API で try/catch を増やしすぎないよう helper にしています。
@@ -61,16 +62,9 @@ export async function requireShopId() {
     };
 }
 
-// 開発中は原因を追いやすくしつつ、本番では内部情報を出しすぎないよう分けています。
+// 開発環境を含め、例外のmessageやstackをAPIレスポンスへ返さない。
 export function internalError(e: unknown) {
-    console.error(e);
-    if (process.env.NODE_ENV !== "production") {
-        const msg = e instanceof Error ? e.message : String(e);
-        return NextResponse.json(
-            { error: "Internal Server Error", message: msg },
-            { status: 500 },
-        );
-    }
+    logOperationalError(e, { operation: "admin_api" });
     return NextResponse.json(
         { error: "Internal Server Error" },
         { status: 500 },
