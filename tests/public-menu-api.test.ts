@@ -199,3 +199,16 @@ test("公開APIは不完全な公開メニューを補足情報の根拠にし�
     const body = await (await requestMenu()).json();
     assert.ok(body.menu.allergenDisplayItems.every((item: {storeHandlesAllergen: boolean}) => !item.storeHandlesAllergen));
 });
+
+test("公開APIのDB例外はレスポンスにも運用ログにも内部情報を出さない", async (t) => {
+    const logs: string[] = [];
+    t.mock.method(console, "error", (value: unknown) => logs.push(String(value)));
+    stubPrisma(t, {
+        findMenu: async () => { throw Object.assign(new Error("postgresql://user:secret@private-db/internal"), { code: "P1001" }); },
+    });
+    const response = await requestMenu();
+    assert.equal(response.status, 500);
+    assert.deepEqual(await response.json(), { error: "Internal Server Error" });
+    assert.ok(logs.some((line) => line.includes('"category":"database"')));
+    assert.ok(logs.every((line) => !line.includes("secret") && !line.includes("private-db")));
+});
