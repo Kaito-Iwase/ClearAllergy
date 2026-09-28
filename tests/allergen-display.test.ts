@@ -4,9 +4,15 @@ import test from "node:test";
 import {
     buildSelectedAllergenSummary,
     buildAllergenDisplayItems,
+    buildSpecifiedIngredientNotice,
     getStoreContainsAllergenSlugs,
+    getAllergenEffectiveRisk,
+    effectiveRiskLabelJa,
+    statusBadgeClass,
+    statusLabelJa,
     classifySelectedAllergenStatuses,
     type AllergenStatus,
+    type AllergenEffectiveRisk,
 } from "../lib/allergens";
 
 const names = new Map([
@@ -140,4 +146,29 @@ test("含む登録が3品目以上あっても他の含む・要確認情報を�
     assert.match(result.summaryText, /大豆（含む可能性あり・要確認）/);
     const allContains = summary({ wheat: "CONTAINS", egg: "CONTAINS", milk: "CONTAINS", soybean: "CONTAINS" }, [...names.keys()], false);
     for (const name of names.values()) assert.ok(allContains.summaryText.includes(name));
+});
+
+test("不正状態をFREEや安心側の表示に変換しない", () => {
+    const invalid = "UNRECOGNIZED" as AllergenStatus;
+    const [item] = buildAllergenDisplayItems(
+        [{ slug: "egg", nameJa: "卵", status: invalid }],
+        new Set(["egg"]),
+    );
+
+    assert.equal(item.status, "UNKNOWN");
+    assert.equal(item.effectiveRisk, "UNKNOWN");
+    assert.equal(getAllergenEffectiveRisk({ status: invalid, storeHandlesAllergen: false }), "UNKNOWN");
+    assert.equal(getAllergenEffectiveRisk({ status: invalid, storeHandlesAllergen: true }), "UNKNOWN");
+    assert.equal(statusLabelJa(invalid), statusLabelJa("UNKNOWN"));
+    assert.equal(statusBadgeClass(invalid), statusBadgeClass("UNKNOWN"));
+    assert.equal(
+        effectiveRiskLabelJa("UNRECOGNIZED" as AllergenEffectiveRisk),
+        effectiveRiskLabelJa("UNKNOWN"),
+    );
+    assert.equal(
+        buildSpecifiedIngredientNotice({
+            rows: [{ slug: "egg", nameJa: "卵", status: invalid }],
+        }).kind,
+        "unknown",
+    );
 });

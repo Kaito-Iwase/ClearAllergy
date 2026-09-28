@@ -148,6 +148,20 @@ test("公開APIはUNKNOWNを含む不完全メニューを404にする", async (
     assert.equal((await requestMenu()).status, 404);
 });
 
+test("公開APIはDB由来の不正状態を404にし、FREEとして返さない", async (t) => {
+    const allergenLinks = makeMenu().allergenLinks.map((link) => ({
+        ...link,
+        status: link.allergen.slug === "egg" ? "UNRECOGNIZED" : "FREE",
+    }));
+    stubPrisma(t, {
+        findMenu: async () => makeMenu({ allergenLinks }),
+    });
+
+    const response = await requestMenu();
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "menu not found" });
+});
+
 test("公開APIはDBマスタが29品目と一致しない場合404にする", async (t) => {
     stubPrisma(t, {
         findMenu: async () => makeMenu(),
