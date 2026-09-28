@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import Module, { createRequire } from "node:module";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
 
@@ -149,7 +150,8 @@ test("公開メニューを部分更新してUNKNOWNにすると、保存結果�
     });
     let storedPublication: unknown;
     replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
-        menuItem: { update: async ({ data }: Args) => {
+        menuItem: { update: async ({ where, data }: Args) => {
+            assert.deepEqual(where, { id: "own-menu", shopId: "own-shop" });
             storedPublication = data?.isPublished;
             return { id: "own-menu", isPublished: storedPublication };
         } },
@@ -171,4 +173,99 @@ test("DB保存に失敗した場合は成功IDを返さず500になる", async (
     const response = await menusRoute.POST(request("POST", "/api/admin/menus", "{}"));
     assert.equal(response.status, 500);
     assert.equal((await response.json()).id, undefined);
+});
+
+test("自店舗メニューの削除は店舗条件付きで実行し既存の成功形を返す", async (t) => {
+    setup(t);
+    replace(t, prisma.menuItem, "findFirst", async ({ where }: Args) => {
+        assert.deepEqual(where, { id: "own-menu", shopId: "own-shop" });
+        return { id: "own-menu", isPublished: false };
+    });
+    let deletedLinks = false;
+    replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
+        menuItemAllergen: { deleteMany: async ({ where }: Args) => {
+            assert.deepEqual(where, { menuItemId: "own-menu" });
+            deletedLinks = true;
+            return { count: 1 };
+        } },
+        menuItem: { delete: async ({ where }: Args) => {
+            assert.equal(deletedLinks, true);
+            assert.deepEqual(where, { id: "own-menu", shopId: "own-shop" });
+            return { id: "own-menu" };
+        } },
+    }));
+    const response = await menuRoute.DELETE(request("DELETE", "/api/admin/menus/own-menu"));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+});
+
+function setupMenuMovedAfterRead(t: TestContext) {
+    setup(t);
+    const initialLinks = ALLERGEN_MASTER.map((allergen) => ({
+        allergen: { slug: allergen.slug },
+        status: "FREE",
+    }));
+    const state = {
+        shopId: "own-shop",
+        name: "元のメニュー",
+        links: initialLinks,
+        deleted: false,
+    };
+    replace(t, prisma.menuItem, "findFirst", async ({ where }: Args) => {
+        assert.deepEqual(where, { id: "own-menu", shopId: "own-shop" });
+        state.shopId = "other-shop";
+        return {
+            id: "own-menu", name: state.name, isPublished: false,
+            priceYen: null, imageUrl: null, allergenLinks: initialLinks,
+        };
+    });
+    replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => {
+        const draft = { ...state, links: [...state.links] };
+        const notFound = () => new Prisma.PrismaClientKnownRequestError(
+            "record not found", { code: "P2025", clientVersion: Prisma.prismaVersion.client },
+        );
+        const result = await work({
+            menuItem: {
+                update: async ({ where, data }: Args) => {
+                    if (where?.id !== "own-menu" || (where.shopId && where.shopId !== draft.shopId)) throw notFound();
+                    draft.name = data?.name as string;
+                    return { id: "own-menu", shopId: draft.shopId, name: draft.name, isPublished: false };
+                },
+                delete: async ({ where }: Args) => {
+                    if (where?.id !== "own-menu" || (where.shopId && where.shopId !== draft.shopId)) throw notFound();
+                    draft.deleted = true;
+                    return { id: "own-menu" };
+                },
+            },
+            menuItemAllergen: {
+                deleteMany: async () => { draft.links = []; return { count: initialLinks.length }; },
+                createMany: async ({ data }: { data: typeof initialLinks }) => { draft.links = data; return { count: data.length }; },
+            },
+        });
+        Object.assign(state, draft);
+        return result;
+    });
+    return { state, initialLinks };
+}
+
+test("PUTの事前取得後にメニューが別店舗へ移ったら404で変更しない", async (t) => {
+    const { state, initialLinks } = setupMenuMovedAfterRead(t);
+    const response = await menuRoute.PUT(request("PUT", "/api/admin/menus/own-menu", '{"name":"変更後"}'));
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "menu not found" });
+    assert.equal(state.shopId, "other-shop");
+    assert.equal(state.name, "元のメニュー");
+    assert.deepEqual(state.links, initialLinks);
+    assert.equal(state.deleted, false);
+});
+
+test("DELETEの事前取得後にメニューが別店舗へ移ったら404でリンクも戻す", async (t) => {
+    const { state, initialLinks } = setupMenuMovedAfterRead(t);
+    const response = await menuRoute.DELETE(request("DELETE", "/api/admin/menus/own-menu"));
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "menu not found" });
+    assert.equal(state.shopId, "other-shop");
+    assert.equal(state.name, "元のメニュー");
+    assert.deepEqual(state.links, initialLinks);
+    assert.equal(state.deleted, false);
 });
