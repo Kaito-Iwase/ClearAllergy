@@ -18,7 +18,7 @@ import {
 } from "@/lib/utils/menu-image-display";
 
 type PageProps = {
-    params: Promise<{ menuId: string }> | { menuId: string };
+    params: Promise<{ menuId: string }>;
 };
 
 export default async function AdminMenuEditPage({ params }: PageProps) {

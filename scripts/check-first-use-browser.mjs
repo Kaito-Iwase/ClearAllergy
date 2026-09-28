@@ -39,6 +39,13 @@ try {
     page.on("pageerror", error => errors.push(error.message));
     await page.goto(base + "/shops");
     await page.getByRole("heading", { name: "条件に一致するClearAllergy登録済み店舗", exact: true }).waitFor();
+    for (const name of ["エリア・駅名", "店舗名・ジャンル・キーワード"]) {
+        assert.equal(await page.getByRole("textbox", { name, exact: true }).count(), 1);
+    }
+    for (const name of ["都道府県", "市区町村"]) {
+        assert.equal(await page.getByRole("combobox", { name, exact: true }).count(), 1);
+    }
+    pass("店舗検索の入力・地域選択を操作目的の名前で識別できる");
     const firstShop = page.locator('a[id^="shop-"]').first();
     const shopHref = await firstShop.getAttribute("href");
     assert.ok(shopHref, "専用テスト環境に公開店舗が必要です");
@@ -49,17 +56,17 @@ try {
     await screenshot(page, "03-shop-after-mobile");
     await search.fill("一致しない検証用メニュー");
     await search.press("Enter");
-    await page.getByText("検索条件に一致する公開メニューがありません。", { exact: true }).waitFor();
+    await page.getByRole("status").filter({ hasText: "検索条件に一致する公開メニューがありません。" }).waitFor();
     await screenshot(page, "04-empty-search-after");
     await page.getByRole("button", { name: "メニュー検索を解除", exact: true }).click();
     await page.waitForURL(base + shopHref, { waitUntil: "domcontentloaded" });
-    await page.locator('article[role="button"]').first().waitFor();
+    await page.locator('#public-menus').getByRole("link").first().waitFor();
     assert.equal(await search.inputValue(), "");
     await search.fill("カレー");
     await search.press("Enter");
     await page.waitForURL(base + shopHref + "?q=" + encodeURIComponent("カレー"), { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "豆乳ベジカレー", exact: true }).waitFor();
-    assert.equal(await page.locator('article[role="button"]').count(), 1);
+    assert.equal(await page.locator('#public-menus').getByRole("link").count(), 1);
     await visible(page.getByRole("button", { name: "検索をクリア", exact: true })).click();
     await page.waitForURL(base + shopHref, { waitUntil: "domcontentloaded" });
     pass("390pxの店舗内検索・Enter送信・0件からの解除・通常検索からの解除");
@@ -133,12 +140,18 @@ try {
     await openPreferences();
     await setMode("卵", "exclude");
     await apply();
+    await search.fill("米粉パンケーキ");
+    await search.press("Enter");
+    await page.getByRole("status").filter({ hasText: "除外設定により表示できるメニューがありません。" }).waitFor();
+    assert.equal(await page.locator('#public-menus').getByRole("link").count(), 0);
+    await visible(page.getByRole("button", { name: "検索をクリア", exact: true })).click();
+    await page.waitForURL(base + shopHref, { waitUntil: "domcontentloaded" });
     await page.getByRole("link", { name: "公開メニューを見る", exact: true }).click();
     await page.waitForURL(base + shopHref + "#public-menus");
     assert.equal(new URL(page.url()).pathname, shopHref);
     assert.equal(new URL(page.url()).hash, "#public-menus");
     await page.getByText("表示 2件 / 検索対象 3件", { exact: true }).waitFor();
-    assert.equal(await page.locator('article[role="button"]').count(), 2);
+    assert.equal(await page.locator('#public-menus').getByRole("link").count(), 2);
     pass("除外後の公開メニュー導線と表示件数が現在の一覧に一致");
 
     for (const width of [390, 1440]) {
@@ -147,8 +160,16 @@ try {
         assert.equal(await visible(page.getByRole("searchbox", { name: "この店舗のメニューを検索", exact: true })).count(), 1);
         await screenshot(page, `03-shop-after-${width}`);
     }
-    await page.locator('article[role="button"]').first().press("Enter");
+    const menuLink = page.locator('#public-menus').getByRole("link").first();
+    const menuHref = await menuLink.getAttribute("href");
+    assert.ok(menuHref?.startsWith(shopHref + "/menus/"));
+    await menuLink.focus();
+    assert.equal(await menuLink.evaluate((element) => element === document.activeElement), true);
+    await menuLink.press("Enter");
     await page.waitForURL(/\/menus\//, { waitUntil: "domcontentloaded" });
+    assert.equal(new URL(page.url()).pathname, menuHref);
+    await page.getByRole("heading", { level: 1 }).waitFor();
+    assert.equal(await page.getByRole("heading", { level: 1 }).count(), 1);
     await page.getByText("確認対象 3件：くるみ・卵・乳", { exact: true }).waitFor();
     await page.getByText("選択中アレルゲンの登録状態", { exact: true }).waitFor();
     await openPreferences();
@@ -202,6 +223,7 @@ try {
     pass("新規入力の破棄をボタン・リンク・再読込で保護し、キャンセルで保持、承認で移動、未入力は警告なし");
 
     await page.goto(base + "/admin/demo/menus");
+    assert.equal(await page.getByRole("searchbox", { name: "管理メニューを検索", exact: true }).count(), 1);
     await page.locator('a[href$="/edit"]').first().click();
     await page.waitForURL(/\/edit$/, { waitUntil: "domcontentloaded" });
     const editName = page.getByLabel("メニュー名", { exact: true });

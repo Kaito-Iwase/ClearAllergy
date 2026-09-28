@@ -8,6 +8,7 @@ import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
 // 通常表示と個人向け表示を切り替えてカード一覧を描画します。
 
 import React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     buildSelectedAllergenSummary,
@@ -112,11 +113,6 @@ export default function ShopMenuListClient({
         });
     }, [excludedSlugs, includeMayContain]);
 
-    function goToMenu(menuId: string) {
-        // カード全体を押した時にメニュー詳細へ移動します。
-        router.push(`/shops/${shopId}/menus/${menuId}`);
-    }
-
     const searchedMenus = React.useMemo(() => {
         if (q === "") {
             return menus;
@@ -175,7 +171,7 @@ export default function ShopMenuListClient({
             </div>
 
             {searchedMenus.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
+                <div role="status" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
                     <p className="text-sm text-gray-700">
                         {q !== ""
                             ? "検索条件に一致する公開メニューがありません。"
@@ -189,17 +185,13 @@ export default function ShopMenuListClient({
                     ) : null}
                 </div>
             ) : visibleMenuItems.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-red-200 bg-red-50 p-6">
+                <div role="status" className="rounded-xl border border-dashed border-red-200 bg-red-50 p-6">
                     <p className="text-sm font-bold text-red-800">
                         除外設定により表示できるメニューがありません。
                     </p>
                     <p className="mt-2 text-xs leading-5 text-red-700">
                         必要に応じて、あなた向けのアレルゲン設定で「除外」を外してください。
                     </p>
-                </div>
-            ) : visibleMenuItems.length === 0 ? (
-                <div role="status" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-700">
-                    検索に一致したメニューはすべて除外設定により非表示です。アレルゲン設定で除外条件を確認・変更できます。
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -227,18 +219,11 @@ export default function ShopMenuListClient({
                             : overallSummary;
 
                         return (
-                            <article
+                            <Link
                                 key={menu.id}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => goToMenu(menu.id)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
-                                        goToMenu(menu.id);
-                                    }
-                                }}
-                                className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#13ec13]/50"
+                                href={`/shops/${shopId}/menus/${menu.id}`}
+                                prefetch={false}
+                                className="group block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
@@ -289,11 +274,11 @@ export default function ShopMenuListClient({
                                     <p className="mt-2 text-xs leading-5 text-amber-900">{STORE_ALLERGEN_NOTE}</p>
                                 ) : null}
                                 {hasPreference ? (
-                                    <p className="mt-2 text-[11px] text-gray-400">
+                                    <p className="mt-2 text-[11px] text-gray-600">
                                         強調・除外の設定に基づく表示
                                     </p>
                                 ) : null}
-                            </article>
+                            </Link>
                         );
                     })}
                 </div>

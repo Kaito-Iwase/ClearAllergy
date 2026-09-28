@@ -122,7 +122,7 @@ export default function PublicMenuDetailBodyClient(props: {
                                 <div
                                     className="absolute inset-0"
                                     style={imageStyle}
-                                    aria-label={menuName}
+                                    aria-hidden="true"
                                 />
                             )}
                         </div>
@@ -144,9 +144,9 @@ export default function PublicMenuDetailBodyClient(props: {
                                     )}
                                 </div>
 
-                                <h2 className="mb-2 text-3xl font-extrabold">
+                                <h1 className="mb-2 text-3xl font-extrabold">
                                     {menuName}
-                                </h2>
+                                </h1>
 
                                 {description ? (
                                     <p className="mb-4 text-lg text-gray-600">
@@ -194,7 +194,7 @@ export default function PublicMenuDetailBodyClient(props: {
                     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                             <span className="text-[#13ec13]">🧺</span>
-                            <h3 className="text-xl font-bold">原材料名</h3>
+                            <h2 className="text-xl font-bold">原材料名</h2>
                         </div>
 
                         {ingredients ? (
@@ -217,9 +217,9 @@ export default function PublicMenuDetailBodyClient(props: {
                     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                             <span className="text-[#13ec13]">🧾</span>
-                            <h3 className="text-xl font-bold">
+                            <h2 className="text-xl font-bold">
                                 アレルゲン（{rows.length}品目）
-                            </h3>
+                            </h2>
                         </div>
 
                         <p className="mb-4 text-sm leading-6 text-gray-700">「原材料に含まない登録」は食品安全の保証ではありません。「含む可能性あり・要確認」は、含む可能性があり、確認が必要な状態です。</p>
@@ -256,7 +256,7 @@ export default function PublicMenuDetailBodyClient(props: {
                     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2">
                             <span className="text-orange-500">ℹ️</span>
-                            <h3 className="text-lg font-bold">注意事項</h3>
+                            <h2 className="text-lg font-bold">注意事項</h2>
                         </div>
 
                         <ul className="list-disc space-y-2 pl-4 text-sm text-gray-600">
@@ -271,7 +271,7 @@ export default function PublicMenuDetailBodyClient(props: {
                     </div>
 
                     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
-                        <h3 className="text-lg font-bold">店舗</h3>
+                        <h2 className="text-lg font-bold">店舗</h2>
                         <p className="mt-2 text-sm text-gray-600">
                             {shopName}
                         </p>

@@ -159,6 +159,7 @@ export default function MenuEditClient(props: {
     const [creating, setCreating] = React.useState(false);
     const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+    const [nameInvalid, setNameInvalid] = React.useState(false);
     const [saved, setSaved] = React.useState(false);
     const unknownAllergenNames = React.useMemo(
         () => getUnknownAllergenNames({ allergens, statusBySlug }),
@@ -280,6 +281,7 @@ export default function MenuEditClient(props: {
     async function onSave() {
         if (saving || uploading || creating) return;
         setError(null);
+        setNameInvalid(false);
         setSaved(false);
 
         if (readOnly) {
@@ -291,6 +293,7 @@ export default function MenuEditClient(props: {
         }
 
         if (!name.trim()) {
+            setNameInvalid(true);
             setError("メニュー名は必須です。");
             return;
         }
@@ -497,7 +500,7 @@ export default function MenuEditClient(props: {
                     {hasUnsavedChanges ? " ／ 未保存の変更があります" : ""}
                 </p>
                 {error && (
-                    <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    <div id="edit-menu-error" role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                         {error}
                     </div>
                 )}
@@ -520,9 +523,12 @@ export default function MenuEditClient(props: {
                             メニュー名
                         </label>
                         <input id="edit-menu-field-1"
+                            aria-required="true"
+                            aria-invalid={nameInvalid}
+                            aria-describedby={nameInvalid && error ? "edit-menu-error" : undefined}
                             maxLength={120}
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => { setName(e.target.value); setNameInvalid(false); }}
                             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
                             placeholder="例：米粉パンケーキ"
                         />

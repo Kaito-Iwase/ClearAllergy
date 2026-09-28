@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/lib/utils/api-error-message";
 
 const DELETE_ERROR_MESSAGE =
@@ -75,6 +75,8 @@ export default function MenuListPageClient({
     const [q, setQ] = useState("");
     const [filter, setFilter] = useState<FilterKey>("all");
     const [error, setError] = useState<string | null>(null);
+    const [deletingMenuId, setDeletingMenuId] = useState<string | null>(null);
+    const deleting = useRef(false);
 
     const stats = useMemo(() => {
         const needsAllergenCount = menus.filter(
@@ -117,6 +119,7 @@ export default function MenuListPageClient({
     }, [menus, q, filter]);
 
     const onDelete = async (menuId: string, menuName: string) => {
+        if (deleting.current) return;
         setError(null);
 
         if (readOnly) {
@@ -132,16 +135,25 @@ export default function MenuListPageClient({
         );
         if (!ok) return;
 
-        const res = await fetch(`/api/admin/menus/${menuId}`, {
-            method: "DELETE",
-        });
+        deleting.current = true;
+        setDeletingMenuId(menuId);
+        try {
+            const res = await fetch(`/api/admin/menus/${menuId}`, {
+                method: "DELETE",
+            });
 
-        if (!res.ok) {
-            setError(await getApiErrorMessage(res, DELETE_ERROR_MESSAGE));
-            return;
+            if (!res.ok) {
+                setError(await getApiErrorMessage(res, DELETE_ERROR_MESSAGE));
+                return;
+            }
+
+            setMenus((prev) => prev.filter((menu) => menu.id !== menuId));
+        } catch {
+            setError(DELETE_ERROR_MESSAGE);
+        } finally {
+            deleting.current = false;
+            setDeletingMenuId(null);
         }
-
-        setMenus((prev) => prev.filter((menu) => menu.id !== menuId));
     };
 
     const filterItems: Array<{
@@ -162,7 +174,7 @@ export default function MenuListPageClient({
     return (
         <div className="space-y-5">
             {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
@@ -191,6 +203,8 @@ export default function MenuListPageClient({
                         search
                     </span>
                     <input
+                        type="search"
+                        aria-label="管理メニューを検索"
                         className="h-12 w-full rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-3 text-base outline-none transition focus:border-[#0f4c2f] focus:bg-white focus:ring-2 focus:ring-[#0f4c2f]/10 sm:text-sm"
                         placeholder="検索（メニュー名・カテゴリ・未設定アレルゲン）"
                         value={q}
@@ -206,6 +220,7 @@ export default function MenuListPageClient({
                             <button
                                 key={item.key}
                                 type="button"
+                                aria-pressed={selected}
                                 onClick={() => setFilter(item.key)}
                                 className={`inline-flex min-h-11 w-full shrink-0 items-center justify-between gap-2 rounded-xl px-4 py-2 text-sm font-bold transition sm:w-auto sm:rounded-full ${
                                     selected
@@ -381,15 +396,15 @@ export default function MenuListPageClient({
                                         onClick={() =>
                                             onDelete(menu.id, menu.name)
                                         }
-                                        disabled={readOnly}
+                                        disabled={readOnly || deletingMenuId !== null}
                                         className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                                         aria-label={`${menu.name}を削除`}
                                     >
-                                        <span className="material-symbols-outlined text-[20px]">
+                                        <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
                                             delete
                                         </span>
                                         <span className="ml-1 sm:sr-only">
-                                            削除
+                                            {deletingMenuId === menu.id ? "削除中…" : "削除"}
                                         </span>
                                     </button>
                                 </div>

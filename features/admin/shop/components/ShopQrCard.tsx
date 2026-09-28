@@ -118,6 +118,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                         <button
                                             key={option.sizeMm}
                                             type="button"
+                                            aria-pressed={selected}
                                             onClick={() =>
                                                 setQrSizeMm(option.sizeMm)
                                             }
@@ -205,7 +206,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                         </div>
 
                         {copiedMessage ? (
-                            <p className="text-sm font-medium text-green-700">
+                            <p role="status" className="text-sm font-medium text-green-700">
                                 {copiedMessage}
                             </p>
                         ) : null}

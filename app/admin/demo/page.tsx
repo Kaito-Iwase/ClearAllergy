@@ -62,7 +62,8 @@ async function getDemoShop() {
 }
 
 export default async function AdminDemoPage() {
-    const demoShop = await getDemoShop().catch(() => null);
+    // 取得失敗はerror境界へ渡す。データがない場合とDB障害を混同しない。
+    const demoShop = await getDemoShop();
 
     return (
         <AdminDashboardShell

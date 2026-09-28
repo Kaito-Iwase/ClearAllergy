@@ -236,16 +236,19 @@ export default function PublicShopListClient({
                     <input
                         value={area}
                         onChange={(e) => setArea(e.target.value)}
+                        aria-label="エリア・駅名"
                         placeholder="エリア・駅名"
                         className="rounded-xl border border-neutral-300 px-4 py-3"
                     />
                     <input
                         value={keyword}
                         onChange={(e) => setKeyword(e.target.value)}
+                        aria-label="店舗名・ジャンル・キーワード"
                         placeholder="店舗名・ジャンル・キーワード"
                         className="rounded-xl border border-neutral-300 px-4 py-3"
                     />
                     <select
+                        aria-label="都道府県"
                         value={prefecture}
                         onChange={(e) => {
                             setPrefecture(e.target.value);
@@ -261,6 +264,7 @@ export default function PublicShopListClient({
                         ))}
                     </select>
                     <select
+                        aria-label="市区町村"
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
                         className="rounded-xl border border-neutral-300 px-3 py-3"
@@ -306,6 +310,7 @@ export default function PublicShopListClient({
                 </div>
                 {locationMessage ? (
                     <p
+                        role="status"
                         className={`mt-3 rounded-xl px-4 py-3 text-xs font-bold ${
                             locationStatus === "error"
                                 ? "bg-amber-50 text-amber-900"
@@ -351,7 +356,7 @@ export default function PublicShopListClient({
                 <h2 className="text-xl font-black text-neutral-900">
                     条件に一致するClearAllergy登録済み店舗
                 </h2>
-                <p className="mt-1 text-sm text-neutral-500">
+                <p role="status" className="mt-1 text-sm text-neutral-600">
                     {filtered.exact.length}件
                 </p>
                 <div className="mt-4">
@@ -373,7 +378,7 @@ export default function PublicShopListClient({
                     <h2 className="text-xl font-black text-neutral-900">
                         条件の一部に一致する店舗
                     </h2>
-                    <p className="mt-1 text-sm text-neutral-500">
+                    <p className="mt-1 text-sm text-neutral-600">
                         {filtered.related.length}件
                     </p>
                     <div className="mt-4">

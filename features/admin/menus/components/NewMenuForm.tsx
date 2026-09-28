@@ -103,6 +103,7 @@ export default function NewMenuForm({
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+    const [nameInvalid, setNameInvalid] = React.useState(false);
     const unknownAllergenNames = React.useMemo(
         () => getUnknownAllergenNames({ allergens, statusBySlug }),
         [allergens, statusBySlug],
@@ -218,6 +219,7 @@ export default function NewMenuForm({
         e.preventDefault();
         if (isSubmitting || uploading) return;
         setError(null);
+        setNameInvalid(false);
 
         if (readOnly) {
             setError(
@@ -228,6 +230,7 @@ export default function NewMenuForm({
 
         const trimmed = name.trim();
         if (!trimmed) {
+            setNameInvalid(true);
             setError("名前は必須です。");
             return;
         }
@@ -294,7 +297,7 @@ export default function NewMenuForm({
             <fieldset disabled={isSubmitting || uploading} className="min-w-0 space-y-6">
                 <legend className="sr-only">メニュー作成</legend>
             {error && (
-                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <div id="new-menu-error" role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                     {error}
                 </div>
             )}
@@ -374,9 +377,12 @@ export default function NewMenuForm({
                             メニュー名
                         </label>
                         <input id="new-menu-field-1"
+                            aria-required="true"
+                            aria-invalid={nameInvalid}
+                            aria-describedby={nameInvalid && error ? "new-menu-error" : undefined}
                             maxLength={120}
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => { setName(e.target.value); setNameInvalid(false); }}
                             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
                             placeholder="例：季節の野菜カレー"
                         />

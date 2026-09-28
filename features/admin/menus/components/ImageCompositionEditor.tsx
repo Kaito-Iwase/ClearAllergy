@@ -270,9 +270,6 @@ function ImagePreview({
             onPointerCancel={onPointerUp}
             onWheelCapture={onWheel}
             onDoubleClick={onDoubleClick}
-            role="application"
-            aria-label="画像をドラッグして表示位置を調整"
-            tabIndex={0}
         >
             <Image
                 src={imageSrc}
