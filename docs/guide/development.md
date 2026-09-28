@@ -14,7 +14,7 @@
 | ホストの `npm.cmd run dev` | 通常3000番 | 環境変数で指定。ローカルDBを自動作成しない | 開発者が用意した接続。実データの接続を安易に流用しない |
 | `compose.yaml` | localhost:3100 | **DBサービスなし**。`.env` / `.env.local` の接続先 | Linuxコンテナ内でアプリを動かす通常開発 |
 | `compose.test.yaml` | localhost:3101 | Compose内部の `test-db`、PostgreSQL 17、DB名 `clearallergy_test`。ホストへDBポートを出さない | 保存・所有権・公開の検証用。Clerk開発環境とBlobは外部接続が残る |
-| GitHub Actions | ジョブ内3000番 | そのジョブだけのPostgreSQL 17 | CI（変更ごとの自動検査）。公開画面だけを架空データで検証。実Clerk認証・Blob更新なし |
+| GitHub Actions | ジョブ内3000番 | そのジョブだけのPostgreSQL 17 | CI（変更ごとの自動検査）。DB制約と公開画面を架空データで検証。実Clerk認証・Blob更新なし |
 
 Dockerはアプリを決まった実行環境に包む仕組み、Composeは複数のサービスを設定ファイルでまとめて起動する仕組みです。通常構成ではDBも隔離される、という意味ではありません。Docker DesktopのLinuxコンテナ機能が必要です。
 
@@ -39,6 +39,8 @@ DBデータ・コンテナ内依存・`.next`（Next.jsの生成物）はそれ�
 | `ADMIN_REGISTRATION_MODE` / `ADMIN_REGISTRATION_INVITE_TOKEN` | 旧登録方式の設定。現行の自己登録停止を解除しない |
 
 `NEXT_PUBLIC_` が付いた値はブラウザへ届き得ます。秘密鍵やDB URLには使いません。ローカルで不足したキーを、CI用の非実在値や本番値で埋めればよいという手順ではありません。
+
+IP制限では、Vercelが自動で設定する `VERCEL=1` の環境だけ転送IPを使います。他の配備先でこの値を手動設定して信頼判定を迂回しないでください。Vercel以外ではIPが不明な共通枠を使うため、複数利用者で制限枠を共有します。[同一オリジンと回数制限](rules.md#request-security)を読み、別のプロキシを使う場合は公開Host・プロトコルと信頼するIP取得経路を検証します。
 
 <a id="startup"></a>
 ## 2. 起動する
@@ -112,6 +114,7 @@ docker compose -f compose.test.yaml ps
 | `npm.cmd run build` | `prebuild` のPrisma生成後、本番向けのNext.js成果物を作る | 終了コード0と生成結果。静的生成時にDB読取や外部取得があり得るため接続先を事前確認 |
 | `npx.cmd prisma validate` | DB構造定義の妥当性 | 検証成功。実DBとの一致までは保証しない |
 | `npx.cmd prisma generate` | 定義からPrisma Clientを生成 | 生成成功。DBを初期化するコマンドではない |
+| `npm.cmd audit --ignore-scripts --audit-level=high` | lockfileの依存関係について既知の脆弱性を照会。ネットワークを使うが自動修正しない | 終了コードと各重大度の件数を記録。通信失敗を脆弱性なしと扱わず、コード全体の安全性とも区別する |
 
 通常のコード変更はlint・型・テスト・buildが最低限です。文書だけならリンク・実装照合・差分確認で省略でき、理由を報告します。Docker内では `npm.cmd` ではなく `npm` を使い、たとえば `docker compose -f compose.test.yaml exec app npm test` とします。
 
@@ -126,24 +129,28 @@ docker compose -f compose.test.yaml up -d app
 <a id="browser"></a>
 ### ブラウザ・実DB検証
 
-ブラウザ回帰は、既に利用できるPlaywright（ブラウザ操作の自動化ツール）とChromiumを指定します。アプリの依存として追加されている前提ではありません。Windowsホスト用の実在パスを確認し、次のプレースホルダーを置き換えてください。
+ブラウザ回帰は `scripts/browser-runner.mjs` でPlaywright 1.61.0とChromiumを隔離して用意します。アプリの依存とlockfileは変更しません。既定の保存先はOSの一時ディレクトリ内の `clearallergy-browser-1.61.0` で、`CLEARALLERGY_BROWSER_RUNNER_DIR` で変更できます。初回の `install` はネットワークから検証ツールを取得するため、利用可能な環境で実行します。アプリの既存依存が必要です。
 
 ```powershell
-$env:PLAYWRIGHT_MODULE_PATH = 'C:\実在する場所\playwright'
-$env:BROWSER_EXECUTABLE = 'C:\実在する場所\chrome.exe'
-node scripts/check-first-use-browser.mjs
+node scripts/browser-runner.mjs install
+node scripts/browser-runner.mjs public
 ```
 
-1行目はモジュールの場所、2行目は実行するブラウザ、3行目は回帰の実行です。先の2行はそのままでは実行可能な例ではありません。既に解決できる環境なら指定を省略できます。既定の接続先はlocalhost:3101。公開済みの架空メニュー（豆乳ベジカレーなど）と管理デモが必要です。
+1行目は初回準備、2行目は公開画面の回帰です。アプリとDBは別途起動しておきます。既定の接続先はlocalhost:3101で、公開済みの架空メニュー（豆乳ベジカレーなど）が必要です。LinuxのCIなどでブラウザ用のOSライブラリも必要な場合だけ `install --with-deps` を使います。Windowsの通常準備には付けません。
+
+`node scripts/browser-runner.mjs demo` は公開画面と保存しない管理デモ、`node scripts/browser-runner.mjs admin` は専用環境の管理操作を確認します。後者はDB・開発用Clerk・Blobへの書込を伴い、専用アカウントと保存先の許可が必要です。ランナーの準備だけで認証情報やテストデータが作られるわけではありません。
 
 | 確認スクリプト | 対象・副作用・成功時の確認 |
 | --- | --- |
 | `scripts/check-first-use-browser.mjs` | 公開検索、スマホ表示、個人設定の追加・解除・競合・保存失敗、詳細遷移、デモの未保存保護等。ブラウザ内設定を操作しDB更新はしない。PASS出力とスクリーンショットを確認 |
-| `scripts/check-test-browser.mjs` | 固定localhost:3101、専用アカウントファイル、Dockerのテストアプリを使う。実Clerkログイン、店舗説明更新、メニュー作成・公開・編集・削除、Blob画像追加、別店舗拒否。許可した専用環境だけで `node scripts/check-test-browser.mjs` を実行 |
-| `scripts/check-test-database.ts` | 専用DBガード後、一時店舗等を書き込み、欠損・UNKNOWNの自動非公開、MAY_CONTAINの公開維持、ロールバックを確認。自分が作った店舗を最後に削除。`docker compose -f compose.test.yaml exec app node --import tsx scripts/check-test-database.ts` |
+| `scripts/check-test-browser.mjs` | 固定localhost:3101、専用アカウントファイル、Dockerのテストアプリを使う。実Clerkログイン、店舗説明更新、メニュー作成・公開・編集・削除、Blob画像追加、別店舗拒否。許可した専用環境だけでランナーの `admin` を実行 |
+| `scripts/check-test-database.ts` | 専用DBガード後、共通の `scripts/database-regression.ts` で公開条件、リンク置換、メニュー移転後の店舗条件付き更新・削除と巻戻し、pending招待の一意性、行ロック、受諾済み行への取消防止、招待置換失敗の巻戻しを確認。当該実行の一時店舗・監査記録だけを最後に削除。`docker compose -f compose.test.yaml exec app node --import tsx scripts/check-test-database.ts` |
+| `scripts/check-ci-database.ts` | CI専用接続先のガード後、同じ実DB回帰を実行。CIのfixture準備後に `node --import tsx scripts/check-ci-database.ts`。通常の開発DBや共有DBに接続先を差し替えて実行しない |
 | `scripts/cleanup-test-images.ts` | 記録ファイルのURLが専用店舗の画像か検証し、Blobから削除する。削除の許可があるときだけ `docker compose -f compose.test.yaml exec app node --import tsx scripts/cleanup-test-images.ts`。失敗時は記録ファイルを保持 |
 
-最初の回帰だけ、`CLEARALLERGY_BROWSER_BASE_URL` で接続先、`CLEARALLERGY_BROWSER_OUTPUT` で画像出力先、`CLEARALLERGY_BROWSER_PUBLIC_ONLY=true` で公開側のみ、`CLEARALLERGY_BROWSER_BLOCK_EXTERNAL=true` でブラウザ外部通信遮断を指定できます。後者はアプリサーバーの外部通信まで止めるものではありません。`check-test-browser.mjs` の接続先を同じ変数で変えられると推測しないでください。
+`public` / `demo` は `CLEARALLERGY_BROWSER_BASE_URL` で接続先、`CLEARALLERGY_BROWSER_OUTPUT` で画像出力先を変更でき、ブラウザの外部通信を遮断します。これはアプリサーバーの外部通信まで止めるものではありません。`admin` の接続先はlocalhost:3101固定です。既存ブラウザを使う場合は `BROWSER_EXECUTABLE` に実在する実行ファイルを指定できます。既存スクリプトを直接起動する場合は従来どおり `PLAYWRIGHT_MODULE_PATH` 等の解決が必要です。
+
+実DB回帰はClerkやBlobを呼びません。DB制約の成功と実セッションによる別店舗拒否は別の確認です。招待の外部サービス失敗・補償はAPIモックテストでも確認しますが、実Clerkとの通信結果が不明な場合の運用まで実証したことにはなりません。
 
 ### 自動テストで置き換えられない手動確認
 
@@ -155,15 +162,39 @@ node scripts/check-first-use-browser.mjs
 <a id="operations"></a>
 ## 5. 運用スクリプトとCI/CD
 
-`seed` は起動コマンドではありません。既存デモの更新、同名メニューと品目リンクの再作成、古いマスタの削除、条件付きClerk同期を含みます。`auth:create:test-user`、`auth:migrate:clerk` はClerk・DB更新、`allergens:backfill:pistachio`、`repair:published-menus` はDB補正を伴います。`allergens:check` も実DBを読むので接続先を確認します。名前だけで安全と判断せず、変更対応表から本体を読んでください。
+`auth:create:test-user` は廃止しました。旧コマンド名を実行しても、環境ファイル・DB・Clerkを読み込まず、終了コード1で停止します。既存アカウントのパスワードを上書きする機能はありません。テストアカウントが必要な場合は、接続先を検査する[専用テスト環境](#test-environment)の手順を使います。
+
+`seed` は起動コマンドではありません。既存デモの更新、同名メニューと品目リンクの再作成、古いマスタの削除、条件付きClerk同期を含みます。`auth:migrate:clerk` はClerk・DB更新、`allergens:backfill:pistachio`、`repair:published-menus` はDB補正を伴います。これらの既存運用コマンドが廃止コマンドと同じく自動拒否されるわけではありません。`allergens:check` も実DBを読むので接続先を確認します。名前だけで安全と判断せず、変更対応表から本体を読んでください。
 
 CI定義は `.github/workflows/ci.yml`。main/develop向けPR、両ブランチへのpush、手動実行で動きます。同じ参照の古い実行をキャンセルし、`Test, lint, typecheck, and build` のジョブで次を順に行います。
 
-依存配置 → Prisma生成 → 単体テスト → lint → 型確認 → CI専用DB準備 → build → 起動 → 公開ブラウザ回帰 → スクリーンショット保存。
+依存配置 → Prisma生成・validate → 単体テスト → lint → 型確認 → CI専用DB準備 → 実DB回帰 → build → ブラウザランナー準備 → 起動 → 公開ブラウザ回帰 → 成果物保存。
 
-専用DB準備は `scripts/setup-ci-env.ts` / `ci-environment.ts` が固定した一時DBを確認し、既存ユーザー・店舗・メニューがあれば投入を拒否します。架空1店舗3メニューを用意し、GitHub Secretsや実Clerk・Blobを使いません。ブラウザ用Playwrightはジョブの一時ディレクトリに用意し、画像成果物はSHA（コミットの識別値）付きで7日間保存します。
+専用DB準備は `scripts/setup-ci-env.ts` / `ci-environment.ts` が固定した一時DBへの両接続URLと有効化フラグを検査し、既存マイグレーションを適用します。その後、既存ユーザー・店舗・メニューがあればfixture投入を拒否します。架空1店舗3メニューを用意し、GitHub Secretsや実Clerk・Blobを使いません。実DB回帰はマイグレーション由来の部分一意インデックスと制約トリガーも対象です。既存環境のリセットや本番DBの適用状況確認ではありません。
+
+ブラウザ用Playwrightはジョブの一時ディレクトリに用意します。失敗時は `scripts/collect-ci-diagnostics.ts` がCI用の接続設定と実行フラグを確認し、生のサーバーログから固定した分類・件数だけの要約を作ります。生ログ・認証情報・入力本文を成果物へ掲載する方式ではありません。スクリーンショットと存在する診断要約をSHA（コミットの識別値）付きで7日間保存します。
+
+依存検査は別の `.github/workflows/dependency-audit.yml` が担当します。main/develop向けの依存ファイル・当該workflow変更PR、毎週月曜03:27 UTC（12:27 JST）、手動実行が入口です。`npm audit --ignore-scripts --audit-level=high` で既知の高・重大の問題を検出すると失敗します。自動修正やパッケージ更新はしません。通信障害の失敗と検出された脆弱性を区別して調べます。
+
+### 要求IDから障害を調べる
+
+API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、対応する `request_completed` / `operation_failed` の分類・処理時間を確認します。分類がDBなら接続状態、外部サービスならClerk・Blob等の当該操作を、許可された環境で確認します。秘密値、本文、セッション、生の例外を追加ログへ写す必要はありません。通常のAPI以外は同じ要求IDで追えるとは限りません。[記録範囲](architecture.md#observability)を参照してください。
+
+招待取消が502ならローカルでは取消済みの可能性があるため、画面を再読込して取消再試行の表示を確認します。受諾と競合した409は確定済み状態を再確認し、受諾済みを取消扱いに上書きしません。補償取消の失敗や通信結果が不明な場合は、権限を持つ運営者がDBの対象招待とClerkを照合します。自動で解決済みと判断せず、外部データの修正は対象・副作用を確認して行います。
 
 CDは配備・公開の自動化のことです。このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
+
+### 公開前と障害時の確認
+
+公開前には、対象SHAのCI結果、PreviewとProductionのDB・Clerk・Blobの分離、適用済みmigration、正規HTTPSでのOrigin検査、画像アップロード上限、ログ保管期間・閲覧権限・通知先を確認します。配備設定の名前や画面が存在するだけで、動作確認済みとはしません。秘密値は記録せず、確認した対象・日時・結果を残します。
+
+API障害はレスポンスの `X-Request-Id` から `request_completed` / `operation_failed` を照合し、ルート、分類、HTTP状態、時間で切り分けます。要求本文・Cookie・認証ヘッダーを調査用ログに追加しません。ページ描画のエラーは `instrumentation.ts` の固定ルート名で調べますが、APIと同じ要求IDが付く保証はありません。
+
+招待の外部処理が失敗した場合は、取消済みで外部IDが残る行の再試行を先に検討します。結果不明や補償取消失敗では対象のClerk招待とDBを運営者が照合し、受諾済み状態や店舗所有者を古い要求で戻しません。監査の成功は記録したDB操作の成功であり、メール配送やClerkとの完全一致の証明ではありません。
+
+復旧では既知の正常SHAへのアプリの切戻しとDB復元を分けます。アプリを戻しても適用済みmigrationや変更データは戻りません。Neonのバックアップ保持・復元先・復元権限を確認し、復元訓練は許可された隔離DBで実施します。本番リセットや逆向きSQLを即席で実行しません。今回の改善では新規migrationはありません。
+
+構造化ログは追加しましたが、通知先へのアラート配送やブラウザ例外収集は未導入です。既存配備ログの通知・保持で不足するかを確認してから、Sentry等の料金、担当人数、ソースマップの非公開管理、個人情報除去、通知試験を判断します。Replayや全要求トレースを一律に収集する構成ではありません。
 
 <a id="troubleshooting"></a>
 ## よくある失敗：原因 → 修正箇所 → 再確認
@@ -175,10 +206,15 @@ CDは配備・公開の自動化のことです。このCIにはVercelへのdepl
 | DBを読み込めない／P1001等 | `.env.local` の優先、接続先、ネットワーク、test-dbの健康状態。パスワードをログに出さない | 対象DB確認後、公開一覧と管理側を再確認 |
 | テスト初期化のガードで停止 | 通常Composeで実行、接続URLの片方だけ違う、Clerkが本番用 | `compose.test.yaml` と開発用キーを確認。ガードは削除しない |
 | ログインできるが編集できない | `User.clerkUserId`、所有稼働店舗、ポートフォリオ制限。認証成功だけでは不十分 | 許可された専用アカウントで確認。他店舗は拒否されることも確認 |
+| 正規の管理要求が403になる | 公開URLのスキーム・Host・ポートとプロキシ設定。Origin制御を外さない | 正規HTTPS要求と異なるOriginの拒否を両方確認 |
+| ログイン補助APIが429になる | `Retry-After`、Vercel以外で共有されるIP不明枠、プロセス内制限 | 待機後に再確認。転送ヘッダーの偽装で制限を避けない |
+| 招待取消が502・再送が失敗する | DB上の状態とClerk側の処理結果。上記の再試行・照合手順 | 確定済み受諾を維持し、取消再試行または対象を限定した運営確認 |
 | 公開できない | マスタ集合や未設定が不完全 | 入力の見直しと公開検証テスト。未設定を一括でFREEにしない |
 | 画像が保存・表示できない | 形式・サイズ、Blob接続、許可URL、店舗パス | 専用画像のアップロードと保存後再読込。不要画像の自動削除を期待しない |
-| Playwrightが見つからない | 外部ランナーのパスかWindowsブラウザ実行ファイルが不一致 | 上記環境変数を実在パスへ修正し再実行。無断で依存追加しない |
+| Playwrightが見つからない | ランナー未準備、保存先の変更、指定ブラウザの不一致 | `node scripts/browser-runner.mjs install` と実在する `BROWSER_EXECUTABLE` を確認。アプリ依存へ追加しない |
 | buildとdevで生成物が壊れる | 同じ `.next` の同時使用 | 対象dev停止後build。無関係なDBボリュームは削除しない |
 | Dockerを再buildしても依存が古い | 既存の依存ボリュームが残っている | 依存更新が承認済みなら対象app停止後、同じComposeで `run --rm --no-deps app npm ci` と `run --rm --no-deps app npx prisma generate`、再起動。DBボリューム削除は不要 |
 
 手順の根拠は現行設定とスクリプトです。補助的にContext7で[Composeのenv_file](https://docs.docker.com/reference/compose-file/services/#env_file)、[環境変数の優先順位](https://docs.docker.com/compose/how-tos/environment-variables/envvars-precedence/)、[Next.jsのrevalidatePath](https://nextjs.org/docs/app/api-reference/functions/revalidatePath)、PrismaのCLI資料を確認しました。取得したPrisma資料にはv7の例も混在していたため、v7移行手順をこのPrisma 6の環境へ採用していません。
+
+認証境界の変更ではContext7で[Vercelの要求ヘッダー](https://vercel.com/docs/headers/request-headers)、[Next.jsのデータ保護](https://nextjs.org/docs/app/guides/data-security)、Clerkのサーバー認証とセッション有効化の資料を確認しています。資料の説明と、このリポジトリのカスタムAPIで実装した検査、実際の配備設定は分けて確認します。

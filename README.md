@@ -26,6 +26,10 @@
 
 [確認範囲・不一致・未確認事項](docs/guide/verification.md) も併せて確認してください。文書の実装説明、テストが検査する内容、今回実際に実行した確認は別々に記録しています。
 
+就職活動で設計・実装の理由を説明する練習には、[面接用Q&A](docs/interview/design-decisions.md)を使ってください。現行仕様の正本は上記ガイドです。
+
+安全性・情報の根拠・設計の再評価は、[Evidence-driven research（2026-09-28）](docs/research/README.md)にまとめています。現行実装の観察、未承認の設計案、検証計画を区別した研究資料であり、現行仕様を変更するものではありません。
+
 ## まず起動・操作したいとき
 
 作業先は `C:\Users\kaito\Documents\Github\ClearAllergy`、実行環境はPowerShellです。既存の変更を保持し、ブランチは勝手に切り替えません。
