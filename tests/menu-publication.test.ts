@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
 import {
+    createStatusBySlug,
     getAllergenMasterValidationErrors,
     getMenuPublishValidationErrors,
     isMenuPublishable,
@@ -111,4 +112,52 @@ test("未設定状態または空のメニュー名は公開条件を満たさ�
         }),
         false,
     );
+});
+
+test("DB由来の不正・空状態はUNKNOWNとして扱い公開しない", () => {
+    for (const invalidStatus of ["UNRECOGNIZED", "", null, undefined]) {
+        const links = masterRows.map((allergen) => ({
+            allergen: { slug: allergen.slug },
+            status: allergen.slug === "egg" ? invalidStatus as string : "FREE",
+        }));
+        const statusBySlug = createStatusBySlug(masterRows, links);
+
+        assert.equal(statusBySlug.egg, "UNKNOWN");
+        assert.equal(
+            isMenuPublishable({
+                name: "テストメニュー",
+                allergens: masterRows,
+                statusBySlug,
+            }),
+            false,
+        );
+    }
+});
+
+test("アレルゲンリンク欠損はUNKNOWNで補完し公開を拒否する", () => {
+    const links = masterRows.filter((a) => a.slug !== "egg").map((allergen) => ({
+        allergen: { slug: allergen.slug }, status: "FREE",
+    }));
+    const statusBySlug = createStatusBySlug(masterRows, links);
+    assert.equal(statusBySlug.egg, "UNKNOWN");
+    assert.equal(isMenuPublishable({ name: "架空メニュー", allergens: masterRows, statusBySlug }), false);
+});
+
+test("有効4状態の公開条件は維持する", () => {
+    for (const status of ["CONTAINS", "FREE", "MAY_CONTAIN", "UNKNOWN"] as const) {
+        assert.equal(isMenuPublishable({
+            name: "架空メニュー", allergens: masterRows, statusBySlug: statusMap(status),
+        }), status !== "UNKNOWN");
+    }
+});
+
+test("公開判定へ直接渡された不正状態も拒否する", () => {
+    const statuses = statusMap();
+    statuses.egg = "UNRECOGNIZED" as AllergenStatus;
+
+    assert.ok(getMenuPublishValidationErrors({
+        name: "テストメニュー",
+        allergens: masterRows,
+        statusBySlug: statuses,
+    }).some((error) => error.includes("卵")));
 });
