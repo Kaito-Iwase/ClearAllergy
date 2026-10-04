@@ -13,6 +13,15 @@ export const ALLERGEN_STATUS_VALUES = [
 
 export type AllergenStatus = (typeof ALLERGEN_STATUS_VALUES)[number];
 
+function isAllergenStatus(value: unknown): value is AllergenStatus {
+    return typeof value === "string" &&
+        ALLERGEN_STATUS_VALUES.includes(value as AllergenStatus);
+}
+
+function normalizeAllergenStatus(value: unknown): AllergenStatus {
+    return isAllergenStatus(value) ? value : "UNKNOWN";
+}
+
 export const ALLERGEN_EFFECTIVE_RISK_VALUES = [
     "CONTAINS",
     "MAY_CONTAIN",
@@ -121,7 +130,7 @@ export function createStatusBySlug(
     }
 
     for (const link of links) {
-        statusBySlug[link.allergen.slug] = link.status as AllergenStatus;
+        statusBySlug[link.allergen.slug] = normalizeAllergenStatus(link.status);
     }
 
     return statusBySlug;
@@ -249,8 +258,10 @@ export function getAllergenEffectiveRisk(args: {
 }): AllergenEffectiveRisk {
     if (args.status === "CONTAINS") return "CONTAINS";
     if (args.status === "MAY_CONTAIN") return "MAY_CONTAIN";
-    if (args.status === "UNKNOWN") return "UNKNOWN";
-    return args.storeHandlesAllergen ? "STORE_HANDLED" : "FREE";
+    if (args.status === "FREE") {
+        return args.storeHandlesAllergen ? "STORE_HANDLED" : "FREE";
+    }
+    return "UNKNOWN";
 }
 
 export function buildAllergenDisplayItems(
@@ -262,15 +273,16 @@ export function buildAllergenDisplayItems(
     storeHandledAllergenSlugs: ReadonlySet<string>,
 ): AllergenDisplayItem[] {
     return rows.map((row) => {
+        const status = normalizeAllergenStatus(row.status);
         const storeHandlesAllergen = storeHandledAllergenSlugs.has(row.slug);
 
         return {
             slug: row.slug,
             nameJa: row.nameJa,
-            status: row.status,
+            status,
             storeHandlesAllergen,
             effectiveRisk: getAllergenEffectiveRisk({
-                status: row.status,
+                status,
                 storeHandlesAllergen,
             }),
         };
@@ -280,8 +292,8 @@ export function buildAllergenDisplayItems(
 export function statusLabelJa(status: AllergenStatus): string {
     if (status === "CONTAINS") return "含む";
     if (status === "MAY_CONTAIN") return "含む可能性あり・要確認";
-    if (status === "UNKNOWN") return "未設定";
-    return "原材料に含まない登録";
+    if (status === "FREE") return "原材料に含まない登録";
+    return "未設定";
 }
 
 export function effectiveRiskLabelJa(
@@ -292,8 +304,8 @@ export function effectiveRiskLabelJa(
     if (effectiveRisk === "STORE_HANDLED") {
         return "原材料に含まない登録・同店舗の別の公開登録に含む情報あり";
     }
-    if (effectiveRisk === "UNKNOWN") return "未確認";
-    return "原材料に含まない登録";
+    if (effectiveRisk === "FREE") return "原材料に含まない登録";
+    return "未確認";
 }
 
 export function statusBadgeClass(status: AllergenStatus): string {
@@ -303,10 +315,10 @@ export function statusBadgeClass(status: AllergenStatus): string {
     if (status === "MAY_CONTAIN") {
         return "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-200";
     }
-    if (status === "UNKNOWN") {
-        return "bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200";
+    if (status === "FREE") {
+        return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
     }
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+    return "bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200";
 }
 
 export function validateAllergenStatusMap(
@@ -331,17 +343,14 @@ export function validateAllergenStatusMap(
     const statusMap: Record<string, AllergenStatus> = {};
 
     for (const [slug, status] of entries) {
-        if (
-            typeof status !== "string" ||
-            !ALLERGEN_STATUS_VALUES.includes(status as AllergenStatus)
-        ) {
+        if (!isAllergenStatus(status)) {
             return {
                 ok: false,
                 message: `invalid allergen status: ${slug}`,
             };
         }
 
-        statusMap[slug] = status as AllergenStatus;
+        statusMap[slug] = status;
     }
 
     return { ok: true, value: statusMap };
@@ -354,7 +363,7 @@ export function getUnknownAllergenNames(args: {
     return args.allergens
         .filter(
             (allergen) =>
-                (args.statusBySlug[allergen.slug] ?? "UNKNOWN") === "UNKNOWN",
+                normalizeAllergenStatus(args.statusBySlug[allergen.slug]) === "UNKNOWN",
         )
         .map((allergen) => allergen.nameJa);
 }
@@ -478,7 +487,7 @@ function buildAllergenClassificationNotice(args: {
     const containsNames = containsRows.map((row) => row.nameJa);
     const mayContainNames = mayContainRows.map((row) => row.nameJa);
     const unknownNames = targetRows
-        .filter((row) => row.status === "UNKNOWN")
+        .filter((row) => normalizeAllergenStatus(row.status) === "UNKNOWN")
         .map((row) => row.nameJa);
     const unknownText =
         unknownNames.length > 0 ? `未設定: ${unknownNames.join("・")}` : null;
