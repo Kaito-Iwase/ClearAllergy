@@ -1,5 +1,18 @@
 # ClearAllergy 開発エージェント向け指示
 
+## 自律開発ハーネス
+
+自律開発を依頼されたセッションでは、[Issue中心の自律開発](docs/agentic-development.md)から開始し、Issue番号の指定を待たずlive GitHubから安全なReady Issueを選ぶ。通常の依頼へcommit/push/PR作成の許可を拡大しない。[導入時監査](docs/agentic-audit.md)は過去snapshotであり毎回再確認する。
+
+- Problem → Evidence → Cause → Candidate solutions → Decision → VerificationをIssue commentへ記録する。labelだけではReadyにしない。
+- GitHub本文のHUMAN_DECISION_REQUIRED、依存、owner、対象環境、既存PRを再確認し、不明ならblockする。claim後も再取得する。既定の実装並列度は1。
+- canonical checkoutを入口に、許可された独立worktreeで1 Issue / 1 branch / 1 worktree / 1 PR。既存未commit変更・他の作業領域を保持する。
+- `node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json`は候補の提案、`node scripts/agent-harness.mjs verify --base origin/main`は既存scriptsのローカル検証。GitHubと実DB/browserの確認は別。snapshot/出力に秘密値を含めない。
+- 独立reviewは、実装履歴を共有しない読取専用subagentへ委任する。Issue、base/head、diff、Invariantと検証結果を渡し、self reviewと区別する。委任できなければDraftで未実施を明記。fix→verify→reviewは最大3 rounds、同じ重大指摘の再発2回で停止。
+- 意味・安全/法務文言・認可model・schema/migration/本番data・公開契約・課金・major依存等の未承認判断を確定しない。通常PRはmergeしない。安全/認証/認可/DB/アレルゲン関係はauto merge対象外。
+- PR後は証拠のある改善だけ重複検索して最大3 follow-up。live Queueを再取得し次の独立Readyへ進む。Readyがなければ監査1回、session最大3実装Issueで無限loopを防ぐ。
+- 実行結果・最終HEAD・review・PR・blocker・次の操作をGitHubに残す。PR作成はIssue close/Done/merge/deployではない。
+
 ## 作業環境と開始時の確認
 
 開発環境はWSLからWindowsへ移行済みです。今後の作業先は必ず次のフォルダを使用してください。
