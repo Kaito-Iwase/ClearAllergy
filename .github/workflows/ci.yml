@@ -81,6 +81,9 @@ jobs:
       - name: Prepare isolated fictional data
         run: node --import tsx scripts/setup-ci-env.ts
 
+      - name: Check owned menu writes in isolated PostgreSQL
+        run: node --import tsx scripts/check-owned-menu-database.ts
+
       - name: Build
         run: npm run build
 
