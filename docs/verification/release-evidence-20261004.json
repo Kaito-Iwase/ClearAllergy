@@ -6,6 +6,9 @@
     "canonicalDirtyPaths": 22,
     "canonicalChangesIncluded": false,
     "lockSha256": "3bf7ffe3aa9117734a634ab523810cb29b204a6152791c8c915fd2a24f670170",
+    "lockSha256Domain": "Windows working-tree raw bytes with CRLF",
+    "lockGitBlobSha256": "afb236292d3c76a8313b05a3c0f99d37b1d85586b8ebffa07a39fb73a167e893",
+    "hashMethod": "node:crypto SHA-256 over raw Buffer; git show <base>:<path> for Git blob, readFileSync for Windows working tree; EOL-normalized content compared separately",
     "versions": {
       "next": "16.3.4",
       "react": "19.2.7",
@@ -22,7 +25,7 @@
     "npmCliVersionAlignment": "bundled11.19.1 differs from CI/Docker global11.18.0; behavior impact UNMEASURED"
   },
   "issue": 54,
-  "collectedAt": "2026-10-04T06:55:03.158Z",
+  "collectedAt": "2026-10-04T07:04:08.306Z",
   "baseSha": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a",
   "scope": "Dated repository/CI/isolated PostgreSQL evidence; production readiness is undecided",
   "mainCI": {
@@ -126,7 +129,8 @@
     "sha": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a",
     "protected": false,
     "repositoryRulesets": [],
-    "observedAt": "2026-10-04T06:55:03.397Z",
+    "observedAt": "2026-10-04T06:49:08.207Z",
+    "repositoryRulesetsObservedAt": "2026-10-04T06:49:09.814Z",
     "requiredChecks": "No protected branch reported by branches/main; CI success alone is not a required-check policy or merge authority",
     "inheritedPolicy": "UNKNOWN"
   },
@@ -287,83 +291,143 @@
     "inputDefinitions": [
       {
         "path": "prisma/schema.prisma",
-        "sha256": "3e018d2a179bfca5dffaa1318e8473db2c88ddd48abf64d02bec4a5423d3c5fa"
+        "sha256": "3e018d2a179bfca5dffaa1318e8473db2c88ddd48abf64d02bec4a5423d3c5fa",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "8bd21913c271cacaf2750316643e249eb4f5b4d68887d70c89241566d9b18ef1",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "lib/constants/allergen-master.ts",
-        "sha256": "4ef29e313d6ac47f803f6779326d919eca7f9c1d65d0489d49efc12142b8a7c8"
+        "sha256": "4ef29e313d6ac47f803f6779326d919eca7f9c1d65d0489d49efc12142b8a7c8",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "49d08ff4cc55f9bda3b8d44c8323e6b97cc7b164dcdf9a45fca7f5cb98f93b45",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "scripts/ci-environment.ts",
-        "sha256": "47e0c9e8335f626877b113215b8703995bbbf1f052d6a6196e6fac3425f74d34"
+        "sha256": "47e0c9e8335f626877b113215b8703995bbbf1f052d6a6196e6fac3425f74d34",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "81c5c02217ca634c2c149c2d6164402abab18f93648ff066b2e1e118226dc8e8",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "scripts/setup-ci-env.ts",
-        "sha256": "1582a25317b2c1c15c0dd88680744d5893969bbce86c5635efc4aef238ff8d51"
+        "sha256": "1582a25317b2c1c15c0dd88680744d5893969bbce86c5635efc4aef238ff8d51",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "d52d04d99ed1cfe5f785aaf2c996a3cfc3b4631ed4ac13fe89941cc7605be3ab",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260301144342_init/migration.sql",
-        "sha256": "f1267dacc146d37ac2dd78bf45ba0d24fb50b09c8602520f9542ea6ff541d5c2"
+        "sha256": "f1267dacc146d37ac2dd78bf45ba0d24fb50b09c8602520f9542ea6ff541d5c2",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "2fc5e679c209613a9714732e7aafdce6f7a7df294252054b04cf01be0f480e58",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260308085850_add_shop_cover_image/migration.sql",
-        "sha256": "fdcf230ec35583a3e3aa5fa7009944f406e494e0858987f8e529636c55e0a919"
+        "sha256": "fdcf230ec35583a3e3aa5fa7009944f406e494e0858987f8e529636c55e0a919",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "be8b030230c2c32d4be1ca6e5a45327cb4104cc0f44e80cc2a75a36913394478",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260404122218_add_clerk_user_id_nullable/migration.sql",
-        "sha256": "ea3dbbe6588fb4c51acb96ac9f62adbc24d399c90e2fa8e914b0523e47c5ffec"
+        "sha256": "ea3dbbe6588fb4c51acb96ac9f62adbc24d399c90e2fa8e914b0523e47c5ffec",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "fd94ab740e36f19e5e9aea3fbdeef82197103adae8e9c69947ce8012bcc0a87f",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260404143000_add_shop_average_budget/migration.sql",
-        "sha256": "39349700f2f80d32b8db7d6c37ba7ed2dbd7b2a9e9cb0a628bdc4474d3ae51b7"
+        "sha256": "39349700f2f80d32b8db7d6c37ba7ed2dbd7b2a9e9cb0a628bdc4474d3ae51b7",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "e233938e06b54786188704ac559b359f825e55d695fecafafac9b0ed99585c75",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260405000000_add_unknown_allergen_status/migration.sql",
-        "sha256": "3e4ad693488a863efabe33b4d15e00e7f52bb14baf9d6cbd9e0808dcfd5e2812"
+        "sha256": "3e4ad693488a863efabe33b4d15e00e7f52bb14baf9d6cbd9e0808dcfd5e2812",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "5df2f4efad7b8936fc6a3e67e8417698d280318c0c1e99fa40072a36f9996f07",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260405000100_set_unknown_allergen_default/migration.sql",
-        "sha256": "fd32e392a7fa1053138e3f048091f213670108eefc5be3aa03b4db6656a7e830"
+        "sha256": "fd32e392a7fa1053138e3f048091f213670108eefc5be3aa03b4db6656a7e830",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "0654843912f5115f8ed64c47af2324e7b31a7c8efd6d02c36a354d6136513463",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260405010000_add_audit_log/migration.sql",
-        "sha256": "1bd0b73ff0f268be440943f7d9d7ada2a12d2148b6d7584f3e9bc659a49546c4"
+        "sha256": "1bd0b73ff0f268be440943f7d9d7ada2a12d2148b6d7584f3e9bc659a49546c4",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "c5eddd5bc6ef5d8589ee39bfb34bd1e7e04c69f6efbf04205c4e298fd174b0d0",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260420000000_add_admin_invites/migration.sql",
-        "sha256": "682391ccf7c69e5a8972a716480459e1a2e493c3f2ddf5dd2560d8b1f545fcd8"
+        "sha256": "682391ccf7c69e5a8972a716480459e1a2e493c3f2ddf5dd2560d8b1f545fcd8",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "1271881fd61b1a30469fd99c7551e87e3410d68bb0ccbc433afb49376b16f961",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260420090000_add_menu_image_display_options/migration.sql",
-        "sha256": "20c21eeb5f0a43ede9563161d8da41844f04de56e24727a39182e3ba9bcb1bc6"
+        "sha256": "20c21eeb5f0a43ede9563161d8da41844f04de56e24727a39182e3ba9bcb1bc6",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "d98d240564a94a05151eaf57b18225bda28f31c34225ffbae1f6d86a0e168f69",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260420100000_add_menu_image_fine_tuning/migration.sql",
-        "sha256": "d8ed91778f00e9cff13ccc26bf7d9651935c2ce06816da21cab5acaec590ec66"
+        "sha256": "d8ed91778f00e9cff13ccc26bf7d9651935c2ce06816da21cab5acaec590ec66",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "febe8eb7a98db00541d1fa727c17758eb06ac41c734c912559401e8d5d6331a8",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260420110000_add_menu_image_frame/migration.sql",
-        "sha256": "ecdd19578ebe57c3ee16765a3a7f635d16e902c2398b157055b139213a55d2e6"
+        "sha256": "ecdd19578ebe57c3ee16765a3a7f635d16e902c2398b157055b139213a55d2e6",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "9987e6f392a89f6ea5a2663d654fde0b052f00b70c7e31ee59f61379969a8800",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260420120000_add_shop_cover_image_display_options/migration.sql",
-        "sha256": "70dfebe887c507a13bb7fe3ffd2e2cc9aa428a65c8fdfbe37f7af8053521c541"
+        "sha256": "70dfebe887c507a13bb7fe3ffd2e2cc9aa428a65c8fdfbe37f7af8053521c541",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "62425aac25dfaf531b6434b7c5a0ea972eb2311210b706d30c794961d68f3118",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260420130000_split_shop_business_fields/migration.sql",
-        "sha256": "1c5d372b7e11aa433bf7366525a99673be39523ea97d7997cdad3dcd61b99994"
+        "sha256": "1c5d372b7e11aa433bf7366525a99673be39523ea97d7997cdad3dcd61b99994",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "44461e5a455875589b7aba189e677039a06d5e15e3a1f066d90ebedfc7693a1c",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260424070000_add_pistachio_allergen/migration.sql",
-        "sha256": "4d64db85127cabb6fd62f34ff7dd18827fcc204398705af90a50e77b5a55fcde"
+        "sha256": "4d64db85127cabb6fd62f34ff7dd18827fcc204398705af90a50e77b5a55fcde",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "cdfb1ff13b682c20c9cb193675b4137db65157511070c93396ceedf6cefbb5ef",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260611000000_add_shop_area_and_google_place/migration.sql",
-        "sha256": "9c0902825c2c5d5c6c47bb6ea679929304f96212daf2f768b62cc8a95eab24bc"
+        "sha256": "9c0902825c2c5d5c6c47bb6ea679929304f96212daf2f768b62cc8a95eab24bc",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "b2ab04ad1e0152e22f7520e06e2336b57bda3f47d0640a6684050dd83d072f67",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       },
       {
         "path": "prisma/migrations/20260622000000_auto_unpublish_incomplete_menus/migration.sql",
-        "sha256": "26d24c817eb0effc437c891e274cc3c098b1a749498a38d07fad0ed964b3e7ad"
+        "sha256": "26d24c817eb0effc437c891e274cc3c098b1a749498a38d07fad0ed964b3e7ad",
+        "sha256Domain": "Windows working-tree raw bytes (CRLF where Git converted EOL)",
+        "gitBlobSha256": "879175e45833a5ed7e5c709e15ea33d3ef03b3647dd350ef90a200eacb8ab1b0",
+        "gitBlobRef": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a"
       }
     ],
     "originalComposeSuiteExecuted": false,

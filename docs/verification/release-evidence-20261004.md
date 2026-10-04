@@ -11,7 +11,7 @@
 | 対象 | 確認した値・範囲 | 判定 |
 | --- | --- | --- |
 | canonical checkout | branch `improve/prototype-usability-ci`、HEAD `f1f209cc4f6891f22ada0a4916244b2be2217e32`、dirty 22 paths | CONFIRMED。未公開変更はこのledger/PRに含めない |
-| lock | SHA-256 `3bf7ffe3aa9117734a634ab523810cb29b204a6152791c8c915fd2a24f670170` | CONFIRMED。production lockはUNKNOWN |
+| lock | Windows worktree生byte（CRLF）のSHA-256 `3bf7ffe3aa9117734a634ab523810cb29b204a6152791c8c915fd2a24f670170` | CONFIRMED。基点Git blob（LF）の別SHA-256はJSONに併記。production lockはUNKNOWN |
 | package-lockの固定版 | Next.js16.3.4、Prisma Client/CLI6.19.3、bundled npm11.19.1。CI global npm指定は11.18.0。その他は原典JSON | CONFIRMED。範囲指定・CLI実行経路と区別 |
 | Node | `.node-version`指定22.23.1 / collector・local検証22.15.1 | 差を確認。CIは指定fileを使用する定義とSetup成功を確認したが、独立した`node --version`の実行結果は未取得 |
 | production | 配備SHA・runtime・lock・適用migration/trigger/index | UNKNOWN |
@@ -30,7 +30,7 @@ GitHub REST `branches/main`は同時点の`protected: false`、repository rulese
 
 一時PostgreSQL17.11（`postgres:17-bookworm`）をlocalhostの専用portに作成し、既存[`scripts/ci-environment.ts`](../../scripts/ci-environment.ts)の`assertCiDatabaseTarget`を通した。既存[`scripts/setup-ci-env.ts`](../../scripts/setup-ci-env.ts)が空の専用DBへ既存16 migrationと架空fixtureを準備した。実サービスの接続情報は使用しない。
 
-collectorは#38の隔離worktree HEAD `6d41bf5f9d737ddc1c51c25cb1513407d11f51ff`で実行した。schema/master/CI guard/setup/全16 migrationはこのmain基点とbyte単位で一致し、原典JSONに各hashを記録した。collectorは実Prisma6.19.3/PGへ接続して次の9組をfresh検証し、exit0と作成fixtureのcleanup完了を確認した。
+collectorは#38の隔離worktree HEAD `6d41bf5f9d737ddc1c51c25cb1513407d11f51ff`で実行した。schema/master/CI guard/setup/全16 migrationは双方のWindows worktree生byteが一致し、双方のcommitのGit blobも一致した。原典JSONに生byteと基点Git blobのSHA-256を別々に記録した。Gitの改行変換によりCRLFのworktreeとLFのblobのhashは異なるが、改行正規化後の内容は一致する。collectorは実Prisma6.19.3/PGへ接続して次の9組をfresh検証し、exit0と作成fixtureのcleanup完了を確認した。
 
 | 実証 | 結果・範囲 |
 | --- | --- |
@@ -50,9 +50,11 @@ collectorは#38の隔離worktree HEAD `6d41bf5f9d737ddc1c51c25cb1513407d11f51ff`
 
 ## 再取得方法・副作用
 
-CIの再取得は同一対象SHAのrun metadata/logを読み、結果・件数・時刻・URLを更新する。repositoryは`git status --short`、HEAD、lock hash、固定版、`.node-version`、CI定義を別々に記録する。未知の配備SHAへこの記録を転用しない。
+CIの再取得は同一対象SHAのrun metadata/logを読み、結果・件数・時刻・URLを更新する。repositoryは`git status --short`、HEAD、lock hash、固定版、`.node-version`、CI定義を別々に記録する。hashはNodeのcryptoでraw BufferへSHA-256を適用し、worktreeは`readFileSync`、Git blobは`git show <base>:<path>`のstdout byteを採取した。Linux/CIやGitHubのfileを検証する際はworktreeのCRLF hashを期待値にせず、基点Git blobのhashと比較する。未知の配備SHAへこの記録を転用しない。
 
-DBの再取得には空の架空データ専用PostgreSQLとlocked依存が必要。既存CI guardの許容接続先・fixture opt-in・非実在credentialを確認してから既存setupを実行する。setupは既存migration/fixtureを書き込むため、shared/production DBへ向けない。原典JSONの`database.collectorSource`を隔離worktreeへ新規保存し、記録されたhashと照合してから、同guardを通す環境で次を実行する。
+DBの再取得には空の架空データ専用PostgreSQLとlocked依存が必要。保存済みcollectorは出力base SHAを固定し、自身ではHEAD/入力hashを検証しないため、**この基点の同一入力を再実証するときだけ**使用する。先に`git rev-parse HEAD`で記録のbaseまたはcollectorWorktreeHeadを確認し、schema/master/guard/setup/全migration/lockを原典のGit blob hashと照合する。1件でも一致しなければこのcollectorを実行せず、結果を旧baseの証拠へ追加しない。別release SHAの採取ではcollectorのbase記録と入力証跡を新しい対象へ更新・reviewし、新規ledgerとして保存する。
+
+同一対象の確認後、既存CI guardの許容接続先・fixture opt-in・非実在credentialを確認してから既存setupを実行する。setupは既存migration/fixtureを書き込むため、shared/production DBへ向けない。原典JSONの`database.collectorSource`を隔離worktreeへ新規保存し、記録されたhashと照合してから、同guardを通す環境で次を実行する。
 
 ```powershell
 node --import tsx <保存したcollector.mjs> <確認したworktreeの絶対path> <新規output.json>
