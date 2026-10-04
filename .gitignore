@@ -48,8 +48,10 @@ next-env.d.ts
 /.clerk/
 
 # local documentation directories
-docs/
 document/
 
 .codex
 
+
+# local autonomous-run snapshots and reports
+/.agent-runs/
