@@ -31,6 +31,13 @@ export function validateImageFile(file: File) {
         };
     }
 
+    if (file.size === 0) {
+        return {
+            ok: false as const,
+            message: "画像ファイルが空です。",
+        };
+    }
+
     if (file.size > MAX_UPLOAD_FILE_SIZE) {
         return {
             ok: false as const,
