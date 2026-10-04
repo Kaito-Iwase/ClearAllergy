@@ -97,6 +97,8 @@ node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json
 
 ## 検証
 
+配備条件を確認するときは、[2026-10-04のEvidence ledger](verification/release-evidence-20261004.md)と[原典JSON](verification/release-evidence-20261004.json)を参照する。これは記載SHA・取得時点のrepository/CI/隔離DB証拠であり、production適用やrelease承認を示さない。次回は同じ対象・日時・出典・未確認事項を再取得する。
+
 package.jsonのscriptsとCIを毎回読み、コマンドと副作用を確認してから実行する。現在の必須scriptsはlint/typecheck/test/build。Prismaが配置されていればgenerate/validateもrunnerが実行する。missing scriptは失敗として止め、成功扱いでskipしない。依存変更は既存依存で合理的に解決できない場合だけ人間判断を経て行う。
 
 ```powershell

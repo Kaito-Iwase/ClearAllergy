@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "repository": {
+    "canonicalHead": "f1f209cc4f6891f22ada0a4916244b2be2217e32",
+    "canonicalBranch": "improve/prototype-usability-ci",
+    "canonicalDirtyPaths": 22,
+    "canonicalChangesIncluded": false,
+    "lockSha256": "3bf7ffe3aa9117734a634ab523810cb29b204a6152791c8c915fd2a24f670170",
+    "versions": {
+      "next": "16.3.4",
+      "react": "19.2.7",
+      "@prisma/client": "6.19.3",
+      "prisma": "6.19.3",
+      "npm": "11.19.1",
+      "typescript": "6.0.3"
+    },
+    "declaredNode": "22.23.1",
+    "collectorActualNode": "22.15.1",
+    "localHarnessBundledNpm": "11.19.1",
+    "ciGlobalNpmDeclared": "11.18.0",
+    "dockerGlobalNpmDeclared": "11.18.0",
+    "npmCliVersionAlignment": "bundled11.19.1 differs from CI/Docker global11.18.0; behavior impact UNMEASURED"
+  },
+  "issue": 54,
+  "collectedAt": "2026-10-04T06:55:03.158Z",
+  "baseSha": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a",
+  "scope": "Dated repository/CI/isolated PostgreSQL evidence; production readiness is undecided",
+  "mainCI": {
+    "url": "https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/37180557443",
+    "headSha": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a",
+    "event": "push",
+    "conclusion": "success",
+    "completedAt": "2026-10-04T05:42:09Z",
+    "jobUrl": "https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/37180557443/job/111372101633",
+    "counts": {
+      "tests": 80,
+      "pass": 80,
+      "fail": 0,
+      "skipped": 0
+    },
+    "publicBrowserGroups": 7,
+    "steps": [
+      {
+        "name": "Set up job",
+        "conclusion": "success"
+      },
+      {
+        "name": "Initialize containers",
+        "conclusion": "success"
+      },
+      {
+        "name": "Checkout",
+        "conclusion": "success"
+      },
+      {
+        "name": "Setup Node.js",
+        "conclusion": "success"
+      },
+      {
+        "name": "Align npm with Docker",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install dependencies",
+        "conclusion": "success"
+      },
+      {
+        "name": "Generate Prisma Client",
+        "conclusion": "success"
+      },
+      {
+        "name": "Test",
+        "conclusion": "success"
+      },
+      {
+        "name": "Lint",
+        "conclusion": "success"
+      },
+      {
+        "name": "Typecheck",
+        "conclusion": "success"
+      },
+      {
+        "name": "Prepare isolated fictional data",
+        "conclusion": "success"
+      },
+      {
+        "name": "Build",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install isolated browser runner",
+        "conclusion": "success"
+      },
+      {
+        "name": "Check public prototype in Chromium",
+        "conclusion": "success"
+      },
+      {
+        "name": "Save browser evidence",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Setup Node.js",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout",
+        "conclusion": "success"
+      },
+      {
+        "name": "Stop containers",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "conclusion": "success"
+      }
+    ],
+    "passExcerpt": "Test, lint, typecheck, and build\tTest\t2026-10-04T05:41:02.4216254Z # tests 80\r\nTest, lint, typecheck, and build\tTest\t2026-10-04T05:41:02.4228306Z # pass 80\r\nTest, lint, typecheck, and build\tTest\t2026-10-04T05:41:02.4228853Z # fail 0\r\nTest, lint, typecheck, and build\tTest\t2026-10-04T05:41:02.4229411Z # skipped 0\r\nTest, lint, typecheck, and build\tCheck public prototype in Chromium\t2026-10-04T05:41:57.7465781Z PASS: 390pxの店舗内検索・Enter送信・0件からの解除・通常検索からの解除\r\nTest, lint, typecheck, and build\tCheck public prototype in Chromium\t2026-10-04T05:41:59.1637278Z PASS: 1件保存後の複数追加・一部解除・オプションも一括適用・折りたたみ中の未適用表示・キャンセル・再読み込み\r\nTest, lint, typecheck, and build\tCheck public prototype in Chromium\t2026-10-04T05:41:59.4555000Z PASS: 別タブ同期・編集中の競合による上書き防止・保存失敗で入力保持・再試行\r\nTest, lint, typecheck, and build\tCheck public prototype in Chromium\t2026-10-04T05:41:59.6006007Z PASS: 除外後の公開メニュー導線と表示件数が現在の一覧に一致\r\nTest, lint, typecheck, and build\tCheck public prototype in Chromium\t2026-10-04T05:42:00.8972825Z PASS: 390/1440pxの横幅・検索欄の重複なし・詳細でもキーボードで設定解除して店舗内検索へ戻る\r\nTest, lint, typecheck, and build\tCheck public prototype in Chromium\t2026-10-04T05:42:01.3060863Z PASS: 店舗URLの共有ボタンから正しい公開URLをコピー\r\nTest, lint, typecheck, and build\tCheck public prototype in Chromium\t2026-10-04T05:42:01.3061263Z PASS: 全フローでクライアント例外なし\r\n",
+    "nodeVersionSource": ".github/workflows/ci.yml: actions/setup-node uses .node-version; no independent node --version result collected"
+  },
+  "branchPolicy": {
+    "source": "GitHub REST branches/main and repository rulesets",
+    "name": "main",
+    "sha": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a",
+    "protected": false,
+    "repositoryRulesets": [],
+    "observedAt": "2026-10-04T06:55:03.397Z",
+    "requiredChecks": "No protected branch reported by branches/main; CI success alone is not a required-check policy or merge authority",
+    "inheritedPolicy": "UNKNOWN"
+  },
+  "database": {
+    "collectedAt": "2026-10-04T06:41:03.029Z",
+    "baseSha": "1830a98fd4f8b60e9621417a5b843a4e42e0d81a",
+    "scope": "throwaway local CI-guarded PostgreSQL; fictional fixture only",
+    "productionApplied": "UNKNOWN",
+    "serverVersion": "17.11 (Debian 17.11-1.pgdg12+2)",
+    "migrations": [
+      {
+        "migration_name": "20260301144342_init",
+        "applied": true
+      },
+      {
+        "migration_name": "20260308085850_add_shop_cover_image",
+        "applied": true
+      },
+      {
+        "migration_name": "20260404122218_add_clerk_user_id_nullable",
+        "applied": true
+      },
+      {
+        "migration_name": "20260404143000_add_shop_average_budget",
+        "applied": true
+      },
+      {
+        "migration_name": "20260405000000_add_unknown_allergen_status",
+        "applied": true
+      },
+      {
+        "migration_name": "20260405000100_set_unknown_allergen_default",
+        "applied": true
+      },
+      {
+        "migration_name": "20260405010000_add_audit_log",
+        "applied": true
+      },
+      {
+        "migration_name": "20260420000000_add_admin_invites",
+        "applied": true
+      },
+      {
+        "migration_name": "20260420090000_add_menu_image_display_options",
+        "applied": true
+      },
+      {
+        "migration_name": "20260420100000_add_menu_image_fine_tuning",
+        "applied": true
+      },
+      {
+        "migration_name": "20260420110000_add_menu_image_frame",
+        "applied": true
+      },
+      {
+        "migration_name": "20260420120000_add_shop_cover_image_display_options",
+        "applied": true
+      },
+      {
+        "migration_name": "20260420130000_split_shop_business_fields",
+        "applied": true
+      },
+      {
+        "migration_name": "20260424070000_add_pistachio_allergen",
+        "applied": true
+      },
+      {
+        "migration_name": "20260611000000_add_shop_area_and_google_place",
+        "applied": true
+      },
+      {
+        "migration_name": "20260622000000_auto_unpublish_incomplete_menus",
+        "applied": true
+      }
+    ],
+    "results": [
+      {
+        "check": "master-set",
+        "status": "PASS",
+        "codeCount": 29,
+        "dbCount": 29
+      },
+      {
+        "check": "allergen-enum",
+        "status": "PASS",
+        "values": [
+          "CONTAINS",
+          "FREE",
+          "MAY_CONTAIN",
+          "UNKNOWN"
+        ]
+      },
+      {
+        "check": "applied-publication-triggers",
+        "status": "PASS",
+        "triggers": [
+          {
+            "name": "Allergen_reconcile_menu_publication",
+            "deferrable": true,
+            "initially_deferred": true
+          },
+          {
+            "name": "MenuItemAllergen_reconcile_publication",
+            "deferrable": true,
+            "initially_deferred": true
+          },
+          {
+            "name": "MenuItem_reconcile_publication",
+            "deferrable": true,
+            "initially_deferred": true
+          }
+        ]
+      },
+      {
+        "check": "applied-pending-unique-indexes",
+        "status": "PASS",
+        "indexes": [
+          {
+            "name": "AdminInvite_pending_email_key",
+            "definition": "CREATE UNIQUE INDEX \"AdminInvite_pending_email_key\" ON public.\"AdminInvite\" USING btree (email) WHERE (status = 'pending'::\"InviteStatus\")"
+          },
+          {
+            "name": "AdminInvite_pending_shopId_key",
+            "definition": "CREATE UNIQUE INDEX \"AdminInvite_pending_shopId_key\" ON public.\"AdminInvite\" USING btree (\"shopId\") WHERE (status = 'pending'::\"InviteStatus\")"
+          }
+        ]
+      },
+      {
+        "check": "missing-links-unpublish",
+        "status": "PASS"
+      },
+      {
+        "check": "complete-MAY_CONTAIN-published",
+        "status": "PASS"
+      },
+      {
+        "check": "UNKNOWN-unpublish",
+        "status": "PASS"
+      },
+      {
+        "check": "transaction-rollback",
+        "status": "PASS"
+      },
+      {
+        "check": "pending-shop-email-uniqueness-and-revoked-coexistence",
+        "status": "PASS"
+      }
+    ],
+    "collectorSourceSha256": "6e497861b144ae31d1789cd9591fabfd069ed4bff43328666cc1837db6917cd1",
+    "collectorSource": "import assert from 'node:assert/strict';\nimport { randomUUID, createHash } from 'node:crypto';\nimport { createRequire } from 'node:module';\nimport { readFileSync, writeFileSync } from 'node:fs';\nimport { fileURLToPath } from 'node:url';\nimport { join } from 'node:path';\nconst [worktree, output] = process.argv.slice(2);\nconst req = createRequire(join(worktree, 'package.json'));\nreq('./scripts/ci-environment.ts').assertCiDatabaseTarget();\nconst { PrismaClient, Prisma } = req('@prisma/client');\nconst { ALLERGEN_MASTER } = req('./lib/constants/allergen-master.ts');\nconst db = new PrismaClient({ log: [] });\nconst results=[]; const shops=[];\ntry {\n const version=await db.$queryRaw`SELECT current_setting('server_version') AS version`;\n const master=await db.allergen.findMany({select:{slug:true},orderBy:{slug:'asc'}});\n assert.deepEqual(master.map(a=>a.slug),ALLERGEN_MASTER.map(a=>a.slug).sort());\n results.push({check:'master-set',status:'PASS',codeCount:ALLERGEN_MASTER.length,dbCount:master.length});\n const enums=await db.$queryRaw`SELECT unnest(enum_range(NULL::\"AllergenStatus\"))::text AS value`;\n assert.deepEqual(enums.map(r=>r.value).sort(),['CONTAINS','FREE','MAY_CONTAIN','UNKNOWN'].sort());\n results.push({check:'allergen-enum',status:'PASS',values:enums.map(r=>r.value)});\n const migrations=await db.$queryRaw`SELECT migration_name, finished_at IS NOT NULL AND rolled_back_at IS NULL AS applied FROM \"_prisma_migrations\" ORDER BY migration_name`;\n assert.equal(migrations.length,16); assert.ok(migrations.every(r=>r.applied));\n const triggers=await db.$queryRaw`SELECT tgname AS name, tgdeferrable AS deferrable, tginitdeferred AS initially_deferred FROM pg_trigger WHERE NOT tgisinternal AND tgname IN ('MenuItem_reconcile_publication','MenuItemAllergen_reconcile_publication','Allergen_reconcile_menu_publication') ORDER BY tgname`;\n assert.equal(triggers.length,3); assert.ok(triggers.every(r=>r.deferrable&&r.initially_deferred));\n results.push({check:'applied-publication-triggers',status:'PASS',triggers});\n const indexes=await db.$queryRaw`SELECT indexname AS name, indexdef AS definition FROM pg_indexes WHERE schemaname='public' AND indexname IN ('AdminInvite_pending_email_key','AdminInvite_pending_shopId_key') ORDER BY indexname`;\n assert.equal(indexes.length,2); assert.ok(indexes.every(r=>r.definition.includes('UNIQUE')&&r.definition.includes('WHERE')&&r.definition.includes('pending')));\n results.push({check:'applied-pending-unique-indexes',status:'PASS',indexes});\n const shop=await db.shop.create({data:{name:`fictional release check ${randomUUID()}`,isActive:true}}); shops.push(shop.id);\n const all=await db.allergen.findMany({select:{id:true}});\n const incomplete=await db.menuItem.create({data:{shopId:shop.id,name:'fictional missing',isPublished:true}});\n assert.equal((await db.menuItem.findUniqueOrThrow({where:{id:incomplete.id}})).isPublished,false);\n results.push({check:'missing-links-unpublish',status:'PASS'});\n const full=await db.menuItem.create({data:{shopId:shop.id,name:'fictional MAY_CONTAIN',isPublished:true,allergenLinks:{create:all.map((a,i)=>({allergenId:a.id,status:i===0?'MAY_CONTAIN':'FREE'}))}}});\n assert.equal((await db.menuItem.findUniqueOrThrow({where:{id:full.id}})).isPublished,true);\n results.push({check:'complete-MAY_CONTAIN-published',status:'PASS'});\n await db.menuItemAllergen.update({where:{menuItemId_allergenId:{menuItemId:full.id,allergenId:all[0].id}},data:{status:'UNKNOWN'}});\n assert.equal((await db.menuItem.findUniqueOrThrow({where:{id:full.id}})).isPublished,false);\n results.push({check:'UNKNOWN-unpublish',status:'PASS'});\n const before=await db.menuItem.count({where:{shopId:shop.id}});\n await assert.rejects(db.$transaction(async tx=>{await tx.menuItem.create({data:{shopId:shop.id,name:'fictional rollback'}});throw new Error('fixture rollback');}),/fixture rollback/);\n assert.equal(await db.menuItem.count({where:{shopId:shop.id}}),before);\n results.push({check:'transaction-rollback',status:'PASS'});\n const invite={email:`fictional-${randomUUID()}@example.invalid`,shopId:shop.id,invitedByClerkUserId:'fictional-release-check'};\n await db.adminInvite.create({data:invite});\n const isDuplicate=e=>e instanceof Prisma.PrismaClientKnownRequestError&&e.code==='P2002';\n await assert.rejects(db.adminInvite.create({data:{...invite,email:`fictional-${randomUUID()}@example.invalid`}}),isDuplicate);\n const second=await db.shop.create({data:{name:'fictional pending email boundary'}}); shops.push(second.id);\n await assert.rejects(db.adminInvite.create({data:{...invite,shopId:second.id}}),isDuplicate);\n await db.adminInvite.create({data:{...invite,status:'revoked'}});\n results.push({check:'pending-shop-email-uniqueness-and-revoked-coexistence',status:'PASS'});\n const source=readFileSync(fileURLToPath(import.meta.url),'utf8');\n writeFileSync(output,JSON.stringify({collectedAt:new Date().toISOString(),baseSha:'1830a98fd4f8b60e9621417a5b843a4e42e0d81a',scope:'throwaway local CI-guarded PostgreSQL; fictional fixture only',productionApplied:'UNKNOWN',serverVersion:version[0].version,migrations,results,collectorSourceSha256:createHash('sha256').update(source).digest('hex'),collectorSource:source,limitations:['Not production database or deployed services','No actual Clerk/Blob integration','Original source assertions use the CI guard for localhost rather than the Compose hostname','No schema changes or new migrations']},null,2));\n console.log(JSON.stringify({status:'PASS',groups:results.length,version:version[0].version,migrations:migrations.length,results:results.map(r=>r.check)}));\n} finally {\n await db.auditLog.deleteMany({where:{actorShopId:{in:shops}}});\n await db.shop.deleteMany({where:{id:{in:shops}}});\n await db.$disconnect();\n}\n",
+    "limitations": [
+      "Not production database or deployed services",
+      "No actual Clerk/Blob integration",
+      "Original source assertions use the CI guard for localhost rather than the Compose hostname",
+      "No schema changes or new migrations"
+    ],
+    "collectorWorktreeHead": "6d41bf5f9d737ddc1c51c25cb1513407d11f51ff",
+    "inputDefinitions": [
+      {
+        "path": "prisma/schema.prisma",
+        "sha256": "3e018d2a179bfca5dffaa1318e8473db2c88ddd48abf64d02bec4a5423d3c5fa"
+      },
+      {
+        "path": "lib/constants/allergen-master.ts",
+        "sha256": "4ef29e313d6ac47f803f6779326d919eca7f9c1d65d0489d49efc12142b8a7c8"
+      },
+      {
+        "path": "scripts/ci-environment.ts",
+        "sha256": "47e0c9e8335f626877b113215b8703995bbbf1f052d6a6196e6fac3425f74d34"
+      },
+      {
+        "path": "scripts/setup-ci-env.ts",
+        "sha256": "1582a25317b2c1c15c0dd88680744d5893969bbce86c5635efc4aef238ff8d51"
+      },
+      {
+        "path": "prisma/migrations/20260301144342_init/migration.sql",
+        "sha256": "f1267dacc146d37ac2dd78bf45ba0d24fb50b09c8602520f9542ea6ff541d5c2"
+      },
+      {
+        "path": "prisma/migrations/20260308085850_add_shop_cover_image/migration.sql",
+        "sha256": "fdcf230ec35583a3e3aa5fa7009944f406e494e0858987f8e529636c55e0a919"
+      },
+      {
+        "path": "prisma/migrations/20260404122218_add_clerk_user_id_nullable/migration.sql",
+        "sha256": "ea3dbbe6588fb4c51acb96ac9f62adbc24d399c90e2fa8e914b0523e47c5ffec"
+      },
+      {
+        "path": "prisma/migrations/20260404143000_add_shop_average_budget/migration.sql",
+        "sha256": "39349700f2f80d32b8db7d6c37ba7ed2dbd7b2a9e9cb0a628bdc4474d3ae51b7"
+      },
+      {
+        "path": "prisma/migrations/20260405000000_add_unknown_allergen_status/migration.sql",
+        "sha256": "3e4ad693488a863efabe33b4d15e00e7f52bb14baf9d6cbd9e0808dcfd5e2812"
+      },
+      {
+        "path": "prisma/migrations/20260405000100_set_unknown_allergen_default/migration.sql",
+        "sha256": "fd32e392a7fa1053138e3f048091f213670108eefc5be3aa03b4db6656a7e830"
+      },
+      {
+        "path": "prisma/migrations/20260405010000_add_audit_log/migration.sql",
+        "sha256": "1bd0b73ff0f268be440943f7d9d7ada2a12d2148b6d7584f3e9bc659a49546c4"
+      },
+      {
+        "path": "prisma/migrations/20260420000000_add_admin_invites/migration.sql",
+        "sha256": "682391ccf7c69e5a8972a716480459e1a2e493c3f2ddf5dd2560d8b1f545fcd8"
+      },
+      {
+        "path": "prisma/migrations/20260420090000_add_menu_image_display_options/migration.sql",
+        "sha256": "20c21eeb5f0a43ede9563161d8da41844f04de56e24727a39182e3ba9bcb1bc6"
+      },
+      {
+        "path": "prisma/migrations/20260420100000_add_menu_image_fine_tuning/migration.sql",
+        "sha256": "d8ed91778f00e9cff13ccc26bf7d9651935c2ce06816da21cab5acaec590ec66"
+      },
+      {
+        "path": "prisma/migrations/20260420110000_add_menu_image_frame/migration.sql",
+        "sha256": "ecdd19578ebe57c3ee16765a3a7f635d16e902c2398b157055b139213a55d2e6"
+      },
+      {
+        "path": "prisma/migrations/20260420120000_add_shop_cover_image_display_options/migration.sql",
+        "sha256": "70dfebe887c507a13bb7fe3ffd2e2cc9aa428a65c8fdfbe37f7af8053521c541"
+      },
+      {
+        "path": "prisma/migrations/20260420130000_split_shop_business_fields/migration.sql",
+        "sha256": "1c5d372b7e11aa433bf7366525a99673be39523ea97d7997cdad3dcd61b99994"
+      },
+      {
+        "path": "prisma/migrations/20260424070000_add_pistachio_allergen/migration.sql",
+        "sha256": "4d64db85127cabb6fd62f34ff7dd18827fcc204398705af90a50e77b5a55fcde"
+      },
+      {
+        "path": "prisma/migrations/20260611000000_add_shop_area_and_google_place/migration.sql",
+        "sha256": "9c0902825c2c5d5c6c47bb6ea679929304f96212daf2f768b62cc8a95eab24bc"
+      },
+      {
+        "path": "prisma/migrations/20260622000000_auto_unpublish_incomplete_menus/migration.sql",
+        "sha256": "26d24c817eb0effc437c891e274cc3c098b1a749498a38d07fad0ed964b3e7ad"
+      }
+    ],
+    "originalComposeSuiteExecuted": false,
+    "collectorExitCode": 0,
+    "cleanupCompleted": true
+  },
+  "production": {
+    "deployedSha": "UNKNOWN",
+    "runtime": "UNKNOWN",
+    "lock": "UNKNOWN",
+    "appliedMigrations": "UNKNOWN",
+    "publicationTriggers": "UNKNOWN",
+    "invitePartialIndexes": "UNKNOWN",
+    "backupAndRestore": "UNKNOWN",
+    "alertsAndOwner": "UNKNOWN",
+    "clerkTenantConfiguration": "UNKNOWN",
+    "blobConfiguration": "UNKNOWN",
+    "deliveryCache": "UNVERIFIED",
+    "userComprehension": "UNVERIFIED"
+  },
+  "separation": {
+    "issue38PR": "https://github.com/Kaito-Iwase/ClearAllergy/pull/62",
+    "issue38Head": "6d41bf5f9d737ddc1c51c25cb1513407d11f51ff",
+    "issue38MergedIntoBase": false,
+    "unpublishedDocuments": "#60 remains BLOCKED; guide/research not restored"
+  },
+  "limitations": [
+    "No production/environment/account files read; no cloud setting changes",
+    "Only local disposable fictional data were written by the collector",
+    "Nine listed groups are not the full Compose/admin browser suite",
+    "No lock contention, concurrent invite race, master-change trigger, real Clerk/Blob or production cache experiment",
+    "No new schema/migrations/dependencies or safety/legal wording",
+    "CI browser artifact retention is seven days; pass excerpt is retained here without screenshots"
+  ]
+}
