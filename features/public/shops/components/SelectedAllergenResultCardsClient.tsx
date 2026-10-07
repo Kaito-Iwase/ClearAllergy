@@ -41,7 +41,7 @@ function AllergenInfoCard({
                     <h3 className={`text-sm font-extrabold ${titleClassName}`}>
                         {title}
                     </h3>
-                    <p className="mt-1 text-xs font-medium leading-relaxed text-gray-600">
+                    <p className="mt-2 text-sm leading-6 text-gray-700">
                         {description}
                     </p>
                 </div>
@@ -65,10 +65,10 @@ function AllergenChips({
             {allergens.map((allergen) => (
                 <span
                     key={allergen.slug}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${className}`}
+                    className={`inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold leading-6 ${className}`}
                 >
                     {allergen.nameJa}
-                    <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-extrabold leading-none">
+                    <span className="rounded bg-white/80 px-1.5 py-0.5 text-xs font-bold leading-5">
                         {label}
                     </span>
                 </span>
@@ -131,12 +131,13 @@ export default function SelectedAllergenResultCardsClient({
 
     return (
         <div className="space-y-3">
+            <h2 className="text-base font-bold text-gray-900">店舗が登録した内容</h2>
             <p className="text-sm font-semibold text-gray-700">
                 確認対象 {selectedAllergens.length}件：{selectedAllergens.map((allergen) => allergen.nameJa).join("・")}
             </p>
             {containsAllergens.length > 0 ? (
                 <AllergenInfoCard
-                    title="選択中アレルゲンを含みます"
+                    title="含む"
                     description="選択中アレルゲンのうち、このメニューで「含む」と登録されている項目です。架空の登録情報であり、実際の飲食判断には使用できません。"
                     className="border-red-200 bg-red-50"
                     titleClassName="text-red-800"
@@ -151,7 +152,7 @@ export default function SelectedAllergenResultCardsClient({
 
             {mayContainAllergens.length > 0 ? (
                 <AllergenInfoCard
-                    title="選択中アレルゲンは含む可能性あり・要確認"
+                    title="含む可能性あり・要確認"
                     description="選択中アレルゲンのうち、このメニューで「含む可能性あり」と登録されている項目です。架空の登録情報であり、実際の飲食判断には使用できません。"
                     className="border-amber-200 bg-amber-50"
                     titleClassName="text-amber-900"
@@ -165,13 +166,13 @@ export default function SelectedAllergenResultCardsClient({
             ) : null}
 
             {storeHandledAllergens.length > 0 ? (
-                <AllergenInfoCard title="同店舗の別の公開登録に含む情報あり" description={STORE_ALLERGEN_NOTE}
+                <AllergenInfoCard title="この店舗の別の公開メニューに「含む」登録があります" description={STORE_ALLERGEN_NOTE}
                     className="border-amber-200 bg-amber-50" titleClassName="text-amber-900">
-                    <AllergenChips allergens={storeHandledAllergens} label="別の公開登録に含む" className="border-amber-200 bg-white text-amber-900" />
+                    <AllergenChips allergens={storeHandledAllergens} label="別メニューに含む登録" className="border-amber-200 bg-white text-amber-900" />
                 </AllergenInfoCard>
             ) : null}
             {hasUnknownResults ? (
-                <AllergenInfoCard title="選択中アレルゲンに未入力・未確認の情報があります" description="含まないことを示す状態ではありません。" className="border-gray-300 bg-gray-50" titleClassName="text-gray-900">
+                <AllergenInfoCard title="未入力・未確認" description="含まないことを示す状態ではありません。" className="border-gray-300 bg-gray-50" titleClassName="text-gray-900">
                     <AllergenChips allergens={unknownAllergens} label="未入力・未確認" className="border-gray-300 bg-white text-gray-900" />
                 </AllergenInfoCard>
             ) : null}
@@ -179,26 +180,26 @@ export default function SelectedAllergenResultCardsClient({
             !hasUnknownResults &&
             freeAllergens.length > 0 ? (
                 <AllergenInfoCard
-                    title="選択中アレルゲンは原材料に含まない登録"
+                    title="原材料に含まない"
                     description="このメニューの原材料に含まないという架空の登録情報です。食品の安全性や摂取可否を保証するものではありません。"
-                    className="border-emerald-100 bg-emerald-50"
-                    titleClassName="text-emerald-800"
+                    className="border-slate-300 bg-slate-50"
+                    titleClassName="text-slate-800"
                 >
                     <AllergenChips
                         allergens={freeAllergens}
-                        label="原材料に含まない登録"
-                        className="border-emerald-100 bg-white text-emerald-800"
+                        label="原材料に含まない"
+                        className="border-slate-300 bg-white text-slate-800"
                     />
                 </AllergenInfoCard>
             ) : null}
             {(hasRiskResults || hasUnknownResults) && freeAllergens.length > 0 ? (
                 <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
                     <p className="font-bold">選択中アレルゲンの登録状態</p>
-                    <p className="mt-1 text-xs leading-5">原材料に含まない登録は食品安全の保証ではありません。上の注意・補足情報も確認してください。</p>
+                    <p className="mt-1 text-sm leading-6">原材料に含まないという登録は食品安全の保証ではありません。上の注意・補足情報も確認してください。</p>
                     <ul className="mt-3 space-y-2">
                         {freeAllergens.map((allergen) => <li key={allergen.slug}>
-                            <span className="font-semibold">{allergen.nameJa}</span>：原材料に含まない登録
-                            {storeHandledAllergenSlugs.includes(allergen.slug) && <span className="block text-xs text-amber-900">同店舗の別の公開登録に「含む」情報あり</span>}
+                            <span className="font-semibold">{allergen.nameJa}</span>：原材料に含まない
+                            {storeHandledAllergenSlugs.includes(allergen.slug) && <span className="block text-sm leading-6 text-amber-900">この店舗の別の公開メニューに「含む」登録があります</span>}
                         </li>)}
                     </ul>
                 </div>

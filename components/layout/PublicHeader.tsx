@@ -6,7 +6,7 @@ import PublicSearchBox from "@/features/public/shops/components/PublicSearchBox"
 export default function PublicHeader() {
     return (
         <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
-            <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between gap-3 px-4 sm:px-6 md:px-10">
+            <div className="mx-auto flex min-h-14 w-full max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6 md:px-10">
                 <div className="flex min-w-0 flex-1 items-center justify-between gap-3 md:flex-none md:gap-8">
                     <Link href="/" className="flex min-w-0 items-center">
                         <BrandLogo variant="publicHeader" priority />
@@ -20,7 +20,7 @@ export default function PublicHeader() {
                             店舗一覧
                         </Link>
                         <Link
-                            className="hidden text-sm font-medium text-gray-700 hover:text-[#13ec13] md:inline"
+                            className="hidden min-h-11 items-center rounded px-1 text-sm font-medium text-gray-700 hover:text-green-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700 md:inline-flex"
                             href="/terms"
                         >
                             利用規約
@@ -28,7 +28,7 @@ export default function PublicHeader() {
                     </nav>
                 </div>
 
-                <div className="hidden w-full max-w-xs md:block">
+                <div className="hidden w-full max-w-xs lg:block">
                     <Suspense
                         fallback={
                             <div className="h-10 rounded-lg bg-gray-100" />
@@ -38,7 +38,7 @@ export default function PublicHeader() {
                     </Suspense>
                 </div>
             </div>
-            <div className="px-4 pb-3 sm:px-6 md:hidden">
+            <div className="px-4 pb-3 sm:px-6 lg:hidden">
                 <Suspense fallback={<div className="h-11 rounded-lg bg-gray-100" />}>
                     <PublicSearchBox />
                 </Suspense>

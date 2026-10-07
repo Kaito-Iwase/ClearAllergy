@@ -140,7 +140,7 @@ try {
     await openPreferences();
     await setMode("卵", "exclude");
     await apply();
-    await search.fill("米粉パンケーキ");
+    await search.fill("照り焼きチキンプレート");
     await search.press("Enter");
     await page.getByRole("status").filter({ hasText: "除外設定により表示できるメニューがありません。" }).waitFor();
     assert.equal(await page.locator('#public-menus').getByRole("link").count(), 0);
@@ -171,7 +171,7 @@ try {
     await page.getByRole("heading", { level: 1 }).waitFor();
     assert.equal(await page.getByRole("heading", { level: 1 }).count(), 1);
     await page.getByText("確認対象 3件：くるみ・卵・乳", { exact: true }).waitFor();
-    await page.getByText("選択中アレルゲンの登録状態", { exact: true }).waitFor();
+    await page.getByRole("heading", { name: "店舗が登録した内容", exact: true }).waitFor();
     await openPreferences();
     await setMode("乳", "none");
     await visible(page.getByRole("button", { name: "変更を適用", exact: true })).press("Enter");

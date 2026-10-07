@@ -2,7 +2,7 @@
 
 [Requirements](../safety/safety-constraints.md) / [Issues](backlog.md) / [Verification](verification-plan.md)
 
-設計D01–D12はIssue I01–I12に1対1。新しいproduct意味・API・schemaはHUMAN_DECISION_REQUIREDのまま。以下は研究時点の設計で、D01のみ後続runの[実装結果](i01-result.md)を持つ。他の設計案を既存動作と誤認しない。
+設計D01–D12はIssue I01–I12に1対1。新しいproduct意味・API・schemaはHUMAN_DECISION_REQUIREDのまま。以下は研究時点の設計で、D01は後続runの[実装結果](i01-result.md)、D02は[実装・隔離DB検証結果](i02-result.md)を持つ。他の設計案を既存動作と誤認しない。
 
 ## D01 — Runtime status normalization（I01 / LOCAL_IMPLEMENTED）
 
@@ -12,7 +12,7 @@ Affected: lib/allergens.ts、tests/allergen-display.test.ts、menu-publication.t
 
 TDD_REQUIRED、T01 pure+API。expected REDはunknown→FREE/publication pass。higher-level: valid enum+missing linkのpublic API回帰、必要ならpublic browser。characterization YES: 有効4値・STORE_HANDLED・選択なし・MAY_CONTAIN設定を固定。危険なunknown挙動は固定しない。
 
-## D02 — Resource-scoped final write（I02 / LOCAL_IMPLEMENTED、DB未検証）
+## D02 — Resource-scoped final write（I02 / LOCAL_IMPLEMENTED、LOCAL_DB_VERIFIED）
 
 後続runの[実装・検証結果](i02-result.md)を参照。以下は研究時点のtarget design。
 

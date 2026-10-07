@@ -1,11 +1,11 @@
 # Implementation backlog — issue register
 
-I01–I12はこの研究内の識別子であり、GitHub番号ではない。I01は[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)で[ローカル実装・検証](i01-result.md)済み。I02は[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)で[ローカル実装・API検証](i02-result.md)済みだが専用DBは未実行。I03–I12も2026-09-28に起票済み。Evidence IDsの出典は [register](../03-evidence-register.md)、現在の保証と提案を区別する。Issueの作成は実装承認や検証完了を意味しない。
+I01–I12はこの研究内の識別子であり、GitHub番号ではない。I01は[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)で[ローカル実装・検証](i01-result.md)済み。I02は[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)で[ローカル実装・API/専用DB検証](i02-result.md)済み（2026-09-30）。I03–I12も2026-09-28に起票済み。Evidence IDsの出典は [register](../03-evidence-register.md)、現在の保証と提案を区別する。Issueの作成は実装承認や検証完了を意味しない。
 
 | Backlog | GitHub Issue | 現在のゲート | 提案Milestone |
 | --- | --- | --- | --- |
 | I01 | [#37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37) | local commit `111817e`、未push | M0 |
-| I02 | [#38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38) | local commits `03d39d4`/`242a0c9`、実DB未検証・未push | M0 |
+| I02 | [#38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38) | local commits `03d39d4`/`242a0c9`、2026-09-30実DB PASS、追検証差分未commit・未push | M0 |
 | I03 | [#48](https://github.com/Kaito-Iwase/ClearAllergy/issues/48) | BLOCKED HD-02 | M2 |
 | I04 | [#49](https://github.com/Kaito-Iwase/ClearAllergy/issues/49) | 測定設計READY、cache変更BLOCKED HD-05 | M1 → M2 |
 | I05 | [#50](https://github.com/Kaito-Iwase/ClearAllergy/issues/50) | BLOCKED HD-06 | M2 |
@@ -31,7 +31,7 @@ M0–M3は[移行計画](migration-plan.md#proposed-milestones)の**提案上の
 
 **最初の実装: I01。** 誤ったnegative表示はH01に直接つながり得る。EX01で局所的に反証済み、schema/API変更への依存がなく、mapping→publication→public responseという小さな縦の経路を守れる。Learning valueは不正値の境界と既存test gapを実際のregressionへ結び付ける点。発生頻度不明を深刻度の確定値へ変換しない。
 
-LOCAL_IMPLEMENTED: I01、I02（ともにlocal commit済・未push。I02のT09実DBは未実行）。READY research/planning/evidence: I04/I07/I08/I09。BLOCKED implementation: I03/I05/I06/I10/I11/I12、およびI04のcache変更。Issueの作成可能性と実装許可・配備許可は別。
+LOCAL_IMPLEMENTED: I01、I02（ともにlocal commit済・未push。I02のT09実DBは2026-09-30 PASS、実Clerk/配備は未確認）。READY research/planning/evidence: I04/I07/I08/I09。BLOCKED implementation: I03/I05/I06/I10/I11/I12、およびI04のcache変更。Issueの作成可能性と実装許可・配備許可は別。
 
 各Issueの実装完了時に追記: commit、RED test名/失敗理由、GREEN run日時/結果、higher-level検証先、残存risk、Claim更新、Traceability更新。単なるチェック済み表示で埋めない。以下の「RED」は設計であり本runでtest codeを書いたものではない。
 
@@ -60,7 +60,7 @@ LOCAL_IMPLEMENTED: I01、I02（ともにlocal commit済・未push。I02のT09実
 
 ## I02 — メニュー最終書込みをserver店舗条件で限定する
 
-**Status:** LOCAL_IMPLEMENTED / DB_UNVERIFIED / D02 / [GitHub #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)。以下は研究時点のIssue仕様。後続の結果は [I02結果](i02-result.md)。Current（研究時点）: 事前readはid+shop、PUT/DELETEの最終writeはidのみ。Why/risk: H03、read後の対象変更時に境界が弱い。通常他店舗拒否は存在し、認可欠如とは主張しない。
+**Status:** LOCAL_IMPLEMENTED / LOCAL_DB_VERIFIED / D02 / [GitHub #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)。以下は研究時点のIssue仕様。後続の結果は [I02結果](i02-result.md)。Current（研究時点）: 事前readはid+shop、PUT/DELETEの最終writeはidのみ。Why/risk: H03、read後の対象変更時に境界が弱い。通常他店舗拒否は存在し、認可欠如とは主張しない。
 **Evidence / requirement / invariant:** R04/R05 → SEC-OWN-001/AR-BOUND-001 → INV03/INV14。
 **Target behavior:** server解決shopに属する対象だけを最終write。事前read後に対象shopが変わったら404、fields/links/deleteすべて無変更。
 

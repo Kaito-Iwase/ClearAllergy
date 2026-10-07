@@ -47,12 +47,12 @@ function ShopCards({
                         href={`/shops/${shop.id}`}
                         className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-green-300 hover:shadow-md sm:p-5"
                     >
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1 basis-40">
                                 <p className="text-xs font-bold text-green-700">
                                     {shop.category || "カテゴリ未設定"}
                                 </p>
-                                <h3 className="mt-1 text-xl font-black text-neutral-900">
+                                <h3 className="mt-1 break-words text-xl font-black leading-7 text-neutral-900">
                                     {shop.name}
                                 </h3>
                             </div>
@@ -217,7 +217,7 @@ export default function PublicShopListClient({
             <section className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950">
                 <p className="font-extrabold">登録情報の表示を検証するデモです</p>
                 <p className="mt-1 leading-6">
-                    「原材料に含まない登録」は食品安全の保証ではありません。「含む可能性あり」は、確認が必要な状態です。
+                    「原材料に含まない」という登録は食品安全の保証ではありません。「含む可能性あり」は、確認が必要な状態です。
                 </p>
             </section>
 
@@ -233,6 +233,8 @@ export default function PublicShopListClient({
                     onSubmit={submitSearch}
                     className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_180px_180px_auto]"
                 >
+                    <label className="flex min-w-0 flex-col gap-1 text-sm font-bold text-neutral-800">
+                    エリア・駅名
                     <input
                         value={area}
                         onChange={(e) => setArea(e.target.value)}
@@ -240,6 +242,9 @@ export default function PublicShopListClient({
                         placeholder="エリア・駅名"
                         className="rounded-xl border border-neutral-300 px-4 py-3"
                     />
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-1 text-sm font-bold text-neutral-800">
+                    店舗名・ジャンル・キーワード
                     <input
                         value={keyword}
                         onChange={(e) => setKeyword(e.target.value)}
@@ -247,6 +252,9 @@ export default function PublicShopListClient({
                         placeholder="店舗名・ジャンル・キーワード"
                         className="rounded-xl border border-neutral-300 px-4 py-3"
                     />
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-1 text-sm font-bold text-neutral-800">
+                    都道府県
                     <select
                         aria-label="都道府県"
                         value={prefecture}
@@ -263,6 +271,9 @@ export default function PublicShopListClient({
                             </option>
                         ))}
                     </select>
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-1 text-sm font-bold text-neutral-800">
+                    市区町村
                     <select
                         aria-label="市区町村"
                         value={city}
@@ -276,9 +287,10 @@ export default function PublicShopListClient({
                             </option>
                         ))}
                     </select>
+                    </label>
                     <button
                         type="submit"
-                        className="rounded-xl bg-[#13ec13] px-5 py-3 font-extrabold text-black"
+                        className="min-h-11 self-end rounded-xl bg-[#13ec13] px-5 py-3 font-extrabold text-black"
                     >
                         検索
                     </button>
@@ -326,7 +338,7 @@ export default function PublicShopListClient({
                     </div>
                 ) : null}
                 {hasExclusionPreference ? (
-                    <p className="mt-3 rounded-xl bg-green-50 px-4 py-3 text-xs font-bold text-green-900">
+                    <p className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm leading-6 text-violet-900">
                         除外設定に一致するメニューしかない店舗は非表示になります
                         {includeMayContain
                             ? "（含む可能性ありも対象）"

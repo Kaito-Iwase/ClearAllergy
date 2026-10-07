@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
+import { runAdminMenuDatabaseRegression } from "./admin-menu-database-regression";
 
 // Call only after the entry point's dedicated DB guard. No Clerk/Blob or shared
 // master changes: all writes and cleanup belong to shops created by this run.
@@ -112,6 +113,8 @@ export async function runDatabaseRegression(db: PrismaClient) {
             assert.equal((await db.menuItem.findUniqueOrThrow({ where: { id: full.id } })).shopId, shopId);
             pass(`scoped ${operation} rejects a menu moved after read without changing its links`);
         }
+
+        await runAdminMenuDatabaseRegression(db, shopIds, run, master);
 
         const inviteData = { email: `db-regression-${run}@example.invalid`, shopId, invitedByClerkUserId: "fixture-operator" };
         const pending = await db.adminInvite.create({ data: inviteData });

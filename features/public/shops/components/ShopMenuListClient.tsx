@@ -56,14 +56,14 @@ function badgeClass(kind: BadgeKind): string {
     if (kind === "unknown") {
         return "bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200";
     }
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+    return "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-300";
 }
 
 function badgeLabel(kind: BadgeKind): string {
     if (kind === "danger") return "含む";
     if (kind === "caution") return "要確認の情報あり";
-    if (kind === "unknown") return "未設定あり";
-    return "原材料に含まない登録";
+    if (kind === "unknown") return "未入力・未確認あり";
+    return "原材料に含まない";
 }
 
 export default function ShopMenuListClient({
@@ -163,12 +163,14 @@ export default function ShopMenuListClient({
             id="public-menus"
             className="scroll-mt-32 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6"
         >
-            <div className="mb-4 flex items-end justify-between">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
                 <h2 className="text-base font-extrabold">公開メニュー</h2>
                 <p className="text-xs text-gray-500">
                     表示 {visibleMenuItems.length}件 / 検索対象 {searchedMenus.length}件
                 </p>
             </div>
+
+            <p className="mb-4 text-sm leading-6 text-gray-700">店舗が登録した内容</p>
 
             {searchedMenus.length === 0 ? (
                 <div role="status" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
@@ -227,17 +229,20 @@ export default function ShopMenuListClient({
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                        <h3 className="truncate text-base font-extrabold text-gray-900">
+                                        <h3 className="break-words text-base font-extrabold leading-7 text-gray-900">
                                             {menu.name}
                                         </h3>
 
-                                        <p className="mt-1 text-xs font-semibold text-gray-600">
+                                        <p className="mt-2 break-words text-sm leading-6 text-gray-700">
+                                            {hasPreference ? `確認対象：${allergenMaster.filter((allergen) => selectedSlugs.includes(allergen.slug)).map((allergen) => allergen.nameJa).join("・")}` : `すべての品目（${allergenMaster.length}品目）`}
+                                        </p>
+                                        <p className="mt-1 text-sm font-semibold leading-6 text-gray-700">
                                             {/* 件数表示でも UNKNOWN を明示し、要約本文と意味がずれないようにします。 */}
                                             含む {activeSummary.containsCount}{" "}
-                                            件 ・ 含む可能性があります{" "}
-                                            {activeSummary.mayCount} 件
+                                            品目 ／ 含む可能性あり{" "}
+                                            {activeSummary.mayCount} 品目
                                             {activeSummary.unknownCount > 0
-                                                ? ` ・ 未設定 ${activeSummary.unknownCount} 件`
+                                                ? ` ／ 未入力・未確認 ${activeSummary.unknownCount} 品目`
                                                 : ""}
                                         </p>
 
@@ -252,21 +257,21 @@ export default function ShopMenuListClient({
                                     </span>
                                 </div>
 
-                                <div className="mt-3 flex items-center justify-between gap-3">
+                                <div className="mt-3 flex flex-col items-start gap-2">
                                     <span
-                                        className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${badgeClass(
+                                        className={`max-w-full rounded-lg px-3 py-1.5 text-sm font-bold leading-6 ${badgeClass(
                                             activeSummary.badge,
                                         )}`}
                                     >
                                         {badgeLabel(activeSummary.badge)}
                                     </span>
 
-                                    <p className="text-right text-xs text-gray-500">
+                                    <p className="text-xs leading-5 text-gray-600">
                                         更新：{formatDateTimeJa(menu.updatedAt)}
                                     </p>
                                 </div>
 
-                                <p className="mt-2 text-xs text-gray-600">
+                                <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-gray-700">
                                     {activeSummary.summaryText}
                                 </p>
 

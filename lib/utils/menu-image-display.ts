@@ -97,3 +97,31 @@ export function getPositionPresetPercent(position: MenuImagePosition) {
     if (position === "right") return { x: 100, y: 50 };
     return { x: 50, y: 50 };
 }
+
+/** Signed movement at 100% position, including object-fit and zoom around that position. */
+export function getImagePositionTravel(args: {
+    frameWidth: number;
+    frameHeight: number;
+    imageWidth: number;
+    imageHeight: number;
+    fit: MenuImageFit;
+    zoom: number;
+}) {
+    const { frameWidth, frameHeight, imageWidth, imageHeight, fit, zoom } = args;
+    if (![frameWidth, frameHeight, imageWidth, imageHeight, zoom].every(
+        (value) => Number.isFinite(value) && value > 0,
+    )) return { x: 0, y: 0 };
+    const fitScale = (fit === "contain" ? Math.min : Math.max)(
+        frameWidth / imageWidth, frameHeight / imageHeight,
+    );
+    const scale = fitScale * zoom / 100;
+    return { x: frameWidth - imageWidth * scale, y: frameHeight - imageHeight * scale };
+}
+
+export function getDraggedImagePosition(startPercent: number, deltaPixels: number, travelPixels: number) {
+    // An axis exactly fitted to the frame has no movement available. Avoid division by zero.
+    if (!Number.isFinite(deltaPixels) || !Number.isFinite(travelPixels) || Math.abs(travelPixels) < 0.01) {
+        return startPercent;
+    }
+    return Math.min(100, Math.max(0, Math.round(startPercent + deltaPixels / travelPixels * 100)));
+}

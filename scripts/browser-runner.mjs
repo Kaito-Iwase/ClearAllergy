@@ -11,7 +11,7 @@ const runner = resolve(process.env.CLEARALLERGY_BROWSER_RUNNER_DIR || join(tmpdi
 const modulePath = join(runner, "node_modules", "playwright");
 const env = { ...process.env, PLAYWRIGHT_MODULE_PATH: modulePath, PLAYWRIGHT_BROWSERS_PATH: join(runner, "browsers") };
 const [command, ...options] = process.argv.slice(2);
-const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | demo | admin";
+const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | ui | composition | qr | demo | admin";
 class RunnerError extends Error {}
 
 function runNode(args, childEnv = env) {
@@ -29,7 +29,8 @@ function assertInstalled() {
 try {
     if (["--help", "-h"].includes(command) && options.length === 0) {
         console.log(usage);
-        console.log("Start the isolated app separately. Public/demo modes block browser external requests. Admin mode uses the dedicated DB, development Clerk and Blob.");
+        console.log("Start the isolated app separately. Public/ui/demo modes block browser external requests. UI mode requires the fictional loopback fixture. Admin mode uses the dedicated DB, development Clerk and Blob.");
+        console.log("Composition/qr modes use temporary local component fixtures and built app CSS; no app, DB or Clerk startup is required.");
     } else if (command === "install" && options.every((option) => option === "--with-deps") && options.length <= 1) {
         // Use the existing npm dependency through Node, avoiding shell quoting
         // and npm.cmd process-launch differences on Windows.
@@ -40,11 +41,17 @@ try {
         assertInstalled();
         runNode([join(modulePath, "cli.js"), "install", ...options, "chromium"]);
         console.log(`Playwright ${version} and Chromium are ready. Start the isolated app, then run node scripts/browser-runner.mjs public.`);
-    } else if (["public", "demo", "admin"].includes(command) && options.length === 0) {
+    } else if (["public", "ui", "composition", "qr", "demo", "admin"].includes(command) && options.length === 0) {
         assertInstalled();
         if (command === "admin") {
             console.log("Running dedicated admin regression: writes to the test DB, development Clerk and configured Blob store. Test images require the separate cleanup command.");
             runNode(["scripts/check-test-browser.mjs"]);
+        } else if (command === "composition") {
+            runNode(["scripts/check-image-composition-browser.mjs"]);
+        } else if (command === "qr") {
+            runNode(["scripts/check-shop-qr-browser.mjs"]);
+        } else if (command === "ui") {
+            runNode(["scripts/check-public-ui-browser.mjs"], { ...env, CLEARALLERGY_BROWSER_BLOCK_EXTERNAL: "true" });
         } else {
             runNode(["scripts/check-first-use-browser.mjs"], { ...env,
                 CLEARALLERGY_BROWSER_PUBLIC_ONLY: command === "public" ? "true" : "false",

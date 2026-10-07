@@ -207,19 +207,19 @@ export function buildSelectedAllergenSummary(args: {
         );
     }
     if (parts.length === 0 && unknownNames.length > 0) {
-        parts.push(`${unknownNames.join("・")}（未設定）`);
+        parts.push(`${unknownNames.join("・")}（未入力・未確認）`);
     } else if (unknownNames.length > 0) {
-        parts.push(`未設定 ${unknownNames.length}件`);
+        parts.push(`未入力・未確認 ${unknownNames.length}品目`);
     }
 
     if (storeHandledSlugs.length > 0) {
-        parts.push(`${storeHandledSlugs.sort(byRank).map(toName).join("・")}（同店舗の別の公開登録に含む情報あり）`);
+        parts.push(`${storeHandledSlugs.sort(byRank).map(toName).join("・")}：この店舗の別の公開メニューに「含む」登録があります`);
     }
     return {
         summaryText:
             parts.length > 0
-                ? parts.join(" / ")
-                : args.selectedSlugs.length > 0 ? "確認対象は原材料に含まない登録です。食品安全の保証ではありません。" : "確認対象が未設定です",
+                ? parts.join("\n")
+                : args.selectedSlugs.length > 0 ? "確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。" : "確認対象が未設定です",
         badge:
             containsSlugs.length > 0
                 ? "danger"
@@ -292,8 +292,8 @@ export function buildAllergenDisplayItems(
 export function statusLabelJa(status: AllergenStatus): string {
     if (status === "CONTAINS") return "含む";
     if (status === "MAY_CONTAIN") return "含む可能性あり・要確認";
-    if (status === "FREE") return "原材料に含まない登録";
-    return "未設定";
+    if (status === "FREE") return "原材料に含まない";
+    return "未入力・未確認";
 }
 
 export function effectiveRiskLabelJa(
@@ -302,10 +302,10 @@ export function effectiveRiskLabelJa(
     if (effectiveRisk === "CONTAINS") return "含む";
     if (effectiveRisk === "MAY_CONTAIN") return "含む可能性あり・要確認";
     if (effectiveRisk === "STORE_HANDLED") {
-        return "原材料に含まない登録・同店舗の別の公開登録に含む情報あり";
+        return "原材料に含まない・この店舗の別の公開メニューに「含む」登録あり";
     }
-    if (effectiveRisk === "FREE") return "原材料に含まない登録";
-    return "未確認";
+    if (effectiveRisk === "FREE") return "原材料に含まない";
+    return "未入力・未確認";
 }
 
 export function statusBadgeClass(status: AllergenStatus): string {
@@ -316,7 +316,7 @@ export function statusBadgeClass(status: AllergenStatus): string {
         return "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-200";
     }
     if (status === "FREE") {
-        return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+        return "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-300";
     }
     return "bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200";
 }

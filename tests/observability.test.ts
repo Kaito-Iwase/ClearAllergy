@@ -156,6 +156,7 @@ test("監査metadataは許可された状態とサーバー操作者IDだけを�
         source: "server_session", actorClerkUserId: "user_valid123",
     });
     assert.deepEqual(sanitizeAuditMetadata({ actorClerkUserId: "user_private@example.test", source: "attacker" }), {});
+    assert.deepEqual(sanitizeAuditMetadata({ reason: "menu_not_found", token: "secret" }), { reason: "menu_not_found" });
     for (const value of [null, [], "secret", 42]) assert.deepEqual(sanitizeAuditMetadata(value), {});
 });
 

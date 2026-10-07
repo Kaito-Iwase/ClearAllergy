@@ -144,7 +144,7 @@ export default function PublicMenuDetailBodyClient(props: {
                                     )}
                                 </div>
 
-                                <h1 className="mb-2 text-3xl font-extrabold">
+                                    <h1 className="mb-2 break-words text-3xl font-extrabold leading-snug">
                                     {menuName}
                                 </h1>
 
@@ -198,7 +198,7 @@ export default function PublicMenuDetailBodyClient(props: {
                         </div>
 
                         {ingredients ? (
-                            <p className="text-base leading-relaxed text-gray-700">
+                            <p className="whitespace-pre-line break-words text-base leading-7 text-gray-700">
                                 {ingredients}
                             </p>
                         ) : (
@@ -208,7 +208,7 @@ export default function PublicMenuDetailBodyClient(props: {
                         )}
 
                         {precaution ? (
-                            <div className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+                            <div className="mt-4 whitespace-pre-line break-words rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-700">
                                 ※ 注意事項：{precaution}
                             </div>
                         ) : null}
@@ -222,7 +222,8 @@ export default function PublicMenuDetailBodyClient(props: {
                             </h2>
                         </div>
 
-                        <p className="mb-4 text-sm leading-6 text-gray-700">「原材料に含まない登録」は食品安全の保証ではありません。「含む可能性あり・要確認」は、含む可能性があり、確認が必要な状態です。</p>
+                        <p className="mb-2 text-sm font-bold text-gray-900">店舗が登録した内容</p>
+                        <p className="mb-4 text-sm leading-6 text-gray-700">「原材料に含まない」という登録は食品安全の保証ではありません。「含む可能性あり・要確認」は、含む可能性があり、確認が必要な状態です。</p>
                         {rows.some((row) => row.effectiveRisk === "STORE_HANDLED") ? (
                             <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-950">{STORE_ALLERGEN_NOTE}</p>
                         ) : null}
@@ -236,15 +237,14 @@ export default function PublicMenuDetailBodyClient(props: {
                                         {row.nameJa}
                                     </span>
                                     <span
-                                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusBadgeClass(
+                                        className={`max-w-full rounded-lg px-3 py-1.5 text-sm font-bold leading-6 ${statusBadgeClass(
                                             row.effectiveRisk === "STORE_HANDLED" ? "MAY_CONTAIN" : row.status,
                                         )}`}
-                                        title={row.slug}
                                     >
                                         {statusLabelJa(row.status)}
                                     </span>
                                     {row.effectiveRisk === "STORE_HANDLED" ? (
-                                        <p className="w-full text-xs leading-5 text-amber-900">同店舗の別の公開登録に「含む」情報あり</p>
+                                        <p className="w-full text-sm leading-6 text-amber-900">この店舗の別の公開メニューに「含む」登録があります</p>
                                     ) : null}
                                 </div>
                             ))}

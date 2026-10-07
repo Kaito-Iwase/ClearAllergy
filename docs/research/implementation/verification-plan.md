@@ -1,6 +1,6 @@
 # Verification-first plan
 
-この節は研究run時点の計画。本研究runはtest code未変更、production code未変更。**REDは設計であり研究runではT01以外の不具合再現を実施済みとしない。** EX01もfailing test実装ではなく既存pure関数への合成入力実験。後続runのT01 RED/GREENは[I01結果](i01-result.md)、T09 API RED/GREENとDB未実行は[I02結果](i02-result.md)へ記録。
+この節は研究run時点の計画。本研究runはtest code未変更、production code未変更。**REDは設計であり研究runではT01以外の不具合再現を実施済みとしない。** EX01もfailing test実装ではなく既存pure関数への合成入力実験。後続runのT01 RED/GREENは[I01結果](i01-result.md)、T09 API RED/GREENと2026-09-30の隔離DB・実ハンドラ結果は[I02結果](i02-result.md)へ記録。
 
 ## Current execution evidence
 

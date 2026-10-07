@@ -4,7 +4,12 @@
 @plugin "@tailwindcss/forms";
 
 body {
-    font-family: "Manrope", "Noto Sans JP", sans-serif;
+    font-family: var(--font-geist-sans), "Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+    outline: 2px solid #15803d;
+    outline-offset: 3px;
 }
 
 /* iOS Safari でフォーム入力時に意図しない拡大が起きないよう、スマホ幅では 16px を下限にします。 */
@@ -44,6 +49,24 @@ body {
 
     body.printing-shop-qr .qr-print-header {
         margin-bottom: 12px !important;
+    }
+
+    body.printing-shop-qr .qr-preview-caption {
+        display: none !important;
+    }
+
+    body.printing-shop-qr .qr-preview-stage {
+        width: var(--qr-print-size) !important;
+        height: var(--qr-print-size) !important;
+        max-width: none !important;
+        aspect-ratio: auto !important;
+        border: 0 !important;
+        background: #ffffff !important;
+    }
+
+    body.printing-shop-qr .qr-print-code {
+        width: 100% !important;
+        height: 100% !important;
     }
 
     body.printing-shop-qr .qr-print-url {

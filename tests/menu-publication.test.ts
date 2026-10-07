@@ -115,7 +115,7 @@ test("未設定状態または空のメニュー名は公開条件を満たさ�
 });
 
 test("DB由来の不正・空状態はUNKNOWNとして扱い公開しない", () => {
-    for (const invalidStatus of ["UNRECOGNIZED", "", null]) {
+    for (const invalidStatus of ["UNRECOGNIZED", "", null, undefined]) {
         const links = masterRows.map((allergen) => ({
             allergen: { slug: allergen.slug },
             status: allergen.slug === "egg" ? invalidStatus as string : "FREE",
@@ -131,6 +131,23 @@ test("DB由来の不正・空状態はUNKNOWNとして扱い公開しない", ()
             }),
             false,
         );
+    }
+});
+
+test("アレルゲンリンク欠損はUNKNOWNで補完し公開を拒否する", () => {
+    const links = masterRows.filter((a) => a.slug !== "egg").map((allergen) => ({
+        allergen: { slug: allergen.slug }, status: "FREE",
+    }));
+    const statusBySlug = createStatusBySlug(masterRows, links);
+    assert.equal(statusBySlug.egg, "UNKNOWN");
+    assert.equal(isMenuPublishable({ name: "架空メニュー", allergens: masterRows, statusBySlug }), false);
+});
+
+test("有効4状態の公開条件は維持する", () => {
+    for (const status of ["CONTAINS", "FREE", "MAY_CONTAIN", "UNKNOWN"] as const) {
+        assert.equal(isMenuPublishable({
+            name: "架空メニュー", allergens: masterRows, statusBySlug: statusMap(status),
+        }), status !== "UNKNOWN");
     }
 });
 

@@ -2,6 +2,14 @@
 
 [READMEへ](../../README.md) · [変更対応表](change-map.md) · [保守ルール](maintenance.md)
 
+## 2026-09-30 Issue #37 / #38 追検証
+
+HEAD `f1f209c`、開始時差分なしの正規Windows作業先で既存実装をレビューし、[I01結果](../research/implementation/i01-result.md)・[I02結果](../research/implementation/i02-result.md)へ今回結果を記録した。未知・空・null・undefined・欠損の表示/404回帰を補強し、全テスト133/133、lint・typecheck・build・diff確認が成功。
+
+Dockerは通常起動で復旧し、今回専用PostgreSQL17へ既存16 migrationと架空fixtureのみを適用した。既存CI接続ガード下のDB回帰18項目がPASS。実PUT/DELETEでread直後の移転/消失→404、両店舗の全fields/links不変、DELETEのリンク巻戻し、正常所有者操作を確認した。Clerkとcacheはテストプロセス内の代用品であり、実セッションや配備cacheを検証した結果ではない。固定監査理由`menu_not_found`の脱落も局所修正し、RED/GREENと実DB保存を確認。
+
+今回差分は未コミット・未push。Node22.15.1/npm10.9.2とrepo基準22.23.1/11.18.0との差、実browser・Clerk/Blob・GitHub CI・配備・owner取消race・理解度は未確認のまま。以下の日付付き記録は当時の結果として保持する。
+
 ## 2026-09-28 I01 局所回帰
 
 未知のアレルゲン状態を否定表示と公開可能判定へ通さない変更の結果は [I01実装・検証結果](../research/implementation/i01-result.md) に記録した。先に追加した回帰テストは27件中4件が意味上の理由で失敗し、実装後は27/27件成功。`npm.cmd test` は128/128件成功、`npm.cmd run lint`・`npm.cmd run typecheck`・`npm.cmd run build` も成功した。build初回はGoogle Fontsへの接続失敗で、接続を許可した再実行が成功した。build中のDB fallbackログがあるため、実DB・ブラウザ・実Clerk/Blob・ユーザー理解度は未確認のまま扱う。
@@ -54,7 +62,7 @@
 | 修正済み・配備先は未確認 | 同一Originをscheme・host・portで比較し、転送ヘッダーで許可元を増やさない | 正常・偽装・scheme違い等の回帰あり。公開Hostとprotocolのプロキシ前提を実Vercel Previewで確認する |
 | 実装上の制約／承認範囲未確認 | 品目マスタ検証と既存SQLに固定件数29の判定がある | 現行29品目に対する動作。将来の品目変更では件数だけ変更せず集合・全層を再確認 |
 | 実装上の制約 | Shopの所有者が一意、メンバー表なし。画像削除・保存失敗後の未参照Blob自動回収なし | 複数担当者運用・画像ライフサイクルは既成機能にしない。別途要件判断 |
-| 検証の不足 | 招待競合はAPIモックとローカルPostgreSQLで検証。実招待全工程・Googleログイン・QR印刷・実配備でのキャッシュ反映時間は未確認 | 対応表の手動確認へ。公開CIやAPIモックだけで実認証の成功を保証しない |
+| 検証の不足 | 招待競合はAPIモックとローカルPostgreSQLで検証。QRは隔離部品で画面比率・印刷CSS／PDF寸法を検査済み（[UI/UX記録](ui-ux-review.md#qr-size)）。実招待全工程・Googleログイン・QRの紙への印刷／カメラ読取・実配備でのキャッシュ反映時間は未確認 | 対応表の手動確認へ。公開CIやAPIモックだけで実認証の成功を保証しない |
 | 配備容量の不一致候補 | アプリの画像上限5MiBとVercel Functionの要求サイズ上限4.5MBは同じではない。multipartの分も必要 | MIME・署名・5MiB境界はローカル検証。実Previewで容量境界を確認し、必要ならUI/API上限の統一かclient upload移行を別途設計する |
 | 運用の残課題 | 通知先へのアラート、監査の保持・削除方針、分散回数制限、未参照Blob回収は未導入 | 構造化ログとプロセス内制限を運用全体の保証にしない。現規模と費用から採否判断する |
 | DBの残課題 | 価格・予算・座標・画像調整の範囲は主にアプリ側で検証。DBへの直接書込すべてを防ぐCHECK制約はない | 既存データを確認せず制約を大量追加しない。公開トリガー・一意制約の回帰とは分ける |

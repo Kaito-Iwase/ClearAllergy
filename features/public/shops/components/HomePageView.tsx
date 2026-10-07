@@ -36,7 +36,7 @@ export default function HomePageView({
     return (
         <main className="min-h-screen bg-[#f6f8f6] text-[#111811]">
             <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
-                <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between gap-3 px-4 sm:px-6 md:px-10">
+                <div className="mx-auto flex min-h-14 w-full max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6 md:px-10">
                     <Link href="/" className="flex min-w-0 items-center">
                         <BrandLogo variant="publicHeader" priority />
                     </Link>
@@ -304,7 +304,7 @@ export default function HomePageView({
                             見やすく整理
                         </h2>
                         <p className="mt-2 text-sm leading-7 text-neutral-600">
-                            「含む」「原材料に含まない登録」「含む可能性あり・要確認」を見分けやすく表示します。
+                            「含む」「原材料に含まない」「含む可能性あり・要確認」を見分けやすく表示します。
                         </p>
                     </div>
 

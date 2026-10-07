@@ -125,7 +125,7 @@ test("別の公開登録による補足があるFREEを安心側の要約にし�
     assert.equal(result.badge, "caution");
     assert.equal(result.storeHandledCount, 1);
     assert.equal(result.mayCount, 0);
-    assert.match(result.summaryText, /別の公開登録/);
+    assert.match(result.summaryText, /別の公開メニューに「含む」登録/);
     const items = buildAllergenDisplayItems([
         { slug: "egg", nameJa: "卵", status: "FREE" }, { slug: "milk", nameJa: "乳", status: "UNKNOWN" },
     ], new Set(["egg", "milk"]));
@@ -149,26 +149,28 @@ test("含む登録が3品目以上あっても他の含む・要確認情報を�
 });
 
 test("不正状態をFREEや安心側の表示に変換しない", () => {
-    const invalid = "UNRECOGNIZED" as AllergenStatus;
-    const [item] = buildAllergenDisplayItems(
-        [{ slug: "egg", nameJa: "卵", status: invalid }],
-        new Set(["egg"]),
-    );
+    for (const value of ["UNRECOGNIZED", "", null, undefined]) {
+        const invalid = value as AllergenStatus;
+        const [item] = buildAllergenDisplayItems(
+            [{ slug: "egg", nameJa: "卵", status: invalid }],
+            new Set(["egg"]),
+        );
 
-    assert.equal(item.status, "UNKNOWN");
-    assert.equal(item.effectiveRisk, "UNKNOWN");
-    assert.equal(getAllergenEffectiveRisk({ status: invalid, storeHandlesAllergen: false }), "UNKNOWN");
-    assert.equal(getAllergenEffectiveRisk({ status: invalid, storeHandlesAllergen: true }), "UNKNOWN");
-    assert.equal(statusLabelJa(invalid), statusLabelJa("UNKNOWN"));
-    assert.equal(statusBadgeClass(invalid), statusBadgeClass("UNKNOWN"));
-    assert.equal(
-        effectiveRiskLabelJa("UNRECOGNIZED" as AllergenEffectiveRisk),
-        effectiveRiskLabelJa("UNKNOWN"),
-    );
-    assert.equal(
-        buildSpecifiedIngredientNotice({
-            rows: [{ slug: "egg", nameJa: "卵", status: invalid }],
-        }).kind,
-        "unknown",
-    );
+        assert.equal(item.status, "UNKNOWN");
+        assert.equal(item.effectiveRisk, "UNKNOWN");
+        assert.equal(getAllergenEffectiveRisk({ status: invalid, storeHandlesAllergen: false }), "UNKNOWN");
+        assert.equal(getAllergenEffectiveRisk({ status: invalid, storeHandlesAllergen: true }), "UNKNOWN");
+        assert.equal(statusLabelJa(invalid), statusLabelJa("UNKNOWN"));
+        assert.equal(statusBadgeClass(invalid), statusBadgeClass("UNKNOWN"));
+        assert.equal(
+            effectiveRiskLabelJa("UNRECOGNIZED" as AllergenEffectiveRisk),
+            effectiveRiskLabelJa("UNKNOWN"),
+        );
+        assert.equal(
+            buildSpecifiedIngredientNotice({
+                rows: [{ slug: "egg", nameJa: "卵", status: invalid }],
+            }).kind,
+            "unknown",
+        );
+    }
 });

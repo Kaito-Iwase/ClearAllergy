@@ -22,7 +22,7 @@ Claimは強い表現のまま検証し、反証されたら維持しない。出
 | C16 警告文と色があるから全利用者が理解できる | R11 | X07は理解度検証でない、E6 humanなし | UNKNOWN / Low | keyboard/screen reader/teach-back UX01 |
 | C17 大規模architecture変更が必要 | 長いroute、framework依存 | pure rulesとprovider helpersは既存、INF01 | UNKNOWN（必要性を支持する証拠不足）/ Medium:現行境界と局所案の比較 | 局所改善案はE7としてSUPPORTED。試行sliceで変更影響/DB検証工数を測り再評価 |
 | C18 29品目を扱えば全食物アレルギーを網羅 | masterが29 | X01対象範囲外、R02有限集合 | CONTRADICTED / High | allergy taxonomyとproduct coverageは別 |
-| C19 I01対象の不正状態はUNKNOWNへ正規化し、新しい公開API応答から除外される | RUN03: T01 RED/GREEN、全128tests、source diff | 実PostgreSQL/配備/キャッシュ済み画面は未確認、通常enum/API入力は元から拒否 | SUPPORTED（対象経路）/ High:意図した反例とHTTP結果で検証 | production到達頻度・実DB適用・既存キャッシュまでは主張しない |
-| C20 I02対象PUT/DELETEの最終writeはserver店舗IDで制限される | RUN04: source diffとT09 API RED/GREEN、全131tests | 実PostgreSQL回帰未実行、owner/isActive変更raceは対象外 | SUPPORTED（API mockの経路）/ Medium:両HTTP応答とmock rollbackは確認、DB実体未確認 | 専用DBのT09と実Clerk/配備確認まで認可保証を拡張しない |
+| C19 I01対象の不正状態はUNKNOWNへ正規化し、新しい公開API応答から除外される | RUN03/RUN05: T01 RED/GREEN、境界ケース補強、全133tests、source diff | 実PostgreSQL/配備/キャッシュ済み画面は未確認、通常enum/API入力は元から拒否 | SUPPORTED（対象経路）/ High:意図した反例とHTTP結果で検証 | production到達頻度・実DB適用・既存キャッシュまでは主張しない |
+| C20 I02対象PUT/DELETEの最終writeはserver店舗IDで制限される | RUN04/RUN05: source diff、T09 API RED/GREEN、隔離PostgreSQL18 PASS、実ハンドラ404/rollback、id-only mutation RED | 実Clerk/配備未確認、owner/isActive変更raceは対象外 | SUPPORTED（ローカル対象経路）/ High:実DBの両HTTP応答と全fields/links不変を確認 | セッションは代用品。実provider・配備・権限取消へ認可保証を拡張しない |
 
 反証探索は、既存ガードが問題を遮断するか、標準が要求していない設計を強制していないか、地域・populationの違い、prototypeで頻度が不明なrisk、UI注意の既存実装、provider側保証を確認した。Riskの可能性と発生頻度を混同せず、確率やrisk reduction percentageは推計していない。

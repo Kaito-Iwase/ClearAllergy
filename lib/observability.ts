@@ -79,6 +79,7 @@ const auditReasons = new Set([
     "invalid_input", "rate_limited", "unauthorized", "internal_error", "file_missing",
     "registration_guard_denied", "shop_already_exists", "clerk_admin_auth_disabled",
     "no_pending_invite", "session_not_verified", "client_reported_failure",
+    "menu_not_found",
 ]);
 
 // 既存の自由形式metadataから必要な状態・変更項目だけを監査DBへ保存する。

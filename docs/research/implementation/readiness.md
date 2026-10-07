@@ -2,7 +2,7 @@
 
 判定日2026-09-28。**PARTIALLY_READY**。研究・設計文書を完成させたことと、製品保証・実装・実配備の検証完了は別。
 
-後続runのI01は[局所実装・検証結果](i01-result.md)、I02は[局所実装・API検証結果](i02-result.md)を参照。I02の専用DB回帰は未実行。この文書のfreeze/実行記録は研究run時点に限定する。残るIssueを含む全体判定はPARTIALLY_READYのまま。
+後続runのI01は[局所実装・検証結果](i01-result.md)、I02は[局所実装・API検証結果](i02-result.md)を参照。I02の専用DB回帰は2026-09-30のRUN05で18項目PASS。実Clerk・配備は未確認。この文書のfreeze/実行記録は研究run時点に限定する。残るIssueを含む全体判定はPARTIALLY_READYのまま。
 
 | Gate | Result | Evidence / condition |
 | --- | --- | --- |

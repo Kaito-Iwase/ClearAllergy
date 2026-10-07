@@ -2,7 +2,7 @@
 
 2026-09-28 / working tree `improve/prototype-usability-ci` / HEAD `64163cc` + 調査開始前からの未コミット変更。**判定: PARTIALLY_READY**。Production code・test code・schemaは変更していない。GitHub Issue作成・commit・pushは未実施。
 
-後続の実装runでI01とI02をローカル修正し、[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)と[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)を起票した。2026-09-28の整理でI01を`111817e`、I02を`03d39d4`、関連するDB/CI回帰定義を`242a0c9`にlocal commitした。I03–I12とHD-01–HD-09もGitHub Issueへ起票済み。pushとI02の専用DB回帰は未実施。[I01結果](implementation/i01-result.md)と[I02結果](implementation/i02-result.md)を参照。上のfreezeと以下のExecutive Summaryは**研究run時点の記録**であり、後続のコード状態を説明する文ではない。全体の設計判定PARTIALLY_READYは継続。
+後続の実装runでI01とI02をローカル修正し、[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)と[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)を起票した。2026-09-28の整理でI01を`111817e`、I02を`03d39d4`、関連するDB/CI回帰定義を`242a0c9`にlocal commitした。I03–I12とHD-01–HD-09もGitHub Issueへ起票済み。pushは未実施。2026-09-30にI01の境界ケースを補強し、I02の隔離PostgreSQL・実ハンドラ回帰18項目を確認した。追検証差分は未コミット。[I01結果](implementation/i01-result.md)と[I02結果](implementation/i02-result.md)を参照。上のfreezeと以下のExecutive Summaryは**研究run時点の記録**であり、後続のコード状態を説明する文ではない。全体の設計判定PARTIALLY_READYは継続。
 
 本書は研究/設計案の入口。現行仕様は [guide/rules](../guide/rules.md)、[変更対応表](../guide/change-map.md)。ここでRECOMMENDED/OPENとした設計を現行仕様へ昇格しない。[Gate判定と検証結果](implementation/readiness.md) / [Issue台帳](implementation/backlog.md) / [提案Milestone](implementation/migration-plan.md#proposed-milestones) / [Traceability](traceability-matrix.md) / [人の判断待ち](open-questions.md)。
 
@@ -26,7 +26,7 @@
 16. **Authorization/transaction/failure:** server session→active owned shop→resource predicate。fields/links/将来revision/reviewは同tx。外部providerはtx外で現行補償を維持。取得不能はFREE/正常0件へ変換しない。commit後cache failureと結果不明はHD-09で契約化。
 17. **Verification:** 適切な最低層でT01～T11を設計し、実DB/provider/cache境界はreal integration、理解はUX01、アクセシビリティはA11Y01、運用はOPS01、配備はREL01。研究時点の124 tests PASSとaudit0、後続の[I01](implementation/i01-result.md)・[I02](implementation/i02-result.md)の局所結果はそれぞれ観察範囲内の証拠。全体安全性の証拠にしない。
 18. **Migration sequence:** baseline→未知値防御→write条件→cache/UX/ops測定→承認後revision→verified identity→review履歴→鮮度/asset/outcome→release evidence。各phaseの互換性/rollbackを定義し、一括rewriteしない。
-19. **Implementation epics/issues:** 5 Epic、[12実装/調査Issue](implementation/backlog.md)と[9判断Issue](open-questions.md)をGitHubに起票済み。I01/I02はlocal commit済み・未pushで、I02の専用DB確認は未実行。I04/I07/I08/I09は調査/計画/証拠収集へ進められ、残りの実装は人の判断等に依存する。最初の局所実装としてI01を選定した理由はH01への直接性・EX01・依存の少なさ・public経路の学習価値。
+19. **Implementation epics/issues:** 5 Epic、[12実装/調査Issue](implementation/backlog.md)と[9判断Issue](open-questions.md)をGitHubに起票済み。I01/I02はlocal commit済み・未pushで、I02の専用DB確認は2026-09-30の後続runでPASS（実Clerk/配備は未確認）。I04/I07/I08/I09は調査/計画/証拠収集へ進められ、残りの実装は人の判断等に依存する。最初の局所実装としてI01を選定した理由はH01への直接性・EX01・依存の少なさ・public経路の学習価値。
 20. **Residual risks:** 食品情報の虚偽/未報告変更、対象29品目外、厨房、配信済み画面、正当ownerの誤操作、provider停止、理解の個人差はarchitectureだけで除去不能。限定safety caseを維持。
 21. **Threats to validity:** dirty working tree、mock/合成値、runtime差、限定文献選定、海外/団体回答/質的研究の適用差、abstract限定、選択bias、未配備/未実DB/未UX、時間経過を明記。
 22. **人が次に確認する事項:** HD-01のprototype維持/実運用移行、HD-02/03/05の競合・確認根拠・鮮度、実provider/DB検証の対象、HD-08の文書不一致。I01/I02のローカル結果と未検証範囲をレビューし、[提案Milestone](implementation/migration-plan.md#proposed-milestones)のゲートを用いて次のsliceを選ぶ。GitHub上のMilestoneは2026-09-28時点で未設定。

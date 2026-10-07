@@ -18,7 +18,7 @@ const variantClassMap: Record<
         wrapper: "gap-2.5",
         icon: 32,
         image: "h-8 w-8",
-        text: "text-[28px] font-black tracking-[-0.04em]",
+        text: "text-[24px] font-black tracking-[-0.04em]",
     },
     publicHeader: {
         wrapper: "gap-2 sm:gap-2.5",
@@ -30,7 +30,7 @@ const variantClassMap: Record<
         wrapper: "gap-2",
         icon: 28,
         image: "h-7 w-7",
-        text: "text-[24px] font-black tracking-[-0.04em]",
+        text: "text-xl font-black tracking-[-0.04em] sm:text-[24px]",
     },
     hero: {
         wrapper: "gap-3",
@@ -59,7 +59,7 @@ export default function BrandLogo({
                 className={`shrink-0 object-contain ${config.image}`}
             />
             <span
-                className={`min-w-0 truncate leading-none text-current ${config.text}`}
+                className={`shrink-0 whitespace-nowrap leading-[1.3] text-current ${config.text}`}
             >
                 ClearAllergy
             </span>

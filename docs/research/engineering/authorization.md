@@ -2,7 +2,7 @@
 
 R05/R06。AuthenticationはClerkのserver session、店舗認可はactive owned shop、運営認可はserver currentUser publicMetadata.role。client shopId/roleだけでは許可しない。portfolio許可は追加制限であり所有権を代替しない。
 
-以下の表は研究時点のinventory。後続I02でPUT/DELETEの最終 `id+shopId` 条件をローカル実装した。API mockの結果と専用DB未実行の限界は [I02結果](../implementation/i02-result.md) を参照。表のid-only writeは現在のコード状態ではない。
+以下の表は研究時点のinventory。後続I02でPUT/DELETEの最終 `id+shopId` 条件をローカル実装した。API mockと2026-09-30の隔離DB・実ハンドラ結果、その限界は [I02結果](../implementation/i02-result.md) を参照。表のid-only writeは現在のコード状態ではない。
 
 | HTTP / entry | Actor → resource → permission | Writes / side effect | Existing verification / gap |
 | --- | --- | --- | --- |
@@ -28,7 +28,7 @@ R05/R06。AuthenticationはClerkのserver session、店舗認可はactive owned 
 
 ## 残る境界
 
-SEC-OWN-001: I02でwrite条件へresource ID+server shopを含めた。認可判定とwriteの間でowner/isActiveが変わる問題は、単なるshopId追加では解決しない。現在owner移転APIは見つからず、DB/operatorが変更する条件をT09 API mockで再現した。専用DB回帰の定義は追加したが実行は未確認で、scopeを区別する。
+SEC-OWN-001: I02でwrite条件へresource ID+server shopを含めた。認可判定とwriteの間でowner/isActiveが変わる問題は、単なるshopId追加では解決しない。現在owner移転APIは見つからず、DB/operatorが変更する条件をT09 API mockで再現した。2026-09-30の専用PostgreSQLでは実ハンドラの移転/消失後404、両店舗fields/links不変、正常操作を確認した（RUN05）。Clerkセッションは代用品であり、実providerとowner/isActive取消raceは未確認。
 
 SEC-ID-001: 招待のemail一致は“serverが返した文字列”というだけで所有の証明ではない。primary emailのverificationを明示的に要求する案はHD-06（認可ルール変更）。Clerk設定が常にverifiedを保証する可能性がcounter evidence。アカウント乗っ取りが実証されたとは報告しない。
 
