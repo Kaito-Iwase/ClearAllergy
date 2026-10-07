@@ -1,17 +1,15 @@
 import { PROTOTYPE_NOTICE } from "@/lib/public-prototype";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Noto_Sans_JP } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-const geistSans = Geist({
-    variable: "--font-geist-sans",
-    subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-    variable: "--font-geist-mono",
-    subsets: ["latin"],
+const uiFont = Noto_Sans_JP({
+    variable: "--font-noto-sans-jp",
+    display: "swap",
+    // Japanese glyphs use unicode-range shards, not a preloadable "japanese" subset.
+    preload: false,
+    adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
@@ -30,7 +28,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="ja">
+        <html lang="ja" className={uiFont.variable}>
             <head>
                 {/* リガチャ文字をアイコンへ置き換えるフォントのため、読込中にアイコン名を表示しないようdisplay=blockを指定する。 */}
                 {/* eslint-disable-next-line @next/next/no-page-custom-font, @next/next/google-font-display */}
@@ -40,7 +38,7 @@ export default function RootLayout({
                 />
             </head>
             <body
-                className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+                className="antialiased"
             >
                 <aside aria-label="プロトタイプについて" className="mx-auto max-w-7xl px-4 pt-4">
                     <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">{PROTOTYPE_NOTICE}</p>

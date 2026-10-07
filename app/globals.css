@@ -3,8 +3,13 @@
 
 @plugin "@tailwindcss/forms";
 
+html {
+  --font-ui: var(--font-noto-sans-jp, "Noto Sans JP"), "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+}
+
 body {
-    font-family: var(--font-geist-sans), "Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  font-family: var(--font-ui);
+  line-height: 1.7;
 }
 
 :where(a, button, input, select, textarea):focus-visible {

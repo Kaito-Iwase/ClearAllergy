@@ -83,10 +83,7 @@ export default function PublicMenuDetailBodyClient(props: {
               transform: `scale(${displayZoom / 100})`,
               transformOrigin: `${displayPositionX}% ${displayPositionY}%`,
           }
-        : {
-              backgroundImage:
-                  "linear-gradient(135deg, rgba(19,236,19,0.25), rgba(0,0,0,0.05))",
-          };
+        : {};
     const preferencePanel = (
         <UserAllergenPreferencePanel
             allergens={allergensForClient}

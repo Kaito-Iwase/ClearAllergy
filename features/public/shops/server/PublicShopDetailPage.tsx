@@ -194,17 +194,11 @@ export default async function PublicShopDetailPage({
             ? `${formatPriceYenLabel(shop.averageBudgetYen)}前後`
             : "未設定";
 
-    // カバー画像があればそれを使い、無ければ既存のグラデーションで見た目を保ちます。
+    // 写真がない場合は白い情報カードとして表示します。
     const safeCoverImageUrl = sanitizeStoredImageUrl(shop.coverImageUrl, {
         kind: "shop",
         shopId,
     });
-    const heroStyle = safeCoverImageUrl
-        ? {}
-        : {
-              backgroundImage:
-                  "linear-gradient(90deg, rgba(19,236,19,0.25) 0%, rgba(19,236,19,0.10) 55%, rgba(255,255,255,0) 100%)",
-          };
     const heroImageStyle: CSSProperties = {
         objectFit: parseMenuImageFit(shop.coverImageFit),
         objectPosition: `${parseMenuImagePositionPercent(
@@ -232,8 +226,7 @@ export default async function PublicShopDetailPage({
 
                 <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
                     <div
-                        className="relative flex min-h-56 w-full items-end bg-cover bg-center bg-no-repeat md:min-h-64"
-                        style={heroStyle}
+                        className={`relative flex w-full items-end bg-white ${safeCoverImageUrl ? "min-h-56 md:min-h-64" : ""}`}
                     >
                         {safeCoverImageUrl ? (
                             <Image
