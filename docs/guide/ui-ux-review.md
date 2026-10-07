@@ -285,3 +285,13 @@ PDFはブラウザからA4・scale=1で生成し、Popplerで4ファイルをPNG
 証跡は `qr-baseline-measurements.json`、`qr-measurements.json`、`qr-pdf-measurements.json`、`qr-screen-35.png`／`qr-screen-60.png`、`qr-stage-35.png`／`qr-stage-60.png`、`qr-print-{35,45,50,60}mm.pdf` とそのPNG。架空URLのテスト出力であり、実店舗のQRとして使わない。PDFの追加測定スクリプトは今回のローカル証跡 `check-qr-pdf.py`。
 
 productにサイズと印刷操作、architectureに画面／印刷の計算、developmentとchange-mapにハーネス入口、verificationに実施済みと未確認の区別を反映した。AGENTSの検証入口にui／composition／qrの実行条件を反映した。rulesは保存・公開・安全性の意味を変えていないため追加更新不要。既存の未コミット変更を保持し、commit・push・merge・配備は実行していない。
+
+## 追加修正：トップ見出しの途中改行（2026-10-07）
+
+HEAD `13cbff4` への追加依頼。従来は4つのblockで強制改行し、36〜62px・font-black・狭い行高と字間を組み合わせていた。デスクトップでも「登録情報を確認できる。」の末尾だけが次行になることを実画面で確認した。文言を保持し、「登録情報を確認できる。」を32〜44px・bold・行高1.4の主見出しへ、前置きと補足を小さい文字へ変更した。主文と補足はinline-blockの語句単位で折り返す。見出しのh1は1つで、リンク・注意表示・登録情報の意味は変更しない。
+
+`node scripts/agent-harness.mjs verify --base origin/main --output home-headline-20261007.json` はPrisma生成・validate、lint、型検査、168/168テスト（失敗・skip 0）、build、diff check、候補fingerprint不変を含めPASS。実Node22.15.1 / npm10.9.2は指定Node22.23.1と異なるため、最新CIの結果はPRへ別記する。
+
+実ローカルトップ画面の補助ハーネスでは、320・390・768・1024・1440pxで元の文言との一致、単一h1、語句内の全glyphが1行、横スクロールなし、クライアント例外なしを確認してPASS。1440pxのCSS zoom2でも横スクロールなし。390・1440pxの画像を目視した。390px以上では主文は1行、320pxは語句単位の2行だった。読取専用subagentの独立差分reviewに未解決P0–P3なし。実機・Safari・音声読み上げ・ネイティブ拡大・文字だけの200%拡大はUNVERIFIEDであり、CSS zoomをその代替とは扱わない。
+
+表示仕様はproduct、本記録は原因・検証範囲を更新した。ルート・API・認証・DB・アレルゲン状態・安全文言・作業規則を変更しないため、その他の正本文書とAGENTSは更新不要。検証画像・測定JSONはローカル成果物であり、本番反映の証明ではない。

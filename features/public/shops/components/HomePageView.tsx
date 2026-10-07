@@ -70,17 +70,14 @@ export default function HomePageView({
                     <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-8">
                         <div className="flex flex-col gap-5">
                             <h1 className="text-neutral-900">
-                                <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
+                                <span className="block text-lg font-semibold leading-7 sm:text-xl">
                                     外食前に、
                                 </span>
-                                <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
-                                    登録情報を確認できる。
+                                <span className="mt-2 block text-[32px] font-bold leading-[1.4] sm:text-[40px] xl:text-[44px]">
+                                    <span className="inline-block">登録情報を</span><span className="inline-block">確認できる。</span>
                                 </span>
-                                <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
-                                    アレルゲン情報を
-                                </span>
-                                <span className="block text-[36px] font-black leading-[1.08] tracking-[-0.04em] sm:text-[56px] sm:leading-[1.02] sm:tracking-[-0.05em] lg:text-[54px] xl:text-[62px]">
-                                    見やすく届ける。
+                                <span className="mt-4 block text-lg font-medium leading-8 text-neutral-600 sm:text-xl">
+                                    <span className="inline-block">アレルゲン情報を</span><span className="inline-block">見やすく届ける。</span>
                                 </span>
                             </h1>
 
