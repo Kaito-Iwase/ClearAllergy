@@ -39,7 +39,9 @@ npm audit fix --forceは使用しない。通常のnpm更新で置き換わら�
 
 独立した読取専用reviewで、新規の重大な回帰は未検出。npm更新の脆弱性改善根拠がないP3は上表で明記し、現行Next.jsバージョン表記のP3は16.3.6へ修正。最終の文書修正で実行コード・lockは変えていない。
 
-依存更新後のブラウザ回帰とPR CIは結果確認後に追記する。PRの旧HEAD f06d43fでは通常CI（実PostgreSQL・公開ブラウザ含む）が成功したが、新しい依存の成功とは区別する。
+同じ依存更新コードで `node scripts/browser-runner.mjs composition` は24群、`qr` は10群がPASS。架空loopback部品fixture・外部通信遮断で、実画像のドラッグ方向、タッチ／ピンチ、320〜1440pxのQRサイズ比、35/45/50/60mmの印刷CSSと解除を確認した。実Clerk・Blobによる管理保存、実機タッチ、紙印刷／カメラ読取、理解度評価はUNVERIFIED。
+
+GitHubの更新後HEAD e0921c9の依存監査もFAIL：高8・中2、計10パッケージ。通常CIと最終HEADの結果は[Draft PR #67](https://github.com/Kaito-Iwase/ClearAllergy/pull/67)へ記録する。旧HEAD f06d43fでは通常CI（実PostgreSQL・公開ブラウザ含む）が成功したが、新しい依存の成功とは区別する。以後の文書だけの追記では実行コード・lockを変更しない。
 
 ## 原典
 
