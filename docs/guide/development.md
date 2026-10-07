@@ -1,7 +1,7 @@
 # 起動・確認・変更の進め方
 
 
-2026-10-07公開前の依存更新・残存指摘・未承認の例外案は[依存更新記録](../verification/security-release-20261007.md)に記録する。通常CIの成功と依存監査の成功を区別し、監査FAILのまま公開を完了扱いにしない。
+2026-10-07公開前の依存更新・残存指摘・公開保留の決定は[依存更新記録](../verification/security-release-20261007.md)に記録する。通常CIの成功と依存監査の成功を区別し、監査FAILのまま公開を完了扱いにしない。
 [READMEへ](../../README.md) · [内部処理](architecture.md) · [変更対応表](change-map.md) · [文書の保守](maintenance.md)
 
 ここに載せるコマンドはリポジトリの設定から整理した手順です。今回すべてを実行した記録ではありません。[確認範囲](verification.md)に実施と未実施を分けています。以下のコードブロックは**PowerShellで実行する手順**で、アプリのソース抜粋ではありません。
@@ -9,7 +9,7 @@
 <a id="environment"></a>
 ## 1. どの環境を使うか決める
 
-作業フォルダは `C:\Users\kaito\Documents\Github\ClearAllergy`。Node.jsは `.node-version` の22.23.1、Dockerfile・CIのnpmは11.18.0です。Windowsでは `npm.cmd` / `npx.cmd` を使います。既に準備済みの環境は、最初に再インストールせず状態を確認します。
+作業フォルダは `C:\Users\kaito\Documents\Github\ClearAllergy`。Node.jsは `.node-version` の22.23.1、Dockerfile・CIのglobal npmは11.18.0、lockfileのローカル検証用npmは11.21.0です。CLI実行経路の統一は別の未解決事項（Issue #64）で、今回の更新によって統一済みとはしません。Windowsでは `npm.cmd` / `npx.cmd` を使います。既に準備済みの環境は、最初に再インストールせず状態を確認します。
 
 | 実行方法 | アプリ | DB | 外部サービス・用途 |
 | --- | --- | --- | --- |

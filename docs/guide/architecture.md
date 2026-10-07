@@ -126,7 +126,7 @@ DB接続障害、外部サービス失敗、業務上の入力・権限エラー
 
 ## 技術構成と選定記録
 
-現行はNext.js 16.3.4、React 19系、TypeScript、Tailwind CSS、Hono、Clerk、Prisma 6系、PostgreSQL、Vercel Blobです。正確な解決バージョンは `package-lock.json` を優先します。Node.jsとnpmの開発基準は[開発手順](development.md#environment)へ集約しています。
+現行はNext.js 16.3.6、React 19系、TypeScript、Tailwind CSS、Hono、Clerk、Prisma 6系、PostgreSQL、Vercel Blobです。正確な解決バージョンは `package-lock.json` を優先します。Node.jsとnpmの開発基準は[開発手順](development.md#environment)へ集約しています。
 
 ページの `params` / `searchParams` はPromiseとして受け取り、`await` して読みます。型確認に加え、buildが生成するNext.jsのページ型との整合性も検証します。
 
