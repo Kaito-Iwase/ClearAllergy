@@ -178,6 +178,8 @@ CI定義は `.github/workflows/ci.yml`。main/develop向けPR、両ブランチ�
 
 依存配置 → Prisma生成・validate → 単体テスト → lint → 型確認 → CI専用DB準備 → 実DB回帰 → build → ブラウザランナー準備 → 起動 → 公開ブラウザ回帰 → 成果物保存。
 
+実DB回帰は `check-ci-database.ts` による制約・ロールバックと、`check-owned-menu-database.ts` による実メニュー更新・削除の所有店舗条件を順に検査します。いずれも接続先ガードを通った一時PostgreSQLに限定し、実Clerk認証は置き換えます。CIの公開画面回帰には実Clerk・Blobへの書込を含みません。
+
 専用DB準備は `scripts/setup-ci-env.ts` / `ci-environment.ts` が固定した一時DBへの両接続URLと有効化フラグを検査し、既存マイグレーションを適用します。その後、既存ユーザー・店舗・メニューがあればfixture投入を拒否します。架空1店舗3メニューを用意し、GitHub Secretsや実Clerk・Blobを使いません。実DB回帰はマイグレーション由来の部分一意インデックスと制約トリガーも対象です。既存環境のリセットや本番DBの適用状況確認ではありません。
 
 ブラウザ用Playwrightはジョブの一時ディレクトリに用意します。失敗時は `scripts/collect-ci-diagnostics.ts` がCI用の接続設定と実行フラグを確認し、生のサーバーログから固定した分類・件数だけの要約を作ります。生ログ・認証情報・入力本文を成果物へ掲載する方式ではありません。スクリーンショットと存在する診断要約をSHA（コミットの識別値）付きで7日間保存します。

@@ -2,6 +2,21 @@
 
 [READMEへ](../../README.md) · [共通ルール](rules.md) · 次は[開発手順](development.md)
 
+<a id="system-diagram"></a>
+## システム構成図
+
+![ClearAllergyの主要な閲覧・更新経路](diagrams/clearallergy-architecture.svg)
+
+[図を拡大](diagrams/clearallergy-architecture.svg) · [draw.io編集用](diagrams/clearallergy-architecture.drawio)
+
+ブラウザ、Next.jsアプリ、外部サービスの境界と、公開閲覧・管理操作の主要な処理経路を示しています。公開ページの初期表示はServer ComponentからPrismaで取得し、管理画面の保存はRoute HandlerとHonoのAPIを通します。公開・管理で共用するアレルゲンの状態・公開判定と、Clerkによる認証・アプリによる店舗所有権確認は、それぞれ役割を分けています。
+
+Vercel・Neonは想定する配備構成です。図はリポジトリの実装をもとにした説明であり、実際の配備先・接続先・サービス設定・稼働状況の確認記録ではありません。Google Placesの管理用店舗候補検索、公開API、管理ページの初期取得、ログなどは概要図から省略しています。詳細は本書と[変更対応表](change-map.md)を参照してください。
+
+### draw.ioで編集するとき
+
+`diagrams/clearallergy-architecture.drawio` が編集用の原本、同名の `.svg` がREADMEなどに表示する画像です。draw.ioで原本を開き、編集後はSVGも更新します。SVGは外部画像・外部フォント・スクリプトに依存せず、draw.ioの編集データも埋め込んでいます。図を変更する際は、公開ページ・管理API・共通判定・DB・画像の実装と照合し、本文と両方のファイルを同じ作業で整合させてください。
+
 ## ファイルの役割を先に理解する
 
 | 場所・技術 | このアプリでの役割 |

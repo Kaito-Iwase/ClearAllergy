@@ -4,6 +4,8 @@
 
 全ページ・主要機能・APIの入口をここだけで管理します。コードパスは**リポジトリルートからの相対パス**です。表は影響範囲の完全な保証ではありません。入口の関数・コンポーネント名を検索して、呼び出し元、共通処理、動的URL、テストを確認してください。行番号だけに依存しません。
 
+構成全体の説明は[システム構成図](architecture.md#system-diagram)から確認できます。閲覧・管理・認証・DB・画像の経路が変わる場合は、本文と併せて編集用の `docs/guide/diagrams/clearallergy-architecture.drawio` と表示用の `docs/guide/diagrams/clearallergy-architecture.svg` を照合し、更新します。
+
 Safety / Security / Dataの研究・設計案は [研究入口](../research/README.md)、Evidence → Hazard → Requirement → Invariant → Expected Test → Issueの対応は [研究traceability](../research/traceability-matrix.md) を参照してください。研究資料の提案を現行仕様や実装済み機能として扱いません。
 
 表の「テスト」は検査するコードが存在するという意味で、今回実行済みという意味ではありません。APIの単体テストはClerk・DB・Blob等をモックに置き換え、実PostgreSQLの制約回帰とは分けています。「手動」は[開発手順のブラウザ確認](development.md#browser)に従います。専用テスト未整備の機能も、説明対象から除いていません。
