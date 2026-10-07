@@ -1,5 +1,7 @@
 # 文書の根拠と確認範囲
 
+
+2026-10-07公開前の依存更新・残存指摘・未承認の例外案は[依存更新記録](../verification/security-release-20261007.md)に記録する。通常CIの成功と依存監査の成功を区別し、監査FAILのまま公開を完了扱いにしない。
 [READMEへ](../../README.md) · [変更対応表](change-map.md) · [保守ルール](maintenance.md)
 
 ## 2026-09-30 Issue #37 / #38 追検証
