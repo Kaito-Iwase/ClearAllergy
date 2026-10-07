@@ -28,7 +28,6 @@
     "bcrypt": "^6.0.0",
     "hono": "4.13.7",
     "next": "16.3.6",
-    "npm": "^11.21.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -43,6 +42,7 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "fast-glob": "file:scripts/next-root-glob",
     "postcss": "8.5.28",
     "prisma": "^6.19.2",
     "tailwindcss": "^4.2.1",
@@ -51,6 +51,9 @@
   },
   "overrides": {
     "postcss": "$postcss",
+    "@next/eslint-plugin-next@16.3.6": {
+      "fast-glob": "$fast-glob"
+    },
     "@prisma/config@6.19.3": {
       "deepmerge-ts": "8.0.0"
     }

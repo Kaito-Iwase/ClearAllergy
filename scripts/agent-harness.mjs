@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { resolveNpmCli } from "./npm-cli.mjs";
 
 export const ASSESSMENT_MARKER = "<!-- clearallergy-agent:v1 -->";
 const REPOSITORY = "Kaito-Iwase/ClearAllergy";
@@ -193,7 +194,8 @@ export function verify({ base, output = "verification.json" }) {
     const pkg = JSON.parse(readFileSync("package.json", "utf8"));
     const commands = verificationCommands(pkg);
     const env = checkEnvironment();
-    const npm = resolve("node_modules/npm/bin/npm-cli.js");
+    const npmCli = resolveNpmCli();
+    const npm = npmCli.path;
     const prisma = resolve("node_modules/prisma/build/index.js");
     if (!existsSync(npm) || (commands.some((command) => command.prisma) && !existsSync(prisma))) throw new Error("Locked local dependencies are missing; inspect before installing.");
     const handle = beginReport(process.cwd(), output);
@@ -226,7 +228,7 @@ export function verify({ base, output = "verification.json" }) {
     const report = { version: 1, repository: REPOSITORY, head, baseSha, startedAt, finishedAt: new Date().toISOString(),
         candidateBefore: before, candidateAfter: after, candidateUnchanged: before === after && head === git("rev-parse", "HEAD") && harnessBefore === sha256(readFileSync(new URL(import.meta.url))),
         harnessSha256: harnessBefore, lockSha256: sha256(readFileSync("package-lock.json")),
-        runtime: { actualNode: process.versions.node, expectedNode, matches: process.versions.node === expectedNode },
+        runtime: { actualNode: process.versions.node, expectedNode, matches: process.versions.node === expectedNode, actualNpm: npmCli.version },
         commands: results, diffCheck: whitespace.status === 0 ? "PASS" : "FAIL",
         unverified: ["real PostgreSQL constraints/races", "browser and accessibility", "real Clerk/Blob", "GitHub checks", "deployment and user comprehension"] };
     report.status = results.length === commands.length && results.every((result) => result.status === "PASS") && report.candidateUnchanged && report.diffCheck === "PASS" ? "PASS" : "FAIL";

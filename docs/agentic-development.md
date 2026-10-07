@@ -105,9 +105,9 @@ package.jsonのscriptsとCIを毎回読み、コマンドと副作用を確認�
 node scripts/agent-harness.mjs verify --base origin/main --output verification.json
 ```
 
-runnerは既存ローカルnpm CLIをNodeから呼び、OS必須変数だけ引き継ぐ。DBは到達不能なlocalhost、ClerkはCIと同じ非実在キーへ限定し、`.env`/account fileがあるworktreeでは停止する。real DB/browser fixtureの初期化、seed、repair、migration、Clerk/Blob writeは実行しない。buildのGoogle Fontsなど既存の公開通信は必要になる。失敗時の生ログはreportに保存せず、コマンド・exit・出力hash・test件数を保存する。詳細調査が必要なら同じ非秘密環境で失敗コマンドを実行し、原因を確認する。
+runnerは `scripts/npm-cli.mjs` で解決したNode配布またはnpm lifecycleの既存CLIをNodeから呼び、OS必須変数だけ引き継ぐ。npmをアプリ依存に同梱しない。DBは到達不能なlocalhost、ClerkはCIと同じ非実在キーへ限定し、`.env`/account fileがあるworktreeでは停止する。real DB/browser fixtureの初期化、seed、repair、migration、Clerk/Blob writeは実行しない。buildのGoogle Fontsなど既存の公開通信は必要になる。失敗時の生ログはreportに保存せず、コマンド・exit・出力hash・test件数を保存する。詳細調査が必要なら同じ非秘密環境で失敗コマンドを実行し、原因を確認する。
 
-既存reportは上書きせず、再検証では`--output verification-next.json`等の新しい名前を指定する。directoryのリンク・既存file/linkを事前拒否し、検証開始前に排他的に新規作成したfile descriptorを保持する。暫定VERIFYINGを書き、candidateとdirectory/file同一性の最終確認が失敗したら保存済みJSONにもFAILを記録する。directoryが途中でリンクへ交換されても保持したdescriptor以外へ書かない。`.agent-runs/verification.json`はhead/base、candidate file hashの前後、lock hash、実Nodeと`.node-version`の差、実行結果・件数・未実施領域を含む。PASSはローカルコマンドの成功で、runtime差やGitHub/DB/browserの確認を補わない。内容・HEADが途中で変わればFAIL。commit後にコードを変更したら再実行し、PRは最終HEADのcheckを取得する。doc-onlyなら指示に従い動作gate省略可能だが、ハーネスrunnerのコード変更は通常gate対象。
+既存reportは上書きせず、再検証では`--output verification-next.json`等の新しい名前を指定する。directoryのリンク・既存file/linkを事前拒否し、検証開始前に排他的に新規作成したfile descriptorを保持する。暫定VERIFYINGを書き、candidateとdirectory/file同一性の最終確認が失敗したら保存済みJSONにもFAILを記録する。directoryが途中でリンクへ交換されても保持したdescriptor以外へ書かない。`.agent-runs/verification.json`はhead/base、candidate file hashの前後、lock hash、実Nodeと`.node-version`の差、実npm版、実行結果・件数・未実施領域を含む。PASSはローカルコマンドの成功で、runtime差やGitHub/DB/browserの確認を補わない。内容・HEADが途中で変わればFAIL。commit後にコードを変更したら再実行し、PRは最終HEADのcheckを取得する。doc-onlyなら指示に従い動作gate省略可能だが、ハーネスrunnerのコード変更は通常gate対象。
 
 認可・安全・公開条件・DBを触ったら影響に応じて別店舗/未認証/API回帰、接続guard下の実PostgreSQL制約・rollback、mobile/desktop/keyboard/状態を追加する。mock、build、schema validateは実DBの代用ではない。専用環境の対象と副作用が未許可ならUNVERIFIEDを記録して該当gateで停止する。既存CIは公開browserを実行するが実Clerk/Blobの試験ではない。
 

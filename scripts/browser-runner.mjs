@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveNpmCli } from "./npm-cli.mjs";
 
 const version = "1.61.0";
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,10 +33,10 @@ try {
         console.log("Start the isolated app separately. Public/ui/demo modes block browser external requests. UI mode requires the fictional loopback fixture. Admin mode uses the dedicated DB, development Clerk and Blob.");
         console.log("Composition/qr modes use temporary local component fixtures and built app CSS; no app, DB or Clerk startup is required.");
     } else if (command === "install" && options.every((option) => option === "--with-deps") && options.length <= 1) {
-        // Use the existing npm dependency through Node, avoiding shell quoting
+        // Use the Node installation's npm through Node, avoiding shell quoting
         // and npm.cmd process-launch differences on Windows.
-        const npmCli = join(repository, "node_modules", "npm", "bin", "npm-cli.js");
-        if (!existsSync(npmCli)) throw new RunnerError("App dependencies are missing. Follow the development guide before preparing the browser runner.");
+        const npmCli = resolveNpmCli().path;
+        if (!existsSync(join(repository, "node_modules/next/package.json"))) throw new RunnerError("App dependencies are missing. Follow the development guide before preparing the browser runner.");
         mkdirSync(runner, { recursive: true });
         runNode([npmCli, "install", "--prefix", runner, "--ignore-scripts", "--no-package-lock", "--no-audit", "--no-fund", "--save-exact", `playwright@${version}`]);
         assertInstalled();
