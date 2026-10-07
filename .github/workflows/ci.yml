@@ -87,6 +87,9 @@ jobs:
       - name: Check PostgreSQL constraints and rollback
         run: node --import tsx scripts/check-ci-database.ts
 
+      - name: Check owned menu writes in isolated PostgreSQL
+        run: node --import tsx scripts/check-owned-menu-database.ts
+
       - name: Build
         run: npm run build
 

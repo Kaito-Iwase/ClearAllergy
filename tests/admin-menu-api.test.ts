@@ -269,3 +269,49 @@ test("DELETEの事前取得後にメニューが別店舗へ移ったら404で�
     assert.deepEqual(state.links, initialLinks);
     assert.equal(state.deleted, false);
 });
+
+function recordNotFound() {
+    return new Prisma.PrismaClientKnownRequestError("fixture target no longer owned", {
+        code: "P2025", clientVersion: Prisma.prismaVersion.client,
+    });
+}
+
+for (const method of ["PUT", "DELETE"] as const) {
+    test(`${method}: 事前取得後の店舗移転は404になり、成功監査・cache更新を行わない`, async (t) => {
+        setup(t);
+        t.mock.method(console, "error", () => {});
+        replace(t, prisma.menuItem, "findFirst", async () => ({
+            id: "moved-menu", name: "original", priceYen: null, imageUrl: null, isPublished: true,
+            allergenLinks: ALLERGEN_MASTER.map((a) => ({ allergen: { slug: a.slug }, status: "FREE" })),
+        }));
+        const auditResults: unknown[] = [];
+        replace(t, prisma.auditLog, "create", async ({ data }: Args) => { auditResults.push(data?.success); return {}; });
+        const finalWrite = async ({ where }: Args) => {
+            assert.equal(where?.id, "moved-menu");
+            if (where?.shopId === "own-shop") throw recordNotFound();
+            return { id: "moved-menu", shopId: "other-shop", isPublished: false };
+        };
+        replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
+            menuItem: { update: finalWrite, delete: finalWrite },
+            menuItemAllergen: { deleteMany: async () => ({}), createMany: async () => ({}) },
+        }));
+        const response = await menuRoute[method](request(method, "/api/admin/menus/moved-menu", method === "PUT" ? '{"name":"changed"}' : undefined));
+        assert.equal(response.status, 404);
+        assert.deepEqual(await response.json(), { error: "menu not found" });
+        assert.ok(!auditResults.includes(true));
+        assert.deepEqual(revalidatedPaths, []);
+    });
+
+    test(`${method}: 事前取得後に消失した対象のP2025は既存404になる`, async (t) => {
+        setup(t);
+        t.mock.method(console, "error", () => {});
+        replace(t, prisma.menuItem, "findFirst", async () => ({
+            id: "gone-menu", name: "original", priceYen: null, imageUrl: null, isPublished: false,
+            allergenLinks: [],
+        }));
+        replace(t, prisma, "$transaction", async () => { throw recordNotFound(); });
+        const response = await menuRoute[method](request(method, "/api/admin/menus/gone-menu", method === "PUT" ? '{}' : undefined));
+        assert.equal(response.status, 404);
+        assert.deepEqual(await response.json(), { error: "menu not found" });
+    });
+}

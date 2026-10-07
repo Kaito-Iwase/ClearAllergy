@@ -52,12 +52,25 @@ docs/*
 !docs/guide/
 docs/guide/*
 !docs/guide/*.md
+!docs/guide/diagrams/
+docs/guide/diagrams/*
+!docs/guide/diagrams/clearallergy-architecture.drawio
+!docs/guide/diagrams/clearallergy-architecture.svg
 !docs/interview/
 docs/interview/*
 !docs/interview/design-decisions.md
 !docs/research/
 !docs/research/**
+!docs/agentic-development.md
+!docs/agentic-audit.md
+!docs/verification/
+docs/verification/*
+!docs/verification/*.md
+!docs/verification/*.json
 document/
 
 .codex
 
+
+# local autonomous-run snapshots and reports
+/.agent-runs/

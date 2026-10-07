@@ -408,6 +408,7 @@ app.put("/api/admin/menus/:menuId", async (c) => {
 
         const updatedMenu = await prisma.$transaction(async (tx) => {
             const updated = await tx.menuItem.update({
+                // Recheck ownership at the write; an earlier read can become stale.
                 where: { id: menuId, shopId: auth.shopId },
                 data: {
                     name: nextName,
@@ -552,6 +553,7 @@ app.delete("/api/admin/menus/:menuId", async (c) => {
             });
 
             await tx.menuItem.delete({
+                // A P2025 also rolls back the preceding allergen-link deletion.
                 where: { id: menuId, shopId: auth.shopId },
             });
         });
