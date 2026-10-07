@@ -1,10 +1,12 @@
 // 画面ごとに品目の順序がずれないよう、現行マスタを表示順つきで返します。
 
 import { Hono } from "hono";
+import { handleUnhandledApiError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.get("/api/allergens", async () => {
     const allergens = await prisma.allergen.findMany({

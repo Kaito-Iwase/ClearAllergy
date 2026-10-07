@@ -7,7 +7,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
+COPY scripts/next-root-glob ./scripts/next-root-glob
 COPY prisma ./prisma
 RUN npm ci
 COPY . .

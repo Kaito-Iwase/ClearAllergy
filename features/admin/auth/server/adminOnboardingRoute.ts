@@ -3,6 +3,7 @@
 // 1ユーザー1店舗の前提を守るため、既存 Shop がある場合は新規作成しません。
 
 import { Hono } from "hono";
+import { handleUnhandledApiError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import {
     getCurrentAppUser,
@@ -28,6 +29,7 @@ type OnboardingBody = {
 };
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.post("/api/admin/onboarding", async (c) => {
     const req = c.req.raw;

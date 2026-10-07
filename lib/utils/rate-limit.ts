@@ -17,6 +17,10 @@ const store =
     globalStore.__clearAllergyRateLimitStore ??
     (globalStore.__clearAllergyRateLimitStore = new Map<string, RateLimitEntry>());
 
+const MAX_ENTRIES = 10_000;
+const CLEANUP_INTERVAL_MS = 60_000;
+let lastCleanupAt = 0;
+
 // この関数は、短時間の連続リクエストを抑える簡易レート制限です。
 // いまはメモリ上の Map を使う最小構成なので、単一インスタンスでは有効ですが、
 // 複数台構成では共有されません。本番を大きくするなら Redis などへ移す前提です。
@@ -26,9 +30,20 @@ export function consumeRateLimit(args: {
     windowMs: number;
 }): RateLimitResult {
     const now = Date.now();
+    if (now - lastCleanupAt >= CLEANUP_INTERVAL_MS) {
+        for (const [key, entry] of store) {
+            if (entry.resetAt <= now) store.delete(key);
+        }
+        lastCleanupAt = now;
+    }
     const existing = store.get(args.key);
 
     if (!existing || existing.resetAt <= now) {
+        // Do not evict live counters: rotating identifiers must not reset another
+        // caller's limit. Reject new keys until the next bounded cleanup instead.
+        if (!existing && store.size >= MAX_ENTRIES) {
+            return { allowed: false, remaining: 0, retryAfterSeconds: 60 };
+        }
         store.set(args.key, {
             count: 1,
             resetAt: now + args.windowMs,

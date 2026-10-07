@@ -74,6 +74,7 @@ export default function AdminLoginPageClient({
             return;
         }
 
+        await reportLoginResult({ email: normalizeEmail(email), success: true });
         router.push("/admin/shop");
     }
 
@@ -176,10 +177,6 @@ export default function AdminLoginPageClient({
             }
 
             if (signIn.status === "complete") {
-                await reportLoginResult({
-                    email: normalizedEmail,
-                    success: true,
-                });
                 await finalizeSignIn();
                 return;
             }
@@ -264,13 +261,6 @@ export default function AdminLoginPageClient({
                 return;
             }
 
-            const normalizedEmail = normalizeEmail(email);
-            if (normalizedEmail) {
-                await reportLoginResult({
-                    email: normalizedEmail,
-                    success: true,
-                });
-            }
             await finalizeSignIn();
         } catch (err) {
             const normalizedEmail = normalizeEmail(email);
@@ -412,19 +402,19 @@ export default function AdminLoginPageClient({
                         ) : null}
 
                         {notice ? (
-                            <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                            <div role="status" className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                                 {notice}
                             </div>
                         ) : null}
 
                         {error ? (
-                            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                            <div id="login-error" role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                                 {error}
                             </div>
                         ) : null}
 
                         {requiresEmailCode ? (
-                            <form className="flex flex-col gap-5" onSubmit={onSubmitEmailCode}>
+                            <form aria-describedby={error ? "login-error" : undefined} className="flex flex-col gap-5" onSubmit={onSubmitEmailCode}>
                                 <div className="flex flex-col gap-2">
                                     <label
                                         className="text-text-main dark:text-white text-sm font-bold leading-normal"
@@ -436,6 +426,7 @@ export default function AdminLoginPageClient({
                                     <input
                                         className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbe6db] dark:border-white/20 bg-background-light dark:bg-black/20 focus:border-primary h-12 px-4 text-base font-normal leading-normal placeholder:text-text-sub/50 transition-all"
                                         id="emailCode"
+                                        aria-describedby={error ? "login-error" : undefined}
                                         name="emailCode"
                                         placeholder="メールで届いたコードを入力"
                                         required
@@ -468,7 +459,7 @@ export default function AdminLoginPageClient({
                                 </div>
                             </form>
                         ) : (
-                            <form className="flex flex-col gap-5" onSubmit={onSubmit}>
+                            <form aria-describedby={error ? "login-error" : undefined} className="flex flex-col gap-5" onSubmit={onSubmit}>
                                 <div className="flex flex-col gap-2">
                                     <label
                                         className="text-text-main dark:text-white text-sm font-bold leading-normal"
@@ -481,6 +472,7 @@ export default function AdminLoginPageClient({
                                         <input
                                             className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbe6db] dark:border-white/20 bg-background-light dark:bg-black/20 focus:border-primary h-12 px-4 text-base font-normal leading-normal placeholder:text-text-sub/50 transition-all"
                                             id="email"
+                                            aria-describedby={error ? "login-error" : undefined}
                                             name="email"
                                             placeholder="manager@example.com"
                                             autoCapitalize="none"
@@ -513,6 +505,7 @@ export default function AdminLoginPageClient({
                                         <input
                                             className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbe6db] dark:border-white/20 bg-background-light dark:bg-black/20 focus:border-primary h-12 px-4 pr-12 text-base font-normal leading-normal placeholder:text-text-sub/50 transition-all"
                                             id="password"
+                                            aria-describedby={error ? "login-error" : undefined}
                                             name="password"
                                             placeholder="パスワードを入力"
                                             required

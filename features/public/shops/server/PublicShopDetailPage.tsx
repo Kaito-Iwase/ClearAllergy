@@ -35,7 +35,7 @@ export const dynamic = "force-static";
 export default async function PublicShopDetailPage({
     params,
 }: {
-    params: Params | Promise<Params>;
+    params: Promise<Params>;
 }) {
     // 動的ルートの shopId を取得し、無ければ 404 とします。
     const { shopId } = await params;

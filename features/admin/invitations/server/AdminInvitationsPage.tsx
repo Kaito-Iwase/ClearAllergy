@@ -31,6 +31,7 @@ export default async function AdminInvitationsPage() {
             status: invite.status,
             expiresAt: invite.expiresAt?.toISOString() ?? null,
             createdAt: invite.createdAt.toISOString(),
+            canRetryRevoke: invite.status === "revoked" && invite.clerkInvitationId !== null,
             shop: invite.shop,
         }),
     );

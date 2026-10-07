@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
-import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
 import {
     adminLoginAuditSchema,
     adminLoginPrecheckSchema,
@@ -11,11 +10,12 @@ import {
 } from "@/lib/auth/admin-api-security";
 import { writeAdminAuditLog } from "@/lib/audit-log";
 import {
-    getDatabaseConnectionDiagnostics,
     isDatabaseUnavailableError,
     logDatabaseUnavailableError,
 } from "@/lib/db/errors";
 import { getIpFromHeaders } from "@/lib/utils/request-ip";
+import { enforceAuthAuditRateLimit, recordVerifiedAuthSession } from "@/lib/auth/auth-audit";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 
 type LoginAuditRequest =
     | {
@@ -31,6 +31,7 @@ type LoginAuditRequest =
       };
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.post("/api/admin/auth/login", async (c) => {
     const req = c.req.raw;
@@ -38,6 +39,8 @@ app.post("/api/admin/auth/login", async (c) => {
     if (originError) {
         return originError;
     }
+    const requestLimit = enforceAuthAuditRateLimit(req);
+    if (requestLimit) return requestLimit;
 
     try {
         const body = (await req
@@ -56,25 +59,6 @@ app.post("/api/admin/auth/login", async (c) => {
             const parsed = adminLoginPrecheckSchema.safeParse(body);
 
             if (!parsed.success) {
-                const emailForAudit =
-                    typeof body.email === "string"
-                        ? body.email.trim().toLowerCase()
-                        : null;
-                await writeAdminAuditLog({
-                    req,
-                    actorUserId: null,
-                    actorShopId: null,
-                    action: "auth_login_failure",
-                    targetType: "auth",
-                    targetId: null,
-                    success: false,
-                    metadata: {
-                        phase: "precheck",
-                        email: emailForAudit,
-                        reason: "invalid_input",
-                    },
-                });
-
                 return NextResponse.json(
                     {
                         message:
@@ -95,21 +79,6 @@ app.post("/api/admin/auth/login", async (c) => {
             });
 
             if (!limit.allowed) {
-                await writeAdminAuditLog({
-                    req,
-                    actorUserId: null,
-                    actorShopId: null,
-                    action: "auth_login_failure",
-                    targetType: "auth",
-                    targetId: null,
-                    success: false,
-                    metadata: {
-                        phase: "precheck",
-                        email: parsed.data.email,
-                        reason: "rate_limited",
-                    },
-                });
-
                 return NextResponse.json(
                     {
                         message:
@@ -128,28 +97,26 @@ app.post("/api/admin/auth/login", async (c) => {
         }
 
         const parsed = adminLoginAuditSchema.safeParse(body);
-        if (!parsed.success) {
+        if (body.mode !== "result" || !parsed.success) {
             return NextResponse.json(
                 { message: "不正なリクエストです。" },
                 { status: 400 },
             );
         }
 
-        const appUser = parsed.data.success ? await getCurrentAppUser() : null;
+        if (parsed.data.success) return await recordVerifiedAuthSession(req, "password");
 
         await writeAdminAuditLog({
             req,
-            actorUserId: appUser?.id ?? null,
-            actorShopId: appUser?.shop?.id ?? null,
-            action: parsed.data.success
-                ? "auth_login_success"
-                : "auth_login_failure",
+            actorUserId: null,
+            actorShopId: null,
+            action: "auth_login_failure",
             targetType: "auth",
-            targetId: appUser?.id ?? null,
-            success: parsed.data.success,
+            targetId: null,
+            success: false,
             metadata: {
-                email: parsed.data.email,
-                reason: parsed.data.reason ?? null,
+                source: "client_report",
+                entrypoint: "password",
             },
         });
 
@@ -170,12 +137,12 @@ app.post("/api/admin/auth/login", async (c) => {
                     error: "database_unavailable",
                     message:
                         "現在データベースへ接続できないため、ログイン前チェックまたは監査記録を完了できません。",
-                    diagnosis: getDatabaseConnectionDiagnostics().diagnosis,
                 },
                 { status: 503 },
             );
         }
 
+        logOperationalError(error, { operation: "auth.login.audit" });
         return NextResponse.json(
             { message: "ログイン監査の記録に失敗しました。" },
             { status: 500 },

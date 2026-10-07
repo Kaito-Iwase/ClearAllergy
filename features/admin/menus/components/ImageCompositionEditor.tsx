@@ -9,6 +9,8 @@ import {
     DEFAULT_MENU_IMAGE_POSITION_X,
     DEFAULT_MENU_IMAGE_POSITION_Y,
     DEFAULT_MENU_IMAGE_ZOOM,
+    getDraggedImagePosition,
+    getImagePositionTravel,
     getPositionPresetPercent,
     type MenuImageFit,
     type MenuImageFrame,
@@ -40,6 +42,9 @@ type DragState = {
     startPositionY: number;
     startDistance: number | null;
     startZoom: number;
+    travelX: number;
+    travelY: number;
+    hasMoved: boolean;
 };
 
 const FRAME_OPTIONS: Array<{ value: MenuImageFrame; label: string }> = [
@@ -269,10 +274,7 @@ function ImagePreview({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             onWheelCapture={onWheel}
-            onDoubleClick={onDoubleClick}
-            role="application"
-            aria-label="画像をドラッグして表示位置を調整"
-            tabIndex={0}
+            onDoubleClick={compareOriginal ? undefined : onDoubleClick}
         >
             <Image
                 src={imageSrc}
@@ -281,13 +283,13 @@ function ImagePreview({
                 sizes="(min-width: 768px) 50vw, 100vw"
                 unoptimized={imageSrc.startsWith("blob:")}
                 draggable={false}
-                className="cursor-grab transition-transform duration-150 active:cursor-grabbing"
+                className={compareOriginal ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
                 style={imageStyle}
             />
             <div className="pointer-events-none absolute inset-[12%] rounded-lg border border-white/70 shadow-[0_0_0_999px_rgba(0,0,0,0.08)]" />
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.28)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.28)_1px,transparent_1px)] bg-[length:33.333%_33.333%] opacity-0 transition group-hover:opacity-100" />
             <div className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-white">
-                ドラッグで位置調整
+                {compareOriginal ? "元画像を表示中" : "ドラッグで写真を移動"}
             </div>
             {compareOriginal ? (
                 <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-gray-900">
@@ -378,6 +380,9 @@ export default function ImageCompositionEditor({
         startPositionY: values.imagePositionY,
         startDistance: null,
         startZoom: values.imageZoom,
+        travelX: 0,
+        travelY: 0,
+        hasMoved: false,
     });
 
     const baseline = initialValues ?? {
@@ -442,9 +447,22 @@ export default function ImageCompositionEditor({
         });
     }
 
+    function captureTravel(frame: HTMLDivElement) {
+        const image = frame.querySelector("img");
+        const travel = getImagePositionTravel({
+            frameWidth: frame.clientWidth, frameHeight: frame.clientHeight,
+            imageWidth: image?.naturalWidth ?? 0, imageHeight: image?.naturalHeight ?? 0,
+            fit: values.imageFit, zoom: values.imageZoom,
+        });
+        dragRef.current.travelX = travel.x;
+        dragRef.current.travelY = travel.y;
+    }
+
     function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+        if (compareOriginal || (event.pointerType === "mouse" && event.button !== 0)) return;
         event.currentTarget.setPointerCapture(event.pointerId);
         const drag = dragRef.current;
+        if (drag.pointers.size === 0) drag.hasMoved = false;
         drag.pointers.set(event.pointerId, {
             x: event.clientX,
             y: event.clientY,
@@ -456,6 +474,7 @@ export default function ImageCompositionEditor({
         drag.startPositionY = values.imagePositionY;
         drag.startZoom = values.imageZoom;
         drag.startDistance = points.length >= 2 ? getDistance(points) : null;
+        captureTravel(event.currentTarget);
     }
 
     function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -470,6 +489,9 @@ export default function ImageCompositionEditor({
         });
 
         const points = [...drag.pointers.values()];
+        if (points.length >= 2 || Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) >= 2) {
+            drag.hasMoved = true;
+        }
         if (points.length >= 2 && drag.startDistance) {
             const nextDistance = getDistance(points);
             onChange({
@@ -483,8 +505,8 @@ export default function ImageCompositionEditor({
         const dx = event.clientX - drag.startX;
         const dy = event.clientY - drag.startY;
         updatePosition(
-            drag.startPositionX - dx / 2.5,
-            drag.startPositionY - dy / 2.5,
+            getDraggedImagePosition(drag.startPositionX, dx, drag.travelX),
+            getDraggedImagePosition(drag.startPositionY, dy, drag.travelY),
         );
     }
 
@@ -499,12 +521,14 @@ export default function ImageCompositionEditor({
             drag.startPositionY = values.imagePositionY;
             drag.startDistance = null;
             drag.startZoom = values.imageZoom;
+            captureTravel(event.currentTarget);
         }
     }
 
     function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
         event.preventDefault();
         event.stopPropagation();
+        if (compareOriginal) return;
         const nextZoom = values.imageZoom + (event.deltaY < 0 ? 5 : -5);
         onChange({ imageZoom: clampZoom(nextZoom) });
     }
@@ -524,7 +548,9 @@ export default function ImageCompositionEditor({
                                 掲載結果プレビュー
                             </p>
                             <p className="mt-1 text-xs leading-5 text-gray-500">
-                                写真を直接ドラッグできます。ホイールまたはピンチでズームできます。
+                                {compareOriginal
+                                    ? "元画像との比較中です。写真上での位置・ズーム調整はできません。"
+                                    : "写真を動かしたい方向へドラッグしてください。ホイールまたはピンチで拡大・縮小できます。"}
                             </p>
                         </div>
                     </div>
@@ -541,7 +567,10 @@ export default function ImageCompositionEditor({
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
                         onWheel={handleWheel}
-                        onDoubleClick={resetCenter}
+                        onDoubleClick={() => {
+                            // A short touch drag can also generate a native double click.
+                            if (!dragRef.current.hasMoved) resetCenter();
+                        }}
                     />
 
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">

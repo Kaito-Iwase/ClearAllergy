@@ -69,6 +69,9 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
       - name: Test
         run: npm test
 
@@ -81,6 +84,9 @@ jobs:
       - name: Prepare isolated fictional data
         run: node --import tsx scripts/setup-ci-env.ts
 
+      - name: Check PostgreSQL constraints and rollback
+        run: node --import tsx scripts/check-ci-database.ts
+
       - name: Check owned menu writes in isolated PostgreSQL
         run: node --import tsx scripts/check-owned-menu-database.ts
 
@@ -88,13 +94,10 @@ jobs:
         run: npm run build
 
       - name: Install isolated browser runner
-        run: |
-          npm install --prefix "$RUNNER_TEMP/clearallergy-browser" --no-package-lock --no-audit --no-fund playwright@1.61.0
-          node "$RUNNER_TEMP/clearallergy-browser/node_modules/playwright/cli.js" install --with-deps chromium
+        run: node scripts/browser-runner.mjs install --with-deps
 
       - name: Check public prototype in Chromium
         env:
-          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/clearallergy-browser/node_modules/playwright
           CLEARALLERGY_BROWSER_BASE_URL: http://localhost:3000
           CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/clearallergy-browser-results
           CLEARALLERGY_BROWSER_PUBLIC_ONLY: "true"
@@ -103,7 +106,11 @@ jobs:
           npm run start > "$RUNNER_TEMP/clearallergy-app.log" 2>&1 &
           app_pid=$!
           trap 'kill "$app_pid" 2>/dev/null || true' EXIT
-          node scripts/check-first-use-browser.mjs
+          node scripts/browser-runner.mjs public
+
+      - name: Summarize app failure without raw logs
+        if: failure()
+        run: node --import tsx scripts/collect-ci-diagnostics.ts "$RUNNER_TEMP/clearallergy-app.log" "$RUNNER_TEMP/clearallergy-browser-results/app-log-summary.json"
 
       - name: Save browser evidence
         if: always()

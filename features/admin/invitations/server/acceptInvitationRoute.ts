@@ -11,6 +11,8 @@ import {
 } from "@/lib/auth/invitations";
 import { isDatabaseUnavailableError } from "@/lib/db/errors";
 import { requirePortfolioMutationAccessApi } from "@/lib/auth/portfolio-mode";
+import { writeAdminAuditLog } from "@/lib/audit-log";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 
 function isUniqueConstraintConflict(error: unknown) {
     return (
@@ -20,6 +22,7 @@ function isUniqueConstraintConflict(error: unknown) {
 }
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.post("/api/invitations/accept", async (c) => {
     const req = c.req.raw;
@@ -53,6 +56,16 @@ app.post("/api/invitations/accept", async (c) => {
         const result = await acceptPendingInviteForCurrentUser({
             clerkUserId: identity.clerkUserId,
             email: identity.email,
+        });
+
+        await writeAdminAuditLog({
+            req,
+            actorUserId: result.appUser.id,
+            actorShopId: result.shop.id,
+            action: "invitation_accept",
+            targetType: "invitation",
+            targetId: result.invite.id,
+            success: true,
         });
 
         return NextResponse.json({
@@ -89,13 +102,14 @@ app.post("/api/invitations/accept", async (c) => {
         }
 
         if (isDatabaseUnavailableError(error)) {
+            logOperationalError(error, { operation: "invitation.accept", category: "database" });
             return NextResponse.json(
                 { message: "現在データベースへ接続できません。" },
                 { status: 503 },
             );
         }
 
-        console.error(error);
+        logOperationalError(error, { operation: "invitation.accept" });
         return NextResponse.json(
             { message: "招待の承認に失敗しました。" },
             { status: 500 },

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { logOperationalError } from "@/lib/observability";
 
 export function isDatabaseUnavailableError(error: unknown) {
     if (error instanceof Prisma.PrismaClientInitializationError) {
@@ -144,51 +145,12 @@ export function getDatabaseConnectionDiagnostics() {
     } as const;
 }
 
-function getErrorSummary(error: unknown) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        return {
-            name: error.name,
-            code: error.code,
-            message: error.message,
-        };
-    }
-
-    if (error instanceof Prisma.PrismaClientInitializationError) {
-        return {
-            name: error.name,
-            code: "P1001",
-            message: error.message,
-        };
-    }
-
-    if (error instanceof Error) {
-        return {
-            name: error.name,
-            code: null,
-            message: error.message,
-        };
-    }
-
-    return {
-        name: "UnknownError",
-        code: null,
-        message: String(error),
-    };
-}
-
 export function logDatabaseUnavailableError(
     context: DatabaseUnavailableLogContext,
     error: unknown,
 ) {
-    const logger =
-        context.visibility === "public" ? console.warn : console.error;
-
-    logger("[db-unavailable]", {
-        scope: context.scope,
-        operation: context.operation ?? null,
-        visibility: context.visibility ?? "internal",
-        ...getErrorSummary(error),
-        ...getDatabaseConnectionDiagnostics(),
-        details: context.details ?? {},
+    logOperationalError(error, {
+        operation: `${context.scope}:${context.operation ?? "database"}`,
+        category: "database",
     });
 }

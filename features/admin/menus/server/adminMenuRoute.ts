@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { Prisma } from "@prisma/client";
+import { handleUnhandledApiError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
@@ -40,9 +41,11 @@ import {
 import { menuInputSchema } from "@/features/admin/menus/schemas/menu-input";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
-function isMenuWriteTargetMissing(error: unknown) {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
+function isMenuWriteNotFound(error: unknown) {
+    return error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025";
 }
 
 app.get("/api/admin/menus/:menuId", async (c) => {
@@ -479,6 +482,7 @@ app.put("/api/admin/menus/:menuId", async (c) => {
 
         return NextResponse.json({ menu: updatedMenu });
     } catch (e) {
+        const notFound = isMenuWriteNotFound(e);
         if (auditShopId) {
             await writeAdminAuditLog({
                 req,
@@ -488,10 +492,10 @@ app.put("/api/admin/menus/:menuId", async (c) => {
                 targetType: "menu",
                 targetId: auditTargetId,
                 success: false,
-                metadata: { reason: isMenuWriteTargetMissing(e) ? "menu_not_found" : "internal_error" },
+                metadata: { reason: notFound ? "menu_not_found" : "internal_error" },
             });
         }
-        if (isMenuWriteTargetMissing(e)) {
+        if (notFound) {
             return NextResponse.json({ error: "menu not found" }, { status: 404 });
         }
         return internalError(e);
@@ -570,6 +574,7 @@ app.delete("/api/admin/menus/:menuId", async (c) => {
 
         return NextResponse.json({ ok: true });
     } catch (e) {
+        const notFound = isMenuWriteNotFound(e);
         if (auditShopId) {
             await writeAdminAuditLog({
                 req,
@@ -579,10 +584,10 @@ app.delete("/api/admin/menus/:menuId", async (c) => {
                 targetType: "menu",
                 targetId: auditTargetId,
                 success: false,
-                metadata: { reason: isMenuWriteTargetMissing(e) ? "menu_not_found" : "internal_error" },
+                metadata: { reason: notFound ? "menu_not_found" : "internal_error" },
             });
         }
-        if (isMenuWriteTargetMissing(e)) {
+        if (notFound) {
             return NextResponse.json({ error: "menu not found" }, { status: 404 });
         }
         return internalError(e);

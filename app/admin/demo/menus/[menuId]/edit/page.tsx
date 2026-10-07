@@ -17,7 +17,7 @@ import {
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-    params: Promise<{ menuId: string }> | { menuId: string };
+    params: Promise<{ menuId: string }>;
 };
 
 export default async function AdminDemoMenuEditPage({ params }: PageProps) {

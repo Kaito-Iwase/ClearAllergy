@@ -8,7 +8,8 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 export const prisma =
     globalForPrisma.prisma ??
     new PrismaClient({
-        log: ["error", "warn"],
+        // 生のPrisma例外は入力値を含み得る。処理境界の安全な運用ログへ集約する。
+        log: [],
     });
 
 if (process.env.NODE_ENV !== "production") {

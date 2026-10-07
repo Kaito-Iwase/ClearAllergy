@@ -17,7 +17,7 @@ const config: Config = {
                 "surface-light": "#ffffff",
                 "surface-dark": "#1a331a",
                 "text-main": "#111811",
-                "text-sub": "#618961",
+                "text-sub": "#4b6b4b",
             },
             fontFamily: {
                 display: ['"Manrope"', '"Noto Sans JP"', "sans-serif"],

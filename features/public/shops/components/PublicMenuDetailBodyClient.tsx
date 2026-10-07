@@ -122,7 +122,7 @@ export default function PublicMenuDetailBodyClient(props: {
                                 <div
                                     className="absolute inset-0"
                                     style={imageStyle}
-                                    aria-label={menuName}
+                                    aria-hidden="true"
                                 />
                             )}
                         </div>
@@ -144,9 +144,9 @@ export default function PublicMenuDetailBodyClient(props: {
                                     )}
                                 </div>
 
-                                <h2 className="mb-2 text-3xl font-extrabold">
+                                    <h1 className="mb-2 break-words text-3xl font-extrabold leading-snug">
                                     {menuName}
-                                </h2>
+                                </h1>
 
                                 {description ? (
                                     <p className="mb-4 text-lg text-gray-600">
@@ -194,11 +194,11 @@ export default function PublicMenuDetailBodyClient(props: {
                     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                             <span className="text-[#13ec13]">🧺</span>
-                            <h3 className="text-xl font-bold">原材料名</h3>
+                            <h2 className="text-xl font-bold">原材料名</h2>
                         </div>
 
                         {ingredients ? (
-                            <p className="text-base leading-relaxed text-gray-700">
+                            <p className="whitespace-pre-line break-words text-base leading-7 text-gray-700">
                                 {ingredients}
                             </p>
                         ) : (
@@ -208,7 +208,7 @@ export default function PublicMenuDetailBodyClient(props: {
                         )}
 
                         {precaution ? (
-                            <div className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+                            <div className="mt-4 whitespace-pre-line break-words rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-700">
                                 ※ 注意事項：{precaution}
                             </div>
                         ) : null}
@@ -217,12 +217,13 @@ export default function PublicMenuDetailBodyClient(props: {
                     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                             <span className="text-[#13ec13]">🧾</span>
-                            <h3 className="text-xl font-bold">
+                            <h2 className="text-xl font-bold">
                                 アレルゲン（{rows.length}品目）
-                            </h3>
+                            </h2>
                         </div>
 
-                        <p className="mb-4 text-sm leading-6 text-gray-700">「原材料に含まない登録」は食品安全の保証ではありません。「含む可能性あり・要確認」は、含む可能性があり、確認が必要な状態です。</p>
+                        <p className="mb-2 text-sm font-bold text-gray-900">店舗が登録した内容</p>
+                        <p className="mb-4 text-sm leading-6 text-gray-700">「原材料に含まない」という登録は食品安全の保証ではありません。「含む可能性あり・要確認」は、含む可能性があり、確認が必要な状態です。</p>
                         {rows.some((row) => row.effectiveRisk === "STORE_HANDLED") ? (
                             <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-950">{STORE_ALLERGEN_NOTE}</p>
                         ) : null}
@@ -236,15 +237,14 @@ export default function PublicMenuDetailBodyClient(props: {
                                         {row.nameJa}
                                     </span>
                                     <span
-                                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusBadgeClass(
+                                        className={`max-w-full rounded-lg px-3 py-1.5 text-sm font-bold leading-6 ${statusBadgeClass(
                                             row.effectiveRisk === "STORE_HANDLED" ? "MAY_CONTAIN" : row.status,
                                         )}`}
-                                        title={row.slug}
                                     >
                                         {statusLabelJa(row.status)}
                                     </span>
                                     {row.effectiveRisk === "STORE_HANDLED" ? (
-                                        <p className="w-full text-xs leading-5 text-amber-900">同店舗の別の公開登録に「含む」情報あり</p>
+                                        <p className="w-full text-sm leading-6 text-amber-900">この店舗の別の公開メニューに「含む」登録があります</p>
                                     ) : null}
                                 </div>
                             ))}
@@ -256,7 +256,7 @@ export default function PublicMenuDetailBodyClient(props: {
                     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                         <div className="mb-4 flex items-center gap-2">
                             <span className="text-orange-500">ℹ️</span>
-                            <h3 className="text-lg font-bold">注意事項</h3>
+                            <h2 className="text-lg font-bold">注意事項</h2>
                         </div>
 
                         <ul className="list-disc space-y-2 pl-4 text-sm text-gray-600">
@@ -271,7 +271,7 @@ export default function PublicMenuDetailBodyClient(props: {
                     </div>
 
                     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
-                        <h3 className="text-lg font-bold">店舗</h3>
+                        <h2 className="text-lg font-bold">店舗</h2>
                         <p className="mt-2 text-sm text-gray-600">
                             {shopName}
                         </p>

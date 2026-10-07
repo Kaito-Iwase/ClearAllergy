@@ -189,6 +189,7 @@ export default function ShopEditClient({
     const [saving, setSaving] = React.useState(false);
     const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+    const [nameInvalid, setNameInvalid] = React.useState(false);
     const [savedMessage, setSavedMessage] = React.useState("");
     const [updatedAtText, setUpdatedAtText] = React.useState(
         formatDateTimeJa(initialShop.updatedAt),
@@ -346,6 +347,7 @@ export default function ShopEditClient({
     async function saveShop() {
         if (saving || uploading) return;
         setError(null);
+        setNameInvalid(false);
         setSavedMessage("");
 
         if (readOnly) {
@@ -357,6 +359,7 @@ export default function ShopEditClient({
 
         const trimmedName = name.trim();
         if (!trimmedName) {
+            setNameInvalid(true);
             setError("店舗名は必須です。");
             return;
         }
@@ -787,7 +790,7 @@ export default function ShopEditClient({
                     {hasUnsavedChanges && <p role="status" className="mt-4 text-sm font-bold text-amber-900">未保存の変更があります。</p>}
 
                     {error ? (
-                        <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        <div id="shop-form-error" role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                             {error}
                         </div>
                     ) : null}
@@ -809,8 +812,10 @@ export default function ShopEditClient({
                             <input
                                 id="shop-name"
                                 type="text"
+                                aria-invalid={nameInvalid}
+                                aria-describedby={nameInvalid && error ? "shop-form-error" : undefined}
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e) => { setName(e.target.value); setNameInvalid(false); }}
                                 placeholder="例：Clear Cafe"
                                 className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
                                 required

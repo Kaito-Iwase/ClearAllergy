@@ -79,7 +79,7 @@ export default function AdminDashboardShell({
             {/* メイン領域ではページごとの内容を表示します。 */}
             <main className="flex h-dvh flex-1 flex-col overflow-y-auto bg-background-light">
                 {/* スマホではサイドバーを出さず、ヘッダーに最小限の操作だけ置きます。 */}
-                <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-surface-light p-4 lg:hidden">
+                <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-surface-light p-4 lg:hidden">
                     <Link href="/" className="flex items-center">
                         <BrandLogo variant="compact" priority />
                     </Link>

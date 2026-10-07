@@ -3,6 +3,7 @@
 // どちらも requireShopId() を通し、ログイン中の店舗だけを対象にします。
 
 import { Hono } from "hono";
+import { handleUnhandledApiError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/lib/auth/admin-api-utils";
@@ -36,6 +37,7 @@ import {
 import { menuInputSchema } from "@/features/admin/menus/schemas/menu-input";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 // GET は保存済みメニュー一覧の取得です。
 // 管理画面トップで表示するため、必要な列だけ絞って返します。

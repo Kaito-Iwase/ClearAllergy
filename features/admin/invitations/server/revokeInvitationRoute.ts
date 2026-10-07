@@ -10,8 +10,11 @@ import { requirePortfolioMutationAccessApi } from "@/lib/auth/portfolio-mode";
 import { serializeAdminInvite } from "@/lib/auth/invitations";
 import { revokeClerkApplicationInvitation } from "@/lib/auth/clerkAdminServer";
 import { isDatabaseUnavailableError } from "@/lib/db/errors";
+import { writeAdminAuditLog } from "@/lib/audit-log";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.post("/api/admin/invitations/:inviteId/revoke", async (c) => {
     const req = c.req.raw;
@@ -60,25 +63,41 @@ app.post("/api/admin/invitations/:inviteId/revoke", async (c) => {
             );
         }
 
-        if (invite.status !== "pending") {
+        if (invite.status !== "pending" && invite.status !== "revoked") {
             return NextResponse.json({
                 message: "この招待はすでに処理済みです。",
                 invitation: serializeAdminInvite(invite),
             });
         }
 
-        if (invite.clerkInvitationId) {
-            await revokeClerkApplicationInvitation(
-                invite.clerkInvitationId,
-            ).catch(() => undefined);
+        // 受諾側の行ロックと競合した場合も、pending のままの招待だけ取り消します。
+        // 外部APIより先にDBで拒否状態を確定し、Clerk障害中も受諾させません。
+        if (invite.status === "pending") {
+            const changed = await prisma.adminInvite.updateMany({
+                where: { id: invite.id, status: "pending" },
+                data: { status: "revoked", revokedAt: new Date() },
+            });
+            if (changed.count !== 1) {
+                return NextResponse.json(
+                    { message: "招待の状態が変わりました。一覧を更新してください。" },
+                    { status: 409 },
+                );
+            }
+
+            await writeAdminAuditLog({
+                req,
+                actorUserId: null,
+                actorShopId: invite.shopId,
+                action: "invitation_revoke",
+                targetType: "invitation",
+                targetId: invite.id,
+                success: true,
+                metadata: { actorClerkUserId: admin.clerkUserId },
+            });
         }
 
-        const revoked = await prisma.adminInvite.update({
+        const revoked = await prisma.adminInvite.findUniqueOrThrow({
             where: { id: invite.id },
-            data: {
-                status: "revoked",
-                revokedAt: new Date(),
-            },
             include: {
                 shop: {
                     select: {
@@ -91,19 +110,42 @@ app.post("/api/admin/invitations/:inviteId/revoke", async (c) => {
             },
         });
 
+        if (revoked.clerkInvitationId) {
+            try {
+                await revokeClerkApplicationInvitation(revoked.clerkInvitationId);
+            } catch (error) {
+                logOperationalError(error, {
+                    operation: "invitation.revoke.clerk",
+                    category: "external_service",
+                });
+                return NextResponse.json(
+                    { message: "招待の受諾は停止しましたが、招待メールの無効化に失敗しました。取消を再試行してください。" },
+                    { status: 502 },
+                );
+            }
+
+            // IDが残っている取消済み行は外部取消の再試行対象です。
+            await prisma.adminInvite.updateMany({
+                where: { id: revoked.id, status: "revoked", clerkInvitationId: revoked.clerkInvitationId },
+                data: { clerkInvitationId: null },
+            });
+            revoked.clerkInvitationId = null;
+        }
+
         return NextResponse.json({
             message: "招待を取り消しました。",
             invitation: serializeAdminInvite(revoked),
         });
     } catch (error) {
         if (isDatabaseUnavailableError(error)) {
+            logOperationalError(error, { operation: "invitation.revoke", category: "database" });
             return NextResponse.json(
                 { message: "現在データベースへ接続できません。" },
                 { status: 503 },
             );
         }
 
-        console.error(error);
+        logOperationalError(error, { operation: "invitation.revoke" });
         return NextResponse.json(
             { message: "招待の取消に失敗しました。" },
             { status: 500 },

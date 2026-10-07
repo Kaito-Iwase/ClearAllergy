@@ -107,7 +107,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                 印刷サイズ
                             </p>
                             <p className="mt-1 text-sm text-gray-600">
-                                用途に合わせて変更できます。印刷ボタンを押すと、選んだ大きさでQRだけ印刷します。
+                                QR画像の一辺の長さを選びます。白い余白を含む大きさです。
                             </p>
 
                             <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -118,6 +118,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                         <button
                                             key={option.sizeMm}
                                             type="button"
+                                            aria-pressed={selected}
                                             onClick={() =>
                                                 setQrSizeMm(option.sizeMm)
                                             }
@@ -142,7 +143,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                 htmlFor="qr-size"
                                 className="mt-4 block text-xs font-bold text-gray-700"
                             >
-                                細かく調整: {formatQrSize(qrSizeMm)}
+                                一辺の長さ: {formatQrSize(qrSizeMm)}
                             </label>
                             <input
                                 id="qr-size"
@@ -161,7 +162,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
                             <p className="font-bold">印刷前の確認</p>
                             <p className="mt-1 leading-6">
-                                印刷画面では、店舗名・QRコード・公開URLだけを表示します。用紙設定はブラウザの印刷画面で選べます。
+                                印刷するのは店舗名・QRコード・公開URLです。選んだ寸法で印刷するには、印刷画面の倍率を100%（実際のサイズ）にしてください。
                             </p>
                         </div>
 
@@ -172,7 +173,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                 disabled={!publicShopUrl}
                                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f4c2f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#0b3d25] disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                <span className="material-symbols-outlined text-[20px]">
+                                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
                                     print
                                 </span>
                                 QRを印刷
@@ -183,7 +184,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                 onClick={handleCopyUrl}
                                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 transition hover:bg-gray-100"
                             >
-                                <span className="material-symbols-outlined text-[20px]">
+                                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
                                     content_copy
                                 </span>
                                 URLをコピー
@@ -196,7 +197,7 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 transition hover:bg-gray-100"
                                 >
-                                    <span className="material-symbols-outlined text-[20px]">
+                                    <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
                                         open_in_new
                                     </span>
                                     公開ページを開く
@@ -205,13 +206,16 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                         </div>
 
                         {copiedMessage ? (
-                            <p className="text-sm font-medium text-green-700">
+                            <p role="status" className="text-sm font-medium text-green-700">
                                 {copiedMessage}
                             </p>
                         ) : null}
                     </div>
 
-                    <div className="qr-print-area flex flex-col items-center gap-4 rounded-lg bg-white p-5 text-center shadow-sm">
+                    <div className="qr-print-area min-w-0 flex flex-col items-center gap-4 rounded-lg bg-white p-5 text-center shadow-sm">
+                        <p className="qr-preview-caption text-sm font-bold text-gray-900">
+                            サイズ比較プレビュー
+                        </p>
                         <div className="qr-print-header">
                             <p className="text-xs font-bold text-[#0f4c2f]">
                                 ClearAllergy
@@ -221,31 +225,43 @@ export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
                             </p>
                         </div>
 
-                        <div className="rounded-lg bg-white p-4 ring-1 ring-gray-100">
+                        <div
+                            className="qr-preview-stage grid w-full shrink-0 place-items-center rounded-lg border border-dashed border-gray-300 bg-gray-50"
+                            style={{
+                                maxWidth: "60mm",
+                                aspectRatio: "1",
+                                "--qr-print-size": `${qrSizeMm}mm`,
+                            } as React.CSSProperties}
+                        >
                             {publicShopUrl ? (
                                 <QRCodeSVG
                                     value={publicShopUrl}
                                     size={qrSizePx}
                                     style={{
-                                        height: `${qrSizeMm}mm`,
-                                        maxWidth: "100%",
-                                        width: `${qrSizeMm}mm`,
+                                        height: "auto",
+                                        width: `${qrSizeMm / 60 * 100}%`,
                                     }}
+                                    className="qr-print-code block"
+                                    title={`${shopName || "店舗"}の公開ページQRコード`}
                                     marginSize={4}
                                     level="M"
-                                    includeMargin={false}
                                 />
                             ) : (
                                 <div
-                                    className="flex items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white text-center text-sm text-gray-500"
+                                    className="qr-print-code flex items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white text-center text-sm text-gray-500"
                                     style={{
-                                        height: `${qrSizeMm}mm`,
-                                        width: `${qrSizeMm}mm`,
+                                        aspectRatio: "1",
+                                        width: `${qrSizeMm / 60 * 100}%`,
                                     }}
                                 >
                                     公開URLを準備中です
                                 </div>
                             )}
+                        </div>
+
+                        <div className="qr-preview-caption text-xs leading-5 text-gray-600">
+                            <p className="font-bold text-gray-900">印刷時の一辺：{formatQrSize(qrSizeMm)}</p>
+                            <p>画面では表示幅に合わせて縮小します。実寸の確認は印刷画面で行ってください。</p>
                         </div>
 
                         <p className="qr-print-url max-w-full break-all text-xs text-gray-600">

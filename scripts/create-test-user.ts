@@ -1,56 +1,6 @@
-// ローカル確認用の管理アカウントを DB と Clerk の両方にそろえる補助スクリプトです。
-import { loadEnvConfig } from "@next/env";
-import { prisma } from "../lib/db";
-import bcrypt from "bcrypt";
-import { syncLegacyUserToClerk } from "../lib/auth/clerkAdminCore";
-
-loadEnvConfig(process.cwd());
-
-async function main() {
-    const email = process.argv[2]?.trim().toLowerCase() || "test@test.com";
-    const password = process.argv[3] || "Passw0rd!";
-    const shopName = process.argv[4] || "テスト店舗";
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const user = await prisma.user.upsert({
-        where: { email },
-        update: { passwordHash },
-        create: { email, passwordHash },
-        select: { id: true, clerkUserId: true, email: true, createdAt: true },
-    });
-
-    const shop = await prisma.shop.upsert({
-        where: { userId: user.id },
-        update: {},
-        create: {
-            userId: user.id,
-            name: shopName,
-            description: "ログイン確認用",
-        },
-        select: { id: true, userId: true, name: true },
-    });
-
-    const synced = await syncLegacyUserToClerk({
-        id: user.id,
-        clerkUserId: user.clerkUserId,
-        email: user.email,
-        passwordHash,
-        createdAt: user.createdAt,
-    });
-
-    console.log("Created/Updated user:", user);
-    console.log("Created/Updated shop:", shop);
-    console.log("Clerk sync:", synced);
-    console.log("Login email:", email);
-    console.log("Login password:", password);
-}
-
-main()
-    .catch((e) => {
-        console.error(e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+// 旧コマンドは既存のDB/Clerk認証情報を上書きするため廃止。
+// 誤って実行されても環境ファイル・DB・Clerkを読み込まず、全環境で停止する。
+console.error(
+    "auth:create:test-user は廃止しました。専用テスト環境の準備は docs/guide/development.md の手順を確認してください。DB・Clerkへの変更は行っていません。",
+);
+process.exitCode = 1;

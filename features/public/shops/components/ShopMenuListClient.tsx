@@ -8,6 +8,7 @@ import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
 // 通常表示と個人向け表示を切り替えてカード一覧を描画します。
 
 import React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     buildSelectedAllergenSummary,
@@ -55,14 +56,14 @@ function badgeClass(kind: BadgeKind): string {
     if (kind === "unknown") {
         return "bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200";
     }
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+    return "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-300";
 }
 
 function badgeLabel(kind: BadgeKind): string {
     if (kind === "danger") return "含む";
     if (kind === "caution") return "要確認の情報あり";
-    if (kind === "unknown") return "未設定あり";
-    return "原材料に含まない登録";
+    if (kind === "unknown") return "未入力・未確認あり";
+    return "原材料に含まない";
 }
 
 export default function ShopMenuListClient({
@@ -111,11 +112,6 @@ export default function ShopMenuListClient({
             );
         });
     }, [excludedSlugs, includeMayContain]);
-
-    function goToMenu(menuId: string) {
-        // カード全体を押した時にメニュー詳細へ移動します。
-        router.push(`/shops/${shopId}/menus/${menuId}`);
-    }
 
     const searchedMenus = React.useMemo(() => {
         if (q === "") {
@@ -167,15 +163,17 @@ export default function ShopMenuListClient({
             id="public-menus"
             className="scroll-mt-32 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6"
         >
-            <div className="mb-4 flex items-end justify-between">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
                 <h2 className="text-base font-extrabold">公開メニュー</h2>
                 <p className="text-xs text-gray-500">
                     表示 {visibleMenuItems.length}件 / 検索対象 {searchedMenus.length}件
                 </p>
             </div>
 
+            <p className="mb-4 text-sm leading-6 text-gray-700">店舗が登録した内容</p>
+
             {searchedMenus.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
+                <div role="status" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
                     <p className="text-sm text-gray-700">
                         {q !== ""
                             ? "検索条件に一致する公開メニューがありません。"
@@ -189,17 +187,13 @@ export default function ShopMenuListClient({
                     ) : null}
                 </div>
             ) : visibleMenuItems.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-red-200 bg-red-50 p-6">
+                <div role="status" className="rounded-xl border border-dashed border-red-200 bg-red-50 p-6">
                     <p className="text-sm font-bold text-red-800">
                         除外設定により表示できるメニューがありません。
                     </p>
                     <p className="mt-2 text-xs leading-5 text-red-700">
                         必要に応じて、あなた向けのアレルゲン設定で「除外」を外してください。
                     </p>
-                </div>
-            ) : visibleMenuItems.length === 0 ? (
-                <div role="status" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-700">
-                    検索に一致したメニューはすべて除外設定により非表示です。アレルゲン設定で除外条件を確認・変更できます。
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -227,32 +221,28 @@ export default function ShopMenuListClient({
                             : overallSummary;
 
                         return (
-                            <article
+                            <Link
                                 key={menu.id}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => goToMenu(menu.id)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
-                                        goToMenu(menu.id);
-                                    }
-                                }}
-                                className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#13ec13]/50"
+                                href={`/shops/${shopId}/menus/${menu.id}`}
+                                prefetch={false}
+                                className="group block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                        <h3 className="truncate text-base font-extrabold text-gray-900">
+                                        <h3 className="break-words text-base font-extrabold leading-7 text-gray-900">
                                             {menu.name}
                                         </h3>
 
-                                        <p className="mt-1 text-xs font-semibold text-gray-600">
+                                        <p className="mt-2 break-words text-sm leading-6 text-gray-700">
+                                            {hasPreference ? `確認対象：${allergenMaster.filter((allergen) => selectedSlugs.includes(allergen.slug)).map((allergen) => allergen.nameJa).join("・")}` : `すべての品目（${allergenMaster.length}品目）`}
+                                        </p>
+                                        <p className="mt-1 text-sm font-semibold leading-6 text-gray-700">
                                             {/* 件数表示でも UNKNOWN を明示し、要約本文と意味がずれないようにします。 */}
                                             含む {activeSummary.containsCount}{" "}
-                                            件 ・ 含む可能性があります{" "}
-                                            {activeSummary.mayCount} 件
+                                            品目 ／ 含む可能性あり{" "}
+                                            {activeSummary.mayCount} 品目
                                             {activeSummary.unknownCount > 0
-                                                ? ` ・ 未設定 ${activeSummary.unknownCount} 件`
+                                                ? ` ／ 未入力・未確認 ${activeSummary.unknownCount} 品目`
                                                 : ""}
                                         </p>
 
@@ -267,21 +257,21 @@ export default function ShopMenuListClient({
                                     </span>
                                 </div>
 
-                                <div className="mt-3 flex items-center justify-between gap-3">
+                                <div className="mt-3 flex flex-col items-start gap-2">
                                     <span
-                                        className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${badgeClass(
+                                        className={`max-w-full rounded-lg px-3 py-1.5 text-sm font-bold leading-6 ${badgeClass(
                                             activeSummary.badge,
                                         )}`}
                                     >
                                         {badgeLabel(activeSummary.badge)}
                                     </span>
 
-                                    <p className="text-right text-xs text-gray-500">
+                                    <p className="text-xs leading-5 text-gray-600">
                                         更新：{formatDateTimeJa(menu.updatedAt)}
                                     </p>
                                 </div>
 
-                                <p className="mt-2 text-xs text-gray-600">
+                                <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-gray-700">
                                     {activeSummary.summaryText}
                                 </p>
 
@@ -289,11 +279,11 @@ export default function ShopMenuListClient({
                                     <p className="mt-2 text-xs leading-5 text-amber-900">{STORE_ALLERGEN_NOTE}</p>
                                 ) : null}
                                 {hasPreference ? (
-                                    <p className="mt-2 text-[11px] text-gray-400">
+                                    <p className="mt-2 text-[11px] text-gray-600">
                                         強調・除外の設定に基づく表示
                                     </p>
                                 ) : null}
-                            </article>
+                            </Link>
                         );
                     })}
                 </div>

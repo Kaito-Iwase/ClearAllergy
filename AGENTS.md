@@ -1,5 +1,16 @@
 # ClearAllergy 開発エージェント向け指示
 
+## 文書の入口と変更の完了条件
+
+- 初めて読む場合は [READMEの読む順番](README.md#reading-order) から進む。コード変更前には [変更対応表](docs/guide/change-map.md) と関連仕様を読み、呼び出し元も検索して影響範囲を確認する。
+- 「影響を受ける範囲」「実際に変更する範囲」「確認のみの範囲」を分け、依頼と無関係な変更を広げない。
+- ページ・表示・入力・状態・権限・API・データ・起動・テスト・運用が変わったら、関連文書を同じ作業で更新する。追加・移動・改名・削除時は、参照・目次・対応表も更新する。
+- 古い説明への追記だけで済ませず、本文全体を整合させる。現行仕様と過去の記録を区別し、実装上の動作だけを理由に不具合を承認済み仕様にしない。
+- 説明・参照も変わらない文書は無理に変更せず、更新不要の理由を報告する。AGENTS.mdは作業ルール・コマンド・参照先が変わる場合に更新し、変更履歴を蓄積しない。
+- 完了前にコード・関連テスト・文書、リンク・コード参照を照合する。必要な文書更新が残る場合は完了扱いにしない。文書変更と動作検証は別に報告する。
+
+詳しい執筆・保守手順とチェックリストは [文書の保守](docs/guide/maintenance.md)、共通仕様の説明先は [状態・公開・権限](docs/guide/rules.md)、起動・検証は [開発手順](docs/guide/development.md) を参照する。
+
 ## 自律開発ハーネス
 
 自律開発を依頼されたセッションでは、[Issue中心の自律開発](docs/agentic-development.md)から開始し、Issue番号の指定を待たずlive GitHubから安全なReady Issueを選ぶ。通常の依頼へcommit/push/PR作成の許可を拡大しない。[導入時監査](docs/agentic-audit.md)は過去snapshotであり毎回再確認する。
@@ -8,6 +19,7 @@
 - GitHub本文のHUMAN_DECISION_REQUIRED、依存、owner、対象環境、既存PRを再確認し、不明ならblockする。claim後も再取得する。既定の実装並列度は1。
 - canonical checkoutを入口に、許可された独立worktreeで1 Issue / 1 branch / 1 worktree / 1 PR。既存未commit変更・他の作業領域を保持する。
 - `node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json`は候補の提案、`node scripts/agent-harness.mjs verify --base origin/main`は既存scriptsのローカル検証。GitHubと実DB/browserの確認は別。snapshot/出力に秘密値を含めない。
+- 検証用npmはアプリ依存に同梱せず、Node配布またはnpm lifecycleの既存CLIを `scripts/npm-cli.mjs` で解決する。CLIが見つからない場合は導入せず停止する。[開発手順](docs/guide/development.md#environment)とreportの実Node/npm版を確認する。Next lintの限定glob互換層はplugin更新時に利用API・rootDir・内部リンク検知・clean install/auditを再確認する。
 - 独立reviewは、実装履歴を共有しない読取専用subagentへ委任する。Issue、base/head、diff、Invariantと検証結果を渡し、self reviewと区別する。委任できなければDraftで未実施を明記。fix→verify→reviewは最大3 rounds、同じ重大指摘の再発2回で停止。
 - 意味・安全/法務文言・認可model・schema/migration/本番data・公開契約・課金・major依存等の未承認判断を確定しない。通常PRはmergeしない。安全/認証/認可/DB/アレルゲン関係はauto merge対象外。
 - PR後は証拠のある改善だけ重複検索して最大3 follow-up。live Queueを再取得し次の独立Readyへ進む。Readyがなければ監査1回、session最大3実装Issueで無限loopを防ぐ。
@@ -101,12 +113,7 @@ HonoとNext.js Route Handlersは既存の使い分けに従い、依頼なしに
 
 状態の意味は `prisma/schema.prisma` と `lib/allergens.ts`、品目の定義は `lib/constants/allergen-master.ts` を確認する。導出できる品目数を古い固定値で実装しない。
 
-| 状態 | 現在の実装での扱い |
-| --- | --- |
-| `CONTAINS` | 含む |
-| `FREE` | 原材料に含まない登録 |
-| `MAY_CONTAIN` | 含む可能性あり・要確認 |
-| `UNKNOWN`・未設定 | 信頼できる判断が入力されていない |
+内部状態・表示分類・未入力の意味は [共通ルール](docs/guide/rules.md#allergens)、公開条件は [公開ルール](docs/guide/rules.md#publication) を正本として説明する。以下は変更時に必ず守る制約である。
 
 - `UNKNOWN`、`null`、レコード欠損、空値を `FREE` として扱わない。
 - 「未入力」を「含まない」に変換しない。
@@ -224,11 +231,11 @@ Server Componentsを基本とし、状態・副作用・イベント・ブラウ
 
 単純な修正を除き、次の順で進める。
 
-1. **理解**：現在の実装、データの流れ、権限、曖昧な点を調べる。
+1. **理解**：変更対応表と関連仕様を読み、現在の実装、データの流れ、権限、曖昧な点を調べる。
 2. **計画**：変更ファイル、維持する挙動、リスク、検証方法を伝える。
-3. **実装**：既存の規約に従い、目的を満たす最小限の変更を行う。
+3. **実装**：既存の規約に従い、目的を満たす最小限の変更と関連文書の更新を行う。
 4. **検証**：影響するテストと必要な静的検証・ビルドを実行する。
-5. **レビュー**：`git diff --check` と `git diff` を確認し、受け入れ条件と照合する。最後に `git status --short` で変更範囲を確認する。
+5. **レビュー**：`git diff --check` と `git diff` を確認し、受け入れ条件と照合する。コード・テスト・文書の整合、目次・相互リンク・コード参照、文書更新の残りを確認する。最後に `git status --short` で変更範囲を確認する。
 
 `package.json` を確認し、存在するスクリプトだけを実行する。Windowsでは `npm.cmd`／`npx.cmd` を使用する。コード変更時の通常の最低限の検証は以下。
 
@@ -253,7 +260,8 @@ npx.cmd prisma generate
 - 自動テストやビルドの成功だけで、ブラウザ動作も確認済みとしない。
 - UI変更ではモバイル／デスクトップ、各表示状態、キーボード操作、関連するアレルゲンの組み合わせを確認する。
 - 認証・認可に関係する変更では、未認証ユーザーと権限のないユーザーの操作も確認する。
-- 既存のブラウザ回帰スクリプトは `scripts/check-first-use-browser.mjs` と `scripts/check-test-browser.mjs`。実行前にREADMEとスクリプト本体を読み、接続先、専用テストデータ、既存のPlaywright・Chromium、Windowsでの実行条件を確認する。
+- ブラウザ回帰の入口は `scripts/browser-runner.mjs`。`install` で隔離したPlaywright・Chromiumを用意し、起動済みアプリへ `public` / `ui` / `demo` / `admin` を実行する。`composition` / `qr` は実コンポーネントとビルド済みCSSの隔離fixtureを使い、アプリ・DB・Clerkの起動は不要。実行前に[開発手順](docs/guide/development.md#browser)と、呼び出す確認スクリプトを読み、接続先、専用テストデータ、副作用、Windowsでの実行条件を確認する。`qr` の印刷CSS／PDF検査は紙への印刷・カメラ読取とは分ける。`admin` は実Clerk・専用DB・Blobへの書込を伴う。
+- DB制約は `scripts/check-test-database.ts`（専用Compose）または `scripts/check-ci-database.ts`（CI一時DB）の接続ガードを通して検証する。既存マイグレーション由来のトリガー・部分一意インデックスも対象であり、schema検証やAPIモックテストの成功で代用しない。
 - 専用テスト環境の初期化や外部サービスへの書き込みは、副作用と対象が依頼の範囲内であることを確認する。ブラウザ検証のためだけに無断で依存パッケージを追加しない。
 - 実行できない項目は理由とともに `UNVERIFIED`（未確認）として残す。実行環境の不足をテスト成功と扱わず、過去の成功件数を今回の結果に流用しない。
 
@@ -261,12 +269,12 @@ npx.cmd prisma generate
 
 原則として日本語で、変更規模に応じて簡潔に報告する。
 
-1. 変更内容と理由
-2. 変更ファイル
+1. 実装の変更内容と理由（文書のみなら実装変更なしと明記）
+2. 更新した文書・ファイルと理由、関連文書を更新不要と判断した場合はその理由
 3. 主な受け入れ条件の `PASS`／`FAIL`／`UNVERIFIED`
 4. 実行したコマンドと実際の結果（テストは件数も記載）
 5. 実行しなかった検証と理由
-6. 残る手動確認、前提、リスク
+6. 未確認事項、不一致、残課題、残る手動確認、前提、リスク
 
 未実行のコマンドを成功と報告しない。必要なビルド・型検査・認可・手動動作が未確認の場合は、実装完了と検証完了を区別する。
 

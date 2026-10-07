@@ -11,6 +11,7 @@ import { requirePortfolioMutationAccessApi } from "@/lib/auth/portfolio-mode";
 import {
     buildInvitationRedirectUrl,
     getInvitationExpiresAt,
+    InvitationError,
     serializeAdminInvite,
 } from "@/lib/auth/invitations";
 import {
@@ -18,13 +19,15 @@ import {
     findClerkUserByEmail,
     revokeClerkApplicationInvitation,
 } from "@/lib/auth/clerkAdminServer";
-import { extractClerkErrorMessage } from "@/lib/auth/clerkErrors";
+import { writeAdminAuditLog } from "@/lib/audit-log";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 import {
     isDatabaseUnavailableError,
     retryOnceOnDatabaseUnavailable,
 } from "@/lib/db/errors";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 function isUniqueConstraintError(error: unknown) {
     return (
@@ -37,6 +40,7 @@ app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
     const req = c.req.raw;
     const inviteId = c.req.param("inviteId");
     let newClerkInvitationId: string | null = null;
+    let failureCategory: "database" | "external_service" | "unexpected" = "unexpected";
 
     try {
         const originError = enforceSameOriginAdminMutation(req);
@@ -61,6 +65,7 @@ app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
             );
         }
 
+        failureCategory = "database";
         const oldInvite = await retryOnceOnDatabaseUnavailable(() =>
             prisma.adminInvite.findUnique({
                 where: { id: inviteId },
@@ -98,6 +103,7 @@ app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
             );
         }
 
+        failureCategory = "external_service";
         const existingClerkUser = await findClerkUserByEmail(oldInvite.email);
         if (existingClerkUser) {
             return NextResponse.json(
@@ -113,9 +119,23 @@ app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
             await revokeClerkApplicationInvitation(
                 oldInvite.clerkInvitationId,
             );
+            // 以降の作成が失敗しても、取消済みの外部招待を再度取り消さず再送できます。
+            failureCategory = "database";
+            const cleared = await prisma.adminInvite.updateMany({
+                where: {
+                    id: oldInvite.id,
+                    status: "pending",
+                    clerkInvitationId: oldInvite.clerkInvitationId,
+                },
+                data: { clerkInvitationId: null },
+            });
+            if (cleared.count !== 1) {
+                throw new InvitationError("招待の状態が変わりました。一覧を更新してください。", 409);
+            }
         }
 
         const expiresInDays = 30;
+        failureCategory = "external_service";
         const newClerkInvitation = await createClerkApplicationInvitation({
             email: oldInvite.email,
             expiresInDays,
@@ -126,14 +146,19 @@ app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
         });
         newClerkInvitationId = newClerkInvitation.id;
 
+        failureCategory = "database";
         const newInvite = await prisma.$transaction(async (tx) => {
-            await tx.adminInvite.update({
-                where: { id: oldInvite.id },
+            const changed = await tx.adminInvite.updateMany({
+                where: { id: oldInvite.id, status: "pending" },
                 data: {
                     status: "revoked",
                     revokedAt: new Date(),
                 },
             });
+
+            if (changed.count !== 1) {
+                throw new InvitationError("招待の状態が変わりました。一覧を更新してください。", 409);
+            }
 
             return tx.adminInvite.create({
                 data: {
@@ -157,6 +182,20 @@ app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
             });
         });
 
+        // 以降のレスポンス処理に失敗しても、確定済み招待は補償取消しません。
+        newClerkInvitationId = null;
+        failureCategory = "unexpected";
+        await writeAdminAuditLog({
+            req,
+            actorUserId: null,
+            actorShopId: newInvite.shopId,
+            action: "invitation_resend",
+            targetType: "invitation",
+            targetId: newInvite.id,
+            success: true,
+            metadata: { actorClerkUserId: admin.clerkUserId },
+        });
+
         return NextResponse.json({
             message: "招待を再送しました。",
             invitation: serializeAdminInvite(newInvite),
@@ -166,7 +205,16 @@ app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
         if (newClerkInvitationId) {
             await revokeClerkApplicationInvitation(
                 newClerkInvitationId,
-            ).catch(() => undefined);
+            ).catch((cleanupError: unknown) => {
+                logOperationalError(cleanupError, {
+                    operation: "invitation.resend.compensate",
+                    category: "external_service",
+                });
+            });
+        }
+
+        if (error instanceof InvitationError) {
+            return NextResponse.json({ message: error.message }, { status: error.status });
         }
 
         if (isUniqueConstraintError(error)) {
@@ -177,19 +225,16 @@ app.post("/api/admin/invitations/:inviteId/resend", async (c) => {
         }
 
         if (isDatabaseUnavailableError(error)) {
+            logOperationalError(error, { operation: "invitation.resend", category: "database" });
             return NextResponse.json(
                 { message: "現在データベースへ接続できません。" },
                 { status: 503 },
             );
         }
 
+        logOperationalError(error, { operation: "invitation.resend", category: failureCategory });
         return NextResponse.json(
-            {
-                message: extractClerkErrorMessage(
-                    error,
-                    "招待の再送に失敗しました。",
-                ),
-            },
+            { message: "招待の再送に失敗しました。" },
             { status: 500 },
         );
     }

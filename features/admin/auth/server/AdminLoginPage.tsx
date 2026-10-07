@@ -19,9 +19,7 @@ const DATABASE_UNAVAILABLE_REASON =
 export default async function AdminLoginPage({
     searchParams,
 }: {
-    searchParams?:
-        | Promise<{ database?: string }>
-        | { database?: string };
+    searchParams?: Promise<{ database?: string }>;
 }) {
     // Server Component 側で先にログイン状態を確認しておくと、
     // すでにログイン済みの人へ不要なフォームを見せずに済みます。

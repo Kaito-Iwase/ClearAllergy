@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="ClearAllergy documentation">
+  <diagram id="clearallergy-system" name="システム構成">
+    <mxGraphModel dx="1600" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="ClearAllergy  |  システム構成" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=34;fontColor=#0f172a;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="34" width="1520" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="公開情報の閲覧と、店舗担当者による情報更新を支える主要な処理経路" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=21;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="1520" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="browser-boundary" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#f8fafc;strokeColor=#cbd5e1;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="150" width="330" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="app-boundary" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#eff6ff;strokeColor=#bfdbfe;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="430" y="150" width="650" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="services-boundary" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#f8fafc;strokeColor=#cbd5e1;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="150" width="400" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="browser-heading" value="ブラウザ" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=25;fontColor=#0f172a;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="170" width="290" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="app-heading" value="Next.js アプリ" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=25;fontColor=#1e40af;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="450" y="170" width="610" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="app-host" value="配備先：Vercelを想定" style="text;html=0;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="820" y="174" width="240" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="services-heading" value="外部サービス・データ" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=25;fontColor=#0f172a;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="170" width="360" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="public-ui" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ffffff;strokeColor=#94a3b8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="235" width="270" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="public-ui-title" value="公開閲覧" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#0f172a;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="249" width="230" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="public-ui-line-0" value="ログイン不要" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="280" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="public-ui-line-1" value="店舗・メニューの確認" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="304" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="public-ui-line-2" value="React / Client Component" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="328" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="preferences" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#f0fdfa;strokeColor=#5eead4;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="405" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="preferences-title" value="端末内の設定" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#115e59;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="419" width="230" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="preferences-line-0" value="確認対象のアレルゲン" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="450" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="preferences-line-1" value="localStorageに保存" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="474" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-ui" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ffffff;strokeColor=#94a3b8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="635" width="270" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-ui-title" value="管理操作" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#0f172a;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="649" width="230" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-ui-line-0" value="店舗担当者：情報の更新" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="680" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-ui-line-1" value="運営担当者：招待の管理" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="704" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-ui-line-2" value="デモ画面は保存なし" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="728" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="public-server" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ffffff;strokeColor=#93c5fd;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="480" y="235" width="530" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="public-server-title" value="公開ページ / Server Component" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#1e40af;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="249" width="490" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="public-server-line-0" value="Prismaで公開データを取得" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="280" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="public-server-line-1" value="公開条件を満たす情報を画面へ渡す" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="304" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="public-server-line-2" value="再検証の設定・更新時のキャッシュ無効化" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="328" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="allergen-rules" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ecfdf5;strokeColor=#6ee7b7;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="480" y="405" width="530" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="allergen-rules-title" value="アレルゲンの共通処理 / lib/allergens.ts" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#065f46;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="419" width="490" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="allergen-rules-line-0" value="状態の正規化・公開判定" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="450" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="allergen-rules-line-1" value="UNKNOWN・欠損をFREEにしない" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="474" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="allergen-rules-line-2" value="登録状態と店舗内の取扱いに関する補足を分離" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="498" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-api" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ffffff;strokeColor=#93c5fd;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="480" y="635" width="530" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-api-title" value="管理API / Route Handler → Hono" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#1e40af;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="649" width="490" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-api-line-0" value="Clerkセッション・店舗所有権・更新権限を確認" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="680" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-api-line-1" value="入力検証・公開条件の確認" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="704" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="admin-api-line-2" value="店舗・メニュー・招待・画像の処理" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="728" width="490" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="prisma" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#dbeafe;strokeColor=#93c5fd;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="480" y="820" width="530" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="prisma-label" value="Prisma  |  取得・トランザクション・監査記録" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=21;fontColor=#1e40af;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="833" width="490" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="clerk" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ffffff;strokeColor=#c4b5fd;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="235" width="340" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="clerk-title" value="Clerk" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#5b21b6;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="249" width="300" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="clerk-line-0" value="ログイン・セッション" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="280" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="clerk-line-1" value="管理者への招待" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="304" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="clerk-line-2" value="所有店舗の判定はアプリ側" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="328" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="blob" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ffffff;strokeColor=#c4b5fd;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="635" width="340" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="blob-title" value="Vercel Blob" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#5b21b6;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="649" width="300" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="blob-line-0" value="店舗・メニュー画像を保存" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="680" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="blob-line-1" value="DBにはURLと表示設定を保存" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="704" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="blob-line-2" value="DBとの一括トランザクションなし" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="728" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ffffff;strokeColor=#c4b5fd;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="785" width="340" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres-title" value="PostgreSQL / Neonを想定" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#5b21b6;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="799" width="300" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres-line-0" value="店舗・メニュー・品目・招待・監査" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="830" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres-line-1" value="公開制約トリガー・一意制約" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="854" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="public-request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#2563eb;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="public-ui" target="public-server">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="preferences-flow" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#0f766e;endArrow=block;endFill=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;dashed=1;dashPattern=6 4;startArrow=block;startFill=1;" edge="1" parent="1" source="public-ui" target="preferences">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="public-rules" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#0f766e;endArrow=block;endFill=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;" edge="1" parent="1" source="public-server" target="allergen-rules">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="management-request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#2563eb;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin-ui" target="admin-api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="management-rules" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#0f766e;endArrow=block;endFill=1;exitX=0.5;exitY=0.0;exitDx=0;exitDy=0;entryX=0.5;entryY=1.0;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin-api" target="allergen-rules">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="read-database" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#2563eb;endArrow=block;endFill=1;exitX=0.0;exitY=0.7666666666666667;exitDx=0;exitDy=0;entryX=0.0;entryY=0.4909090909090909;entryDx=0;entryDy=0;" edge="1" parent="1" source="public-server" target="prisma">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="455" y="327" />
+              <mxPoint x="455" y="847" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="update-database" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#2563eb;endArrow=block;endFill=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin-api" target="prisma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="session-and-invite" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#7c3aed;endArrow=block;endFill=1;exitX=1.0;exitY=0.2230769230769231;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin-api" target="clerk">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1120" y="664" />
+              <mxPoint x="1120" y="295" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="upload-image" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#7c3aed;endArrow=block;endFill=1;exitX=1.0;exitY=0.7307692307692307;exitDx=0;exitDy=0;entryX=0.0;entryY=0.7307692307692307;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin-api" target="blob">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="prisma-database" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#7c3aed;endArrow=block;endFill=1;exitX=1.0;exitY=0.4909090909090909;exitDx=0;exitDy=0;entryX=0.0;entryY=0.62;entryDx=0;entryDy=0;" edge="1" parent="1" source="prisma" target="postgres">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="public-request-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="351" y="259" width="118" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="public-request-label" value="ページ要求" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="355" y="259" width="110" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="prefs-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="214" y="365" width="123" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="prefs-label" value="表示設定" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#0f766e;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="218" y="365" width="115" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="public-rules-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="769" y="366" width="118" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="public-rules-label" value="公開判定" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#0f766e;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="773" y="366" width="110" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="management-request-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="343" y="664" width="133" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="management-request-label" value="保存・更新" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="347" y="664" width="125" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="management-rules-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="769" y="568" width="133" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="management-rules-label" value="公開前確認" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#0f766e;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="773" y="568" width="125" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="read-database-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="494" y="784" width="130" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="read-database-label" value="公開データ取得" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="498" y="784" width="122" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="update-database-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="774" y="784" width="108" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="update-database-label" value="DB更新" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="778" y="784" width="100" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="clerk-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1032" y="257" width="148" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="clerk-label" value="認証・招待" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#7c3aed;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1036" y="257" width="140" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="blob-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="693" width="160" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="blob-label" value="アップロード" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#7c3aed;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1024" y="693" width="152" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1024" y="807" width="154" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres-label" value="読込・保存" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#7c3aed;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="1028" y="807" width="146" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-boundary" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="930" width="1520" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-heading" value="検証  |  GitHub Actions" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=23;fontColor=#0f172a;fontStyle=1;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="943" width="440" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-detail" value="テスト・lint・型検査・Prisma検証・ビルド" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=20;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="520" y="943" width="1020" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-detail-two" value="一時PostgreSQLの制約回帰 / 架空データでChromiumの公開画面回帰" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="520" y="976" width="1020" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="scope-note" value="主要経路の概要図。画像配信・公開API・管理ページ初期取得・Google Places・ログの詳細は本文を参照。" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1034" width="1520" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="deployment-note" value="Vercel・Neonは想定構成。実際の配備先・接続先・稼働状況、最新CI結果はこの図の検証対象外。" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=17;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1063" width="1520" height="28" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

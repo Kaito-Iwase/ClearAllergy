@@ -1,3 +1,4 @@
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { requireShopId } from "@/lib/auth/admin-api-utils";
@@ -11,11 +12,13 @@ import { writeAdminAuditLog } from "@/lib/audit-log";
 import { requirePortfolioMutationAccessApi } from "@/lib/auth/portfolio-mode";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.post("/api/admin/upload-shop-image", async (c) => {
     const req = c.req.raw;
     let actorUserId: string | null = null;
     let actorShopId: string | null = null;
+    let failureCategory: "external_service" | undefined;
     try {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
@@ -55,7 +58,7 @@ app.post("/api/admin/upload-shop-image", async (c) => {
             );
         }
 
-        const validation = validateImageFile(file);
+        const validation = await validateImageFile(file);
         if (!validation.ok) {
             // MIME やサイズが条件を満たさない時は、ここで保存処理へ進ませません。
             await writeAdminAuditLog({
@@ -66,7 +69,7 @@ app.post("/api/admin/upload-shop-image", async (c) => {
                 targetType: "image_upload",
                 targetId: actorShopId,
                 success: false,
-                metadata: { reason: validation.message, mimeType: file.type },
+                metadata: { reason: "invalid_input" },
             });
             return NextResponse.json(
                 { error: validation.message },
@@ -75,6 +78,7 @@ app.post("/api/admin/upload-shop-image", async (c) => {
         }
 
         const path = `shops/${auth.shopId}/cover-${Date.now()}.${validation.extension}`;
+        failureCategory = "external_service";
         const blob = await uploadImageToBlob({
             file,
             pathname: path,
@@ -108,6 +112,7 @@ app.post("/api/admin/upload-shop-image", async (c) => {
                 metadata: { reason: "internal_error" },
             });
         }
+        logOperationalError(error, { operation: "shop_image_upload", category: failureCategory });
         const uploadError = buildUploadJsonError(error);
         return NextResponse.json(
             { error: uploadError.error },

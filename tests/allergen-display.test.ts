@@ -125,7 +125,7 @@ test("別の公開登録による補足があるFREEを安心側の要約にし�
     assert.equal(result.badge, "caution");
     assert.equal(result.storeHandledCount, 1);
     assert.equal(result.mayCount, 0);
-    assert.match(result.summaryText, /別の公開登録/);
+    assert.match(result.summaryText, /別の公開メニューに「含む」登録/);
     const items = buildAllergenDisplayItems([
         { slug: "egg", nameJa: "卵", status: "FREE" }, { slug: "milk", nameJa: "乳", status: "UNKNOWN" },
     ], new Set(["egg", "milk"]));

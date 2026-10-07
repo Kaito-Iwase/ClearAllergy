@@ -9,6 +9,7 @@ export type AdminInvitationListItem = {
     status: "pending" | "accepted" | "revoked" | "expired" | "failed";
     expiresAt: string | null;
     createdAt: string;
+    canRetryRevoke: boolean;
     shop: {
         id: string;
         name: string;
@@ -127,6 +128,8 @@ export default function AdminInvitationManager({
 
             if (!response.ok) {
                 setError(data?.message ?? "招待操作に失敗しました。");
+                // ローカル取消後に外部取消だけ失敗した場合も、再試行可能な状態を取り込む。
+                router.refresh();
                 return;
             }
 
@@ -144,6 +147,7 @@ export default function AdminInvitationManager({
         <div className="space-y-6">
             <form
                 onSubmit={createInvitation}
+                aria-describedby={error ? "invitation-error" : undefined}
                 className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
             >
                 <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
@@ -185,13 +189,13 @@ export default function AdminInvitationManager({
                 </div>
 
                 {notice ? (
-                    <p className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    <p role="status" className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                         {notice}
                     </p>
                 ) : null}
 
                 {error ? (
-                    <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    <p id="invitation-error" role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                         {error}
                     </p>
                 ) : null}
@@ -254,7 +258,7 @@ export default function AdminInvitationManager({
                                         <button
                                             type="button"
                                             disabled={
-                                                !isPending ||
+                                                (!isPending && !invite.canRetryRevoke) ||
                                                 actionId === `revoke:${invite.id}`
                                             }
                                             onClick={() =>
@@ -264,7 +268,7 @@ export default function AdminInvitationManager({
                                         >
                                             {actionId === `revoke:${invite.id}`
                                                 ? "取消中..."
-                                                : "取消"}
+                                                : invite.canRetryRevoke ? "取消を再試行" : "取消"}
                                         </button>
                                     </div>
                                 </div>

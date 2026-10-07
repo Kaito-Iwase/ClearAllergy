@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 import { requireShopId } from "@/lib/auth/admin-api-utils";
 import {
     isGooglePlacesConfigured,
@@ -7,6 +8,7 @@ import {
 } from "@/lib/google-places";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.get("/api/admin/places/search", async (c) => {
     const auth = await requireShopId();
@@ -34,7 +36,7 @@ app.get("/api/admin/places/search", async (c) => {
             places: await searchGooglePlaces(query, { limit: 5 }),
         });
     } catch (error) {
-        console.error(error);
+        logOperationalError(error, { operation: "places_search", category: "external_service" });
         return NextResponse.json(
             { error: "Google店舗候補を現在検索できません。", places: [] },
             { status: 503 },

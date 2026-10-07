@@ -26,7 +26,7 @@ export const dynamic = "force-static";
 export default async function PublicMenuDetailPage({
     params,
 }: {
-    params: Params | Promise<Params>;
+    params: Promise<Params>;
 }) {
     // どの店舗のどのメニューかを、動的ルートの 2 つの ID で決めます。
     const { shopId, menuId } = await params;

@@ -3,6 +3,7 @@
 // ローカル DB には clerkUserId と Shop だけを保存します。
 
 import { Hono } from "hono";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isDatabaseUnavailableError } from "@/lib/db/errors";
@@ -31,6 +32,7 @@ type RegisterRequestBody = {
 };
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 app.post("/api/admin/register", async (c) => {
     const req = c.req.raw;
@@ -246,10 +248,7 @@ app.post("/api/admin/register", async (c) => {
                 appUserId: createdUser.id,
             });
         } catch (externalIdError) {
-            console.warn(
-                "Failed to attach Clerk externalId after admin registration.",
-                externalIdError,
-            );
+            logOperationalError(externalIdError, { operation: "registration_external_id", category: "external_service" });
         }
 
         await writeAdminAuditLog({

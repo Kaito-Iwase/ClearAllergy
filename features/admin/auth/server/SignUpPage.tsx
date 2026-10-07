@@ -5,7 +5,7 @@ type SignUpSearchParams = Record<string, string | string[] | undefined>;
 export default async function SignUpPage({
     searchParams,
 }: {
-    searchParams?: Promise<SignUpSearchParams> | SignUpSearchParams;
+    searchParams?: Promise<SignUpSearchParams>;
 }) {
     const resolvedSearchParams = (await searchParams) ?? {};
     const ticketParam =

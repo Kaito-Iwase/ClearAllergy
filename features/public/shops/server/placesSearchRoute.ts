@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import { handleUnhandledApiError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 
 const app = new Hono();
+app.onError(handleUnhandledApiError);
 
 // v1 の公開検索は登録済み店舗だけ。旧URLは unavailable 応答を維持し、
 // サーバーキーの有無にかかわらず外部Places APIは呼び出しません。
