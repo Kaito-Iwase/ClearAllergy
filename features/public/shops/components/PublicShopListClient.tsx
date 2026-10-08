@@ -338,7 +338,7 @@ export default function PublicShopListClient({
                     </div>
                 ) : null}
                 {hasExclusionPreference ? (
-                    <p className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm leading-6 text-violet-900">
+                    <p className="mt-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm leading-6 text-red-900">
                         除外設定に一致するメニューしかない店舗は非表示になります
                         {includeMayContain
                             ? "（含む可能性ありも対象）"

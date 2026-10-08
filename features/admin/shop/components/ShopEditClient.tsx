@@ -525,7 +525,7 @@ export default function ShopEditClient({
         <fieldset disabled={saving || uploading} className="min-w-0 space-y-6">
             <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
                 <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
-                    <div className="relative min-h-[300px] overflow-hidden bg-gradient-to-r from-green-200 via-green-100 to-gray-50 p-5 sm:min-h-[360px] sm:p-8 md:p-10">
+                    <div className={`relative overflow-hidden bg-white p-5 sm:p-8 md:p-10 ${previewImageUrl ? "min-h-[300px] sm:min-h-[360px]" : ""}`}>
                         {previewImageUrl ? (
                             <Image
                                 src={previewImageUrl}
@@ -538,18 +538,17 @@ export default function ShopEditClient({
                             />
                         ) : null}
 
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.45),transparent_35%)]" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/10 to-white/10" />
+                        {previewImageUrl ? <div className="absolute inset-0 bg-black/60" /> : null}
 
                         <div className="relative z-10 flex h-full flex-col justify-between">
                             <div>
-                                <p className="text-sm font-semibold text-white/90 drop-shadow">
+                                <p className={`text-sm font-semibold ${previewImageUrl ? "text-white/90 drop-shadow" : "text-gray-800"}`}>
                                     公開プレビュー
                                 </p>
-                                <h2 className="mt-5 text-3xl font-extrabold tracking-tight text-white drop-shadow sm:mt-6 sm:text-4xl md:text-5xl">
+                                <h2 className={`mt-5 text-3xl font-extrabold tracking-tight sm:mt-6 sm:text-4xl md:text-5xl ${previewImageUrl ? "text-white drop-shadow" : "text-gray-900"}`}>
                                     {name.trim() || "店舗名未設定"}
                                 </h2>
-                                <p className="mt-4 max-w-xl text-base font-medium text-white/90 md:text-lg">
+                                <p className={`mt-4 max-w-xl text-base font-medium md:text-lg ${previewImageUrl ? "text-white/90" : "text-gray-700"}`}>
                                     {description.trim() ||
                                         "店舗説明は未設定です。"}
                                 </p>

@@ -19,8 +19,8 @@ export type UserAllergenPreferenceAllergen = { slug: string; nameJa: string };
 
 const modeAppearance: Record<AllergenPreferenceMode, { row: string; select: string }> = {
     none: { row: "bg-white", select: "border-gray-300 bg-white text-gray-800" },
-    highlight: { row: "bg-blue-50", select: "border-blue-400 bg-blue-50 font-bold text-blue-900" },
-    exclude: { row: "bg-violet-50", select: "border-violet-400 bg-violet-50 font-bold text-violet-900" },
+    highlight: { row: "bg-yellow-50", select: "border-yellow-700 bg-yellow-50 font-bold text-yellow-950" },
+    exclude: { row: "bg-red-50", select: "border-red-700 bg-red-50 font-bold text-red-900" },
 };
 
 export function useUserAllergenPreferences() {
@@ -104,8 +104,8 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                     <span className="block text-base font-bold text-gray-900">あなた向けのアレルゲン設定</span>
                     <span className="mt-2 block text-sm leading-6 text-gray-700">
                         {saved.selectedSlugs.length === 0 ? "未設定" : <>
-                            {saved.highlightSlugs.length > 0 && <span className="mb-1 block rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-blue-900">注目：{names(saved.highlightSlugs)}</span>}
-                            {saved.excludedSlugs.length > 0 && <span className="block rounded-lg border border-violet-200 bg-violet-50 px-3 py-1 text-violet-900">除外：{names(saved.excludedSlugs)}</span>}
+                            {saved.highlightSlugs.length > 0 && <span className="mb-1 block rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-1 text-yellow-950">注目：{names(saved.highlightSlugs)}</span>}
+                            {saved.excludedSlugs.length > 0 && <span className="block rounded-lg border border-red-300 bg-red-50 px-3 py-1 text-red-900">除外：{names(saved.excludedSlugs)}</span>}
                         </>}
                     </span>
                     {dirty && <span className="mt-1 block text-sm font-bold text-amber-900">未適用の変更あり</span>}
@@ -116,8 +116,8 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
             {state.isOpen && <div id={`${id}-editor`} className="border-t border-gray-100 p-4 sm:p-5">
                 <p className="text-sm leading-6 text-gray-700">保存済みの設定を編集できます。最後に「変更を適用」を押してください。</p>
                 <div className="mt-3 space-y-2 text-sm leading-6">
-                    <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900">「注目して表示」は選んだ項目を確認対象にします。</p>
-                    <p className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-violet-900">「一覧から除外」は、その項目を「含む」と登録したメニューを非表示にします。</p>
+                    <p className="rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-yellow-950">「注目して表示」は選んだ項目を確認対象にします。</p>
+                    <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-red-900">「一覧から除外」は、その項目を「含む」と登録したメニューを非表示にします。</p>
                 </div>
                 <label htmlFor={`${id}-search`} className="mt-4 block text-sm font-bold">アレルゲンを探す</label>
                 <input id={`${id}-search`} type="search" value={query} onChange={(event) => setQuery(event.target.value)}
@@ -151,8 +151,8 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                 <div className="mt-4 border-t border-gray-200 pt-3">
                     <p role="status" className="text-sm text-gray-700">{dirty ? `適用後の設定：${selectedCount}件（未適用）` : `保存済み：${selectedCount}件`}</p>
                     <div className="mt-2 space-y-2 break-words text-sm leading-6" aria-label="編集中の表示設定">
-                        {draft.highlightSlugs.length > 0 && <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-900">注目：{names(draft.highlightSlugs)}</p>}
-                        {draft.excludedSlugs.length > 0 && <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-violet-900">除外：{names(draft.excludedSlugs)}</p>}
+                        {draft.highlightSlugs.length > 0 && <p className="rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-yellow-950">注目：{names(draft.highlightSlugs)}</p>}
+                        {draft.excludedSlugs.length > 0 && <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-red-900">除外：{names(draft.excludedSlugs)}</p>}
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
                         <button type="button" onClick={() => { state.onCancel(); setQuery(""); trigger.current?.focus(); }} className="min-h-11 rounded-lg border border-gray-300 px-3 text-sm font-bold">キャンセル</button>

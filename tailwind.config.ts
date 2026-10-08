@@ -20,8 +20,9 @@ const config: Config = {
                 "text-sub": "#4b6b4b",
             },
             fontFamily: {
-                display: ['"Manrope"', '"Noto Sans JP"', "sans-serif"],
-                body: ['"Manrope"', '"Noto Sans JP"', "sans-serif"],
+                sans: ["var(--font-ui)"],
+                display: ["var(--font-ui)"],
+                body: ["var(--font-ui)"],
             },
             borderRadius: {
                 DEFAULT: "0.25rem",
