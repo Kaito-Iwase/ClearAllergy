@@ -14,6 +14,7 @@ import {
 import { createMenuButtonClassName } from "@/features/admin/menus/components/CreateMenuButton";
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
 import MenuPublishReadinessNotice from "@/features/admin/menus/components/MenuPublishReadinessNotice";
+import MenuAllergenRegistrationGuide from "./MenuAllergenRegistrationGuide";
 import {
     normalizeOptionalMenuText,
     parseMenuPriceYenInput,
@@ -604,16 +605,16 @@ export default function MenuEditClient(props: {
                     <label htmlFor="edit-menu-field-6" className="mb-1 block text-sm font-medium text-gray-700">
                         注意書き
                     </label>
-                    <textarea id="edit-menu-field-6"
+                    <textarea id="edit-menu-field-6" aria-describedby="edit-menu-precaution-help"
                         maxLength={2000}
                             value={precaution}
                         onChange={(e) => setPrecaution(e.target.value)}
                         rows={3}
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
-                        placeholder="例：同一厨房でえび・かに・卵を扱っています。"
+                        placeholder="例：仕入れ品に「乳を扱う製造ライン」の注意表示があります。小麦を使う料理と揚げ油を共用しています。"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                        未入力でも保存・公開できますが、できるだけ入力をおすすめします。
+                    <p id="edit-menu-precaution-help" className="mt-1 text-xs leading-5 text-gray-600">
+                        注意の対象品目・理由・仕入先の注意内容を記載してください。注意書きだけでは品目別の状態は変わりません。
                     </p>
                 </div>
 
@@ -697,8 +698,7 @@ export default function MenuEditClient(props: {
                     アレルゲン{allergens.length}品目
                 </div>
                 <p className="mt-1 text-sm text-gray-600">
-                    各品目について「未設定 / 含む / 含まない /
-                    含む可能性があります」を選択してください。
+                    各品目について「未設定 / 含む / 原材料に含まない登録 / 含む可能性あり・要確認」を選択してください。
                 </p>
 
                 <MenuPublishReadinessNotice
@@ -706,6 +706,7 @@ export default function MenuEditClient(props: {
                     totalAllergenCount={allergens.length}
                     onFindUnknown={findNextUnknown}
                 />
+                <MenuAllergenRegistrationGuide />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     {allergens.map((a) => {

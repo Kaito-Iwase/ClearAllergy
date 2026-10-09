@@ -12,11 +12,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     buildSelectedAllergenSummary,
+    buildDefaultAllergenSummaries,
     createStatusBySlug,
+    SPECIFIED_INGREDIENT_SLUGS,
     type AllergenStatus,
 } from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import { useUserAllergenPreferences } from "@/features/public/shops/components/UserAllergenPreferenceClient";
+import MenuAllergenSummary from "./MenuAllergenSummary";
 
 type BadgeKind = "danger" | "caution" | "safe" | "unknown";
 
@@ -32,6 +35,7 @@ type MenuItemCard = {
     description: string | null;
     priceYen: number | null;
     category: string | null;
+    precaution: string | null;
     updatedAt: string;
     allergenLinks: Array<{
         status: AllergenStatus;
@@ -198,9 +202,7 @@ export default function ShopMenuListClient({
             ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {visibleMenuItems.map(({ menu, statusBySlug }) => {
-                        const overallSummary = buildSelectedAllergenSummary({
-                            selectedSlugs: allergenMaster.map((allergen) => allergen.slug),
-                            includeMayContain: false,
+                        const defaultSummaries = buildDefaultAllergenSummaries({
                             storeHandledAllergenSlugs: new Set(storeHandledAllergenSlugs),
                             statusBySlug,
                             nameJaBySlug,
@@ -218,7 +220,8 @@ export default function ShopMenuListClient({
 
                         const activeSummary = hasPreference
                             ? personalizedSummary
-                            : overallSummary;
+                            : defaultSummaries.specified;
+                        const otherSummary = defaultSummaries.other;
 
                         return (
                             <Link
@@ -234,18 +237,8 @@ export default function ShopMenuListClient({
                                         </h3>
 
                                         <p className="mt-2 break-words text-sm leading-6 text-gray-700">
-                                            {hasPreference ? `確認対象：${allergenMaster.filter((allergen) => selectedSlugs.includes(allergen.slug)).map((allergen) => allergen.nameJa).join("・")}` : `すべての品目（${allergenMaster.length}品目）`}
+                                            {hasPreference ? `確認対象：${allergenMaster.filter((allergen) => selectedSlugs.includes(allergen.slug)).map((allergen) => allergen.nameJa).join("・")}` : `確認対象：特定原材料（${SPECIFIED_INGREDIENT_SLUGS.length}品目）`}
                                         </p>
-                                        <p className="mt-1 text-sm font-semibold leading-6 text-gray-700">
-                                            {/* 件数表示でも UNKNOWN を明示し、要約本文と意味がずれないようにします。 */}
-                                            含む {activeSummary.containsCount}{" "}
-                                            品目 ／ 含む可能性あり{" "}
-                                            {activeSummary.mayCount} 品目
-                                            {activeSummary.unknownCount > 0
-                                                ? ` ／ 未入力・未確認 ${activeSummary.unknownCount} 品目`
-                                                : ""}
-                                        </p>
-
                                         <p className="mt-2 text-sm text-gray-700">
                                             {menu.category || "カテゴリ未設定"}{" "}
                                             ・ {formatPriceYenLabel(menu.priceYen)}
@@ -263,21 +256,31 @@ export default function ShopMenuListClient({
                                             activeSummary.badge,
                                         )}`}
                                     >
-                                        {badgeLabel(activeSummary.badge)}
+                                        {hasPreference ? badgeLabel(activeSummary.badge) : `特定原材料：${badgeLabel(activeSummary.badge)}`}
                                     </span>
 
-                                    <p className="text-xs leading-5 text-gray-600">
-                                        更新：{formatDateTimeJa(menu.updatedAt)}
-                                    </p>
                                 </div>
 
-                                <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-gray-700">
-                                    {activeSummary.summaryText}
-                                </p>
+                                <MenuAllergenSummary summary={activeSummary} />
 
-                                {activeSummary.storeHandledCount > 0 ? (
+                                {!hasPreference && defaultSummaries.otherCount > 0 && otherSummary.badge !== "safe" ? (
+                                    <div role="group" aria-label="その他のアレルゲン" className="mt-3 border-t border-gray-200 pt-3">
+                                        <h4 className="text-sm font-bold text-gray-900">その他のアレルゲン（{defaultSummaries.otherCount}品目）</h4>
+                                        <MenuAllergenSummary summary={otherSummary} />
+                                    </div>
+                                ) : null}
+                                {activeSummary.storeHandledCount > 0 || (!hasPreference && otherSummary.storeHandledCount > 0) ? (
                                     <p className="mt-2 text-xs leading-5 text-amber-900">{STORE_ALLERGEN_NOTE}</p>
                                 ) : null}
+                                {menu.precaution?.trim() ? (
+                                    <div role="group" aria-label="店舗の注意書き" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                                        <h4 className="text-xs font-bold leading-5 text-gray-700">店舗の注意書き</h4>
+                                        <p className="mt-1 whitespace-pre-line break-words text-sm leading-6 text-gray-700">{menu.precaution}</p>
+                                    </div>
+                                ) : null}
+                                <p className="mt-3 text-xs leading-5 text-gray-600">
+                                    更新：{formatDateTimeJa(menu.updatedAt)}
+                                </p>
                                 {hasPreference ? (
                                     <p className="mt-2 text-[11px] text-gray-600">
                                         強調・除外の設定に基づく表示

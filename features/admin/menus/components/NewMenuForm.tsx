@@ -14,6 +14,7 @@ import {
 import { createMenuButtonClassName } from "@/features/admin/menus/components/CreateMenuButton";
 import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompositionEditor";
 import MenuPublishReadinessNotice from "@/features/admin/menus/components/MenuPublishReadinessNotice";
+import MenuAllergenRegistrationGuide from "./MenuAllergenRegistrationGuide";
 import {
     normalizeOptionalMenuText,
     parseMenuPriceYenInput,
@@ -460,16 +461,16 @@ export default function NewMenuForm({
                     <label htmlFor="new-menu-field-6" className="mb-1 block text-sm font-medium text-gray-700">
                         注意書き
                     </label>
-                    <textarea id="new-menu-field-6"
+                    <textarea id="new-menu-field-6" aria-describedby="new-menu-precaution-help"
                         maxLength={2000}
                             value={precaution}
                         onChange={(e) => setPrecaution(e.target.value)}
                         rows={3}
                         className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
-                        placeholder="例：同一厨房でえび・かに・卵を扱っています。"
+                        placeholder="例：仕入れ品に「乳を扱う製造ライン」の注意表示があります。小麦を使う料理と揚げ油を共用しています。"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                        未入力でも保存・公開できますが、できるだけ入力をおすすめします。
+                    <p id="new-menu-precaution-help" className="mt-1 text-xs leading-5 text-gray-600">
+                        注意の対象品目・理由・仕入先の注意内容を記載してください。注意書きだけでは品目別の状態は変わりません。
                     </p>
                 </div>
 
@@ -553,6 +554,7 @@ export default function NewMenuForm({
                     totalAllergenCount={allergens.length}
                     onFindUnknown={findNextUnknown}
                 />
+                <MenuAllergenRegistrationGuide />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                     {allergens.map((allergen) => {

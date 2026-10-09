@@ -260,7 +260,7 @@ npx.cmd prisma generate
 - 自動テストやビルドの成功だけで、ブラウザ動作も確認済みとしない。
 - UI変更ではモバイル／デスクトップ、各表示状態、キーボード操作、関連するアレルゲンの組み合わせを確認する。
 - 認証・認可に関係する変更では、未認証ユーザーと権限のないユーザーの操作も確認する。
-- ブラウザ回帰の入口は `scripts/browser-runner.mjs`。`install` で隔離したPlaywright・Chromiumを用意し、起動済みアプリへ `public` / `ui` / `demo` / `admin` を実行する。`composition` / `qr` は実コンポーネントとビルド済みCSSの隔離fixtureを使い、アプリ・DB・Clerkの起動は不要。実行前に[開発手順](docs/guide/development.md#browser)と、呼び出す確認スクリプトを読み、接続先、専用テストデータ、副作用、Windowsでの実行条件を確認する。`qr` の印刷CSS／PDF検査は紙への印刷・カメラ読取とは分ける。`admin` は実Clerk・専用DB・Blobへの書込を伴う。
+- ブラウザ回帰の入口は `scripts/browser-runner.mjs`。`install` で隔離したPlaywright・Chromiumを用意し、起動済みアプリへ `public` / `ui` / `demo` / `admin` を実行する。`allergens` / `composition` / `qr` は実コンポーネントとビルド済みCSSの隔離fixtureを使い、アプリ・DB・Clerkの起動は不要。実行前に[開発手順](docs/guide/development.md#browser)と、呼び出す確認スクリプトを読み、接続先、専用テストデータ、副作用、Windowsでの実行条件を確認する。`qr` の印刷CSS／PDF検査は紙への印刷・カメラ読取とは分ける。`admin` は実Clerk・専用DB・Blobへの書込を伴う。
 - DB制約は `scripts/check-test-database.ts`（専用Compose）または `scripts/check-ci-database.ts`（CI一時DB）の接続ガードを通して検証する。既存マイグレーション由来のトリガー・部分一意インデックスも対象であり、schema検証やAPIモックテストの成功で代用しない。
 - 専用テスト環境の初期化や外部サービスへの書き込みは、副作用と対象が依頼の範囲内であることを確認する。ブラウザ検証のためだけに無断で依存パッケージを追加しない。
 - 実行できない項目は理由とともに `UNVERIFIED`（未確認）として残す。実行環境の不足をテスト成功と扱わず、過去の成功件数を今回の結果に流用しない。

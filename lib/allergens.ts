@@ -173,7 +173,12 @@ export function buildSelectedAllergenSummary(args: {
     storeHandledAllergenSlugs?: ReadonlySet<string>;
 }): {
     summaryText: string;
+    registrationSummaryText: string;
     badge: SelectedAllergenSummaryKind;
+    containsNames: string[];
+    mayContainNames: string[];
+    unknownNames: string[];
+    storeHandledNames: string[];
     containsCount: number;
     mayCount: number;
     unknownCount: number;
@@ -212,14 +217,25 @@ export function buildSelectedAllergenSummary(args: {
         parts.push(`未入力・未確認 ${unknownNames.length}品目`);
     }
 
+    const registrationSummaryText = parts.length > 0
+        ? parts.join("\n")
+        : args.selectedSlugs.length > 0
+          ? "確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。"
+          : "確認対象が未設定です";
+    const storeHandledNames = storeHandledSlugs.sort(byRank).map(toName);
     if (storeHandledSlugs.length > 0) {
-        parts.push(`${storeHandledSlugs.sort(byRank).map(toName).join("・")}：この店舗の別の公開メニューに「含む」登録があります`);
+        parts.push(`${storeHandledNames.join("・")}：この店舗の別の公開メニューに「含む」登録があります`);
     }
     return {
         summaryText:
             parts.length > 0
                 ? parts.join("\n")
-                : args.selectedSlugs.length > 0 ? "確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。" : "確認対象が未設定です",
+                : registrationSummaryText,
+        registrationSummaryText,
+        containsNames,
+        mayContainNames,
+        unknownNames,
+        storeHandledNames,
         badge:
             containsSlugs.length > 0
                 ? "danger"
@@ -232,6 +248,24 @@ export function buildSelectedAllergenSummary(args: {
         mayCount: mayContainSlugs.length,
         unknownCount: unknownSlugs.length,
         storeHandledCount: storeHandledSlugs.length,
+    };
+}
+
+// 設定なしの一覧は特定原材料を主判定にし、その他の注意は別に保持します。
+// 特定原材料がマスタから欠けていても判定対象から外さず、UNKNOWN とします。
+export function buildDefaultAllergenSummaries(
+    args: Omit<Parameters<typeof buildSelectedAllergenSummary>[0], "selectedSlugs" | "includeMayContain">,
+) {
+    const specifiedSlugs: readonly string[] = SPECIFIED_INGREDIENT_SLUGS;
+    const otherSlugs = [...args.nameJaBySlug.keys()].filter((slug) => !specifiedSlugs.includes(slug));
+    const specifiedStatusBySlug = { ...args.statusBySlug };
+    for (const slug of specifiedSlugs) {
+        if (!args.nameJaBySlug.has(slug)) specifiedStatusBySlug[slug] = "UNKNOWN";
+    }
+    return {
+        specified: buildSelectedAllergenSummary({ ...args, statusBySlug: specifiedStatusBySlug, selectedSlugs: specifiedSlugs, includeMayContain: false }),
+        other: buildSelectedAllergenSummary({ ...args, selectedSlugs: otherSlugs, includeMayContain: false }),
+        otherCount: otherSlugs.length,
     };
 }
 

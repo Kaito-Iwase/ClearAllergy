@@ -104,6 +104,7 @@ export default async function PublicShopDetailPage({
                                 description: true,
                                 priceYen: true,
                                 category: true,
+                                precaution: true,
                                 updatedAt: true,
                                 allergenLinks: {
                                     select: {
@@ -173,6 +174,7 @@ export default async function PublicShopDetailPage({
         description: menu.description,
         priceYen: menu.priceYen,
         category: menu.category,
+        precaution: menu.precaution,
         updatedAt: menu.updatedAt.toISOString(),
         allergenLinks: menu.allergenLinks.map((link) => ({
             status: link.status,
