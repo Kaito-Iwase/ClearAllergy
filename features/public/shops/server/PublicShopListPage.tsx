@@ -1,19 +1,18 @@
 import { Suspense } from "react";
-import { prisma } from "@/lib/db";
+import { readPublicSnapshot } from "./public-read-snapshot";
 import { readPublicDataOrFallback } from "@/lib/public-db";
 import PublicShopListClient from "@/features/public/shops/components/PublicShopListClient";
-import { createStatusBySlug, isMenuPublishable } from "@/lib/allergens";
+import { createStatusBySlug, isMenuPublishable, isFoodReviewCurrent } from "@/lib/allergens";
 
-export const revalidate = 60;
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export default async function PublicShopListPage() {
-    // 公開メニューを持つ店舗と、検索画面で使うアレルゲン設定用マスタを 60 秒単位で取得します。
+    // 公開メニューを持つ店舗と、検索画面で使うアレルゲン設定用マスタをアクセスごとに取得します。
     const { data: publicShopListData, isDatabaseAvailable } =
         await readPublicDataOrFallback(
-            async () => {
+            async () => readPublicSnapshot(async tx => {
                 const [shops, allergenMaster] = await Promise.all([
-                    prisma.shop.findMany({
+                    tx.shop.findMany({
                         where: {
                             isActive: true,
                             menus: {
@@ -48,6 +47,8 @@ export default async function PublicShopListPage() {
                                 select: {
                                     name: true,
                                     priceYen: true,
+                                    foodVersion: true,
+                                    reviewedFoodVersion: true,
                                     allergenLinks: {
                                         select: {
                                             status: true,
@@ -69,14 +70,14 @@ export default async function PublicShopListPage() {
                             },
                         },
                     }),
-                    prisma.allergen.findMany({
+                    tx.allergen.findMany({
                         orderBy: { sortOrder: "asc" },
                         select: { slug: true, nameJa: true },
                     }),
                 ]);
 
                 return { shops, allergenMaster };
-            },
+            }),
             {
                 shops: [],
                 allergenMaster: [],
@@ -90,7 +91,7 @@ export default async function PublicShopListPage() {
     // 現行マスタに対するリンク欠損も createStatusBySlug が UNKNOWN として扱います。
     const shopsWithPublishableMenus = shops.flatMap((shop) => {
         const publishableMenus = shop.menus.filter((menu) =>
-            isMenuPublishable({
+            isFoodReviewCurrent(menu) && isMenuPublishable({
                 name: menu.name,
                 allergens: allergenMaster,
                 statusBySlug: createStatusBySlug(
@@ -105,7 +106,11 @@ export default async function PublicShopListPage() {
         return [
             {
                 ...shop,
-                menus: publishableMenus,
+                menus: publishableMenus.map(({ name, priceYen, allergenLinks }) => ({
+                    name,
+                    priceYen,
+                    allergenLinks,
+                })),
                 _count: { ...shop._count, menus: publishableMenus.length },
             },
         ];

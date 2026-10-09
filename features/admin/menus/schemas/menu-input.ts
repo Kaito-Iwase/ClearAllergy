@@ -11,8 +11,19 @@ export const MENU_TEXT_LIMITS = {
 const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
 const optionalNumber = z.union([z.number().finite(), z.string().max(32)]).nullable().optional();
 
+export const foodReviewInputSchema = z.object({
+    evidenceRefs: z.string().trim().min(1).max(4000),
+    scope: z.string().trim().min(1).max(2000),
+    checkedAt: z.string().datetime({ offset: true }),
+    unresolvedIssues: optionalText(2000),
+});
+
 // 省略は既存の下書き・部分更新の契約を維持し、指定された値の型不正は拒否します。
 export const menuInputSchema = z.object({
+    expectedVersion: z.number().int().nonnegative().max(2147483647).optional(),
+    operationId: z.string().uuid().optional(),
+    foodChangeReported: z.boolean().optional(),
+    foodReview: foodReviewInputSchema.optional(),
     name: z.string().trim().min(1, "メニュー名は必須です。").max(MENU_TEXT_LIMITS.name).optional(),
     description: optionalText(MENU_TEXT_LIMITS.description),
     category: optionalText(MENU_TEXT_LIMITS.category),

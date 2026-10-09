@@ -7,7 +7,7 @@ import Image from "next/image";
 import type { CSSProperties } from "react";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { readPublicSnapshot } from "./public-read-snapshot";
 import ShareShopUrlButton from "@/features/public/shops/components/ShareShopUrlButton";
 import ShopMenuListClient from "@/features/public/shops/components/ShopMenuListClient";
 import UserAllergenPreferenceClient from "@/features/public/shops/components/UserAllergenPreferenceClient";
@@ -20,6 +20,7 @@ import {
     createStatusBySlug,
     getStoreContainsAllergenSlugs,
     isMenuPublishable,
+    isFoodReviewCurrent,
 } from "@/lib/allergens";
 import {
     parseMenuImageFit,
@@ -29,8 +30,7 @@ import {
 
 type Params = { shopId: string };
 
-export const revalidate = 60;
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export default async function PublicShopDetailPage({
     params,
@@ -47,16 +47,16 @@ export default async function PublicShopDetailPage({
         data: publicShopData,
         isDatabaseAvailable,
     } = await readPublicDataOrFallback(
-        async () => {
+        async () => readPublicSnapshot(async tx => {
             const [allergenMaster, shop] = await Promise.all([
                 // アレルゲンマスタは一覧カードや設定 UI の両方で使うため、1 回だけ取得します。
-                prisma.allergen.findMany({
+                tx.allergen.findMany({
                     select: { slug: true, nameJa: true, sortOrder: true },
                     orderBy: { sortOrder: "asc" },
                 }),
 
                 // 店舗本体と公開メニューを一緒に取り、N+1 を避けます。
-                prisma.shop.findFirst({
+                tx.shop.findFirst({
                     where: {
                         id: shopId,
                         isActive: true,
@@ -106,6 +106,8 @@ export default async function PublicShopDetailPage({
                                 category: true,
                                 precaution: true,
                                 updatedAt: true,
+                                foodVersion: true,
+                                reviewedFoodVersion: true,
                                 allergenLinks: {
                                     select: {
                                         status: true,
@@ -122,7 +124,7 @@ export default async function PublicShopDetailPage({
                 allergenMaster,
                 shop,
             };
-        },
+        }),
         {
             allergenMaster: [],
             shop: null,
@@ -151,7 +153,7 @@ export default async function PublicShopDetailPage({
 
     // 公開フラグだけでなく、現行マスタの全品目が確定済みかを公開時にも再確認します。
     const publishableMenus = shop.menus.filter((menu) =>
-        isMenuPublishable({
+        isFoodReviewCurrent(menu) && isMenuPublishable({
             name: menu.name,
             allergens: allergenMaster,
             statusBySlug: createStatusBySlug(

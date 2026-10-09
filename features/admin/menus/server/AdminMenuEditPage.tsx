@@ -3,6 +3,7 @@
 // Server Component なので、他店舗メニューのアクセス制御と初期データ取得を先に行えます。
 
 import MenuEditClient from "@/features/admin/menus/components/MenuEditClient";
+import { foodReviewHistorySelection } from "./food-review-save";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -61,6 +62,10 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                 imagePositionX: true,
                 imagePositionY: true,
                 isPublished: true,
+                version: true,
+                foodVersion: true,
+                reviewedFoodVersion: true,
+                foodReviews: foodReviewHistorySelection,
                 allergenLinks: {
                     select: {
                         status: true,
@@ -102,6 +107,10 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                 <div className="mt-6">
                     <MenuEditClient
                         menuId={menu.id}
+                        initialVersion={menu.version}
+                        initialFoodVersion={menu.foodVersion}
+                        initialReviewedFoodVersion={menu.reviewedFoodVersion}
+                        initialFoodReviews={menu.foodReviews.map(review => ({ ...review, checkedAt: review.checkedAt.toISOString(), recordedAt: review.recordedAt.toISOString(), unresolvedIssues: review.unresolvedIssues ?? "" }))}
                         initialName={menu.name}
                         initialDescription={menu.description}
                         initialPriceYen={menu.priceYen}

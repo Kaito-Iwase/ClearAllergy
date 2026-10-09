@@ -20,6 +20,13 @@ function statusMap(status: AllergenStatus = "FREE") {
     );
 }
 
+test("卵の識別子に小麦の表示名を結び付けたマスタでは公開できない", () => {
+    assert.equal(ALLERGEN_MASTER.find(row => row.slug === "egg")?.nameJa, "卵");
+    assert.equal(ALLERGEN_MASTER.find(row => row.slug === "milk")?.nameJa, "乳");
+    const rows = masterRows.map(row => row.slug === "egg" ? { ...row, nameJa: "小麦" } : row);
+    assert.equal(isMenuPublishable({ name: "確認例", allergens: rows, statusBySlug: statusMap() }), false);
+});
+
 test("正常な29品目マスタは公開検証を通過する", () => {
     assert.deepEqual(getAllergenMasterValidationErrors(masterRows), []);
     assert.equal(

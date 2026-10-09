@@ -72,10 +72,10 @@ try {
     await publicPage.evaluate(() => localStorage.setItem('clearallergy:user-allergens', JSON.stringify({ highlightSlugs: ['egg'], excludedSlugs: [], includeMayContain: false })));
     await publicPage.reload();
     const pancake = publicPage.locator('#public-menus').getByRole('link').filter({ has: publicPage.getByRole('heading', { name: '米粉パンケーキ', exact: true }) });
-    await pancake.getByText(/同店舗の別の公開登録/).waitFor();
+    await pancake.getByText(/別の公開メニューに「含む」登録/).waitFor();
     await pancake.press('Enter');
     await publicPage.waitForURL(/\/menus\//);
-    await publicPage.getByText(/実際の厨房での取扱いや交差接触を確認した結果ではありません/).first().waitFor();
+    await publicPage.getByText(/交差接触を確認した結果ではありません/).first().waitFor();
     const publicMenuId = new URL(publicPage.url()).pathname.split('/').pop();
     const supplementResponse = await publicPage.request.get(base + '/api/menus/' + publicMenuId);
     const supplementData = await supplementResponse.json();
@@ -89,6 +89,11 @@ try {
     const free = a.page.getByRole('button', { name: '原材料に含まない登録', exact: true });
     for (let i = 0; i < await free.count(); i++) await free.nth(i).click();
     await a.page.getByRole('group', { name: '卵', exact: true }).getByRole('button', { name: '含む可能性あり・要確認', exact: true }).click();
+    await a.page.getByRole('checkbox', { name: '今回の提供内容と原資料を照合した記録を保存する', exact: true }).check();
+    await a.page.getByLabel('根拠資料・製品識別・資料の版', { exact: true }).fill('架空試験資料 test-v1（実食品の証拠ではない）');
+    await a.page.getByLabel('確認した提供内容・バリエーション・構成品・対象アレルゲンの範囲', { exact: true }).fill('架空の全構成品・全品目');
+    const checkedLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    await a.page.getByLabel('食品根拠を確認した日時', { exact: true }).fill(checkedLocal);
     // 小さなPNGを今回の店舗IDのパスへだけアップロードする。
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=', 'base64');
     await a.page.locator('input[type=file]').setInputFiles({ name: 'test-fixture.png', mimeType: 'image/png', buffer: png });
@@ -174,7 +179,7 @@ try {
     assert.equal(await deleteButton.isDisabled(), true);
     await deleteButton.evaluate(button => { button.click(); button.click(); });
     releaseDelete();
-    await a.page.getByRole('alert').filter({ hasText: '削除に失敗しました' }).waitFor();
+    await a.page.getByRole('alert').filter({ hasText: '削除結果を確認できません' }).waitFor();
     assert.equal(deleteRequests, 1);
     assert.equal(await deleteButton.isEnabled(), true);
     assert.equal(await menuSearch.inputValue(), savedMenuName);
@@ -202,7 +207,11 @@ try {
     process.exitCode = 1;
 } finally {
     if (ownerContext) for (const id of cleanupMenus) {
-        const response = await ownerContext.request.delete(base + '/api/admin/menus/' + id, { headers: { Origin: base } });
+        const current = await ownerContext.request.get(base + '/api/admin/menus/' + id);
+        if (current.status() === 404) continue;
+        if (current.status() !== 200) { console.error('Test menu cleanup could not read the current version'); process.exitCode = 1; continue; }
+        const saved = await current.json();
+        const response = await ownerContext.request.delete(base + '/api/admin/menus/' + id, { headers: { Origin: base }, data: { expectedVersion: saved.menu.version } });
         if (response.status() !== 200) { console.error('Test menu cleanup did not succeed'); process.exitCode = 1; }
     }
     await browser.close();

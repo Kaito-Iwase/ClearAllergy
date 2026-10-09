@@ -3,7 +3,11 @@
 // どちらも requireShopId() を通し、ログイン中の店舗だけを対象にします。
 
 import { Hono } from "hono";
-import { handleUnhandledApiError } from "@/lib/observability";
+import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
+import { foodSnapshot } from "../food-review";
+import { saveFoodReview, validFoodReviewTime, flushMenuPublicationChecks } from "./food-review-save";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/lib/auth/admin-api-utils";
@@ -37,6 +41,11 @@ import {
 import { menuInputSchema } from "@/features/admin/menus/schemas/menu-input";
 
 const app = new Hono();
+function creationReplay(shopId: string, menuId: string) {
+    try { revalidatePublicMenuPaths(shopId, menuId); }
+    catch (error) { logOperationalError(error, { operation: "public_menu_refresh_after_commit" }); return NextResponse.json({ id: menuId, publicRefreshPending: true }, { status: 201 }); }
+    return NextResponse.json({ id: menuId }, { status: 201 });
+}
 app.onError(handleUnhandledApiError);
 
 // GET は保存済みメニュー一覧の取得です。
@@ -66,6 +75,7 @@ app.get("/api/admin/menus", async () => {
                 imagePositionX: true,
                 imagePositionY: true,
                 isPublished: true,
+                version: true,
                 updatedAt: true,
             },
         });
@@ -94,6 +104,8 @@ app.post("/api/admin/menus", async (c) => {
     const req = c.req.raw;
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
+    let operationId: string | undefined;
+    let requestHash: string | undefined;
     try {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
@@ -120,6 +132,14 @@ app.post("/api/admin/menus", async (c) => {
             );
         }
         const body = parsedBody.data;
+        operationId = body.operationId;
+        requestHash = createHash("sha256").update(JSON.stringify({ ...body, operationId: undefined })).digest("hex");
+        if (!validFoodReviewTime(body.foodReview)) return NextResponse.json({ error: "食品確認日時は現在より5分を超える未来には指定できません。" }, { status: 400 });
+
+        if (operationId) {
+            const replay = await prisma.menuItem.findFirst({ where: { shopId: auth.shopId, creationOperationId: operationId }, select: { id: true, creationRequestHash: true } });
+            if (replay) return replay.creationRequestHash === requestHash ? creationReplay(auth.shopId, replay.id) : NextResponse.json({ error: "同じ作成操作で異なる入力を再送できません。保存済みのメニューを確認してください。" }, { status: 409 });
+        }
 
 
         // 下書き作成では、名前未入力でも既定タイトルで進められるようにします。
@@ -207,6 +227,7 @@ app.post("/api/admin/menus", async (c) => {
         }
 
         if (isPublished) {
+            if (!body.foodReview || body.foodReview.unresolvedIssues) return NextResponse.json({ error: "公開するには未解決事項のない食品確認記録が必要です。" }, { status: 400 });
             // 公開時だけは、サーバー側で必須条件を必ず再確認します。
             // UI が壊れても API 直打ちでも、この壁を越えない限り公開できません。
             const publishErrors = getMenuPublishValidationErrors({
@@ -239,13 +260,15 @@ app.post("/api/admin/menus", async (c) => {
             const menu = await tx.menuItem.create({
                 data: {
                     shopId: auth.shopId,
+                    creationOperationId: operationId,
+                    creationRequestHash: operationId ? requestHash : undefined,
                     name,
                     description,
                     priceYen: priceResult.value,
                     category,
                     ingredients,
                     precaution,
-                    isPublished,
+                    isPublished: false,
                     imageUrl: imageUrlResult.value,
                     imageFrame,
                     imageFit,
@@ -268,7 +291,12 @@ app.post("/api/admin/menus", async (c) => {
                 })),
             });
 
-            return menu;
+            if (body.foodReview) await saveFoodReview(tx, { menuId: menu.id, shopId: auth.shopId, actorUserId: auth.appUser.id,
+                review: body.foodReview, snapshot: foodSnapshot({ name, description, category, ingredients, precaution, imageUrl: imageUrlResult.value }, allergens, completeAllergenMap) });
+            if (isPublished) await tx.menuItem.update({ where: { id: menu.id, shopId: auth.shopId }, data: { isPublished: true } });
+            await flushMenuPublicationChecks(tx);
+
+            return tx.menuItem.findFirstOrThrow({ where: { id: menu.id, shopId: auth.shopId }, select: { id: true, isPublished: true } });
         });
 
         await writeAdminAuditLog({
@@ -280,19 +308,23 @@ app.post("/api/admin/menus", async (c) => {
             targetId: created.id,
             success: true,
             metadata: {
-                isPublished,
+                isPublished: created.isPublished,
                 hasImage: Boolean(imageUrlResult.value),
             },
         });
 
-        if (isPublished) {
+        try { if (created.isPublished) {
             revalidatePublicMenuPaths(auth.shopId, created.id);
         } else {
             revalidatePublicShopPaths(auth.shopId);
-        }
+        } } catch (error) { logOperationalError(error, { operation: "public_menu_refresh_after_commit" }); return NextResponse.json({ id: created.id, publicRefreshPending: true }, { status: 201 }); }
 
         return NextResponse.json({ id: created.id }, { status: 201 });
     } catch (e) {
+        if (operationId && auditShopId && e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+            const replay = await prisma.menuItem.findFirst({ where: { shopId: auditShopId, creationOperationId: operationId }, select: { id: true, creationRequestHash: true } });
+            if (replay) return replay.creationRequestHash === requestHash ? creationReplay(auditShopId, replay.id) : NextResponse.json({ error: "同じ作成操作で異なる入力を再送できません。" }, { status: 409 });
+        }
         if (auditShopId) {
             await writeAdminAuditLog({
                 req,

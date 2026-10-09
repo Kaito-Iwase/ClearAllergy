@@ -80,13 +80,13 @@
         <mxCell id="public-server-title" value="公開ページ / Server Component" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#1e40af;fontStyle=1;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="500" y="249" width="490" height="28" as="geometry" />
         </mxCell>
-        <mxCell id="public-server-line-0" value="Prismaで公開データを取得" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="public-server-line-0" value="アクセスごとに同じDB時点で取得" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="500" y="280" width="490" height="25" as="geometry" />
         </mxCell>
         <mxCell id="public-server-line-1" value="公開条件を満たす情報を画面へ渡す" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="500" y="304" width="490" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="public-server-line-2" value="再検証の設定・更新時のキャッシュ無効化" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="public-server-line-2" value="食品情報のページキャッシュを使わない" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=19;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="500" y="328" width="490" height="25" as="geometry" />
         </mxCell>
         <mxCell id="allergen-rules" value="" style="rounded=1;arcSize=12;absoluteArcSize=1;fillColor=#ecfdf5;strokeColor=#6ee7b7;strokeWidth=1.5;" vertex="1" parent="1">
@@ -113,7 +113,7 @@
         <mxCell id="admin-api-line-0" value="Clerkセッション・店舗所有権・更新権限を確認" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="500" y="680" width="490" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="admin-api-line-1" value="入力検証・公開条件の確認" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="admin-api-line-1" value="入力・版・食品確認・公開条件" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="500" y="704" width="490" height="25" as="geometry" />
         </mxCell>
         <mxCell id="admin-api-line-2" value="店舗・メニュー・招待・画像の処理" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
@@ -161,10 +161,10 @@
         <mxCell id="postgres-title" value="PostgreSQL / Neonを想定" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#5b21b6;fontStyle=1;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="1210" y="799" width="300" height="28" as="geometry" />
         </mxCell>
-        <mxCell id="postgres-line-0" value="店舗・メニュー・品目・招待・監査" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="postgres-line-0" value="店舗・メニュー・品目・確認記録" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="1210" y="830" width="300" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="postgres-line-1" value="公開制約トリガー・一意制約" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="postgres-line-1" value="招待・監査・公開制約・版管理" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="1210" y="854" width="300" height="25" as="geometry" />
         </mxCell>
         <mxCell id="public-request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#2563eb;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="public-ui" target="public-server">

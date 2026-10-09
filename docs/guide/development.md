@@ -143,7 +143,7 @@ node scripts/browser-runner.mjs ui
 
 `node scripts/browser-runner.mjs demo` は公開画面と保存しない管理デモ、`node scripts/browser-runner.mjs admin` は専用環境の管理操作を確認します。後者はDB・開発用Clerk・Blobへの書込を伴い、専用アカウントと保存先の許可が必要です。ランナーの準備だけで認証情報やテストデータが作られるわけではありません。
 
-`node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォームを、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。320／390／768／1440pxの品目名・状態別件数・対象範囲・注意書き全文、個人設定とMAY_CONTAIN除外、補足元の非公開化、混在するUNKNOWN、新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスを確認します。既存TypeScriptとNext同梱webpackを使用し、依存を追加しません。Nextのリンク・画像・navigationだけをfixture用に置き換えるため、実ルート・公開データ取得・認証・保存・アップロードの確認とは区別します。ブラウザの外部通信を遮断し、保存操作は行いません。
+`node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォームを、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。320／390／768／1440pxの品目名・状態別件数・対象範囲・注意書き全文、個人設定とMAY_CONTAIN除外、補足元の非公開化、混在するUNKNOWN、新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスを確認します。食品確認の必須欄・履歴、保存競合時の入力保持、保存成功と公開反映失敗の表示、不正な成功DTO・作成IDと通信断、送信中の独自画像gestureによる変更拒否も確認します。既存TypeScriptとNext同梱webpackを使用し、依存を追加しません。Nextのリンク・画像・navigationと保存APIの応答をfixture用に置き換えるため、実ルート・公開データ取得・認証・DB保存・アップロードの確認とは区別します。ブラウザの外部通信を遮断し、保存操作で実DBやBlobへ書き込みません。
 
 `node scripts/browser-runner.mjs composition` は画像構図の実コンポーネントを一時ディレクトリでコンパイルし、使い捨てのloopbackサーバーで検証します。事前にアプリのビルド済みCSS（`.next/static/chunks`）と隔離ブラウザランナーが必要です。アプリ・DBの起動やClerk／Blobのキーは不要。新規依存は導入せず、既存TypeScript・Next同梱webpack・sharpを使用します。写真の目印の画素が指／マウスの方向に動くこと、拡大・余白・両プレビュー・端・元画像比較・390pxのタッチ／ピンチを確認し、終了時にブラウザとサーバーを閉じます。実管理画面での画像アップロードや保存の検証とは別です。
 
@@ -208,7 +208,23 @@ API障害はレスポンスの `X-Request-Id` から `request_completed` / `oper
 
 招待の外部処理が失敗した場合は、取消済みで外部IDが残る行の再試行を先に検討します。結果不明や補償取消失敗では対象のClerk招待とDBを運営者が照合し、受諾済み状態や店舗所有者を古い要求で戻しません。監査の成功は記録したDB操作の成功であり、メール配送やClerkとの完全一致の証明ではありません。
 
-復旧では既知の正常SHAへのアプリの切戻しとDB復元を分けます。アプリを戻しても適用済みmigrationや変更データは戻りません。Neonのバックアップ保持・復元先・復元権限を確認し、復元訓練は許可された隔離DBで実施します。本番リセットや逆向きSQLを即席で実行しません。今回の改善では新規migrationはありません。
+復旧では既知の正常SHAへのアプリの切戻しとDB復元を分けます。アプリを戻しても適用済みmigrationや変更データは戻りません。Neonのバックアップ保持・復元先・復元権限を確認し、復元訓練は許可された隔離DBで実施します。本番リセットや逆向きSQLを即席で実行しません。
+
+### 食品確認記録の移行と検証
+
+`20261009000000_menu_food_review` は編集版・食品版・確認対応版・作成操作IDを `MenuItem` に追加し、`MenuFoodReview` とDBトリガーを作成します。記録をUIだけに持つ方式では別端末・直接DB更新・再読込に対応できないためDBに保存します。既存レコードは確認済みとして補完せず、公開中も一旦停止します。移行前に許可された環境のバックアップ、停止対象、再確認担当、停止告知と公開キャッシュの更新を準備してください。本番適用はこの作業では実施していません。
+
+API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで428となります。切戻しで記録や新列を即座に削除せず、書込・公開を停止して証拠を保持し、適用済みトリガーとの互換性を確認します。旧公開フラグの一括復元や旧確認の自動復活は行わず、再確認したメニューだけを公開します。逆向きmigration・本番復元は別の承認済み作業として準備します。
+
+`scripts/food-review-fixture.ts` はCI／専用テスト接続ガードを通る架空メニューだけに、実食品の証拠ではない旨を記した合成記録を作ります。通常seedや既存実データへは適用しません。通常seedの公開フラグだけでは新条件を満たさず、DBで停止されます。既存の専用テストデータも移行で停止するので、内容を照合して専用fixtureを準備してください。
+
+`node --import tsx scripts/check-public-read-snapshot.ts` はCI専用接続ガード付きDBと架空fixtureを使い、一時loopback TCPプロキシで実Prismaの子SELECTを止め、別接続の食品訂正を確定してから解放します。旧食品＋新FREEが混ざる反例と、本番用 `readPublicSnapshot` のRepeatableReadで旧食品＋旧CONTAINSを維持すること、次の取得で停止を反映することを検査します。SQLの結果や時刻をmockする検査ではありません。プロキシ・Prisma接続を閉じ、今回作った店舗だけを削除します。schema/migrationは変更しません。既存の公開データ取得が複数SQLに分かれても、全4入口と補足を同じtransaction clientへ揃えます。`tests/public-read-snapshot.test.ts` はtransaction完了不能と通常処理エラーの区別、既存取得不能表示への受渡しを代用品で検査します。
+
+`scripts/food-review-database-regression.ts` と `scripts/admin-menu-database-regression.ts` は、競合保存・古い全体フォーム・直接DB更新・記録失敗の巻戻し・マスタ変更・公開停止・キャッシュ例外・作成再送を検査します。確認記録の直接INSERTによる未解決事項の追加、過去／未来版の拒否、DB生成snapshotと日時、訂正ロック待ち後の古い確認拒否も検査します。入口は上記の `check-test-database.ts` / `check-ci-database.ts` です。独立の `check-owned-menu-database.ts` も最終版を送り、所有店舗条件を検査します。実認証の `check-test-browser.mjs` は新規確認欄と版付きcleanupに対応していますが、実Clerk・Blobの書込を伴うので今回未実行です。合成記録と成功した検査は、実食品の正確性や現場運用を実証しません。今回の結果は[食品確認記録の検証](../verification/menu-food-review-20261009.md)に記録します。
+
+`node --import tsx scripts/check-food-review-migration.ts` は空の使い捨てCI DBだけで、旧migration→架空の旧公開データ→新migration→再適用を検査します。既存DBをリセットせず、空でなければ停止します。接続ガードは `check-ci-database.ts` と同じです。実Clerk・Blobを使わず、実行先には合成データが残るため、専用コンテナ等を作業後に停止してください。
+
+`node --import tsx scripts/check-publication-propagation.ts` は起動済みの本番buildと架空CI DBで、公開ページを取得した後の食品変更・停止をHTTPで検査します。`CLEARALLERGY_BROWSER_BASE_URL` はHTTPのlocalhost／127.0.0.1だけ（既定は127.0.0.1:3102）、DBはCI接続ガードが必須です。アプリのDBも同じ専用DBにしてください。作成する検査店舗だけを最後に削除し、`CLEARALLERGY_BROWSER_OUTPUT` に `propagation.json` を保存します。任意の `PLAYWRIGHT_MODULE_PATH` と `PLAYWRIGHT_BROWSERS_PATH` に準備済みの隔離ランナーを指定すると、390pxの実ブラウザで停止メニューがnot-found画面になることも検査し画像を保存します。外部通信は遮断します。Clerk・Blobは使わず、既に開いたブラウザへの訂正到達を保証する検査ではありません。
 
 構造化ログは追加しましたが、通知先へのアラート配送やブラウザ例外収集は未導入です。既存配備ログの通知・保持で不足するかを確認してから、Sentry等の料金、担当人数、ソースマップの非公開管理、個人情報除去、通知試験を判断します。Replayや全要求トレースを一律に収集する構成ではありません。
 

@@ -30,6 +30,8 @@ function makeMenu(overrides: Record<string, unknown> = {}) {
         imagePositionX: null,
         imagePositionY: null,
         isPublished: true,
+        foodVersion: 1,
+        reviewedFoodVersion: 1,
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
         updatedAt: new Date("2026-01-01T00:00:00.000Z"),
         allergenLinks: allergenRows.map((allergen) => ({
@@ -64,10 +66,16 @@ function stubPrisma(
         findMany: QueryMethod;
     };
     const originals = {
+        transaction: prisma.$transaction,
         findMenu: menuDelegate.findFirst,
         findAllergens: allergenDelegate.findMany,
         findStoreMenus: linkDelegate.findMany,
     };
+
+    prisma.$transaction = (async (read: (tx: typeof prisma) => Promise<unknown>, options: { isolationLevel: string }) => {
+        assert.equal(options.isolationLevel, "RepeatableRead");
+        return read(prisma);
+    }) as unknown as typeof prisma.$transaction;
 
     menuDelegate.findFirst = handlers.findMenu;
     allergenDelegate.findMany =
@@ -75,6 +83,7 @@ function stubPrisma(
     linkDelegate.findMany = handlers.findStoreMenus ?? (async () => []);
 
     t.after(() => {
+        prisma.$transaction = originals.transaction;
         menuDelegate.findFirst = originals.findMenu;
         allergenDelegate.findMany = originals.findAllergens;
         linkDelegate.findMany = originals.findStoreMenus;
@@ -84,6 +93,18 @@ function stubPrisma(
 async function requestMenu() {
     return GET(new Request("http://localhost/api/menus/menu-1"));
 }
+
+test("公開APIは記録なし・旧版の確認では公開せず、私的な根拠記録を返さない", async (t) => {
+    let reviewedFoodVersion: number | null = null;
+    stubPrisma(t, { findMenu: async () => makeMenu({ reviewedFoodVersion, foodReviews: [{ evidenceRefs: "private evidence" }] }) });
+    for (const value of [null, 0]) { reviewedFoodVersion = value; assert.equal((await requestMenu()).status, 404); }
+    reviewedFoodVersion = 1;
+    const response = await requestMenu();
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.menu.foodReviews, undefined);
+    assert.equal(body.menu.reviewedFoodVersion, undefined);
+});
 
 test("公開APIは稼働店舗の公開可能メニューだけを返す", async (t) => {
     stubPrisma(t, {

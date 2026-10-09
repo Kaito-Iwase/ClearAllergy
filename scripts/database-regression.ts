@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
 import { runAdminMenuDatabaseRegression } from "./admin-menu-database-regression";
+import { publishReviewedFixture } from "./food-review-fixture";
+import { runFoodReviewDatabaseRegression } from "./food-review-database-regression";
 
 // Call only after the entry point's dedicated DB guard. No Clerk/Blob or shared
 // master changes: all writes and cleanup belong to shops created by this run.
@@ -34,6 +36,7 @@ export async function runDatabaseRegression(db: PrismaClient) {
         const full = await db.$transaction(async (tx) => {
             const menu = await tx.menuItem.create({ data: { shopId, name: "完全な架空登録", isPublished: true } });
             await tx.menuItemAllergen.createMany({ data: links(menu.id) });
+            await publishReviewedFixture(tx, menu.id);
             return menu;
         });
         assert.equal(await published(full.id), true);
@@ -43,8 +46,8 @@ export async function runDatabaseRegression(db: PrismaClient) {
             await tx.menuItemAllergen.deleteMany({ where: { menuItemId: full.id } });
             await tx.menuItemAllergen.createMany({ data: links(full.id) });
         });
-        assert.equal(await published(full.id), true);
-        pass("replacing all allergen links in one transaction does not unpublish a complete menu");
+        assert.equal(await published(full.id), false);
+        pass("replacing allergen links invalidates the food review even if input remains complete");
 
         await db.menuItemAllergen.update({ where: { menuItemId_allergenId: { menuItemId: full.id, allergenId: master[0].id } }, data: { status: "UNKNOWN" } });
         assert.equal(await published(full.id), false);
@@ -52,7 +55,7 @@ export async function runDatabaseRegression(db: PrismaClient) {
 
         await db.$transaction(async (tx) => {
             await tx.menuItemAllergen.update({ where: { menuItemId_allergenId: { menuItemId: full.id, allergenId: master[0].id } }, data: { status: "FREE" } });
-            await tx.menuItem.update({ where: { id: full.id }, data: { isPublished: true } });
+            await publishReviewedFixture(tx, full.id);
         });
         assert.equal(await published(full.id), true);
         await db.menuItemAllergen.delete({ where: { menuItemId_allergenId: { menuItemId: full.id, allergenId: master[0].id } } });
@@ -115,6 +118,7 @@ export async function runDatabaseRegression(db: PrismaClient) {
         }
 
         await runAdminMenuDatabaseRegression(db, shopIds, run, master);
+        await runFoodReviewDatabaseRegression(db, shopId, master);
 
         const inviteData = { email: `db-regression-${run}@example.invalid`, shopId, invitedByClerkUserId: "fixture-operator" };
         const pending = await db.adminInvite.create({ data: inviteData });

@@ -5,6 +5,9 @@
 
 import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
+import MenuFoodReviewFields from "./MenuFoodReviewFields";
+import { emptyFoodReviewDraft, foodReviewDraftComplete } from "../food-review";
+import { menuCreateResponseSchema } from "../schemas/menu-response";
 import { useRouter } from "next/navigation";
 import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
 import {
@@ -42,8 +45,6 @@ type Allergen = {
     sortOrder: number;
 };
 
-type CreateMenuResponse = { id: string } | { error: string; message?: string };
-
 type UploadResponse = {
     url?: string;
     pathname?: string;
@@ -51,7 +52,7 @@ type UploadResponse = {
 };
 
 const CREATE_ERROR_MESSAGE =
-    "作成に失敗しました。時間をおいてもう一度お試しください。";
+    "作成結果を確認できません。保存済みのメニューがないか確認してください。";
 const UPLOAD_ERROR_MESSAGE =
     "画像のアップロードに失敗しました。時間をおいてもう一度お試しください。";
 
@@ -105,11 +106,15 @@ export default function NewMenuForm({
     const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [nameInvalid, setNameInvalid] = React.useState(false);
+    const [foodReview, setFoodReview] = React.useState(emptyFoodReviewDraft);
+    const [recordingReview, setRecordingReview] = React.useState(false);
+    const creationOperation = React.useRef<string | null>(null);
+    const uploadedFile = React.useRef<{ file: File; url: string } | null>(null);
     const unknownAllergenNames = React.useMemo(
         () => getUnknownAllergenNames({ allergens, statusBySlug }),
         [allergens, statusBySlug],
     );
-    const canPublish = unknownAllergenNames.length === 0;
+    const canPublish = unknownAllergenNames.length === 0 && recordingReview && foodReviewDraftComplete(foodReview);
     const allergenRows = React.useRef(new Map<string, HTMLDivElement>());
     function findNextUnknown() {
         const next = allergens.find((allergen) => (statusBySlug[allergen.slug] ?? "UNKNOWN") === "UNKNOWN");
@@ -121,7 +126,7 @@ export default function NewMenuForm({
     }
     const currentDraft = JSON.stringify({ name, description, priceYenInput, category, ingredients, precaution,
         imageUrl, imageFrame, imageFit, imagePosition, imageZoom, imagePositionX, imagePositionY,
-        isPublished, statusBySlug });
+        isPublished, statusBySlug, foodReview, recordingReview });
     const [initialDraft] = React.useState(currentDraft);
     const [created, setCreated] = React.useState(false);
     const confirmLeave = useUnsavedMenuChanges(!created && (currentDraft !== initialDraft || selectedFile !== null));
@@ -147,7 +152,7 @@ export default function NewMenuForm({
         if (!isPublished && !canPublish) {
             setIsPublished(false);
             setError(
-                `公開するにはアレルゲン${allergens.length}品目を確定してください。未設定: ${unknownAllergenNames.length}件`,
+                unknownAllergenNames.length ? `公開するにはアレルゲン${allergens.length}品目を確定してください。未設定: ${unknownAllergenNames.length}件` : "公開するには、食品確認記録と未解決事項の解消が必要です。",
             );
             return;
         }
@@ -182,6 +187,7 @@ export default function NewMenuForm({
         if (!selectedFile) {
             return normalizeOptionalMenuText(imageUrl);
         }
+        if (uploadedFile.current?.file === selectedFile) return uploadedFile.current.url;
 
         setUploading(true);
 
@@ -210,6 +216,7 @@ export default function NewMenuForm({
             }
 
             setImageUrl(data.url);
+            uploadedFile.current = { file: selectedFile, url: data.url };
             return data.url;
         } finally {
             setUploading(false);
@@ -237,6 +244,9 @@ export default function NewMenuForm({
         }
 
         const reviewMessage = getMenuReviewMessage({ name, willPublish: isPublished, ingredientsChanged: false });
+        if (recordingReview && (!foodReview.evidenceRefs.trim() || !foodReview.scope.trim() || !Number.isFinite(Date.parse(foodReview.checkedAt)))) {
+            setError("根拠資料・確認範囲・確認日時を入力してください。"); return;
+        }
         if (reviewMessage && !window.confirm(reviewMessage)) return;
         setIsSubmitting(true);
 
@@ -245,6 +255,8 @@ export default function NewMenuForm({
             const uploadedImageUrl = await uploadSelectedImage();
 
             const body = {
+                operationId: creationOperation.current ??= crypto.randomUUID(),
+                ...(recordingReview ? { foodReview: { ...foodReview, checkedAt: new Date(foodReview.checkedAt).toISOString() } } : {}),
                 name: trimmed,
                 description: normalizeOptionalMenuText(description),
                 priceYen,
@@ -267,24 +279,23 @@ export default function NewMenuForm({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
-            });
+            }).catch(() => { throw new Error(CREATE_ERROR_MESSAGE); });
 
             if (!res.ok) {
                 setError(await getApiErrorMessage(res, CREATE_ERROR_MESSAGE));
                 return;
             }
 
-            const data = (await res.json().catch(() => null)) as
-                | CreateMenuResponse
-                | null;
-
-            if (!data || !("id" in data)) {
+            const result = menuCreateResponseSchema.safeParse(await res.json().catch(() => null));
+            if (!result.success) {
                 setError(CREATE_ERROR_MESSAGE);
                 return;
             }
+            const data = result.data;
 
             // 作成成功後は、そのメニューの編集画面へそのまま移動します。
             setCreated(true);
+            if (data.publicRefreshPending) window.alert("作成は完了しましたが、公開表示の更新処理が未完了です。再作成せず公開表示を確認してください。");
             router.push(`/admin/menus/${data.id}/edit`);
         } catch (err) {
             setError(getThrownErrorMessage(err, CREATE_ERROR_MESSAGE));
@@ -311,21 +322,21 @@ export default function NewMenuForm({
                         <button
                             type="button"
                             onClick={togglePublished}
-                            aria-pressed={isPublished}
+                            aria-pressed={isPublished && canPublish}
                             disabled={
                                 (readOnly && !readOnlyPreview) ||
                                 isSubmitting ||
                                 uploading
                             }
                             className={`min-h-11 w-full rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto ${
-                                isPublished
+                                isPublished && canPublish
                                     ? "bg-green-600"
                                     : canPublish
                                       ? "bg-gray-900"
                                       : "bg-amber-600"
                             }`}
                         >
-                            {isPublished ? "登録時に公開する" : canPublish ? "非公開の下書きとして登録する" : "未設定があるため公開不可"}
+                            {canPublish ? isPublished ? "登録時に公開する" : "非公開の下書きとして登録する" : "登録時は非公開（アレルゲン設定・食品確認が必要）"}
                             {readOnly ? "（デモ）" : ""}
                         </button>
 
@@ -522,6 +533,7 @@ export default function NewMenuForm({
                             imagePositionY,
                         }}
                         onChange={(next) => {
+                            if (isSubmitting || uploading) return;
                             if (next.imageFrame) setImageFrame(next.imageFrame);
                             if (next.imageFit) setImageFit(next.imageFit);
                             if (next.imagePosition) {
@@ -554,6 +566,7 @@ export default function NewMenuForm({
                     totalAllergenCount={allergens.length}
                     onFindUnknown={findNextUnknown}
                 />
+                <MenuFoodReviewFields value={foodReview} onChange={setFoodReview} recording={recordingReview} onRecordingChange={setRecordingReview} current={false} />
                 <MenuAllergenRegistrationGuide />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">

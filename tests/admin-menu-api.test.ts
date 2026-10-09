@@ -35,7 +35,10 @@ type Args = { where?: Record<string, unknown>; data?: Record<string, unknown> };
 function replace(t: TestContext, target: object, key: string, value: unknown) {
     const delegate = target as Record<string, unknown>;
     const old = delegate[key];
-    delegate[key] = value;
+    delegate[key] = target === prisma.menuItem && key === "findFirst" ? async (...args: unknown[]) => {
+        const result = await (value as (...args: unknown[]) => Promise<Record<string, unknown> | null>)(...args);
+        return result ? { version: 0, foodVersion: 0, reviewedFoodVersion: null, ...result } : result;
+    } : value;
     t.after(() => { delegate[key] = old; });
 }
 function setup(t: TestContext) {
@@ -64,6 +67,10 @@ function setup(t: TestContext) {
     replace(t, prisma, "$transaction", async () => { assert.fail("Unexpected database write"); });
 }
 function request(method: string, path = "/api/admin/menus/foreign-menu", body?: string, origin = "http://localhost") {
+    if (method === "DELETE" && body === undefined) body = '{"expectedVersion":0}';
+    if (method === "PUT" && body) {
+        try { const parsed = JSON.parse(body); if (parsed && !Array.isArray(parsed) && typeof parsed === "object") body = JSON.stringify({ expectedVersion: 0, ...parsed }); } catch { /* Keep invalid JSON. */ }
+    }
     return new Request(`http://localhost${path}`, {
         method,
         headers: { Origin: origin, "Content-Type": "application/json" },
@@ -112,7 +119,29 @@ test("壊れたJSON・不正な型は下書きを作らず400で拒否する", a
 
 test("未入力アレルゲンの公開要求は保存前に400で拒否する", async (t) => {
     setup(t);
-    assert.equal((await menusRoute.POST(request("POST", "/api/admin/menus", '{"name":"未確認","isPublished":true}'))).status, 400);
+    const response = await menusRoute.POST(request("POST", "/api/admin/menus", JSON.stringify({ name: "未確認", isPublished: true,
+        foodReview: { evidenceRefs: "架空資料 v1", scope: "架空の全対象", checkedAt: "2026-10-08T00:00:00Z" },
+    })));
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /未設定|入力/);
+});
+
+test("全状態を入力しても食品確認記録なし・未解決事項ありの新規公開は拒否する", async (t) => {
+    setup(t);
+    const base = { name: "架空", isPublished: true, allergenStatusBySlug: Object.fromEntries(ALLERGEN_MASTER.map(a => [a.slug, "FREE"])) };
+    for (const foodReview of [undefined, { evidenceRefs: "架空資料 v1", scope: "架空の全対象", checkedAt: "2026-10-08T00:00:00Z", unresolvedIssues: "未照合の別添" }]) {
+        const response = await menusRoute.POST(request("POST", "/api/admin/menus", JSON.stringify({ ...base, foodReview })));
+        assert.equal(response.status, 400);
+        assert.match((await response.json()).error, /食品確認記録|未解決/);
+    }
+});
+
+test("食品確認の不足・不正日時・5分を超える未来は書込前に拒否する", async (t) => {
+    setup(t);
+    const review = { evidenceRefs: "架空資料 v1", scope: "架空の全対象", checkedAt: "2026-10-08T00:00:00Z" };
+    for (const foodReview of [{ ...review, evidenceRefs: " " }, { ...review, scope: "" }, { ...review, checkedAt: "invalid" }, { ...review, checkedAt: new Date(Date.now() + 10 * 60_000).toISOString() }]) {
+        assert.equal((await menusRoute.POST(request("POST", "/api/admin/menus", JSON.stringify({ foodReview })))).status, 400);
+    }
 });
 
 test("別originからの更新要求は認証・DB処理の前に拒否する", async (t) => {
@@ -121,11 +150,32 @@ test("別originからの更新要求は認証・DB処理の前に拒否する", 
     assert.equal((await menuRoute.PUT(request("PUT", undefined, "{}", "https://other.example"))).status, 403);
 });
 
+test("PUTとDELETEは版なしを428、古い版を409で拒否して書き込まない", async (t) => {
+    setup(t);
+    replace(t, prisma.menuItem, "findFirst", async () => ({ id: "own-menu", name: "newer", version: 7, isPublished: false, allergenLinks: [] }));
+    for (const method of ["PUT", "DELETE"] as const) {
+        const raw = new Request("http://localhost/api/admin/menus/own-menu", { method, headers: { Origin: "http://localhost", "Content-Type": "application/json" }, body: "{}" });
+        assert.equal((await menuRoute[method](raw)).status, 428);
+        assert.equal((await menuRoute[method](request(method, "/api/admin/menus/own-menu", '{"expectedVersion":6}'))).status, 409);
+    }
+    assert.equal((await menuRoute.DELETE(new Request("http://localhost/api/admin/menus/own-menu", { method: "DELETE", headers: { Origin: "http://localhost" } }))).status, 428);
+});
+
+test("STOPは未認証・他店舗・異なるOriginを拒否する", async (t) => {
+    setup(t);
+    replace(t, prisma.menuItem, "update", async () => { throw recordNotFound(); });
+    assert.equal((await menuRoute.STOP(request("POST", "/api/admin/menus/foreign-menu/stop"))).status, 404);
+    assert.equal((await menuRoute.STOP(request("POST", "/api/admin/menus/foreign-menu/stop", undefined, "https://other.example"))).status, 403);
+    clerkUserId = null;
+    assert.equal((await menuRoute.STOP(request("POST", "/api/admin/menus/foreign-menu/stop"))).status, 401);
+});
+
 test("空objectの下書きは所有店舗に作成し、欠損状態をすべてUNKNOWNで保存する", async (t) => {
     setup(t);
     let savedLinks: { status: string }[] = [];
     replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
-        menuItem: { create: async ({ data }: Args) => {
+        $executeRaw: async () => 0,
+        menuItem: { findFirstOrThrow: async () => ({ id: "new-menu", isPublished: false }), create: async ({ data }: Args) => {
             assert.equal(data?.shopId, "own-shop");
             assert.equal(data?.isPublished, false);
             return { id: "new-menu" };
@@ -150,11 +200,12 @@ test("公開メニューを部分更新してUNKNOWNにすると、保存結果�
     });
     let storedPublication: unknown;
     replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
+        $executeRaw: async () => 0,
         menuItem: { update: async ({ where, data }: Args) => {
-            assert.deepEqual(where, { id: "own-menu", shopId: "own-shop" });
+            assert.deepEqual(where, { id: "own-menu", shopId: "own-shop", ...(where?.version !== undefined ? { version: 0 } : {}) });
             storedPublication = data?.isPublished;
-            return { id: "own-menu", isPublished: storedPublication };
-        } },
+            return { id: "own-menu", isPublished: storedPublication, version: 1, foodVersion: 1, reviewedFoodVersion: null };
+        }, findFirstOrThrow: async () => ({ id: "own-menu", isPublished: false, version: 2, foodVersion: 1, reviewedFoodVersion: null }) },
         menuItemAllergen: { deleteMany: async () => ({}), createMany: async () => ({}) },
     }));
     const response = await menuRoute.PUT(request("PUT", "/api/admin/menus/own-menu", JSON.stringify({
@@ -181,16 +232,9 @@ test("自店舗メニューの削除は店舗条件付きで実行し既存の�
         assert.deepEqual(where, { id: "own-menu", shopId: "own-shop" });
         return { id: "own-menu", isPublished: false };
     });
-    let deletedLinks = false;
     replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
-        menuItemAllergen: { deleteMany: async ({ where }: Args) => {
-            assert.deepEqual(where, { menuItemId: "own-menu" });
-            deletedLinks = true;
-            return { count: 1 };
-        } },
         menuItem: { delete: async ({ where }: Args) => {
-            assert.equal(deletedLinks, true);
-            assert.deepEqual(where, { id: "own-menu", shopId: "own-shop" });
+            assert.deepEqual(where, { id: "own-menu", shopId: "own-shop", version: 0 });
             return { id: "own-menu" };
         } },
     }));
@@ -213,6 +257,7 @@ function setupMenuMovedAfterRead(t: TestContext) {
     };
     replace(t, prisma.menuItem, "findFirst", async ({ where }: Args) => {
         assert.deepEqual(where, { id: "own-menu", shopId: "own-shop" });
+        if (state.shopId !== "own-shop") return null;
         state.shopId = "other-shop";
         return {
             id: "own-menu", name: state.name, isPublished: false,
@@ -280,7 +325,8 @@ for (const method of ["PUT", "DELETE"] as const) {
     test(`${method}: 事前取得後の店舗移転は404になり、成功監査・cache更新を行わない`, async (t) => {
         setup(t);
         t.mock.method(console, "error", () => {});
-        replace(t, prisma.menuItem, "findFirst", async () => ({
+        let reads = 0;
+        replace(t, prisma.menuItem, "findFirst", async () => ++reads > 1 ? null : ({
             id: "moved-menu", name: "original", priceYen: null, imageUrl: null, isPublished: true,
             allergenLinks: ALLERGEN_MASTER.map((a) => ({ allergen: { slug: a.slug }, status: "FREE" })),
         }));
@@ -309,7 +355,7 @@ for (const method of ["PUT", "DELETE"] as const) {
             id: "gone-menu", name: "original", priceYen: null, imageUrl: null, isPublished: false,
             allergenLinks: [],
         }));
-        replace(t, prisma, "$transaction", async () => { throw recordNotFound(); });
+        replace(t, prisma, "$transaction", async () => { replace(t, prisma.menuItem, "findFirst", async () => null); throw recordNotFound(); });
         const response = await menuRoute[method](request(method, "/api/admin/menus/gone-menu", method === "PUT" ? '{}' : undefined));
         assert.equal(response.status, 404);
         assert.deepEqual(await response.json(), { error: "menu not found" });

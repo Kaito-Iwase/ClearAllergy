@@ -403,7 +403,7 @@ export function getUnknownAllergenNames(args: {
 }
 
 export function getAllergenMasterValidationErrors(
-    allergens: Array<{ slug: string }>,
+    allergens: Array<{ slug: string; nameJa?: string }>,
 ): string[] {
     const expectedSlugs = ALLERGEN_MASTER.map((allergen) => allergen.slug);
     const expectedSlugSet = new Set(expectedSlugs);
@@ -427,9 +427,9 @@ export function getAllergenMasterValidationErrors(
     );
     const errors: string[] = [];
 
-    if (actualSlugs.length !== 29) {
+    if (actualSlugs.length !== expectedSlugs.length) {
         errors.push(
-            `アレルゲンマスタは29件必要です（現在${actualSlugs.length}件）。`,
+            `アレルゲンマスタは${expectedSlugs.length}件必要です（現在${actualSlugs.length}件）。`,
         );
     }
     if (duplicateSlugSet.size > 0) {
@@ -440,6 +440,10 @@ export function getAllergenMasterValidationErrors(
     }
     if (extraSlugs.length > 0) {
         errors.push(`余分なslug: ${extraSlugs.join("・")}`);
+    }
+    for (const allergen of allergens) {
+        const expected = ALLERGEN_MASTER.find(row => row.slug === allergen.slug);
+        if (expected && allergen.nameJa !== expected.nameJa) errors.push(`品目名不一致: ${allergen.slug}`);
     }
 
     return errors;
@@ -463,7 +467,7 @@ export function getMenuPublishValidationErrors(args: {
     );
     if (allergenMasterErrors.length > 0) {
         errors.push(
-            `アレルゲンマスタがコード上の29品目と一致しないため公開できません。${allergenMasterErrors.join(" ")}`,
+            `アレルゲンマスタがコード上の${ALLERGEN_MASTER.length}品目と一致しないため公開できません。${allergenMasterErrors.join(" ")}`,
         );
     }
 
@@ -489,6 +493,11 @@ export function isMenuPublishable(args: {
     statusBySlug: Record<string, AllergenStatus>;
 }) {
     return getMenuPublishValidationErrors(args).length === 0;
+}
+
+export function isFoodReviewCurrent(menu: { foodVersion?: number; reviewedFoodVersion?: number | null }) {
+    return typeof menu.foodVersion === "number" && Number.isSafeInteger(menu.foodVersion) && menu.foodVersion >= 0 &&
+        menu.reviewedFoodVersion !== null && menu.reviewedFoodVersion !== undefined && menu.reviewedFoodVersion === menu.foodVersion;
 }
 
 export type AllergenClassificationNotice = {

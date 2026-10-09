@@ -6,12 +6,13 @@ import { loadStoreAllergenSupplement } from "./storeAllergenSupplement";
 import { Hono } from "hono";
 import { NextResponse } from "next/server";
 import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
-import { prisma } from "@/lib/db";
+import { readPublicSnapshot } from "./public-read-snapshot";
 import {
     buildAllergenDisplayItems,
     buildAllergenRows,
     createStatusBySlug,
     isMenuPublishable,
+    isFoodReviewCurrent,
 } from "@/lib/allergens";
 import { validateStoredImageUrl } from "@/lib/storage/image-url-policy";
 import {
@@ -44,123 +45,127 @@ app.get("/api/menus/:menuId", async (c) => {
             );
         }
 
-        // 公開 API なので isPublished: true を条件に入れます。
-        const menu = await prisma.menuItem.findFirst({
-            where: {
-                id: menuId,
-                isPublished: true,
-                shop: {
-                    isActive: true,
+        return await readPublicSnapshot(async tx => {
+            // 公開 API なので isPublished: true を条件に入れます。
+            const menu = await tx.menuItem.findFirst({
+                where: {
+                    id: menuId,
+                    isPublished: true,
+                    shop: {
+                        isActive: true,
+                    },
                 },
-            },
-            select: {
-                id: true,
-                shopId: true,
-                name: true,
-                description: true,
-                priceYen: true,
-                category: true,
-                ingredients: true,
-                precaution: true,
-                imageUrl: true,
-                imageFrame: true,
-                imageFit: true,
-                imagePosition: true,
-                imageZoom: true,
-                imagePositionX: true,
-                imagePositionY: true,
-                isPublished: true,
-                createdAt: true,
-                updatedAt: true,
-                allergenLinks: {
-                    select: {
-                        status: true,
-                        allergen: {
-                            select: {
-                                slug: true,
+                select: {
+                    id: true,
+                    shopId: true,
+                    name: true,
+                    description: true,
+                    priceYen: true,
+                    category: true,
+                    ingredients: true,
+                    precaution: true,
+                    imageUrl: true,
+                    imageFrame: true,
+                    imageFit: true,
+                    imagePosition: true,
+                    imageZoom: true,
+                    imagePositionX: true,
+                    imagePositionY: true,
+                    isPublished: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    foodVersion: true,
+                    reviewedFoodVersion: true,
+                    allergenLinks: {
+                        select: {
+                            status: true,
+                            allergen: {
+                                select: {
+                                    slug: true,
+                                },
                             },
                         },
                     },
                 },
-            },
-        });
+            });
 
-        if (!menu) {
-            return NextResponse.json(
-                { error: "menu not found" },
-                { status: 404 },
-            );
-        }
+            if (!menu) {
+                return NextResponse.json(
+                    { error: "menu not found" },
+                    { status: 404 },
+                );
+            }
 
-        const allergenMaster = await prisma.allergen.findMany({
-            orderBy: { sortOrder: "asc" },
-            select: {
-                id: true,
-                slug: true,
-                nameJa: true,
-                nameEn: true,
-                sortOrder: true,
-            },
-        });
+            const allergenMaster = await tx.allergen.findMany({
+                orderBy: { sortOrder: "asc" },
+                select: {
+                    id: true,
+                    slug: true,
+                    nameJa: true,
+                    nameEn: true,
+                    sortOrder: true,
+                },
+            });
 
-        if (
-            !isMenuPublishable({
-                name: menu.name,
-                allergens: allergenMaster,
-                statusBySlug: createStatusBySlug(
-                    allergenMaster,
-                    menu.allergenLinks,
-                ),
-            })
-        ) {
-            return NextResponse.json(
-                { error: "menu not found" },
-                { status: 404 },
-            );
-        }
+            if (
+                !isFoodReviewCurrent(menu) || !isMenuPublishable({
+                    name: menu.name,
+                    allergens: allergenMaster,
+                    statusBySlug: createStatusBySlug(
+                        allergenMaster,
+                        menu.allergenLinks,
+                    ),
+                })
+            ) {
+                return NextResponse.json(
+                    { error: "menu not found" },
+                    { status: 404 },
+                );
+            }
 
-        const storeHandledAllergenSlugs = await loadStoreAllergenSupplement(menu.shopId, allergenMaster);
+            const storeHandledAllergenSlugs = await loadStoreAllergenSupplement(menu.shopId, allergenMaster, tx);
 
-        // 現行マスタを基準に正規化し、欠損しているリンクも UNKNOWN として返します。
-        const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
-        const allergenDisplayItems = buildAllergenDisplayItems(
-            allergens,
-            storeHandledAllergenSlugs,
-        );
-        const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
-            kind: "menu",
-            shopId: menu.shopId,
-        });
-
-        return NextResponse.json({
-            menu: {
-                id: menu.id,
-                shopId: menu.shopId,
-                name: menu.name,
-                description: menu.description,
-                priceYen: menu.priceYen,
-                category: menu.category,
-                ingredients: menu.ingredients,
-                precaution: menu.precaution,
-                // 公開 API でも保存済み URL をそのまま信用せず、
-                // 表示してよい画像 URL だけ返します。
-                imageUrl: safeImageUrl.ok ? safeImageUrl.value : null,
-                imageFrame: parseMenuImageFrame(menu.imageFrame),
-                imageFit: parseMenuImageFit(menu.imageFit),
-                imagePosition: parseMenuImagePosition(menu.imagePosition),
-                imageZoom: parseMenuImageZoom(menu.imageZoom),
-                imagePositionX: parseMenuImagePositionPercent(
-                    menu.imagePositionX,
-                ),
-                imagePositionY: parseMenuImagePositionPercent(
-                    menu.imagePositionY,
-                ),
-                isPublished: menu.isPublished,
-                createdAt: menu.createdAt,
-                updatedAt: menu.updatedAt,
+            // 現行マスタを基準に正規化し、欠損しているリンクも UNKNOWN として返します。
+            const allergens = buildAllergenRows(allergenMaster, menu.allergenLinks);
+            const allergenDisplayItems = buildAllergenDisplayItems(
                 allergens,
-                allergenDisplayItems,
-            },
+                storeHandledAllergenSlugs,
+            );
+            const safeImageUrl = validateStoredImageUrl(menu.imageUrl, {
+                kind: "menu",
+                shopId: menu.shopId,
+            });
+
+            return NextResponse.json({
+                menu: {
+                    id: menu.id,
+                    shopId: menu.shopId,
+                    name: menu.name,
+                    description: menu.description,
+                    priceYen: menu.priceYen,
+                    category: menu.category,
+                    ingredients: menu.ingredients,
+                    precaution: menu.precaution,
+                    // 公開 API でも保存済み URL をそのまま信用せず、
+                    // 表示してよい画像 URL だけ返します。
+                    imageUrl: safeImageUrl.ok ? safeImageUrl.value : null,
+                    imageFrame: parseMenuImageFrame(menu.imageFrame),
+                    imageFit: parseMenuImageFit(menu.imageFit),
+                    imagePosition: parseMenuImagePosition(menu.imagePosition),
+                    imageZoom: parseMenuImageZoom(menu.imageZoom),
+                    imagePositionX: parseMenuImagePositionPercent(
+                        menu.imagePositionX,
+                    ),
+                    imagePositionY: parseMenuImagePositionPercent(
+                        menu.imagePositionY,
+                    ),
+                    isPublished: menu.isPublished,
+                    createdAt: menu.createdAt,
+                    updatedAt: menu.updatedAt,
+                    allergens,
+                    allergenDisplayItems,
+                },
+            });
         });
     } catch (e) {
         logOperationalError(e, { operation: "public_menu_read" });

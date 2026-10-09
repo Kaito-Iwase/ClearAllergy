@@ -4,6 +4,7 @@ import { assertCiDatabaseTarget } from "./ci-environment";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
 import { DEMO_MENUS, validateDemoMenuFixtures } from "../prisma/demo-menus";
 import { DEMO_USER_EMAIL } from "../lib/auth/demo-shop";
+import { publishReviewedFixture } from "./food-review-fixture";
 
 async function main() {
     assertCiDatabaseTarget();
@@ -28,11 +29,12 @@ async function main() {
                 address: "架空住所（実在しません）", category: "カフェ",
             } });
             for (const { allergenStatusBySlug, ...menu } of DEMO_MENUS) {
-                await tx.menuItem.create({ data: { ...menu, shopId: shop.id, isPublished: true,
+                const created = await tx.menuItem.create({ data: { ...menu, shopId: shop.id, isPublished: false,
                     allergenLinks: { create: allergens.map((allergen) => ({
                         allergenId: allergen.id, status: allergenStatusBySlug[allergen.slug],
                     })) },
                 } });
+                await publishReviewedFixture(tx, created.id);
             }
         });
         console.log("CI専用の架空店舗と3メニューを作成しました。外部認証・画像保存は行っていません。");

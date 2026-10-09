@@ -9,7 +9,7 @@ import { useMemo, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/lib/utils/api-error-message";
 
 const DELETE_ERROR_MESSAGE =
-    "削除に失敗しました。時間をおいてもう一度お試しください。";
+    "削除結果を確認できません。メニュー一覧を再読み込みして確認してください。";
 
 type MenuRow = {
     id: string;
@@ -18,6 +18,7 @@ type MenuRow = {
     priceYen: number | null;
     imageUrl: string | null;
     isPublished: boolean;
+    version?: number;
     updatedAt: string;
     unknownAllergenNames: string[];
 };
@@ -118,7 +119,7 @@ export default function MenuListPageClient({
         });
     }, [menus, q, filter]);
 
-    const onDelete = async (menuId: string, menuName: string) => {
+    const onDelete = async (menuId: string, menuName: string, version?: number) => {
         if (deleting.current) return;
         setError(null);
 
@@ -140,6 +141,8 @@ export default function MenuListPageClient({
         try {
             const res = await fetch(`/api/admin/menus/${menuId}`, {
                 method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ expectedVersion: version }),
             });
 
             if (!res.ok) {
@@ -147,7 +150,10 @@ export default function MenuListPageClient({
                 return;
             }
 
+            const result = await res.json().catch(() => null);
+            if (result?.ok !== true) { setError(DELETE_ERROR_MESSAGE); return; }
             setMenus((prev) => prev.filter((menu) => menu.id !== menuId));
+            if (result.publicRefreshPending) setError("削除は保存されましたが、公開ページの反映は未確認です。");
         } catch {
             setError(DELETE_ERROR_MESSAGE);
         } finally {
@@ -394,7 +400,7 @@ export default function MenuListPageClient({
                                     <button
                                         type="button"
                                         onClick={() =>
-                                            onDelete(menu.id, menu.name)
+                                            onDelete(menu.id, menu.name, menu.version)
                                         }
                                         disabled={readOnly || deletingMenuId !== null}
                                         className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"

@@ -7,6 +7,7 @@ import { assertTestDatabaseTarget } from "./test-environment";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
 import { DEMO_USER_EMAIL } from "../lib/auth/demo-shop";
 import { DEMO_MENUS, validateDemoMenuFixtures } from "../prisma/demo-menus";
+import { publishReviewedFixture } from "./food-review-fixture";
 
 type Account = { email: string; password: string; clerkUserId?: string; shopId?: string };
 type State = { instance: string; accounts: Account[] };
@@ -74,9 +75,12 @@ async function main() {
             for (const menu of DEMO_MENUS) {
                 if (await prisma.menuItem.findFirst({ where: { shopId, name: menu.name }, select: { id: true } })) continue;
                 const { allergenStatusBySlug, ...fields } = menu;
-                await prisma.menuItem.create({ data: { ...fields, shopId, isPublished: true,
+                await prisma.$transaction(async tx => {
+                const created = await tx.menuItem.create({ data: { ...fields, shopId, isPublished: false,
                     allergenLinks: { create: master.map((a) => ({ allergenId: a.id, status: allergenStatusBySlug[a.slug] })) },
                 } });
+                await publishReviewedFixture(tx, created.id);
+                });
             }
         }
         console.log("テスト専用DB・架空店舗3件・管理者2アカウントを準備しました。");
