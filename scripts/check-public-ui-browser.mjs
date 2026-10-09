@@ -1,7 +1,7 @@
 // Public UI adversarial regression. Fictional loopback fixture only; no DB/auth/Blob writes.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -195,12 +195,15 @@ try {
     assert.deepEqual(errors, [], "Normal public routes must have no client exceptions");
     const notFoundResponse = await page.goto(new URL("/shops/ui-audit-does-not-exist", base).href);
     const notFoundHtml = await notFoundResponse.text();
+    writeFileSync(join(output, "not-found-response.html"), notFoundHtml, "utf8");
     await page.getByRole("heading", { name: "ページが見つかりません", exact: true }).waitFor();
     await page.getByRole("link", { name: "店舗一覧を見る", exact: true }).click();
     await page.waitForURL(new URL("/shops", base).href);
     // Next's streamed notFound may abort Suspense after HTTP 200 has committed.
     // Report this separately; never suppress #419 on normal routes or other errors.
-    assert.ok(errors.every(message => message.startsWith("Minified React error #419;") && notFoundHtml.includes('data-dgst="NEXT_HTTP_ERROR_FALLBACK;404"')));
+    const notFoundBoundary = notFoundHtml.includes('data-dgst="NEXT_HTTP_ERROR_FALLBACK;404"') || /\$RX\("[^"\n]+","NEXT_HTTP_ERROR_FALLBACK;404"\)/.test(notFoundHtml);
+    assert.ok(notFoundBoundary && notFoundHtml.includes('<meta name="robots" content="noindex"'));
+    assert.ok(errors.every(message => message.startsWith("Minified React error #419;")));
     if (errors.length > 0) console.log(`LIMITATION: streamed notFound recovery reported React #419 (${errors.length}); HTTP ${notFoundResponse.status()}. Normal routes had zero client exceptions.`);
     pass("404 renders recovery link; known streamed notFound fallback accounted for separately");
     await context.close();

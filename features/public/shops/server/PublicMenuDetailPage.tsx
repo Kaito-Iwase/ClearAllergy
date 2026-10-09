@@ -5,7 +5,7 @@ import { loadStoreAllergenSupplement } from "./storeAllergenSupplement";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { readPublicSnapshot } from "./public-read-snapshot";
 import PublicDataUnavailable from "@/features/public/shops/components/PublicDataUnavailable";
 import PublicMenuDetailBodyClient from "@/features/public/shops/components/PublicMenuDetailBodyClient";
 import {
@@ -13,6 +13,7 @@ import {
     buildAllergenDisplayItems,
     createStatusBySlug,
     isMenuPublishable,
+    isFoodReviewCurrent,
 } from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYen } from "@/lib/utils/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
@@ -20,8 +21,7 @@ import { readPublicDataOrFallback } from "@/lib/public-db";
 
 type Params = { shopId: string; menuId: string };
 
-export const revalidate = 60;
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export default async function PublicMenuDetailPage({
     params,
@@ -39,16 +39,16 @@ export default async function PublicMenuDetailPage({
         data: publicMenuData,
         isDatabaseAvailable,
     } = await readPublicDataOrFallback(
-        async () => {
+        async () => readPublicSnapshot(async tx => {
             const [allergenMaster, menu] = await Promise.all([
                 // 未登録品目も画面に出したいので、アレルゲンマスタを全件取得します。
-                prisma.allergen.findMany({
+                tx.allergen.findMany({
                     select: { slug: true, nameJa: true, sortOrder: true },
                     orderBy: { sortOrder: "asc" },
                 }),
 
                 // 公開中のメニューだけを対象にし、非公開データは見せません。
-                prisma.menuItem.findFirst({
+                tx.menuItem.findFirst({
                     where: {
                         id: menuId,
                         shopId,
@@ -76,6 +76,8 @@ export default async function PublicMenuDetailPage({
                         shop: {
                             select: { id: true, name: true },
                         },
+                        foodVersion: true,
+                        reviewedFoodVersion: true,
                         allergenLinks: {
                             select: {
                                 status: true,
@@ -86,9 +88,9 @@ export default async function PublicMenuDetailPage({
                 }),
             ]);
 
-            const storeHandledAllergenSlugs = menu ? [...await loadStoreAllergenSupplement(shopId, allergenMaster)] : [];
+            const storeHandledAllergenSlugs = menu ? [...await loadStoreAllergenSupplement(shopId, allergenMaster, tx)] : [];
             return { allergenMaster, menu, storeHandledAllergenSlugs };
-        },
+        }),
         {
             allergenMaster: [],
             menu: null,
@@ -119,7 +121,7 @@ export default async function PublicMenuDetailPage({
         menu.allergenLinks,
     );
     if (
-        !isMenuPublishable({
+        !isFoodReviewCurrent(menu) || !isMenuPublishable({
             name: menu.name,
             allergens: allergenMaster,
             statusBySlug,

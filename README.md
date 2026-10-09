@@ -37,6 +37,7 @@
 | 情報の不足が「含まない」に見えることを防ぐ | 保存状態を4状態で扱い、未入力・欠損を `UNKNOWN` に正規化。公開条件をUI・API・DBトリガーで確認し、登録状態と店舗内の取扱いに関する補足を分離 | [共通ルール](docs/guide/rules.md#allergens)、[公開条件](docs/guide/rules.md#publication)、[lib/allergens.ts](lib/allergens.ts) |
 | ログインした担当者が他店舗のデータを操作することを防ぐ | Clerkで本人を確認した後、サーバー側で所有店舗を解決。メニューの取得・更新・削除をリソースIDと店舗IDで限定 | [権限の境界](docs/guide/rules.md#ownership)、[adminMenuRoute.ts](features/admin/menus/server/adminMenuRoute.ts) |
 | メニューと品目別情報の保存が途中で食い違うことを防ぐ | 関連レコードをトランザクションで更新。招待受諾では行ロックと一意制約を利用。画像ストレージとの整合性は別の課題として扱う | [保存処理](docs/guide/architecture.md#mutation)、[招待処理](docs/guide/architecture.md#invitations)、[DB定義](prisma/schema.prisma) |
+| 古い入力や以前の確認が食品変更後も使われることを防ぐ | 版付き保存で競合を拒否。根拠・範囲・日時と当時の食品内容を記録し、食品変更後は再確認まで停止。記録の存在は実食品の正確性を証明しない | [食品確認と公開条件](docs/guide/rules.md#publication)、[移行と検証](docs/guide/development.md#食品確認記録の移行と検証) |
 | 閲覧と入力で必要な処理を分ける | 公開ページはServer Componentでデータを取得し、検索・端末設定・入力などをClient Componentで処理。管理操作はAPIで検証して保存 | [内部処理](docs/guide/architecture.md)、[PublicMenuDetailPage.tsx](features/public/shops/server/PublicMenuDetailPage.tsx) |
 | 障害の原因を追いながら、内部情報の露出を抑える | APIに要求IDを付け、処理時間と固定したエラー分類を記録。業務監査と運用ログを分け、利用者には一般的なエラーと再試行を表示 | [要求と障害の追跡](docs/guide/architecture.md#observability)、[lib/observability.ts](lib/observability.ts) |
 

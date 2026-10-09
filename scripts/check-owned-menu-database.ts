@@ -27,10 +27,10 @@ try {
 } finally { loader._load = originalLoad; }
 const { prisma } = requireForTest("../lib/db") as typeof import("../lib/db");
 
-function request(method: "PUT" | "DELETE", id: string) {
+function request(method: "PUT" | "DELETE", id: string, expectedVersion: number) {
     return new Request(`http://localhost/api/admin/menus/${id}`, {
         method, headers: { Origin: "http://localhost", "Content-Type": "application/json" },
-        ...(method === "PUT" ? { body: JSON.stringify({ name: "changed by fixture owner", allergenStatusBySlug: {} }) } : {}),
+        body: JSON.stringify(method === "PUT" ? { expectedVersion, name: "changed by fixture owner", allergenStatusBySlug: {} } : { expectedVersion }),
     });
 }
 
@@ -49,7 +49,7 @@ async function main() {
         const other = await prisma.shop.create({ data: { isActive: true, name: `fictional B ${run}` } });
         shops.push(other.id);
         const create = () => prisma.menuItem.create({ data: {
-            shopId: own.id, name: "original fixture", isPublished: true,
+            shopId: own.id, name: "original fixture", isPublished: false,
             allergenLinks: { create: master.map((a) => ({ allergenId: a.id, status: "FREE" })) },
         } });
         const snapshot = (id: string) => prisma.menuItem.findUnique({ where: { id }, include: { allergenLinks: { orderBy: { allergenId: "asc" } } } });
@@ -59,6 +59,7 @@ async function main() {
         for (const method of ["PUT", "DELETE"] as const) {
             for (const interference of ["move", "delete"] as const) {
                 const menu = await create();
+                const expectedVersion = (await snapshot(menu.id))!.version;
                 const originalFind = prisma.menuItem.findFirst;
                 let expected: Awaited<ReturnType<typeof snapshot>> = null;
                 let injected = false;
@@ -73,7 +74,7 @@ async function main() {
                     return row;
                 }) as typeof originalFind;
                 try {
-                    const response = await route[method](request(method, menu.id));
+                    const response = await route[method](request(method, menu.id, expectedVersion));
                     assert.ok(injected, "Interference must occur after the real ownership read");
                     assert.equal(response.status, 404, `${method} ${interference}: expected ownership/missing rejection`);
                     assert.deepEqual(await response.json(), { error: "menu not found" });
@@ -84,11 +85,11 @@ async function main() {
             }
         }
         const normalUpdate = await create();
-        const updated = await route.PUT(request("PUT", normalUpdate.id));
+        const updated = await route.PUT(request("PUT", normalUpdate.id, (await snapshot(normalUpdate.id))!.version));
         assert.equal(updated.status, 200);
         assert.equal((await updated.json()).menu.shopId, own.id);
         assert.equal((await snapshot(normalUpdate.id))?.name, "changed by fixture owner");
-        const deleted = await route.DELETE(request("DELETE", normalUpdate.id));
+        const deleted = await route.DELETE(request("DELETE", normalUpdate.id, (await snapshot(normalUpdate.id))!.version));
         assert.equal(deleted.status, 200);
         assert.deepEqual(await deleted.json(), { ok: true });
         assert.equal(await snapshot(normalUpdate.id), null);

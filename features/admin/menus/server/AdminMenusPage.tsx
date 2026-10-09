@@ -32,6 +32,7 @@ export default async function AdminMenusPage() {
                 priceYen: true,
                 imageUrl: true,
                 isPublished: true,
+                version: true,
                 updatedAt: true,
                 allergenLinks: {
                     select: {
@@ -58,6 +59,7 @@ export default async function AdminMenusPage() {
             priceYen: menu.priceYen,
             imageUrl: menu.imageUrl,
             isPublished: menu.isPublished,
+            version: menu.version,
             updatedAt: menu.updatedAt.toISOString(),
             unknownAllergenNames,
         };

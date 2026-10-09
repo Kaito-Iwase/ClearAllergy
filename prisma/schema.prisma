@@ -115,12 +115,37 @@ model MenuItem {
   imagePositionX Int                @default(50)
   imagePositionY Int                @default(50)
   isPublished    Boolean            @default(false)
+  version        Int                @default(0)
+  foodVersion    Int                @default(0)
+  reviewedFoodVersion Int?
+  creationOperationId String?
+  creationRequestHash String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   shop           Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
   allergenLinks  MenuItemAllergen[]
+  foodReviews    MenuFoodReview[]
 
   @@index([shopId])
+  @@unique([shopId, creationOperationId])
+}
+
+model MenuFoodReview {
+  id               String   @id @default(cuid())
+  menuItemId       String
+  foodVersion      Int
+  reviewSequence   Int      @default(0)
+  contentSnapshot  Json
+  evidenceRefs     String
+  scope            String
+  checkedAt        DateTime
+  recordedAt       DateTime @default(now())
+  actorUserId      String
+  unresolvedIssues String?
+  menuItem         MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([menuItemId, foodVersion])
+  @@unique([menuItemId, reviewSequence])
 }
 
 model Allergen {

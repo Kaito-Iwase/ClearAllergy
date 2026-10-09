@@ -8,6 +8,10 @@ type PublicQueryResult<T> = {
     isDatabaseAvailable: boolean;
 };
 
+export class PublicReadUnavailableError extends Error {
+    constructor() { super("Public database snapshot could not be completed."); }
+}
+
 export async function readPublicDataOrFallback<T>(
     loader: () => Promise<T>,
     fallback: T,
@@ -21,7 +25,7 @@ export async function readPublicDataOrFallback<T>(
             isDatabaseAvailable: true,
         };
     } catch (error) {
-        if (!isDatabaseUnavailableError(error)) {
+        if (!(error instanceof PublicReadUnavailableError) && !isDatabaseUnavailableError(error)) {
             throw error;
         }
 
