@@ -61,6 +61,22 @@ try {
     const menuHref = await menuArea.getByRole("link").first().getAttribute("href");
     assert.ok(menuHref?.startsWith(`${shopHref}/menus/`));
 
+    const defaultChicken = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "照り焼きチキンプレート", exact: true }) });
+    assert.match(await defaultChicken.innerText(), /確認対象：特定原材料（9品目）/);
+    assert.match(await defaultChicken.innerText(), /特定原材料：含む/);
+    const chickenOther = defaultChicken.getByRole("group", { name: "その他のアレルゲン", exact: true });
+    const chickenOtherRows = chickenOther.locator("dl > div");
+    assert.match(await chickenOtherRows.filter({ has: page.locator("dt", { hasText: /^含む$/ }) }).innerText(), /大豆・鶏肉\s*（2品目）/);
+    assert.match(await chickenOtherRows.filter({ has: page.locator("dt", { hasText: "含む可能性あり・要確認" }) }).innerText(), /ごま\s*（1品目）/);
+    // Check the primary counts separately from the other group, so all-29 aggregation cannot pass.
+    const primaryText = await defaultChicken.evaluate(card => card.innerText.split("その他のアレルゲン")[0]);
+    assert.match(primaryText, /含む\s+卵\s*（1品目）/);
+    assert.match(primaryText, /含む可能性あり・要確認\s+小麦・乳\s*（2品目）/);
+    const defaultPancake = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "米粉パンケーキ", exact: true }) });
+    assert.doesNotMatch(await defaultPancake.innerText(), /特定原材料：含む/);
+    assert.match(await defaultPancake.getByRole("group", { name: "その他のアレルゲン", exact: true }).innerText(), /含む\s+大豆\s*（1品目）/);
+    pass("Unselected cards classify specified ingredients separately; other CONTAINS/MAY_CONTAIN facts remain visible");
+
     for (const width of [320, 390, 768, 1024, 1440]) {
         await page.setViewportSize({ width, height: 900 });
         for (const route of ["/", "/shops", shopHref, menuHref, "/terms"]) {
@@ -79,8 +95,17 @@ try {
             let renderedFonts;
             for (let attempt = 0; attempt < 3; attempt++) {
                 try {
+                    // Navigation can retain hidden page DOM. Inspect the visible heading only,
+                    // and wait for its glyphs rather than a fonts.ready promise from the previous page.
+                    await visible(page.locator("main h1")).evaluate(async heading => {
+                        document.querySelectorAll("[data-ui-font-heading]").forEach(node => node.removeAttribute("data-ui-font-heading"));
+                        heading.setAttribute("data-ui-font-heading", "");
+                        await document.fonts.load(getComputedStyle(heading).font, heading.textContent ?? "");
+                        await document.fonts.ready;
+                        await new Promise(requestAnimationFrame);
+                    });
                     const { root } = await fontInspector.send("DOM.getDocument");
-                    const { nodeId } = await fontInspector.send("DOM.querySelector", { nodeId: root.nodeId, selector: "main h1" });
+                    const { nodeId } = await fontInspector.send("DOM.querySelector", { nodeId: root.nodeId, selector: "[data-ui-font-heading]" });
                     assert.ok(nodeId, "Inspect a real page heading");
                     ({ fonts: renderedFonts } = await fontInspector.send("CSS.getPlatformFontsForNode", { nodeId }));
                     break;
@@ -140,6 +165,8 @@ try {
     await visible(page.getByRole("button", { name: "すべて設定なしにする（未適用）", exact: true })).click();
     await apply();
     await open();
+    await defaultChicken.waitFor();
+    assert.match(await defaultChicken.innerText(), /確認対象：特定原材料（9品目）/);
     await mode("ピスタチオ", "highlight");
     await apply();
     const firstCard = menuArea.getByRole("link").first();

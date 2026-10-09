@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     buildSelectedAllergenSummary,
+    buildDefaultAllergenSummaries,
+    SPECIFIED_INGREDIENT_SLUGS,
     buildAllergenDisplayItems,
     buildSpecifiedIngredientNotice,
     getStoreContainsAllergenSlugs,
@@ -14,6 +16,7 @@ import {
     type AllergenStatus,
     type AllergenEffectiveRisk,
 } from "../lib/allergens";
+import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
 
 const names = new Map([
     ["wheat", "小麦"],
@@ -27,6 +30,72 @@ const ranks = new Map([
     ["milk", 2],
     ["soybean", 3],
 ]);
+
+function defaultSummaries(overrides: Record<string, AllergenStatus>, storeHandled: string[] = []) {
+    return buildDefaultAllergenSummaries({
+        statusBySlug: { ...Object.fromEntries(ALLERGEN_MASTER.map((item) => [item.slug, "FREE"])), ...overrides },
+        nameJaBySlug: new Map(ALLERGEN_MASTER.map((item) => [item.slug, item.nameJa])),
+        rankBySlug: new Map(ALLERGEN_MASTER.map((item, index) => [item.slug, index])),
+        storeHandledAllergenSlugs: new Set(storeHandled),
+    });
+}
+
+test("未選択の主判定はカシューナッツを含む特定原材料の全品目を対象にする", () => {
+    for (const slug of SPECIFIED_INGREDIENT_SLUGS) {
+        const result = defaultSummaries({ [slug]: "CONTAINS" });
+        assert.equal(result.specified.badge, "danger", slug);
+        assert.equal(result.specified.containsCount, 1);
+        assert.equal(result.other.badge, "safe");
+    }
+});
+
+test("大豆・鶏肉だけを含む場合は特定原材料の主判定に混ぜずその他の注意を保持する", () => {
+    const result = defaultSummaries({ soybean: "CONTAINS", chicken: "CONTAINS", sesame: "MAY_CONTAIN" });
+    assert.equal(result.specified.badge, "safe");
+    assert.equal(result.specified.containsCount, 0);
+    assert.equal(result.other.badge, "danger");
+    assert.equal(result.otherCount, ALLERGEN_MASTER.length - SPECIFIED_INGREDIENT_SLUGS.length);
+    assert.equal(result.other.containsCount, 2);
+    assert.match(result.other.summaryText, /大豆.*鶏肉（含む）/);
+    assert.match(result.other.summaryText, /ごま（含む可能性あり・要確認）/);
+});
+
+test("卵・大豆・鶏肉と可能性ありの登録を特定原材料とその他へ正しく分ける", () => {
+    const result = defaultSummaries({ egg: "CONTAINS", soybean: "CONTAINS", chicken: "CONTAINS", wheat: "MAY_CONTAIN", milk: "MAY_CONTAIN", sesame: "MAY_CONTAIN" });
+    assert.equal(result.specified.containsCount, 1);
+    assert.equal(result.specified.mayCount, 2);
+    assert.equal(result.other.containsCount, 2);
+    assert.equal(result.other.mayCount, 1);
+});
+
+test("両分類で可能性あり・別メニュー由来の補足・未入力を隠さない", () => {
+    const may = defaultSummaries({ egg: "MAY_CONTAIN", soybean: "MAY_CONTAIN" });
+    assert.equal(may.specified.badge, "caution");
+    assert.equal(may.other.badge, "caution");
+    const handled = defaultSummaries({}, ["egg", "soybean"]);
+    for (const result of [handled.specified, handled.other]) {
+        assert.equal(result.badge, "caution");
+        assert.equal(result.storeHandledCount, 1);
+        assert.match(result.summaryText, /別の公開メニューに「含む」登録/);
+    }
+    const unknown = defaultSummaries({ egg: "UNKNOWN", soybean: "UNKNOWN" });
+    assert.equal(unknown.specified.badge, "unknown");
+    assert.equal(unknown.other.badge, "unknown");
+});
+
+test("特定原材料のマスタ・リンク欠損を含まないという判定にしない", () => {
+    const result = buildDefaultAllergenSummaries({ statusBySlug: {}, nameJaBySlug: new Map(), rankBySlug: new Map() });
+    assert.equal(result.specified.badge, "unknown");
+    assert.equal(result.specified.unknownCount, SPECIFIED_INGREDIENT_SLUGS.length);
+    assert.doesNotMatch(result.specified.summaryText, /含まない/);
+    const staleStatus = buildDefaultAllergenSummaries({
+        statusBySlug: Object.fromEntries(ALLERGEN_MASTER.map((item) => [item.slug, "FREE"])),
+        nameJaBySlug: new Map(ALLERGEN_MASTER.filter((item) => item.slug !== "cashew").map((item) => [item.slug, item.nameJa])),
+        rankBySlug: new Map(),
+    });
+    assert.equal(staleStatus.specified.badge, "unknown");
+    assert.equal(staleStatus.specified.unknownCount, 1);
+});
 
 function summary(
     statusBySlug: Record<string, AllergenStatus>,
@@ -132,6 +201,34 @@ test("別の公開登録による補足があるFREEを安心側の要約にし�
     assert.equal(items[0].status, "FREE");
     assert.equal(items[0].effectiveRisk, "STORE_HANDLED");
     assert.equal(items[1].effectiveRisk, "UNKNOWN");
+});
+
+test("一覧用の品目名は登録状態と別メニューの補足を分け、混在する未確認も名前で保持する", () => {
+    const result = buildSelectedAllergenSummary({
+        statusBySlug: { wheat: "CONTAINS", egg: "MAY_CONTAIN", milk: "UNKNOWN", soybean: "FREE" },
+        selectedSlugs: ["soybean", "milk", "egg", "wheat"],
+        includeMayContain: false,
+        nameJaBySlug: names,
+        rankBySlug: ranks,
+        storeHandledAllergenSlugs: new Set(["soybean"]),
+    });
+    assert.deepEqual(result.containsNames, ["小麦"]);
+    assert.deepEqual(result.mayContainNames, ["卵"]);
+    assert.deepEqual(result.unknownNames, ["乳"]);
+    assert.deepEqual(result.storeHandledNames, ["大豆"]);
+    assert.equal(result.mayCount, 1, "別メニューの補足を可能性ありの件数に加えない");
+    assert.doesNotMatch(result.registrationSummaryText, /大豆|別の公開メニュー|含まない/);
+});
+
+test("原材料に含まない登録と自動補足は別々に表示でき、補足がなくても安全とは要約しない", () => {
+    for (const storeHandledAllergenSlugs of [new Set<string>(), new Set(["egg"])]) {
+        const result = buildSelectedAllergenSummary({ statusBySlug: { egg: "FREE" }, selectedSlugs: ["egg"],
+            includeMayContain: false, nameJaBySlug: names, rankBySlug: ranks, storeHandledAllergenSlugs });
+        assert.match(result.registrationSummaryText, /原材料に含まないと登録/);
+        assert.match(result.registrationSummaryText, /食品安全の保証ではありません/);
+        assert.deepEqual(result.storeHandledNames, storeHandledAllergenSlugs.size ? ["卵"] : []);
+        assert.equal(result.mayCount, 0);
+    }
 });
 
 test("不完全なメニューは同店舗の補足に使わない", () => {
