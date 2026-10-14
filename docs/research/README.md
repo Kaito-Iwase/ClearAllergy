@@ -6,6 +6,27 @@
 
 本書は研究/設計案の入口。現行仕様は [guide/rules](../guide/rules.md)、[変更対応表](../guide/change-map.md)。ここでRECOMMENDED/OPENとした設計を現行仕様へ昇格しない。[Gate判定と検証結果](implementation/readiness.md) / [Issue台帳](implementation/backlog.md) / [提案Milestone](implementation/migration-plan.md#proposed-milestones) / [Traceability](traceability-matrix.md) / [人の判断待ち](open-questions.md)。
 
+## 2026-10-14 の調査記録と更新運用案
+
+本日作成された出典付き原稿を、要約せず全文で収録しています。外部資料の確認事実、設計上の提案、適用限界、未確認事項は原稿の区分を保持しています。原稿の保存は、機能採用・実装・実店舗での実証や公開状態の変更を意味しません。現行仕様の正本は [状態・公開・権限](../guide/rules.md)、実装と検証の入口は [変更対応表](../guide/change-map.md) です。
+
+| 読む順番 | 文書 | 役割と収録範囲 |
+| --- | --- | --- |
+| 1 | [ClearAllergy 調査記録（2026-10-14）](literature/clearallergy-research-20261014.md) | 根拠の読み方、店舗負担・コスト・利用者需要、誤食事例・ヒューマンエラー・制度、データ資源・既存サービス・追加研究、非機能要件と検証課題 |
+| 2 | [ClearAllergy 更新運用の検討（2026-10-14）](product/clearallergy-update-workflow-20261014.md) | 変更検知、根拠・影響範囲の確認、保留・再公開・訂正、担当不在・代替材料・日替わり・オフライン・復旧、一人営業とチェーン、検索への状態反映、受入試験候補 |
+| 3 | [情報の正確性を保つための他組織の設計例（2026-10-14、未採用研究）](literature/information-integrity-patterns-20261014.md) | GS1、SAP/Akeneo、Contentful、Google SRE、Meta/Uber、GitHubの一次資料からの示唆。根拠の所有、変更と承認、版・訂正・伝播と限界 |
+| 4 | [Big Tech一次資料によるコンテキスト整備案（2026-10-14、未採用研究）](literature/big-tech-context-practices-20261014.md) | Google、Microsoft/VS Code、Meta/Docusaurus等の公開一次資料。正本・同時更新・必要な文脈・検証・リンク確認・出典の提案と限界 |
+| 5 | [日本企業の一次資料による開発コンテキスト整備案（2026-10-14、未採用研究）](literature/japan-context-practices-20261014.md) | LINEヤフー、SmartHR、CyberAgent、リクルート、DeNA、追加のメルカリ資料。小規模適用の候補・移さない機構・費用概算・評価方法 |
+
+調査記録は根拠、更新運用はその根拠を踏まえた設計案として読みます。実店舗での負担・効果・支払意思、外部データの利用条件、法的・医療的判断、保留権限・対象範囲・鮮度や復旧目標は、各原稿に記載した未確認・合意待ちのまま保持しています。
+
+追加研究は、リポジトリを調査していない外部の設計批評です。本文の “Adopt” / “defer” / “reject” は製品への推奨であり、ClearAllergyでの採用決定・実装計画・現行機能の説明ではありません。企業向け仕組みをそのまま導入する方針にはせず、適用限界も含めて保存しています。
+
+Big Tech版・国内事例版も、公開資料からの未採用提案として保存しています。本文の「採用」「今やる」や工数・成功条件は調査上の推奨・概算であり、CAでの採用決定・実行結果・効果保証ではありません。各社の手順やコマンドをCAの指示として扱わず、現行の文書更新ルールは別の明示依頼に基づく最小変更として管理します。
+
+以下の Executive summary、Navigation と冒頭のブランチ・HEAD・判定は、2026-09-28 の研究と記載済み後続作業の履歴です。2026-10-14 の原稿や現在のコード状態へ読み替えません。
+
+
 ## Executive summary
 
 1. **System boundary:** README/共通注意による現行scopeは架空データを用いるUI prototype。登録・公開情報の処理を調査し、食品の真実性、厨房の交差接触、摂取可否、医療判断は保証しない。missionの実サービス像との差をR01として記録。

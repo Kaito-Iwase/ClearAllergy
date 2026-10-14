@@ -22,6 +22,8 @@ reviewer、対象HEAD、指摘・修正・再検証。self reviewを独立review
 
 関連文書更新、または更新不要の理由。改善Issueと重複検索結果。
 
+- [ ] 文書保守ルール（`docs/guide/maintenance.md#update-map`）に沿って必要なdocsを同じ変更内で更新し、更新文書または不要理由とリンク・コマンドの照合結果を示した
+
 - [ ] 最終diff/check・受け入れ条件・参照を照合した
 - [ ] 必須gateの失敗/未実施を隠していない（未達ならDraft）
 - [ ] 安全・認証・認可・DB・アレルゲンに関係する変更はauto merge対象外
