@@ -6,6 +6,12 @@
 
 本書は研究/設計案の入口。現行仕様は [guide/rules](../guide/rules.md)、[変更対応表](../guide/change-map.md)。ここでRECOMMENDED/OPENとした設計を現行仕様へ昇格しない。[Gate判定と検証結果](implementation/readiness.md) / [Issue台帳](implementation/backlog.md) / [提案Milestone](implementation/migration-plan.md#proposed-milestones) / [Traceability](traceability-matrix.md) / [人の判断待ち](open-questions.md)。
 
+## 2026-10-14 の追加調査（訂正統合版）
+
+[読む入口と検証計画](product/clearallergy-followup-20261014.md)から、導入・更新負担、誤表示等の防止策、情報の継続管理の3文書へ進めます。提供された独立レビューの訂正を本文へ統合した追補です。
+
+出典・日付・母集団・限界を保持し、初期/継続負担、低負担・最小性・事故低減は未実証のまま扱います。注文・厨房・配膳は周辺リスクであり、現行製品への追加仕様・必須測定ではありません。
+
 ## 2026-10-14 の調査記録と更新運用案
 
 本日作成された出典付き原稿を、要約せず全文で収録しています。外部資料の確認事実、設計上の提案、適用限界、未確認事項は原稿の区分を保持しています。原稿の保存は、機能採用・実装・実店舗での実証や公開状態の変更を意味しません。現行仕様の正本は [状態・公開・権限](../guide/rules.md)、実装と検証の入口は [変更対応表](../guide/change-map.md) です。
