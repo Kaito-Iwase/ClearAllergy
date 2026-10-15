@@ -1,0 +1,366 @@
+{
+  "utc": "2026-10-15T14:52:21.499397+00:00",
+  "method": "static document, link, provenance and diff verification",
+  "application_tests": "not run locally: docs-only",
+  "checks": {
+    "markdown_files": 111,
+    "local_links": 1081,
+    "missing_files": [],
+    "anchor_candidates_needing_review": [],
+    "external_links_not_refetched": 539,
+    "preservation": [
+      {
+        "path": "docs/research/engineering/identity-operations-issues-20261015.md",
+        "expected": "bb60cae0afc14fa01b98a1b8fd11923226c5fc98bf9d2f710025d785f358a496",
+        "actual": "bb60cae0afc14fa01b98a1b8fd11923226c5fc98bf9d2f710025d785f358a496",
+        "pass": true
+      },
+      {
+        "path": "docs/research/engineering/issue-document-references-20261015.md",
+        "expected": "b2ee2ca8b207c689c3546c69054c3a2952d21071c13456f09c1f129a4cdfaa8d",
+        "actual": "b2ee2ca8b207c689c3546c69054c3a2952d21071c13456f09c1f129a4cdfaa8d",
+        "pass": true
+      },
+      {
+        "path": "docs/research/engineering/menu-contract-issues-20261015.md",
+        "expected": "8ebefecf34f8ae13be2114693122c4b26c673135bfc075ffcb20129bf11e8fb9",
+        "actual": "8ebefecf34f8ae13be2114693122c4b26c673135bfc075ffcb20129bf11e8fb9",
+        "pass": true
+      },
+      {
+        "path": "docs/research/engineering/open-issues-current-code-20261015.md",
+        "expected": "14310dd9d0274b7012da80232f9c35b17ef377f8d08869116919f26d2af5fd78",
+        "actual": "14310dd9d0274b7012da80232f9c35b17ef377f8d08869116919f26d2af5fd78",
+        "pass": true
+      },
+      {
+        "path": "docs/research/literature/ca-overnight-adoption.md",
+        "expected": "06808348176fea516d5b1c7f8fe72c5cc67366d31d91973d712dc51b7ddf7b07",
+        "actual": "06808348176fea516d5b1c7f8fe72c5cc67366d31d91973d712dc51b7ddf7b07",
+        "pass": true
+      },
+      {
+        "path": "docs/research/literature/ca-overnight-competition.md",
+        "expected": "929f46068f6d361fda6572f972f6667f63902b89cec4afd950161b5466139e14",
+        "actual": "929f46068f6d361fda6572f972f6667f63902b89cec4afd950161b5466139e14",
+        "pass": true
+      },
+      {
+        "path": "docs/research/literature/ca-overnight-discovery.md",
+        "expected": "a1891eeb245fbd069b2544432454e4a3b09363bee11ae516ad8a97c00c903abc",
+        "actual": "a1891eeb245fbd069b2544432454e4a3b09363bee11ae516ad8a97c00c903abc",
+        "pass": true
+      },
+      {
+        "path": "docs/research/literature/ca-overnight-integrity.md",
+        "expected": "4f9ef0ca60e12a2f4ec0aaeb02dbb4597df5811f72a32b3ca09f69a4316af9a3",
+        "actual": "4f9ef0ca60e12a2f4ec0aaeb02dbb4597df5811f72a32b3ca09f69a4316af9a3",
+        "pass": true
+      },
+      {
+        "path": "docs/research/literature/ca-overnight-security-operations.md",
+        "expected": "64e5b4554911ca9a8c37e31f5c629efe416d7a0c8ba7d7b39b177ec6fab92fd5",
+        "actual": "64e5b4554911ca9a8c37e31f5c629efe416d7a0c8ba7d7b39b177ec6fab92fd5",
+        "pass": true
+      },
+      {
+        "path": "docs/research/product/ca-overnight-decision-memo.md",
+        "expected": "7b53a324224b7333c2175dcfb788ed955865f386483194101b88585c30582808",
+        "actual": "7b53a324224b7333c2175dcfb788ed955865f386483194101b88585c30582808",
+        "pass": true
+      },
+      {
+        "path": "docs/research/product/ca-overnight-independent-review.md",
+        "expected": "22e781017c81ebebfb507542677b908685c8b293eb5ec0accbb8a3457f20a4a1",
+        "actual": "22e781017c81ebebfb507542677b908685c8b293eb5ec0accbb8a3457f20a4a1",
+        "pass": true
+      },
+      {
+        "path": "docs/research/product/overnight-source-provenance-20261015.md",
+        "expected": "0c54f06ccc106194fd1b06549fb99e1969e2ec9e9bf1a00dd05f9a483f4ecb48",
+        "actual": "0c54f06ccc106194fd1b06549fb99e1969e2ec9e9bf1a00dd05f9a483f4ecb48",
+        "pass": true
+      },
+      {
+        "path": "docs/verification/shop-menu-isolated-probe-20261015.md",
+        "expected": "266c0aaeb6fa6cd9289b5f3e0100bdae97c471e0add119f8511857e5357f8248",
+        "actual": "266c0aaeb6fa6cd9289b5f3e0100bdae97c471e0add119f8511857e5357f8248",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ca-next-direction-20261015.md.txt",
+        "expected": "ff1ce64ad406d23b2a1b37381defdd3ce34869a6fa4e478e30d641bd3c294c0c",
+        "actual": "ff1ce64ad406d23b2a1b37381defdd3ce34869a6fa4e478e30d641bd3c294c0c",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ca-current-main-issue-audit-20261015.md.txt",
+        "expected": "102b62e20f745aaeb2e82f927a138a2625d2a7ae43e25379ca8c88ababbe1b07",
+        "actual": "102b62e20f745aaeb2e82f927a138a2625d2a7ae43e25379ca8c88ababbe1b07",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ca-one-dish-reconciliation-20261015.md.txt",
+        "expected": "e9248c454c00c3f530aba6323de3ca65546938239d7c50841228d5ee705479d9",
+        "actual": "e9248c454c00c3f530aba6323de3ca65546938239d7c50841228d5ee705479d9",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ca-next-verification-plan-20261015.md.txt",
+        "expected": "b07886dcf767838d5a45d08cdc1be087d6ef4e371fc34c9ca972190c6929b1a9",
+        "actual": "b07886dcf767838d5a45d08cdc1be087d6ef4e371fc34c9ca972190c6929b1a9",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ca-next-independent-review-20261015.md.txt",
+        "expected": "fe5b77844be8fd3971089ce94e2b48bccf95ae22a1bf15765e7ccddcfafe5d0d",
+        "actual": "fe5b77844be8fd3971089ce94e2b48bccf95ae22a1bf15765e7ccddcfafe5d0d",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ca-next-result-20261015.md.txt",
+        "expected": "82bc03252f2e3b51a5e944e3d628f4e997d5fa34c4bcf6002f42063b34ceb2d4",
+        "actual": "82bc03252f2e3b51a5e944e3d628f4e997d5fa34c4bcf6002f42063b34ceb2d4",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/received-research-status-20261015.md.txt",
+        "expected": "f10070de09d11e122d237ce33d1428863d6b9cca593995f454026676b26bc533",
+        "actual": "f10070de09d11e122d237ce33d1428863d6b9cca593995f454026676b26bc533",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/received-shop-adoption-plan-20261015-v2.md.txt",
+        "expected": "1af435bd82092603fe16d6948367bb02c38cd06bc8a111aefdc5f26066b73d7e",
+        "actual": "1af435bd82092603fe16d6948367bb02c38cd06bc8a111aefdc5f26066b73d7e",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/received-safety-understanding-plan-20261015-v2.md.txt",
+        "expected": "4286a521f8e423112c6182863cb37e0d596e5b6a4cbf4458e7c5b2de940c5c2f",
+        "actual": "4286a521f8e423112c6182863cb37e0d596e5b6a4cbf4458e7c5b2de940c5c2f",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/received-plans-independent-review-20261015.md.txt",
+        "expected": "8308152fe07cf9e4021ea956c6e6b0b62004b7d02dc106db11f425e715d9f2ff",
+        "actual": "8308152fe07cf9e4021ea956c6e6b0b62004b7d02dc106db11f425e715d9f2ff",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/received-shop-adoption-plan-20261015-v1.md.txt",
+        "expected": "3412ee9b6d0dec7c53a44c4bcb206efe00256fd6ecb3b32da2314c39a2c335c5",
+        "actual": "3412ee9b6d0dec7c53a44c4bcb206efe00256fd6ecb3b32da2314c39a2c335c5",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/received-safety-understanding-plan-20261015-v1.md.txt",
+        "expected": "3304c2151e02cb2cc8b3b7b2b7dcd94eb2191a084378b6841581d93ae9445e5f",
+        "actual": "3304c2151e02cb2cc8b3b7b2b7dcd94eb2191a084378b6841581d93ae9445e5f",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ja-readability-rollout-plan-20261015.md.txt",
+        "expected": "206c119347994cc36a1f542d9890370c85f51927fcb3a088b884a3abbc1894e6",
+        "actual": "206c119347994cc36a1f542d9890370c85f51927fcb3a088b884a3abbc1894e6",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ja-readability-pr78-main-plan.md.txt",
+        "expected": "c8be94606e9025d24881e63edee5486527d6e8c437bf72cea9c79512213890e7",
+        "actual": "c8be94606e9025d24881e63edee5486527d6e8c437bf72cea9c79512213890e7",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ja-readability-result-20261015.md.txt",
+        "expected": "cdcaec1905c5a7db3ec60460ce0500f49e1e3c6e4f6f14d3f1f2d22fda95c61c",
+        "actual": "cdcaec1905c5a7db3ec60460ce0500f49e1e3c6e4f6f14d3f1f2d22fda95c61c",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-main-integration/ja-readability-content-map.md.txt",
+        "expected": "47ed245bd2fafc5177549eb3c0e85cbb8bf48eae99f3c392aceda20eb441d031",
+        "actual": "47ed245bd2fafc5177549eb3c0e85cbb8bf48eae99f3c392aceda20eb441d031",
+        "pass": true
+      }
+    ],
+    "candidate_preservation": [
+      {
+        "path": "README.md",
+        "pass": true
+      },
+      {
+        "path": "docs/research/README.md",
+        "pass": true
+      },
+      {
+        "path": "docs/research/safety/losses-hazards.md",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/.gitattributes",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-ja-readability/losses-hazards.md.txt",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/20261015-ja-readability/research-index.md.txt",
+        "pass": true
+      },
+      {
+        "path": "docs/research/originals/README.md",
+        "pass": true
+      }
+    ],
+    "evidence_copies": [
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-next-open-issues-20261015-start.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-next-issue-comments-20261015.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-next-prs-20261015-start.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-next-static-evidence-20261015.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-next-main-ci-final-20261015.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-next-main-ci-final-20261015.log",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-next-documents-check-20261015.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-received-original-check-20261015.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ca-received-v2-text-provenance-20261015.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      },
+      {
+        "path": "docs/verification/evidence/20261015-next-direction/ja-readability-canonical-preservation.json",
+        "worktree_bytes_equal": true,
+        "index_bytes_equal": true
+      }
+    ],
+    "non_document_changes": [],
+    "raw_original_links": "Excluded .md.txt: original locations deliberately retained; originals/README provides view mapping.",
+    "safety_identifiers": {
+      "count": 38,
+      "old": [
+        "DR-CON-001",
+        "DR-OUT-001",
+        "DR-PROV-001",
+        "H01",
+        "H02",
+        "H03",
+        "H04",
+        "H05",
+        "H06",
+        "H07",
+        "H08",
+        "H09",
+        "H10",
+        "L01",
+        "L02",
+        "L03",
+        "L04",
+        "OR-INC-001",
+        "OR-REL-001",
+        "SC01",
+        "SC02",
+        "SC03",
+        "SC04",
+        "SC05",
+        "SC06",
+        "SC07",
+        "SC08",
+        "SC09",
+        "SC10",
+        "SEC-ASSET-001",
+        "SEC-ID-001",
+        "SEC-OWN-001",
+        "SR-FRESH-001",
+        "SR-PUB-001",
+        "SR-REV-001",
+        "SR-SEM-001",
+        "UX-A11Y-001",
+        "UX-COMP-001"
+      ],
+      "new": [
+        "DR-CON-001",
+        "DR-OUT-001",
+        "DR-PROV-001",
+        "H01",
+        "H02",
+        "H03",
+        "H04",
+        "H05",
+        "H06",
+        "H07",
+        "H08",
+        "H09",
+        "H10",
+        "L01",
+        "L02",
+        "L03",
+        "L04",
+        "OR-INC-001",
+        "OR-REL-001",
+        "SC01",
+        "SC02",
+        "SC03",
+        "SC04",
+        "SC05",
+        "SC06",
+        "SC07",
+        "SC08",
+        "SC09",
+        "SC10",
+        "SEC-ASSET-001",
+        "SEC-ID-001",
+        "SEC-OWN-001",
+        "SR-FRESH-001",
+        "SR-PUB-001",
+        "SR-REV-001",
+        "SR-SEM-001",
+        "UX-A11Y-001",
+        "UX-COMP-001"
+      ],
+      "equal": true
+    },
+    "old_index_omissions": []
+  },
+  "canonical_preservation": {
+    "utc": "2026-10-15T14:49:44.1511615Z",
+    "files": 358,
+    "oldChanges": 9,
+    "head": "f5ec73b69c91f3c19d516f131a14c7f644fe8f32",
+    "branch": "docs/shops-recovery-20261010",
+    "differences": [],
+    "result": "PASS"
+  }
+}
