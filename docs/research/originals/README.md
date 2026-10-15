@@ -37,3 +37,22 @@
 - [ja-readability-pr78-main-plan.md.txt](20261015-main-integration/ja-readability-pr78-main-plan.md.txt) — SHA-256 `c8be94606e9025d24881e63edee5486527d6e8c437bf72cea9c79512213890e7` / 3469 bytes
 - [ja-readability-result-20261015.md.txt](20261015-main-integration/ja-readability-result-20261015.md.txt) — SHA-256 `cdcaec1905c5a7db3ec60460ce0500f49e1e3c6e4f6f14d3f1f2d22fda95c61c` / 9706 bytes
 - [ja-readability-content-map.md.txt](20261015-main-integration/ja-readability-content-map.md.txt) — SHA-256 `47ed245bd2fafc5177549eb3c0e85cbb8bf48eae99f3c392aceda20eb441d031` / 6605 bytes
+
+## main統合原稿から閲覧版へ進む
+
+原稿内の相対リンクは元配置を保持しているため、閲覧にはこの対応表を使います。現在の実施順序は[調査・友人テスト方針](../product/research-and-friend-testing-policy-20261015.md)で確認します。
+
+| 作成時点の原稿 | リンクを整えた閲覧版・現在の入口 |
+| --- | --- |
+| [ca-next-direction-20261015.md](20261015-main-integration/ca-next-direction-20261015.md.txt) | [clearallergy-next-direction-20261015.md](../product/clearallergy-next-direction-20261015.md) |
+| [ca-current-main-issue-audit-20261015.md](20261015-main-integration/ca-current-main-issue-audit-20261015.md.txt) | [current-main-issue-audit-20261015.md](../engineering/current-main-issue-audit-20261015.md) |
+| [ca-one-dish-reconciliation-20261015.md](20261015-main-integration/ca-one-dish-reconciliation-20261015.md.txt) | [one-dish-reconciliation-20261015.md](../product/one-dish-reconciliation-20261015.md) |
+| [ca-next-verification-plan-20261015.md](20261015-main-integration/ca-next-verification-plan-20261015.md.txt) | [next-verification-plan-20261015.md](../product/next-verification-plan-20261015.md) |
+| [ca-next-independent-review-20261015.md](20261015-main-integration/ca-next-independent-review-20261015.md.txt) | [next-direction-independent-review-20261015.md](../product/next-direction-independent-review-20261015.md) |
+| [ca-next-result-20261015.md](20261015-main-integration/ca-next-result-20261015.md.txt) | [当時の準備結果](../../verification/next-direction-preparation-20261015.md) |
+| [received-research-status-20261015.md](20261015-main-integration/received-research-status-20261015.md.txt) | [additional-plans-provenance-20261015.md](../product/additional-plans-provenance-20261015.md) |
+| [received-shop-adoption-plan-20261015-v2.md](20261015-main-integration/received-shop-adoption-plan-20261015-v2.md.txt) | [shop-adoption-plan-20261015.md](../literature/shop-adoption-plan-20261015.md) |
+| [received-safety-understanding-plan-20261015-v2.md](20261015-main-integration/received-safety-understanding-plan-20261015-v2.md.txt) | [safety-understanding-plan-20261015.md](../literature/safety-understanding-plan-20261015.md) |
+| [received-plans-independent-review-20261015.md](20261015-main-integration/received-plans-independent-review-20261015.md.txt) | [provided-plans-independent-review-20261015.md](../product/provided-plans-independent-review-20261015.md) |
+
+導入・理解計画のv1は履歴として保管し、上表のv2閲覧版から版の関係を確認します。日本語改善の旧計画・結果4件は作成時点の保存資料で、現在の状態は[全文書の精査記録](../../guide/document-audit-20261015.md)とPRで確認します。

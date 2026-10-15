@@ -18,7 +18,7 @@
 | L / H / SR / INV | 損失・危険な状態・安全上の要求・維持する条件。[安全分析](safety/losses-hazards.md)、[制約](safety/safety-constraints.md) |
 | R / E / EX / RUN | リスクや論点、根拠、反例の実験、実行記録。[根拠台帳](03-evidence-register.md)、[主張と反証](04-claim-register.md)。Eは当日監査では固定コード証拠の番号にも使う |
 | HD / I / D / T / UX | 人の判断待ち、実装課題、設計、検証ケース、理解・操作の課題。[未確定事項](open-questions.md)、[課題台帳](implementation/backlog.md)、各設計・検証表 |
-| X / INF | 追加の反例や推論。各表の定義と根拠を読む。推論を実行済み事実へ変えない |
+| X / INF | Xは消費者庁・FSA・MIT等の外部資料の根拠ID、INFは推論。合成実験のEXとは別。推論を実行済み事実へ変えない |
 | S / C / A〜G | 出典や架空シナリオの記号。原稿ごとに独立。小丼のS0〜S7と鶏料理のA〜Gは別の課題 |
 | #番号 / PR | GitHub Issue（課題）とPull Request（変更提案）。Issueがopenでも機能が未実装とは限らず、PRがmerge済みでもmain宛てとは限らない |
 

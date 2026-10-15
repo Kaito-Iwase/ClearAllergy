@@ -4,6 +4,21 @@
 
 ここには、ClearAllergyを設計・検証するために調べた根拠、設計案、未確認事項を保存しています。まず下の「知りたいこと」から文書を選んでください。現在の操作や実装の仕様を知りたい場合は、研究資料より先に[現行ガイド](../guide/product.md)を読みます。
 
+## 現在の入口：公開資料の精査と友人テスト
+
+現段階では実店舗へ直接聞く手段がないため、店舗接触を実施順序の前提にしません。店舗側は公開資料・事例・シナリオを精査し、利用者の操作・理解は友人の架空課題で確認します。友人の店員役から店舗負担・継続・支払意思は実証できません。
+
+| 目的 | 読む文書 |
+| --- | --- |
+| 現在の方針と未検証の境界 | [調査・友人テスト方針](product/research-and-friend-testing-policy-20261015.md) → [次の判断](product/clearallergy-next-direction-20261015.md) |
+| 実施準備 | [友人テスト台本](product/friend-user-test-20261015.md) → [空の記録票](product/friend-user-test-record-sheet-20261015.md)。未実施 |
+| 既存機能と提案を区別する | [cd502b時点の27 Issue監査](engineering/current-main-issue-audit-20261015.md) → [一料理の静的照合](product/one-dish-reconciliation-20261015.md) → [6領域の検証条件](product/next-verification-plan-20261015.md) |
+| 原稿の版・出典・独立レビュー | [提供計画の来歴](product/additional-plans-provenance-20261015.md) → [導入計画v2](literature/shop-adoption-plan-20261015.md) / [理解計画v2](literature/safety-understanding-plan-20261015.md) → [提供元レビュー](product/provided-plans-independent-review-20261015.md) / [照合資料レビュー](product/next-direction-independent-review-20261015.md) |
+| 文書を読むための補助 | [用語・時点・注意箇所](reading-guide.md) → [全文書の精査記録](../guide/document-audit-20261015.md) → [原稿保管](originals/README.md) |
+
+下の研究5稿とIssue照合は、e26b608時点または外部原稿作成時の記録です。#73/#74や#76の未merge記述を、cd502b以降の未実装へ読み替えません。古い店舗募集・聞き取り案は履歴として保持し、現在の順序は上記方針に従います。
+
+
 ## 知りたいことから選ぶ
 
 | 知りたいこと | 最初に読む文書 | 読んだ後に確認できること |
