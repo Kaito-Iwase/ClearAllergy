@@ -101,7 +101,28 @@ test("他店舗のmenuIdは取得・更新・削除で404、本文のshopIdで�
 test("所有する稼働店舗がない場合は管理APIを403で拒否する", async (t) => {
     setup(t);
     replace(t, prisma.shop, "findFirst", async () => null);
+    assert.equal((await menusRoute.GET(request("GET", "/api/admin/menus"))).status, 403);
     assert.equal((await menusRoute.POST(request("POST", "/api/admin/menus", "{}"))).status, 403);
+});
+
+test("一覧GETは自店舗の食品確認状態を返し、確認根拠・未解決本文は返さない", async (t) => {
+    setup(t);
+    replace(t, prisma.menuItem, "findMany", async ({ where }: Args) => {
+        assert.deepEqual(where, { shopId: "own-shop" });
+        return [{ id: "own-menu", name: "架空料理", category: null, priceYen: null,
+            imageUrl: null, isPublished: false, version: 4, updatedAt: new Date("2026-10-15T00:00:00Z"),
+            foodVersion: 2, reviewedFoodVersion: null, allergenLinks: [],
+            foodReviews: [{ foodVersion: 2, unresolvedIssues: "非公開の仕入れ照合メモ" }],
+        }];
+    });
+    const response = await menusRoute.GET(request("GET", "/api/admin/menus"));
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.menus[0].foodReviewState, "unresolved");
+    assert.equal(body.menus[0].unknownAllergenNames.length, ALLERGEN_MASTER.length);
+    assert.ok(!JSON.stringify(body).includes("非公開の仕入れ照合メモ"));
+    assert.ok(!("foodReviews" in body.menus[0]));
+    assert.ok(!("allergenLinks" in body.menus[0]));
 });
 
 test("閲覧専用のportfolio利用者は直接POSTしても403になる", async (t) => {

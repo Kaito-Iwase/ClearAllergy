@@ -2,10 +2,7 @@ import { DEMO_SHOP_WHERE } from "@/lib/auth/demo-shop";
 import CreateMenuButton from "@/features/admin/menus/components/CreateMenuButton";
 import MenuListPageClient from "@/features/admin/menus/components/MenuListPageClient";
 import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
-import {
-    createStatusBySlug,
-    getUnknownAllergenNames,
-} from "@/lib/allergens";
+import { adminMenuListSelect, toAdminMenuListRow } from "@/features/admin/menus/server/menu-list-data";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -23,21 +20,7 @@ async function getDemoShopMenus() {
             id: true,
             menus: {
                 orderBy: { updatedAt: "desc" },
-                select: {
-                    id: true,
-                    name: true,
-                    category: true,
-                    priceYen: true,
-                    imageUrl: true,
-                    isPublished: true,
-                    updatedAt: true,
-                    allergenLinks: {
-                        select: {
-                            status: true,
-                            allergen: { select: { slug: true } },
-                        },
-                    },
-                },
+                select: adminMenuListSelect,
             },
         },
     });
@@ -53,27 +36,7 @@ export default async function AdminDemoMenusPage() {
     ]);
 
     const initialMenus =
-        demoShop?.menus.map((menu) => {
-            const statusBySlug = createStatusBySlug(
-                allergens,
-                menu.allergenLinks,
-            );
-            const unknownAllergenNames = getUnknownAllergenNames({
-                allergens,
-                statusBySlug,
-            });
-
-            return {
-                id: menu.id,
-                name: menu.name,
-                category: menu.category,
-                priceYen: menu.priceYen,
-                imageUrl: menu.imageUrl,
-                isPublished: menu.isPublished,
-                updatedAt: menu.updatedAt.toISOString(),
-                unknownAllergenNames,
-            };
-        }) ?? [];
+        demoShop?.menus.map((menu) => toAdminMenuListRow(menu, allergens)) ?? [];
 
     return (
         <AdminDashboardShell
@@ -96,7 +59,7 @@ export default async function AdminDemoMenusPage() {
                                 メニュー管理
                             </h1>
                             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-                                通常の管理画面と同じ見た目で、公開状態・価格・アレルゲン設定状況を確認できます。作成・削除などの編集権限はなく、DB には反映されません。
+                                通常の管理画面と同じ見た目で、公開状態・価格・アレルゲン設定状況・食品確認の再確認待ちを確認できます。作成・削除などの編集権限はなく、DB には反映されません。
                             </p>
                         </div>
 

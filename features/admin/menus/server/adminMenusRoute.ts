@@ -39,6 +39,7 @@ import {
 } from "@/lib/utils/menu-image-display";
 
 import { menuInputSchema } from "@/features/admin/menus/schemas/menu-input";
+import { adminMenuListSelect, toAdminMenuListRow } from "./menu-list-data";
 
 const app = new Hono();
 function creationReplay(shopId: string, menuId: string) {
@@ -59,26 +60,22 @@ app.get("/api/admin/menus", async () => {
         }
 
         // shopId で絞ることで、他店舗のメニューが混ざらないようにします。
-        const menus = await prisma.menuItem.findMany({
-            where: { shopId: auth.shopId },
-            orderBy: { updatedAt: "desc" },
-            select: {
-                id: true,
-                name: true,
-                priceYen: true,
-                category: true,
-                imageUrl: true,
-                imageFrame: true,
-                imageFit: true,
-                imagePosition: true,
-                imageZoom: true,
-                imagePositionX: true,
-                imagePositionY: true,
-                isPublished: true,
-                version: true,
-                updatedAt: true,
-            },
-        });
+        const [allergens, menus] = await Promise.all([
+            prisma.allergen.findMany({ orderBy: { sortOrder: "asc" }, select: { slug: true, nameJa: true } }),
+            prisma.menuItem.findMany({
+                where: { shopId: auth.shopId },
+                orderBy: { updatedAt: "desc" },
+                select: {
+                    ...adminMenuListSelect,
+                    imageFrame: true,
+                    imageFit: true,
+                    imagePosition: true,
+                    imageZoom: true,
+                    imagePositionX: true,
+                    imagePositionY: true,
+                },
+            }),
+        ]);
 
         return NextResponse.json({
             menus: menus.map((menu) => {
@@ -88,7 +85,13 @@ app.get("/api/admin/menus", async () => {
                 });
 
                 return {
-                    ...menu,
+                    ...toAdminMenuListRow(menu, allergens),
+                    imageFrame: menu.imageFrame,
+                    imageFit: menu.imageFit,
+                    imagePosition: menu.imagePosition,
+                    imageZoom: menu.imageZoom,
+                    imagePositionX: menu.imagePositionX,
+                    imagePositionY: menu.imagePositionY,
                     imageUrl: safeImageUrl.ok ? safeImageUrl.value : null,
                 };
             }),

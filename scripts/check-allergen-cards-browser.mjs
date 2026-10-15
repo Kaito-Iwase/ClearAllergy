@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,16 +24,19 @@ const entry = [
     "import React from 'react'; import {createRoot} from 'react-dom/client';",
     "import ShopMenus from '@/features/public/shops/components/ShopMenuListClient'; import NewMenu from '@/features/admin/menus/components/NewMenuForm'; import EditMenu from '@/features/admin/menus/components/MenuEditClient'; import MenuList from '@/features/admin/menus/components/MenuListPageClient';",
     "import {ALLERGEN_MASTER} from '@/lib/constants/allergen-master'; import {getStoreContainsAllergenSlugs} from '@/lib/allergens'; import {saveUserAllergenPreferences} from '@/lib/public-allergen-preferences';",
+    "import {toAdminMenuListRow} from '@/features/admin/menus/server/menu-list-data';",
     "const master=ALLERGEN_MASTER.map((a,i)=>({...a,sortOrder:i+1})); const statuses=Object.fromEntries(master.map(a=>[a.slug,'FREE']));",
     "const reviewedStatuses={...statuses,egg:'CONTAINS'}; const history=[{id:'fictional-review',foodVersion:1,evidenceRefs:'架空資料 test-v1（実食品ではない）',scope:'架空の全対象品目',checkedAt:'2026-10-08T00:00:00Z',recordedAt:'2026-10-09T00:00:00Z',unresolvedIssues:'',contentSnapshot:{name:'入力ガイド確認用',description:null,category:null,ingredients:null,precaution:null,imageUrl:null,allergens:master.map(a=>({slug:a.slug,nameJa:a.nameJa,status:reviewedStatuses[a.slug]}))}}];",
     "const links=overrides=>master.map(a=>({allergen:{slug:a.slug},status:overrides[a.slug]||'FREE'}));",
     "const note='乳：仕入れ品に、乳を扱う製造ラインについての注意表示があります。\\n小麦：小麦を使う料理と揚げ油を共用しています。';",
     "const target={id:'target',name:'ミックスプレート',description:null,category:'デザート',priceYen:880,precaution:note,updatedAt:'2026-10-09T00:00:00Z',allergenLinks:links({egg:'CONTAINS',wheat:'MAY_CONTAIN',milk:'MAY_CONTAIN',soybean:'CONTAINS'})};",
     "const source={...target,id:'source',name:'くるみを使う別メニュー',precaution:null,allergenLinks:links({walnut:'CONTAINS'})};",
+    "const listBase={category:'架空検証',priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:new Date('2026-10-15T00:00:00Z'),foodVersion:2,reviewedFoodVersion:null,allergenLinks:links({}),foodReviews:[]}; const listRows=[{id:'unknown',name:'架空・品目未設定',allergenLinks:links({milk:'UNKNOWN'})},{id:'current',name:'架空・現行確認で公開中',isPublished:true,reviewedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]},{id:'old',name:'架空・材料更新で旧確認',foodReviews:[{foodVersion:1,unresolvedIssues:null}]},{id:'unresolved',name:'架空・最新記録が未解決',foodReviews:[{foodVersion:2,unresolvedIssues:'非公開の架空仕入れメモ'}]},{id:'missing',name:'架空・確認記録なし'},{id:'stopped',name:'架空・通常の公開停止',reviewedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]}].map(row=>toAdminMenuListRow({...listBase,...row},master));",
     "function prefs(highlightSlugs=[],excludedSlugs=[],includeMayContain=false){saveUserAllergenPreferences({highlightSlugs,excludedSlugs,includeMayContain,selectedSlugs:[]})}",
     "function App(){const [published,setPublished]=React.useState(true);const [unknown,setUnknown]=React.useState(false);const [long,setLong]=React.useState(false);const current={...target,precaution:long?'小麦：'+ '長い注意書き'.repeat(250):note,allergenLinks:unknown?links({egg:'CONTAINS',milk:'UNKNOWN'}):target.allergenLinks};const menus=published?[current,source]:[current];",
     "if(location.pathname.startsWith('/new'))return <NewMenu allergens={master} readOnlyPreview={location.pathname==='/new'}/>;",
-    "if(location.pathname==='/list-delete')return <MenuList totalAllergenCount={master.length} initialMenus={[{id:'fixture',name:'架空削除メニュー',category:null,priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:'2026-10-09T00:00:00Z',unknownAllergenNames:[]}]}/>;",
+    "if(location.pathname==='/list-delete')return <MenuList totalAllergenCount={master.length} initialMenus={[{id:'fixture',name:'架空削除メニュー',category:null,priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:'2026-10-09T00:00:00Z',unknownAllergenNames:[],foodReviewState:'current'}]}/>;",
+    "if(location.pathname.startsWith('/review-queue'))return <MenuList totalAllergenCount={master.length} initialMenus={location.pathname==='/review-queue-empty'?[]:listRows} readOnly={location.pathname==='/review-queue-demo'} readOnlyEditHrefBase={location.pathname==='/review-queue-demo'?'/admin/demo/menus':undefined}/>;",
     "if(location.pathname.startsWith('/edit'))return <EditMenu menuId='fixture' initialVersion={5} initialFoodVersion={1} initialReviewedFoodVersion={location.pathname==='/edit-save'?1:null} initialFoodReviews={location.pathname==='/edit-save'?history:[]} initialName='入力ガイド確認用' initialDescription={null} initialPriceYen={null} initialCategory={null} initialIngredients={null} initialPrecaution={null} initialImageUrl={null} initialImageFrame='wide' initialImageFit='contain' initialImagePosition='center' initialImageZoom={100} initialImagePositionX={50} initialImagePositionY={50} initialIsPublished={location.pathname==='/edit-save'} allergens={master} initialStatusBySlug={location.pathname==='/edit-save'?reviewedStatuses:statuses} readOnlyPreview={location.pathname==='/edit'}/>;",
     "return <><h1>架空データによるカード確認</h1><nav style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}><button onClick={()=>prefs()}>設定を解除</button><button onClick={()=>prefs(['milk','walnut'])}>乳とくるみを注目</button><button onClick={()=>prefs([],['walnut'])}>くるみを除外</button><button onClick={()=>prefs([],['milk'])}>乳の可能性は残す</button><button onClick={()=>prefs([],['milk'],true)}>乳の可能性も除外</button><button onClick={()=>setPublished(v=>!v)}>補足元の公開を切替</button><button onClick={()=>setUnknown(v=>!v)}>未確認の入力を切替</button><button onClick={()=>setLong(v=>!v)}>長い注意書きを切替</button></nav><ShopMenus shopId='fixture' menus={menus} allergenMaster={master} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs(menus,master)]}/></>}",
     "createRoot(document.getElementById('root')).render(<App/>);",
@@ -51,10 +54,22 @@ await new Promise((resolveBuild, reject) => compiler.run((error, stats) => compi
     if (error || closeError || stats?.hasErrors()) reject(error || closeError || new Error(stats.toString({ all: false, errors: true })));
     else resolveBuild();
 })));
-const chunks = join(root, ".next/static/chunks");
-const css = readdirSync(chunks).filter(name => name.endsWith(".css")).map(name => readFileSync(join(chunks, name), "utf8")).join("\n");
+const cssFiles = ["chunks", "css"].flatMap(directory => {
+    const path = join(root, ".next/static", directory);
+    return existsSync(path) ? readdirSync(path).filter(name => name.endsWith(".css")).map(name => join(path, name)) : [];
+});
+assert.ok(cssFiles.length > 0, "Build the application CSS before running this fixture");
+const css = cssFiles.map(path => readFileSync(path, "utf8")).join("\n");
 const html = '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body style="padding:16px"><main style="max-width:1000px;margin:auto"><div id="root"></div></main><script src="/bundle.js"></script></body></html>';
 const assets = new Map([["/style.css", ["text/css", css]], ["/bundle.js", ["text/javascript", readFileSync(join(fixture, "bundle.js"))]]]);
+// An optional cache of the current layout's public icon CSS/font keeps browser
+// requests on loopback. It is a fixture asset, never an app dependency.
+if (existsSync(join(output, "material-symbols.css")) && existsSync(join(output, "material-symbols.woff2"))) {
+    assets.set("/style.css", ["text/css", css + "\n" + readFileSync(join(output, "material-symbols.css"), "utf8")]);
+    assets.set("/material-symbols.woff2", ["font/woff2", readFileSync(join(output, "material-symbols.woff2"))]);
+} else {
+    console.log("UNVERIFIED: icon-font rendering without a local cache of the current layout stylesheet and font.");
+}
 assets.set("/image.svg", ["image/svg+xml", '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="green"/></svg>']);
 const media = join(root, ".next/static/media");
 for (const name of readdirSync(media)) if (name.endsWith(".woff2")) {
@@ -62,7 +77,7 @@ for (const name of readdirSync(media)) if (name.endsWith(".woff2")) {
 }
 const server = createServer((request, response) => {
     const path = new URL(request.url, "http://localhost").pathname;
-    const asset = assets.get(path) || (["/", "/new", "/new-save", "/edit", "/edit-save", "/list-delete"].includes(path) ? ["text/html", html] : null);
+    const asset = assets.get(path) || (["/", "/new", "/new-save", "/edit", "/edit-save", "/list-delete", "/review-queue", "/review-queue-demo", "/review-queue-empty"].includes(path) ? ["text/html", html] : null);
     response.writeHead(asset ? 200 : 404, { "Content-Type": asset?.[0] || "text/plain" });
     response.end(asset?.[1] || "Not found");
 });
@@ -295,6 +310,84 @@ try {
     await page.getByRole("alert").filter({ hasText: "削除は保存されました" }).waitFor();
     assert.ok(deletions.every(body => body.expectedVersion === 5));
     pass("Network-lost save retains input; malformed/network-lost delete requests current-state verification; confirmed delete separates cache pending; simulated responses only");
+
+    await page.unroute("**/api/admin/menus/fixture");
+    await page.goto(base + "/review-queue");
+    await page.locator("article").first().waitFor();
+    await page.evaluate(async () => { await document.fonts.ready; });
+    if (existsSync(join(output, "material-symbols.woff2"))) {
+        assert.equal(await page.evaluate(() => [...document.fonts].some(font => /Material Symbols Outlined/.test(font.family) && font.status === "loaded")), true);
+    }
+    assert.equal(await page.locator("article").count(), 6);
+    assert.match(await page.getByRole("status").innerText(), /表示中 6 件/);
+    assert.match(await page.locator("article").filter({ hasText: "通常の公開停止" }).innerText(), /非公開.*現行の食品確認記録あり/s);
+    assert.ok(!(await page.locator("body").innerText()).includes("非公開の架空仕入れメモ"));
+    assert.doesNotMatch(await page.locator("body").innerText(), /設定すると公開準備が完了/);
+    const reviewFilter = page.getByRole("button", { name: /^食品確認の再確認待ち/ });
+    assert.match(await reviewFilter.innerText(), /4/);
+    await reviewFilter.focus();
+    await page.keyboard.press("Enter");
+    assert.equal(await reviewFilter.getAttribute("aria-pressed"), "true");
+    assert.equal(await reviewFilter.evaluate(el => el.matches(":focus-visible") && getComputedStyle(el).outlineStyle !== "none"), true);
+    assert.equal(await page.locator("article").count(), 4);
+    assert.equal(await page.locator("article").filter({ hasText: "通常の公開停止" }).count(), 0);
+    assert.match(await page.locator("body").innerText(), /現在の食品内容に対応する確認記録がありません/);
+    assert.match(await page.locator("body").innerText(), /最新の食品確認記録に未解決事項があります/);
+    assert.match(await page.locator("body").innerText(), /食品確認記録がありません/);
+    const reviewLink = page.getByRole("link", { name: "架空・材料更新で旧確認：食品確認を見直す", exact: true });
+    assert.equal(await reviewLink.getAttribute("href"), "/admin/menus/old/edit");
+    await reviewLink.focus();
+    assert.equal(await reviewLink.evaluate(el => el.matches(":focus-visible") && getComputedStyle(el).outlineStyle !== "none"), true);
+    pass("Review queue counts four pending records, explains missing/outdated/unresolved, and keeps a normal STOP current; keyboard filter and edit focus are visible");
+    for (const width of [320, 390, 768, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, width + "px review queue overflow");
+        if (existsSync(join(output, "material-symbols.woff2"))) {
+            assert.equal(await reviewLink.evaluate(element => {
+                const box = element.getBoundingClientRect();
+                const text = [...element.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.includes("食品確認を見直す"));
+                if (!text) return false;
+                const range = document.createRange(); range.selectNodeContents(text);
+                return [...range.getClientRects()].every(rect => rect.width > 0 && rect.left >= box.left && rect.right <= box.right + 1 && rect.top >= box.top && rect.bottom <= box.bottom + 1);
+            }), true, width + "px edit action text remains inside the link");
+        }
+        if ([390, 1440].includes(width)) await page.screenshot({ path: join(output, "review-queue-" + width + ".png"), fullPage: true });
+    }
+    const search = page.getByRole("searchbox", { name: "管理メニューを検索", exact: true });
+    await search.fill("材料更新");
+    assert.equal(await page.locator("article").count(), 1);
+    await search.fill("該当なし");
+    assert.equal(await page.locator("article").count(), 0);
+    await page.getByText("該当するメニューがありません", { exact: true }).waitFor();
+    await search.fill("");
+    await page.getByRole("button", { name: /^公開中/ }).click();
+    assert.equal(await page.locator("article").count(), 1);
+    await page.getByRole("button", { name: /^非公開/ }).click();
+    assert.equal(await page.locator("article").count(), 5);
+    await page.getByRole("button", { name: /^未設定あり/ }).click();
+    assert.equal(await page.locator("article").count(), 1);
+    await reviewFilter.click();
+    await search.fill("材料更新");
+    const queueDeletes = [];
+    await page.route("**/api/admin/menus/old", route => {
+        assert.equal(route.request().method(), "DELETE"); queueDeletes.push(route.request().postDataJSON());
+        return route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' });
+    });
+    await page.getByRole("button", { name: "架空・材料更新で旧確認を削除", exact: true }).click();
+    await page.getByText("該当するメニューがありません", { exact: true }).waitFor();
+    assert.equal(await search.inputValue(), "材料更新");
+    assert.equal(await reviewFilter.getAttribute("aria-pressed"), "true");
+    assert.match(await reviewFilter.innerText(), /3/);
+    assert.deepEqual(queueDeletes, [{ expectedVersion: 5 }]);
+    pass("Review queue supports 320/390/768/1440px, search and each existing filter, zero matches, and simulated versioned deletion with counts/search retained");
+    await page.goto(base + "/review-queue-demo");
+    await page.locator("article").first().waitFor();
+    assert.equal(await page.getByRole("link", { name: "架空・材料更新で旧確認：食品確認を見直す", exact: true }).getAttribute("href"), "/admin/demo/menus/old/edit");
+    for (const button of await page.getByRole("button", { name: /を削除$/ }).all()) assert.equal(await button.isDisabled(), true);
+    await page.goto(base + "/review-queue-empty");
+    await page.getByText("該当するメニューがありません", { exact: true }).waitFor();
+    assert.match(await page.getByRole("status").innerText(), /表示中 0 件 \/ 全 0 件/);
+    pass("Read-only demo shares review explanations and demo edit links; deletion stays disabled and empty lists remain usable");
     assert.deepEqual(errors, []);
     pass("Real new/edit forms show the guide and associated help; note text never changes state; cards and note fields support keyboard focus");
     pass("Food review evidence/scope/time inputs are labelled and required; unresolved issues and keyboard/mobile layout remain visible");

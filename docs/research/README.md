@@ -1,5 +1,11 @@
 # ClearAllergy evidence-driven research
 
+## 2026-10-15 一料理の材料変更を使う検証準備
+
+[進行台本](product/ingredient-change-trial-20261015.md)、[ローカル操作画面・架空資料](product/ingredient-change-trial-fixture-20261015.md)、[匿名の空記録票](product/ingredient-change-trial-record-sheet-20261015.md)を一組で使います。[準備の実行記録](../verification/ingredient-change-trial-preparation-20261015.md)は実コンポーネントの隔離ブラウザと起動・終了を扱い、参加者観察・店舗工数・理解度測定の実施記録ではありません。
+
+通常STOP、食品変更後の旧確認、最新未解決、未申告変更、旧新在庫、複合材料の抜けと既存画面の限界を分けて観察する計画です。材料・在庫モデルやゲスト申告・グループ適合判定をアプリへ追加する仕様ではありません。
+
 2026-09-28 / working tree `improve/prototype-usability-ci` / HEAD `64163cc` + 調査開始前からの未コミット変更。**判定: PARTIALLY_READY**。Production code・test code・schemaは変更していない。GitHub Issue作成・commit・pushは未実施。
 
 後続の実装runでI01とI02をローカル修正し、[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)と[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)を起票した。2026-09-28の整理でI01を`111817e`、I02を`03d39d4`、関連するDB/CI回帰定義を`242a0c9`にlocal commitした。I03–I12とHD-01–HD-09もGitHub Issueへ起票済み。pushは未実施。2026-09-30にI01の境界ケースを補強し、I02の隔離PostgreSQL・実ハンドラ回帰18項目を確認した。追検証差分は未コミット。[I01結果](implementation/i01-result.md)と[I02結果](implementation/i02-result.md)を参照。上のfreezeと以下のExecutive Summaryは**研究run時点の記録**であり、後続のコード状態を説明する文ではない。全体の設計判定PARTIALLY_READYは継続。
