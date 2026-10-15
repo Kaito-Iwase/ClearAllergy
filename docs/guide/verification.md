@@ -1,5 +1,7 @@
 # 文書の根拠と確認範囲
 
+日付付きの各段落は、その時点のコード・環境・試験結果です。2026-10-15の後続main `cd502b` は[27 Issueの固定監査](../research/engineering/current-main-issue-audit-20261015.md)、文書全体の読み取りは[精査記録](document-audit-20261015.md)から確認してください。以下の `e26b6088` は#79/#80より前の記録で、修復後の未解決一覧ではありません。
+
 2026-10-15 JSTの固定main `e26b6088` に対する店舗保存・再確認待ち一覧の限定確認は、[#73/#74の隔離実行記録](../verification/shop-menu-isolated-probe-20261015.md)を参照してください。実処理＋メモリPrisma／synthetic Reactの7ケースであり、実DB・実ブラウザ・Clerk・本番・実食品は今回未確認です。修復・公開条件変更・実店舗利用の承認ではありません。
 
 同時点の[27件のIssueと現行コードの照合](../research/engineering/open-issues-current-code-20261015.md)は研究記録です。古い未実装前提、実装済み、過去の実行報告、残る判断・運用・環境を区別しており、既存Issueのcloseや現在releaseの合格を決めるものではありません。

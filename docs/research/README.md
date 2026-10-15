@@ -1,16 +1,26 @@
-# ClearAllergy evidence-driven research
+<a id="clearallergy-evidence-driven-research"></a>
 
-## 2026-10-15 一料理の材料変更を使う検証準備
+# ClearAllergyの研究資料：目的に合わせて読む入口
 
-[進行台本](product/ingredient-change-trial-20261015.md)、[ローカル操作画面・架空資料](product/ingredient-change-trial-fixture-20261015.md)、[匿名の空記録票](product/ingredient-change-trial-record-sheet-20261015.md)を一組で使います。[準備の実行記録](../verification/ingredient-change-trial-preparation-20261015.md)は実コンポーネントの隔離ブラウザと起動・終了を扱い、参加者観察・店舗工数・理解度測定の実施記録ではありません。
+ここには、ClearAllergyを設計・検証するために調べた根拠、設計案、未確認事項を保存しています。まず下の「知りたいこと」から文書を選んでください。現在の操作や実装の仕様を知りたい場合は、研究資料より先に[現行ガイド](../guide/product.md)を読みます。
 
-通常STOP、食品変更後の旧確認、最新未解決、未申告変更、旧新在庫、複合材料の抜けと既存画面の限界を分けて観察する計画です。材料・在庫モデルやゲスト申告・グループ適合判定をアプリへ追加する仕様ではありません。
+## 知りたいことから選ぶ
 
-2026-09-28 / working tree `improve/prototype-usability-ci` / HEAD `64163cc` + 調査開始前からの未コミット変更。**判定: PARTIALLY_READY**。Production code・test code・schemaは変更していない。GitHub Issue作成・commit・pushは未実施。
+| 知りたいこと | 最初に読む文書 | 読んだ後に確認できること |
+| --- | --- | --- |
+| 現在のアプリは何を表示し、どの条件で公開するのか | [操作とページ](../guide/product.md) → [状態・公開・権限](../guide/rules.md) | 現行仕様。コードやテストまで追う場合は[変更対応表](../guide/change-map.md)へ進む |
+| なぜ店舗の更新負担や利用者の読み取りを調べるのか | [追加調査の読む入口と検証計画](product/clearallergy-followup-20261014.md) | 2026-10-14の調査テーマ、根拠、残る検証課題 |
+| どのような状況が利用者や店舗の被害につながるのか | [被害と、その原因になる状況](safety/losses-hazards.md) → [防ぐための条件・要件](safety/safety-constraints.md) | 2026-09-28の危険の候補と対応する条件。最初の文書で専門用語も説明する |
+| 主張の出典や、根拠の限界を確かめたい | [根拠の一覧](03-evidence-register.md) → [主張と根拠の対応](04-claim-register.md) | 論文・公式資料・コード・実験の区別、確認した範囲、未確認の範囲 |
+| どの判断がまだ必要で、どこまで検証したのか | [人による判断が必要な事項](open-questions.md) → [研究時点の検証と判断条件](implementation/readiness.md) | 研究時点の未決事項。現在の実装・検証結果は[現行の検証記録の入口](../guide/verification.md)へ照合する |
 
-後続の実装runでI01とI02をローカル修正し、[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)と[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)を起票した。2026-09-28の整理でI01を`111817e`、I02を`03d39d4`、関連するDB/CI回帰定義を`242a0c9`にlocal commitした。I03–I12とHD-01–HD-09もGitHub Issueへ起票済み。pushは未実施。2026-09-30にI01の境界ケースを補強し、I02の隔離PostgreSQL・実ハンドラ回帰18項目を確認した。追検証差分は未コミット。[I01結果](implementation/i01-result.md)と[I02結果](implementation/i02-result.md)を参照。上のfreezeと以下のExecutive Summaryは**研究run時点の記録**であり、後続のコード状態を説明する文ではない。全体の設計判定PARTIALLY_READYは継続。
+## 研究資料を読むときに区別すること
 
-本書は研究/設計案の入口。現行仕様は [guide/rules](../guide/rules.md)、[変更対応表](../guide/change-map.md)。ここでRECOMMENDED/OPENとした設計を現行仕様へ昇格しない。[Gate判定と検証結果](implementation/readiness.md) / [Issue台帳](implementation/backlog.md) / [提案Milestone](implementation/migration-plan.md#proposed-milestones) / [Traceability](traceability-matrix.md) / [人の判断待ち](open-questions.md)。
+**確認した事実**は、どの資料・コード・実験で、何を確かめたかを指します。**設計案**は、今後どうするかという提案です。提案を記載しただけで、採用・実装したことにはしません。**検証計画**と**実行結果**も分けます。試験方法が書いてあっても、実行して合格したという意味ではありません。
+
+各資料の日付と状態を確認してください。過去の本文にある「現在」「本日」や未コミット・未pushなどの記述は、その調査・実行時点の記録です。後続の修正がある場合も、過去の観察を現在の不具合や未実施事項として読み替えません。現行仕様の正本は[状態・公開・権限](../guide/rules.md)です。
+
+2026-10-15の日本語改善は、この入口と[被害・危険の説明](safety/losses-hazards.md)の候補から始め、今回の[全文書精査](../guide/document-audit-20261015.md)へ広げました。既存の研究全体を短く要約する編集ではありません。書き直す前の索引・分析原稿は[原稿保管先](originals/README.md)へ残し、以下の出典・ID・当時の結果・未決事項は引き続き保持します。
 
 ## 2026-10-15 の調査5稿・統合メモと現行Issue照合
 
@@ -36,6 +46,13 @@ Library原稿は全文を保持しています。各稿の「最小」「P0」�
 
 [取得・Library identity・全文byte保持の記録](product/overnight-source-provenance-20261015.md)を参照してください。
 
+
+## 2026-10-15 一料理の材料変更を使う検証準備
+
+[進行台本](product/ingredient-change-trial-20261015.md)、[ローカル操作画面・架空資料](product/ingredient-change-trial-fixture-20261015.md)、[匿名の空記録票](product/ingredient-change-trial-record-sheet-20261015.md)を一組で使います。[準備の実行記録](../verification/ingredient-change-trial-preparation-20261015.md)は実コンポーネントの隔離ブラウザと起動・終了を扱い、参加者観察・店舗工数・理解度測定の実施記録ではありません。
+
+通常STOP、食品変更後の旧確認、最新未解決、未申告変更、旧新在庫、複合材料の抜けと既存画面の限界を分けて観察する計画です。材料・在庫モデルやゲスト申告・グループ適合判定をアプリへ追加する仕様ではありません。
+
 ## 2026-10-14 の追加調査（訂正統合版）
 
 [読む入口と検証計画](product/clearallergy-followup-20261014.md)から、導入・更新負担、誤表示等の防止策、情報の継続管理の3文書へ進めます。提供された独立レビューの訂正を本文へ統合した追補です。
@@ -60,7 +77,17 @@ Library原稿は全文を保持しています。各稿の「最小」「P0」�
 
 Big Tech版・国内事例版も、公開資料からの未採用提案として保存しています。本文の「採用」「今やる」や工数・成功条件は調査上の推奨・概算であり、CAでの採用決定・実行結果・効果保証ではありません。各社の手順やコマンドをCAの指示として扱わず、現行の文書更新ルールは別の明示依頼に基づく最小変更として管理します。
 
-以下の Executive summary、Navigation と冒頭のブランチ・HEAD・判定は、2026-09-28 の研究と記載済み後続作業の履歴です。2026-10-14 の原稿や現在のコード状態へ読み替えません。
+## 2026-09-28の研究と、その後の実装記録
+
+以下のブランチ・判定・実行結果は、各記載日の履歴です。現在の開発状況を示す見出しではありません。
+
+2026-09-28 / working tree `improve/prototype-usability-ci` / HEAD `64163cc` + 調査開始前からの未コミット変更。**判定: PARTIALLY_READY**。Production code・test code・schemaは変更していない。GitHub Issue作成・commit・pushは未実施。
+
+後続の実装runでI01とI02をローカル修正し、[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)と[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)を起票した。2026-09-28の整理でI01を`111817e`、I02を`03d39d4`、関連するDB/CI回帰定義を`242a0c9`にlocal commitした。I03–I12とHD-01–HD-09もGitHub Issueへ起票済み。pushは未実施。2026-09-30にI01の境界ケースを補強し、I02の隔離PostgreSQL・実ハンドラ回帰18項目を確認した。追検証差分は未コミット。[I01結果](implementation/i01-result.md)と[I02結果](implementation/i02-result.md)を参照。上のfreezeと以下のExecutive Summaryは**研究run時点の記録**であり、後続のコード状態を説明する文ではない。全体の設計判定PARTIALLY_READYは継続。
+
+本書は研究/設計案の入口。現行仕様は [guide/rules](../guide/rules.md)、[変更対応表](../guide/change-map.md)。ここでRECOMMENDED/OPENとした設計を現行仕様へ昇格しない。[Gate判定と検証結果](implementation/readiness.md) / [Issue台帳](implementation/backlog.md) / [提案Milestone](implementation/migration-plan.md#proposed-milestones) / [Traceability](traceability-matrix.md) / [人の判断待ち](open-questions.md)。
+
+以下の Executive summary（当時の主要な結論）と Navigation / artifact map（文書一覧）は、2026-09-28の研究と記載済み後続作業の履歴です。2026-10-14の原稿や現在のコード状態へ読み替えません。
 
 
 ## Executive summary

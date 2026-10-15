@@ -1,17 +1,23 @@
 # 起動・確認・変更の進め方
 
-
-2026-10-07公開前の依存更新・残存指摘・公開保留の決定は[依存更新記録](../verification/security-release-20261007.md)に記録する。通常CIの成功と依存監査の成功を区別し、監査FAILのまま公開を完了扱いにしない。
 [READMEへ](../../README.md) · [内部処理](architecture.md) · [変更対応表](change-map.md) · [文書の保守](maintenance.md)
 
 ここに載せるコマンドはリポジトリの設定から整理した手順です。今回すべてを実行した記録ではありません。[確認範囲](verification.md)に実施と未実施を分けています。以下のコードブロックは**PowerShellで実行する手順**で、アプリのソース抜粋ではありません。
 
+過去の依存更新と公開判断に関する記録：
+
+2026-10-07公開前の依存更新・残存指摘・公開保留の決定は[依存更新記録](../verification/security-release-20261007.md)に記録する。通常CIの成功と依存監査の成功を区別し、監査FAILのまま公開を完了扱いにしない。
+
 <a id="environment"></a>
 ## 1. どの環境を使うか決める
 
-作業フォルダは `C:\Users\kaito\Documents\Github\ClearAllergy`。Node.jsは `.node-version` の22.23.1、Dockerfile・CIのglobal npmは11.18.0です。npmはアプリ依存へ同梱しません。ハーネスとブラウザ導入は `scripts/npm-cli.mjs` でnpm lifecycleの `npm_execpath` またはNode配布の標準位置を検証し、NodeからCLIを引数配列で呼び出します。ホストの実npm版はハーネス結果の `runtime.actualNpm` へ記録します。npmが見つからない場合は暗黙に導入せず停止するため、Node配布を調べるか `npm.cmd exec -- node scripts/agent-harness.mjs verify --base origin/main` で既存npmから起動してください。Windowsでは `npm.cmd` / `npx.cmd` を使います。既に準備済みの環境は、最初に再インストールせず状態を確認します。
+作業フォルダは `C:\Users\kaito\Documents\Github\ClearAllergy`。Node.jsは `.node-version` の22.23.1、Dockerfile・CIのグローバルnpmは11.18.0です。npmはアプリ依存へ同梱しません。
 
-| 実行方法 | アプリ | DB | 外部サービス・用途 |
+ハーネスとブラウザ導入は `scripts/npm-cli.mjs` でnpmのスクリプト実行時に渡される `npm_execpath` またはNode配布の標準位置を検証し、NodeからCLI（コマンドライン実行用プログラム）を引数配列で呼び出します。ホストの実npm版はハーネス結果の `runtime.actualNpm` へ記録します。npmが見つからない場合は暗黙に導入せず停止するため、Node配布を調べるか `npm.cmd exec -- node scripts/agent-harness.mjs verify --base origin/main` で既存npmから起動してください。
+
+Windowsでは `npm.cmd` / `npx.cmd` を使います。既に準備済みの環境は、最初に再インストールせず状態を確認します。
+
+| 実行方法 | アプリ | DB（データベース） | 外部サービス・用途 |
 | --- | --- | --- | --- |
 | ホストの `npm.cmd run dev` | 通常3000番 | 環境変数で指定。ローカルDBを自動作成しない | 開発者が用意した接続。実データの接続を安易に流用しない |
 | `compose.yaml` | localhost:3100 | **DBサービスなし**。`.env` / `.env.local` の接続先 | Linuxコンテナ内でアプリを動かす通常開発 |
@@ -33,7 +39,7 @@ DBデータ・コンテナ内依存・`.next`（Next.jsの生成物）はそれ�
 | `DATABASE_URL` / `DIRECT_URL` | DBの通常接続／Prismaの直接接続。両方の接続先を確認する |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` | Clerkの公開用／サーバー専用キー。テスト初期化には開発用が必要 |
 | `PORTFOLIO_MODE` / `PORTFOLIO_EDITOR_APP_USER_IDS` | 更新制限と許可対象。[権限ルール](rules.md#ownership)を参照 |
-| `ENABLE_CLERK_ADMIN_AUTH` | Google / Clerk SSO導線の表示判定に使う。全認証の無効化スイッチではない |
+| `ENABLE_CLERK_ADMIN_AUTH` | Google / Clerk SSO（外部アカウントによるログイン）導線の表示判定に使う。全認証の無効化スイッチではない |
 | `NEXT_PUBLIC_APP_URL` | 公開URL・QR等の基準URL |
 | `BLOB_READ_WRITE_TOKEN` / `ALLOWED_IMAGE_URL_PREFIXES` | アップロードと許可する画像ストア。未設定なら画像機能を無理に試さない |
 | `GOOGLE_MAPS_SERVER_API_KEY` | 管理画面のGoogle店舗候補検索用 |
@@ -66,7 +72,7 @@ npm.cmd run dev
 
 1行目はNode.js、2行目はnpmのバージョン確認、3行目は開発サーバー起動です。起動ログのURL（通常 `http://localhost:3000`）を開きます。成功判定はプロセス起動だけでなく、`/shops` にデータまたは正しい空表示が出ることです。DB障害の案内は接続成功ではありません。
 
-初回取得で依存がない場合だけ `npm.cmd ci`（lockfile通りに依存を配置）、続けて `npx.cmd prisma generate`（DB構造定義からアクセス用コードを生成）を行います。後者はDBのマイグレーションではありません。未初期化DBに対する既存マイグレーション適用は別の書込作業です。接続先と権限を確認せず `migrate dev`、`db push`、`seed` を起動のついでに実行しないでください。
+初回取得で依存がない場合だけ `npm.cmd ci`（ロックファイル通りに依存を配置）、続けて `npx.cmd prisma generate`（DB構造定義からアクセス用コードを生成）を行います。後者はDBのマイグレーションではありません。未初期化DBに対する既存マイグレーション適用は別の書込作業です。接続先と権限を確認せず `migrate dev`、`db push`、`seed` を起動のついでに実行しないでください。
 
 **通常Dockerで起動：** 上と同じ接続先確認に加え、Docker Desktopを起動してから実行します。
 
@@ -131,9 +137,11 @@ docker compose -f compose.test.yaml up -d app
 <a id="browser"></a>
 ### ブラウザ・実DB検証
 
-店舗保存の局所回帰は `node --import tsx --test tests/admin-shop-api.test.ts tests/shop-response.test.ts`。DB・Clerk・cacheは代用品であり、実DBの競合確認は別です。`node --import tsx scripts/check-shop-database.ts` は既存の専用ComposeまたはCI接続guardを最初に通し、架空User/Shopの作成・条件付き保存・同時read・所有状態変更・cache失敗・後始末を行います。通常環境では接続guardで停止します。CIは架空データ準備後にこのscriptを実行し、migration/reset/本番接続は追加しません。
+以下でいうfixtureは検証用の環境と架空データ、loopbackは自分のPCだけに接続する通信先、DTOは画面やAPIへ受け渡すデータです。
 
-`node scripts/check-shop-save-browser.mjs` は実ShopEditClientを一時bundleにしたloopback専用fixtureで、不正200・競合・結果不明時の入力/画像保持、保存済み/反映未確認、送信中抑止、390/1440px・keyboardを検査し、JSONと画像を保存します。アプリ・DB・Clerk・Blobの起動は不要で、Nextとfetchは代用品です。既に準備した隔離Playwrightを `PLAYWRIGHT_MODULE_PATH`、必要なら対応ブラウザを `BROWSER_EXECUTABLE` / `PLAYWRIGHT_BROWSERS_PATH` に指定してください。アプリ依存へPlaywrightを追加しません。たとえば既存runnerを使うPowerShellの指定は次のとおりです。
+店舗保存の局所回帰は `node --import tsx --test tests/admin-shop-api.test.ts tests/shop-response.test.ts`。DB・Clerk・キャッシュは代用品であり、実DBの競合確認は別です。`node --import tsx scripts/check-shop-database.ts` は既存の専用ComposeまたはCI接続ガードを最初に通し、架空のUser/Shopの作成・条件付き保存・同時読取・所有状態変更・キャッシュ失敗・後始末を行います。通常環境では接続ガードで停止します。CIは架空データ準備後にこのスクリプトを実行し、マイグレーション・リセット・本番接続は追加しません。
+
+`node scripts/check-shop-save-browser.mjs` は、実際の `ShopEditClient` をまとめた一時コード（bundle）をloopback専用fixtureで動かし、不正200・競合・結果不明時の入力/画像保持、保存済み/反映未確認、送信中抑止、390/1440px・キーボード操作を検査し、JSONと画像を保存します。アプリ・DB・Clerk・Blobの起動は不要で、Nextとfetchは代用品です。既に準備した隔離Playwrightを `PLAYWRIGHT_MODULE_PATH`、必要なら対応ブラウザを `BROWSER_EXECUTABLE` / `PLAYWRIGHT_BROWSERS_PATH` に指定してください。アプリ依存へPlaywrightを追加しません。たとえば既存ランナーを使うPowerShellの指定は次のとおりです。
 
 ```powershell
 $env:PLAYWRIGHT_MODULE_PATH = Join-Path $env:TEMP 'clearallergy-browser-1.61.0\node_modules\playwright'
@@ -142,7 +150,7 @@ $env:CLEARALLERGY_BROWSER_OUTPUT = Join-Path $env:TEMP 'clearallergy-shop-save-r
 node scripts/check-shop-save-browser.mjs
 ```
 
-同worktreeのbuild済みCSSが必要です。Webpackの `.next/static/css` と既定の `.next/static/chunks` を読めます。既存Windows依存をjunctionで共有してTurbopackがroot外として拒否する環境では、同一schemaの生成済みClientを確認したうえで `npm.cmd --ignore-scripts run build -- --webpack` を使い、共有Clientの再生成を省略したことを記録します。通常の独立環境/CIは従来の `npm run build` とPrisma生成を使います。[今回の結果と限界](../verification/shop-save-contract-20261015.md)を参照してください。
+同じ作業ツリー（worktree）のビルド済みCSS（画面の見た目を指定するスタイル）が必要です。Webpackの `.next/static/css` と既定の `.next/static/chunks` を読めます。既存Windows依存をジャンクション（ディレクトリの参照リンク）で共有してTurbopackが作業ルートの外として拒否する環境では、同じスキーマの生成済みClientを確認したうえで `npm.cmd --ignore-scripts run build -- --webpack` を使い、共有Clientの再生成を省略したことを記録します。通常の独立環境・CIは従来の `npm run build` とPrisma生成を使います。[今回の結果と限界](../verification/shop-save-contract-20261015.md)を参照してください。
 
 ブラウザ回帰は `scripts/browser-runner.mjs` でPlaywright 1.61.0とChromiumを隔離して用意します。アプリの依存とlockfileは変更しません。既定の保存先はOSの一時ディレクトリ内の `clearallergy-browser-1.61.0` で、`CLEARALLERGY_BROWSER_RUNNER_DIR` で変更できます。初回の `install` はネットワークから検証ツールを取得するため、利用可能な環境で実行します。アプリの既存依存が必要です。
 
@@ -156,7 +164,13 @@ node scripts/browser-runner.mjs ui
 
 `node scripts/browser-runner.mjs demo` は公開画面と保存しない管理デモ、`node scripts/browser-runner.mjs admin` は専用環境の管理操作を確認します。後者はDB・開発用Clerk・Blobへの書込を伴い、専用アカウントと保存先の許可が必要です。ランナーの準備だけで認証情報やテストデータが作られるわけではありません。
 
-`node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォーム、管理メニュー一覧を、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。320／390／768／1440pxの品目名・状態別件数・対象範囲・注意書き全文、個人設定とMAY_CONTAIN除外、補足元の非公開化、混在するUNKNOWN、新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスを確認します。食品確認の必須欄・履歴、保存競合時の入力保持、保存成功と公開反映失敗の表示、不正な成功DTO・作成IDと通信断、送信中の独自画像gestureによる変更拒否も確認します。管理一覧では品目未設定・現行確認・旧確認・最新未解決・記録なし・通常STOPを分け、件数・検索／filter・編集入口・版付き削除後の件数・空表示・保存しないdemoを検査します。既存TypeScriptとNext同梱webpackを使用し、依存を追加しません。Nextのリンク・画像・navigationと保存APIの応答をfixture用に置き換えるため、実ルート・公開データ取得・認証・DB保存・アップロードの確認とは区別します。ブラウザの外部通信を遮断し、保存操作で実DBやBlobへ書き込みません。
+`node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォーム、管理メニュー一覧を、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。
+
+320／390／768／1440pxの品目名・状態別件数・対象範囲・注意書き全文、個人設定とMAY_CONTAIN除外、補足元の非公開化、混在するUNKNOWN、新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスを確認します。
+
+食品確認の必須欄・履歴、保存競合時の入力保持、保存成功と公開反映失敗の表示、不正な成功DTO・作成IDと通信断、送信中の独自の画像ジェスチャーによる変更拒否も確認します。管理一覧では品目未設定・現行確認・旧確認・最新未解決・記録なし・通常STOPを分け、件数・検索／filter・編集入口・版付き削除後の件数・空表示・保存しないデモを検査します。
+
+既存TypeScriptとNext同梱webpackを使用し、依存を追加しません。Nextのリンク・画像・navigationと保存APIの応答をfixture用に置き換えるため、実ルート・公開データ取得・認証・DB保存・アップロードの確認とは区別します。ブラウザの外部通信を遮断し、保存操作で実DBやBlobへ書き込みません。
 
 `node scripts/browser-runner.mjs composition` は画像構図の実コンポーネントを一時ディレクトリでコンパイルし、使い捨てのloopbackサーバーで検証します。事前にアプリのビルド済みCSS（`.next/static/chunks`）と隔離ブラウザランナーが必要です。アプリ・DBの起動やClerk／Blobのキーは不要。新規依存は導入せず、既存TypeScript・Next同梱webpack・sharpを使用します。写真の目印の画素が指／マウスの方向に動くこと、拡大・余白・両プレビュー・端・元画像比較・390pxのタッチ／ピンチを確認し、終了時にブラウザとサーバーを閉じます。実管理画面での画像アップロードや保存の検証とは別です。
 
@@ -182,7 +196,7 @@ node scripts/browser-runner.mjs ui
 
 一料理の材料変更を試すローカル演習は、[台本](../research/product/ingredient-change-trial-20261015.md)・[起動手順と架空資料](../research/product/ingredient-change-trial-fixture-20261015.md)・[匿名空票](../research/product/ingredient-change-trial-record-sheet-20261015.md)を一組で使います。build済みCSSがあるworktreeで `node scripts/ingredient-change-trial.mjs --serve --minutes 30` を実行すると127.0.0.1だけで起動し、時間終了またはCtrl+Cでメモリ内の架空保存を破棄します。実Clerk/DB/Blobへ接続しません。管理一覧・編集・公開表示は実部品、保存応答とNextのnavigationは代用品です。
 
-起動時に出るtoken付き進行役URLは初回回答者へ渡さず、回答者には条件別の資料だけを渡します。進行役の全資料・期待結果は別PCまたは専用の紙で管理し、PC・ブラウザ履歴・ターミナルを共有しません。tokenはこのfixture内の表示・制御の分離であり、同じOS利用者からの秘密保護を保証する仕組みではありません。
+起動時に出るtoken（進行役用の識別値）付き進行役URLは初回回答者へ渡さず、回答者には条件別の資料だけを渡します。進行役の全資料・期待結果は別PCまたは専用の紙で管理し、PC・ブラウザ履歴・ターミナルを共有しません。tokenはこのfixture内の表示・制御の分離であり、同じOS利用者からの秘密保護を保証する仕組みではありません。
 
 `--check` は既存隔離Playwrightを `PLAYWRIGHT_MODULE_PATH`、必要なら対応するブラウザを `BROWSER_EXECUTABLE` / `PLAYWRIGHT_BROWSERS_PATH` に指定して、操作・状態・画像を自動確認し終了します。実Material Symbolsのローカルcacheを使う場合は `--icons-root` で既に取得したCSS/woff2のディレクトリを指定し、ブラウザの外部通信は遮断します。アプリ依存へ追加しません。[準備結果](../verification/ingredient-change-trial-preparation-20261015.md)は補助試験の範囲で、台本全分岐・実店舗の工数/理解度を合格にしません。
 
@@ -193,6 +207,8 @@ node scripts/browser-runner.mjs ui
 
 <a id="operations"></a>
 ## 5. 運用スクリプトとCI/CD
+
+CDは配備・公開の自動化のことです。
 
 `auth:create:test-user` は廃止しました。旧コマンド名を実行しても、環境ファイル・DB・Clerkを読み込まず、終了コード1で停止します。既存アカウントのパスワードを上書きする機能はありません。テストアカウントが必要な場合は、接続先を検査する[専用テスト環境](#test-environment)の手順を使います。
 
@@ -210,7 +226,7 @@ CI定義は `.github/workflows/ci.yml`。main/develop向けPR、両ブランチ�
 
 依存検査は別の `.github/workflows/dependency-audit.yml` が担当します。main/develop向けの依存ファイル・当該workflow変更PR、毎週月曜03:27 UTC（12:27 JST）、手動実行が入口です。`npm audit --ignore-scripts --audit-level=high` で既知の高・重大の問題を検出すると失敗します。自動修正やパッケージ更新はしません。通信障害の失敗と検出された脆弱性を区別して調べます。対象はdevを含むアプリlockfileで、Node配布のnpm CLI・OS・隔離Playwrightの脆弱性まで修正した証拠ではありません。
 
-Next.jsのlint設定は全ルールを維持します。`@next/eslint-plugin-next@16.3.6` のルートディレクトリ検索だけ、`scripts/next-root-glob` のローカル互換層へoverrideします。既存tinyglobby 0.2.17を使い、ディレクトリの自動展開を無効にして絶対パス・末尾区切りを正規化します。パターンは65,536文字・入れ子128段までとし、超過と未対応の範囲brace（`app{1..12}` 等）は検査失敗です。範囲は明示した配列か選択braceへ置き換えてください。`.npmrc` の `install-links=true` をinstall/ciで共有し、Dockerはローカルpackageをnpm ciの前にCOPYします。一般のfast-glob代替として使わず、Next plugin更新時には利用API・rootDir検索・内部リンク検知とclean install/auditを再確認してください。保守対象はこのリポジトリです。検証は `tests/next-root-glob.test.ts` と `tests/npm-cli.test.ts` から追えます。
+Next.jsのlint設定は全ルールを維持します。`@next/eslint-plugin-next@16.3.6` のルートディレクトリ検索だけ、`scripts/next-root-glob` のローカル互換層へoverrideします。既存tinyglobby 0.2.17を使い、ディレクトリの自動展開を無効にして絶対パス・末尾区切りを正規化します。パターンは65,536文字・入れ子128段までとし、超過と未対応の範囲brace（波括弧による範囲指定。`app{1..12}` 等）は検査失敗です。範囲は明示した配列か選択braceへ置き換えてください。`.npmrc` の `install-links=true` をinstall/ciで共有し、Dockerはローカルpackageをnpm ciの前にCOPYします。一般のfast-glob代替として使わず、Next plugin更新時には利用API・rootDir検索・内部リンク検知とclean install/auditを再確認してください。保守対象はこのリポジトリです。検証は `tests/next-root-glob.test.ts` と `tests/npm-cli.test.ts` から追えます。
 
 ### 要求IDから障害を調べる
 
@@ -218,7 +234,7 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 
 招待取消が502ならローカルでは取消済みの可能性があるため、画面を再読込して取消再試行の表示を確認します。受諾と競合した409は確定済み状態を再確認し、受諾済みを取消扱いに上書きしません。補償取消の失敗や通信結果が不明な場合は、権限を持つ運営者がDBの対象招待とClerkを照合します。自動で解決済みと判断せず、外部データの修正は対象・副作用を確認して行います。
 
-CDは配備・公開の自動化のことです。このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
+このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
 
 ### 公開前と障害時の確認
 
