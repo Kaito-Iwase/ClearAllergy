@@ -1,0 +1,76 @@
+# ClearAllergy：現在のmainとopen Issueの照合
+
+対象時点：2026-10-15 08:01 UTC（17:01 JST）の読取記録。基準mainは `cd502b2404f518975dc4243ab6c41a702e7aa226`。これは製品の現在状態を整理する机上監査であり、アプリ・DB・外部サービスを新たに動かした試験ではない。
+
+[判断の入口](ca-next-direction-20261015.md) · [一料理の照合](ca-one-dish-reconciliation-20261015.md) · [次の検証](ca-next-verification-plan-20261015.md)
+
+## 今回確認した範囲
+
+- live GitHubのopen Issue **27件と全40コメント**、PRのmerge先・日時・commit、mainのCIを取得した。本文がopenでも、実装前の記述をそのまま現在の欠陥とは扱わない。
+- 同じmainのコード・schema・migration・検証script・現行ガイド46ファイルをハッシュ付きで固定した。[静的証拠JSON](ca-next-static-evidence-20261015.json)。日本語改善候補7ファイルだけがあるworktreeから読み、実行コードにHEADとの差分がないことを確認した。索引の候補本文をmainの本文として引用していない。
+- [Issue本文JSON](ca-next-open-issues-20261015-start.json)、[コメントJSON](ca-next-issue-comments-20261015.json)、[PR JSON](ca-next-prs-20261015-start.json)を別に保存した。Issueの本文・label・stateは変更していない。
+
+## 同じmainで得られている技術的証拠
+
+[CI run 38696206166](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/38696206166)は上記SHAのpush実行でcompleted / success。通常テスト **203/203、失敗0**、lint・型検査・Prisma生成/検証・buildが成功。ログに、制約・食品確認・rollbackのPostgreSQL試験、一覧投影7ケース、所有店舗での最終メニュー書込5組、店舗保存8ケース、公開prototypeのChromium8群を確認した。[結果JSON](ca-next-main-ci-final-20261015.json)と[取得ログ](ca-next-main-ci-final-20261015.log)を保持する。
+
+これはCIの架空データ・一時DB・公開prototypeでの証拠。実ClerkとDBを通す管理E2E、実Blob、現在の配備SHA/制約、公開先の鮮度、人の理解、店舗の工数・継続・食品の正しさを一括保証しない。#79だけの先行main CIがcancelledだったのは、直後の#80 mergeによる後続runと区別する。
+
+## 27件の現在の読み方と次の扱い
+
+「整理候補」は、受入条件へ証拠を対応付けて人がIssueの更新・完了を判断する候補を意味する。今回のclose、Ready化、残条件の免除ではない。
+
+| Issue | mainで確認できること | まだ残ること／次の扱い |
+| --- | --- | --- |
+| [#38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38) 最終メニュー書込 | #62 merge済み。PUT/DELETEの最終条件はmenuId＋server shopId＋版。現在CIでも移転/消失4ケース＋正常操作1組成功 | **元の技術修復は整理候補**。店舗owner/isActiveのread直後取消を全経路で即時保証した意味へ広げない。E03/E09 |
+| [#39](https://github.com/Kaito-Iwase/ClearAllergy/issues/39) 使用目的・公開claim | prototypeの境界、注意文、食品確認と公開制御はある | 対象者、実店舗pilot/一般提供の範囲、公開claim、重大誤認の受入・責任者は人間判断。E10 |
+| [#40](https://github.com/Kaito-Iwase/ClearAllergy/issues/40) 同時編集契約 | #70で整数version必須、428/409、DELETEも対象となった | 「revisionなし」は旧説明。採用経緯と旧client/混在writer/切戻し範囲を判断記録へ対応付ける。店舗保存の日時tokenとは別。E03 |
+| [#41](https://github.com/Kaito-Iwase/ClearAllergy/issues/41) 確認根拠・保持 | 現行食品版へ結び付く追記snapshot、根拠・範囲・申告確認日時・記録日時がある | 保持期間、削除/cascadeと復元、閲覧権限、収集する営業秘密、現品との照合と担当負担は未確定/未実証。E04 |
+| [#42](https://github.com/Kaito-Iwase/ClearAllergy/issues/42) 停止・復旧責任 | 店舗所有者のSTOPと運用手順はある。運営招待管理権限は店舗編集権限と別 | owner不在時の対応、停止/復旧責任者・目標時間・信頼できる訂正連絡経路を決める。新緊急権限を自動で作らない。E06/E07 |
+| [#43](https://github.com/Kaito-Iwase/ClearAllergy/issues/43) 鮮度・障害表示 | 新規公開readはdynamic、食品/品目/マスター/補足を同一DB時点で読む | 「ISR60」は旧前提。既存タブ、戻る/offline、実配信の許容ageと障害時契約を決める必要は残る。E05 |
+| [#44](https://github.com/Kaito-Iwase/ClearAllergy/issues/44) 招待identity | 現helperはprimaryメールを選び、欠ければ先頭へfallback。verificationやauth ID/currentUser ID一致を明示条件としていない | **現在も判断・調査が残る**。専用tenantの到達性と影響callerを調べ、採用条件を決める。攻撃が実サービスで成立したとは未実証。E07 |
+| [#45](https://github.com/Kaito-Iwase/ClearAllergy/issues/45) draft画像・保持 | Blob uploadはaccess publicで、menu公開フラグと独立 | 公開写真のみ/private draft/暫定保持の契約、猶予・参照race・復元を判断。食品根拠資料を画像欄へ集める前提にしない。E08 |
+| [#46](https://github.com/Kaito-Iwase/ClearAllergy/issues/46) 公開0件の店 | 公開可能menuが0件ならpageはnotFound。現行ガイドもこの境界を説明 | 旧文書矛盾は解消。現挙動を維持/別表示にする製品判断の記録は別。訂正の到達性と併せて考える。E05/E10 |
+| [#47](https://github.com/Kaito-Iwase/ClearAllergy/issues/47) commit後応答 | メニューは既知commit後cache失敗をsuccess＋publicRefreshPendingで返す。作成ID/hashの限定再送抑止もある | 元のA/B/Cから一案を新規選択する段階ではない。採用契約、操作ID寿命、unknown回復、運用event調査担当を同期。E03/E06 |
+| [#48](https://github.com/Kaito-Iwase/ClearAllergy/issues/48) メニュー競合 | version CAS・入力保持・同版の2PUTで200/409、古いPUT/DELETEが訂正を壊さないCI証拠あり | **実装済み＋残証跡の照合**。旧案のmissing400/DELETE対象外/backfill1を現在へ移植しない。全writer・旧client/混在配備・切戻しの未実証範囲を分ける。E03/E09 |
+| [#49](https://github.com/Kaito-Iwase/ClearAllergy/issues/49) 実配信鮮度 | 10/4のF01–F08測定設計と、その後のdynamic/snapshot修復はある | Preview等の実配信時間系列と既存タブ/障害/負荷の測定は未確認。旧「別読取」前提を更新し、環境・操作許可を固定してから実測。E05 |
+| [#50](https://github.com/Kaito-Iwase/ClearAllergy/issues/50) 招待verified強制 | #44と同じ現行helperをaccept routeが使用 | #44の承認条件、専用tenant、拒否時DB不変、正常受諾を確認するまで全面実装Readyとはしない。E07 |
+| [#51](https://github.com/Kaito-Iwase/ClearAllergy/issues/51) 確認と食品版 | #70のmodel/trigger/同tx保存を確認。未解決・旧/未来版・削除による旧記録復活防止等のCI証拠あり | 「確認modelなし」は古い。保持/privacy・現場task・移行/復元範囲を#41へ分ける。checkedAtは店舗の申告、recordedAt等と同じserver観測時刻ではない。E04/E09 |
+| [#52](https://github.com/Kaito-Iwase/ClearAllergy/issues/52) 理解・a11y | 10/4 U01–U08設計、現在の実部品fixture/演習台本/空票、補助ブラウザ検証あり | 人の理解・実際の支援技術の利用・採点一致は未実施。#39の対象/同意/rubric/保持と、無援助回答を固定して初めて実施。E11 |
+| [#53](https://github.com/Kaito-Iwase/ClearAllergy/issues/53) 運用訓練 | 10/4 O01–O07台本、STOP/cache/招待取消の実装と限定回帰はある | 台本は訓練実施ではない。#42の担当・権限・隔離backup/restore・cleanupと実providerの許可範囲が必要。E06/E07/E10 |
+| [#54](https://github.com/Kaito-Iwase/ClearAllergy/issues/54) 配備証拠 | #63 merge済みのdated ledger、専用PG適用/制約証拠とproduction UNKNOWNの区別あり | **当時の文書成果は整理候補**。現在releaseの配備SHA、適用制約、backup/復元、通知、required checksは今回未確認。10/10の限定復旧記録を現在の一式証明としない。E09/E10 |
+| [#55](https://github.com/Kaito-Iwase/ClearAllergy/issues/55) draft/orphan | public URL、既存owner/URL検証は存在 | #45の採用判断、専用Blob、参照race、保持/復元が先。0バイト修復と同じ課題ではない。E08 |
+| [#56](https://github.com/Kaito-Iwase/ClearAllergy/issues/56) 0件と文書 | 現行guideとnotFoundは一致。正常停止後の新規pageで食品を返さない過去検証もある | **文書不一致の修復は整理候補**。#46の判断記録、pageとAPI、streaming200/notFound/HTTP404を区別して受入に対応付ける。E05/E10 |
+| [#57](https://github.com/Kaito-Iwase/ClearAllergy/issues/57) 保存結果不明 | メニューのsaved/pending、通信断/不正DTOで入力保持、作成IDの限定再送が既存 | 一般DB例外をrollback確定としない。実セッション＋応答喪失、unknown回復手順、運用eventの検知/配送、#43契約が残る。店舗の同類修復は#73/#79。E03/E06/E09 |
+| [#60](https://github.com/Kaito-Iwase/ClearAllergy/issues/60) Issue文書参照 | 現mainにはguide/researchがあり「全て未公開」は旧時点の記述 | 歴史コメントを改竄せず、現在読めるcommitへの参照と未完了scopeを整理。#75/#77反映や#78別baseを混同しない。E10 |
+| [#64](https://github.com/Kaito-Iwase/ClearAllergy/issues/64) npm差 | 現ハーネスは既存npm CLIを解決しactualNpmをreportへ記録。CI/Dockerは11.18.0指定 | 古い「アプリ同梱npm11.19.1・実CLI不明」はそのまま現在の問題ではない。許容runtime差・実report・既存基盤変更との対応を確認する整理が先。新依存更新の理由にしない。E12 |
+| [#65](https://github.com/Kaito-Iwase/ClearAllergy/issues/65) 0バイト画像 | #66 merge済み。共通validatorは0バイト拒否、現在は形式署名も検査 | **元の修復は整理候補**。画像全体decode/食品資料の真正性/Blob機密性の証拠へ拡大しない。E08 |
+| [#72](https://github.com/Kaito-Iwase/ClearAllergy/issues/72) 初回調査保存 | #75はmainへmerge済み。5原稿・同期ルール・索引がmainにある | **文書成果は整理候補**。元checkoutの未commit9差分を消す許可ではない。古いCI進行中コメントと現在CIを区別。E10 |
+| [#73](https://github.com/Kaito-Iwase/ClearAllergy/issues/73) 店舗保存 | #79がmainへmerge済み。日時token CAS、既知saved/pending、不正成功/unknown/競合の入力保持・再送抑止。現在CI実PG8ケース成功 | **修復済み＋元受入の整理候補**。実Clerk/最新タブの通常セッション・全writer・利用者の回復理解は別。E01/E09 |
+| [#74](https://github.com/Kaito-Iwase/ClearAllergy/issues/74) 再確認待ち一覧 | #80がmainへmerge済み。missing/outdated/unresolved/current、公開flag/UNKNOWN別表示、共通DTO投影。CI実PG7ケース成功 | **修復済み＋元受入の整理候補**。実店舗の見落とし率/時短、人の初見理解を合格としない。E02/E09/E11 |
+| [#76](https://github.com/Kaito-Iwase/ClearAllergy/issues/76) 追加調査訂正 | #77がmainへmerge済み。3詳細調査と入口・索引あり | **文書成果は整理候補**。本日受領の2計画とは別稿。原稿保存・CIを研究効果の実証としない。E10 |
+
+## 固定ソースの入口
+
+全リンクは同じSHAへ固定する。行番号は関心箇所の入口で、根拠は関数と呼出元・schema/trigger・検証を合わせて読む。
+
+| ID | 主なソース |
+| --- | --- |
+| E01 店舗保存 | [最終書込](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/shop/server/adminShopRoute.ts#L388)、[応答検証](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/shop/schemas/shop-response.ts)、[UI](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/shop/components/ShopEditClient.tsx) |
+| E02 一覧 | [状態導出](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/menus/menu-list.ts)、[取得/DTO](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/menus/server/menu-list-data.ts) |
+| E03 メニュー保存 | [PUT/DELETE/STOP](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/menus/server/adminMenuRoute.ts)、[作成/再送](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/menus/server/adminMenusRoute.ts) |
+| E04 食品確認 | [食品snapshot](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/menus/food-review.ts)、[記録保存](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/menus/server/food-review-save.ts)、[DB制約](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/prisma/migrations/20261009000000_menu_food_review/migration.sql) |
+| E05 公開read | [店舗page](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/public/shops/server/PublicShopDetailPage.tsx)、[一時点read](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/public/shops/server/public-read-snapshot.ts)、[公開条件](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/lib/allergens.ts) |
+| E06 結果・運用 | E03のpostcommit/STOP、[開発・運用手順](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/docs/guide/development.md) |
+| E07 認証/招待 | [identity helper](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/lib/auth/getCurrentAppUser.ts)、[受諾route](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/features/admin/invitations/server/acceptInvitationRoute.ts)、[店舗認可](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/lib/auth/admin-auth.ts) |
+| E08 画像 | [共通validator/Blob](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/lib/storage/upload-images.ts) |
+| E09 技術検証 | 上記CIの実ログ、[食品版DB回帰](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/scripts/food-review-database-regression.ts)、[店舗DB](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/scripts/check-shop-database.ts)、[一覧DB](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/scripts/check-admin-menu-list-database.ts) |
+| E10 文書・履歴 | [現行ルール](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/docs/guide/rules.md)、[研究索引](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/docs/research/README.md)、[10/10限定復旧記録](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/docs/verification/shops-recovery-20261010.md) |
+| E11 一料理演習 | [準備結果](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/docs/verification/ingredient-change-trial-preparation-20261015.md)、[架空資料/fixture](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/docs/research/product/ingredient-change-trial-fixture-20261015.md) |
+| E12 npm実体 | [CLI解決](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/scripts/npm-cli.mjs)、[reportのactualNpm](https://github.com/Kaito-Iwase/ClearAllergy/blob/cd502b2404f518975dc4243ab6c41a702e7aa226/scripts/agent-harness.mjs#L231) |
+
+## mainにない文書を混ぜない
+
+#78はMERGEDだがmerge先が旧作業branchであり、今回のmainに13新規文書がない。既存2索引/検証文書にも差がある。[別main取込計画](ja-readability-pr78-main-plan.md)を維持し、この監査の現在コード証拠を#78の過去棚卸しだけで代用しない。新しい日本語改善候補7ファイルも未commitのまま保持している。
+
+今回の成果はtask-2内の新しい判断資料と証拠だけ。アプリ、DB、設定、公開状態、canonicalの既存変更、candidate7ファイル、GitHub上のIssue/PRを変更していない。ローカルlint/型検査/tests/build/DB/browserは文書・読取だけのため再実行せず、取得した同一mainのCI結果と分けて報告する。
