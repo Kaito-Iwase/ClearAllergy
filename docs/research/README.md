@@ -6,6 +6,30 @@
 
 本書は研究/設計案の入口。現行仕様は [guide/rules](../guide/rules.md)、[変更対応表](../guide/change-map.md)。ここでRECOMMENDED/OPENとした設計を現行仕様へ昇格しない。[Gate判定と検証結果](implementation/readiness.md) / [Issue台帳](implementation/backlog.md) / [提案Milestone](implementation/migration-plan.md#proposed-milestones) / [Traceability](traceability-matrix.md) / [人の判断待ち](open-questions.md)。
 
+## 2026-10-15 の調査5稿・統合メモと現行Issue照合
+
+[次の開発・現場検証を決める統合メモ](product/ca-overnight-decision-memo.md)は公開資料からの研究入口です。続けて[27件のIssueと現行コードの照合](engineering/open-issues-current-code-20261015.md)を読み、原稿担当が未確認だった機能と、今回確認した固定mainの実装・限定実行を区別してください。前者を後者で省略せず、両方を残しています。
+
+| 原稿・記録 | 役割と残す詳細 |
+| --- | --- |
+| [競争比較](literature/ca-overnight-competition.md) | CAN EAT MAP等の発表時点、現在の未確認範囲、同じ3ケース、差別化を否定する条件、一次資料S1–S10 |
+| [小規模店の導入・継続](literature/ca-overnight-adoption.md) | 店のA〜D分類、非誘導20問、同じ情報品質での人・分と待ち時間、拒否・離脱・支払主体・支援原価 |
+| [発見・絞り込みと理解度](literature/ca-overnight-discovery.md) | 架空S1–S6、文言比較、自由回答、採点・分母・重大誤認・アクセシビリティ・未完了 |
+| [情報整合性](literature/ca-overnight-integrity.md) | 出典・対象・時点、11シナリオ、T01–T25、未申告変更・材料欠落・同一料理AND・将来日・表示への過信 |
+| [権限・公開範囲・個人情報・障害運用](literature/ca-overnight-security-operations.md) | 公開DTOと原本、健康情報最小化、保持/削除/復元、権限、停止・訂正、PPC/RFC/Chromeと適用限界 |
+| [統合メモ全文](product/ca-overnight-decision-memo.md) | 比較・採否、掲載継続/保留/訂正表、D01–D06、役割別負担、店舗側でのみ得られる証拠 |
+| [研究5稿の独立・反証レビュー全文](product/ca-overnight-independent-review.md) | R1–R11、一次資料スポット監査の限界、17試験初版と25試験版の区別、最終4修正の反映確認 |
+| [別担当のIssue棚卸し原稿（Library）](https://chatgpt.com/api/library/files/libfile_92bf9b64a8688191b8dbe573f09a06a9/download) | アクセス権が必要な補助記録。15:12–15:15 UTCの27件/PR/SHA対応で、GitHub閲覧の必須根拠にしない。後続の受入・実行・承認状態は今回照合に収録 |
+| [今回の27件コード照合](engineering/open-issues-current-code-20261015.md) | 全Issueの現在地、受入・次手・依存・優先度、#73/#74の具体案と副作用、11件/14件詳細・全参照表への入口 |
+| [#73/#74の隔離実行と方法レビュー](../verification/shop-menu-isolated-probe-20261015.md) | 実処理＋メモリ/React代用7ケース、全コード・全JSON・23source hashes、安全値の固定/実測区別と未実施 |
+
+Library原稿は全文を保持しています。各稿の「最小」「P0」等は研究上の提案・対象用途前の判断順であり、既存製品の欠陥、現在の必須実装、法的義務、採用決定ではありません。原稿担当の「現行実装は不明」を「ない機能」に変換しません。メニューCAS・食品確認・STOP・snapshot・pending等は現行実装の証拠と対応付けましたが、実食品・理解度・店舗負担・全本番の証拠とは別です。
+
+10:00 JSTは報告時刻であり作業打切り期限ではありません。T01–T25、D01–D06の増補・修正は試験の実施/合格ではありません。今回の7ケース、過去CI/実DB/復旧記録、原稿の公的資料、将来の店舗/利用者調査を混ぜず、実装・Issue close・merge・公開・外部連絡は別の承認範囲として扱います。現行仕様の正本は[共通ルール](../guide/rules.md)、作業文書の更新先は[保守](../guide/maintenance.md#update-map)です。
+
+
+[取得・Library identity・全文byte保持の記録](product/overnight-source-provenance-20261015.md)を参照してください。
+
 ## 2026-10-14 の追加調査（訂正統合版）
 
 [読む入口と検証計画](product/clearallergy-followup-20261014.md)から、導入・更新負担、誤表示等の防止策、情報の継続管理の3文書へ進めます。提供された独立レビューの訂正を本文へ統合した追補です。

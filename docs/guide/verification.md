@@ -1,5 +1,9 @@
 # 文書の根拠と確認範囲
 
+2026-10-15 JSTの固定main `e26b6088` に対する店舗保存・再確認待ち一覧の限定確認は、[#73/#74の隔離実行記録](../verification/shop-menu-isolated-probe-20261015.md)を参照してください。実処理＋メモリPrisma／synthetic Reactの7ケースであり、実DB・実ブラウザ・Clerk・本番・実食品は今回未確認です。修復・公開条件変更・実店舗利用の承認ではありません。
+
+同時点の[27件のIssueと現行コードの照合](../research/engineering/open-issues-current-code-20261015.md)は研究記録です。古い未実装前提、実装済み、過去の実行報告、残る判断・運用・環境を区別しており、既存Issueのcloseや現在releaseの合格を決めるものではありません。
+
 2026-10-10の本番店舗一覧のDB不整合・migration適用・架空デモの再公開と復旧は[障害復旧記録](../verification/shops-recovery-20261010.md)を参照してください。
 
 2026-10-09の食品確認記録・保存競合・公開停止と取得鮮度は[今回の検証記録](../verification/menu-food-review-20261009.md)を参照してください。以下の日付付き結果は過去の実行記録として保持します。
