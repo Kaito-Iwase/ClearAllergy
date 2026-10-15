@@ -14,6 +14,7 @@ import ImageCompositionEditor from "@/features/admin/menus/components/ImageCompo
 import AdminGooglePlacePicker from "@/features/admin/shop/components/AdminGooglePlacePicker";
 import { PREFECTURES } from "@/lib/constants/prefectures";
 import type { GooglePlaceCandidate } from "@/types/google-places";
+import { parseShopSaveResponse } from "@/features/admin/shop/schemas/shop-response";
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import {
     DEFAULT_SHOP_COVER_IMAGE_FIT,
@@ -191,6 +192,8 @@ export default function ShopEditClient({
     const [error, setError] = React.useState<string | null>(null);
     const [nameInvalid, setNameInvalid] = React.useState(false);
     const [savedMessage, setSavedMessage] = React.useState("");
+    const [needsSaveCheck, setNeedsSaveCheck] = React.useState(false);
+    const expectedUpdatedAt = React.useRef(initialShop.updatedAt);
     const [updatedAtText, setUpdatedAtText] = React.useState(
         formatDateTimeJa(initialShop.updatedAt),
     );
@@ -345,7 +348,7 @@ export default function ShopEditClient({
     }
 
     async function saveShop() {
-        if (saving || uploading) return;
+        if (saving || uploading || needsSaveCheck) return;
         setError(null);
         setNameInvalid(false);
         setSavedMessage("");
@@ -365,53 +368,47 @@ export default function ShopEditClient({
         }
 
         setSaving(true);
+        let shopSaveRequested = false;
 
         try {
             // 画像アップロードが必要なら先に終わらせ、その URL を店舗更新 API に送ります。
             const uploadedCoverImageUrl = await uploadSelectedImage();
 
             // 保存処理そのものは API に任せ、DB 更新ロジックはサーバー側へ集約します。
+            shopSaveRequested = true;
             const res = await fetch("/api/admin/shop", {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ ...formValues, coverImageUrl: uploadedCoverImageUrl }),
+                body: JSON.stringify({ ...formValues, coverImageUrl: uploadedCoverImageUrl, expectedUpdatedAt: expectedUpdatedAt.current }),
             });
 
-            const data = (await res.json().catch(() => null)) as {
-                error?: string;
-                shop?: {
-                    updatedAt: string;
-                    hours?: string | null;
-                    prefecture?: string | null;
-                    city?: string | null;
-                    nearestStation?: string | null;
-                    category?: string | null;
-                    latitude?: number | null;
-                    longitude?: number | null;
-                    googlePlaceId?: string | null;
-                    regularHoliday?: string | null;
-                    phoneNumber?: string | null;
-                    note?: string | null;
-                    averageBudgetYen?: number | null;
-                    coverImageUrl?: string | null;
-                    coverImageFrame?: MenuImageFrame;
-                    coverImageFit?: MenuImageFit;
-                    coverImagePosition?: MenuImagePosition;
-                    coverImageZoom?: number;
-                    coverImagePositionX?: number;
-                    coverImagePositionY?: number;
-                };
-            } | null;
+            const payload: unknown = await res.json().catch(() => null);
 
             if (!res.ok) {
-                setError(data?.error ?? "保存に失敗しました。");
+                const needsCheck = res.status >= 500 || [404, 409, 428].includes(res.status);
+                setNeedsSaveCheck(needsCheck);
+                if (res.status >= 500) {
+                    setError("保存結果を確認できませんでした。入力は保持しています。再送せず、最新の保存内容を確認してください。");
+                } else {
+                    setError(payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+                        ? payload.error : "保存を受け付けられませんでした。入力は保持しています。");
+                }
                 return;
             }
 
+            const data = parseShopSaveResponse(payload, initialShop.id, expectedUpdatedAt.current);
+            if (!data) {
+                setNeedsSaveCheck(true);
+                setError("保存結果を確認できませんでした。入力は保持しています。再送せず、最新の保存内容を確認してください。");
+                return;
+            }
+            expectedUpdatedAt.current = data.shop.updatedAt;
             // API が返した最新の updatedAt と coverImageUrl を画面にも反映します。
-            setSavedMessage("店舗情報を保存しました。");
+            setSavedMessage(data.publicRefreshPending
+                ? "店舗情報は保存済みです。公開ページへの反映は未確認です。再送せず公開ページを確認し、必要なら運営へ連絡してください。"
+                : "店舗情報を保存しました。");
 
             if (data?.shop?.coverImageUrl !== undefined) {
                 setCoverImageUrl(data.shop.coverImageUrl ?? "");
@@ -489,9 +486,11 @@ export default function ShopEditClient({
                 URL.revokeObjectURL(localPreviewUrl);
                 setLocalPreviewUrl(null);
             }
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            setError(`保存中にエラーが発生しました: ${msg}`);
+        } catch {
+            setNeedsSaveCheck(shopSaveRequested);
+            setError(shopSaveRequested
+                ? "保存結果を確認できませんでした。入力は保持しています。再送せず、最新の保存内容を確認してください。"
+                : "画像を送信できませんでした。店舗情報の保存は要求していません。入力を保持しています。");
         } finally {
             setSaving(false);
         }
@@ -693,7 +692,7 @@ export default function ShopEditClient({
                         <button
                             type="button"
                             onClick={saveShop}
-                            disabled={readOnly || saving || uploading}
+                            disabled={readOnly || saving || uploading || needsSaveCheck}
                             className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
                             {readOnly
@@ -738,7 +737,7 @@ export default function ShopEditClient({
                         <button
                             type="button"
                             onClick={saveShop}
-                            disabled={readOnly || saving || uploading}
+                            disabled={readOnly || saving || uploading || needsSaveCheck}
                             className="inline-flex items-center justify-center rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition hover:bg-black/80 disabled:opacity-60"
                         >
                             {readOnly
@@ -773,7 +772,7 @@ export default function ShopEditClient({
 
                         <button
                             type="submit"
-                            disabled={readOnly || saving || uploading}
+                            disabled={readOnly || saving || uploading || needsSaveCheck}
                             className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
                             {readOnly
@@ -791,6 +790,16 @@ export default function ShopEditClient({
                     {error ? (
                         <div id="shop-form-error" role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                             {error}
+                        </div>
+                    ) : null}
+
+                    {needsSaveCheck ? (
+                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                            <p>この画面の入力は残しています。最新の保存内容と見比べ、必要な変更だけを最新の画面へ転記してください。</p>
+                            <a href="/admin/shop" target="_blank" rel="noopener noreferrer"
+                                className="mt-2 inline-block font-bold underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+                                最新の保存内容を別タブで確認
+                            </a>
                         </div>
                     ) : null}
 
@@ -1186,7 +1195,7 @@ export default function ShopEditClient({
                     <div className="mt-6 flex flex-wrap gap-3">
                         <button
                             type="submit"
-                            disabled={readOnly || saving || uploading}
+                            disabled={readOnly || saving || uploading || needsSaveCheck}
                             className="inline-flex items-center justify-center rounded-xl bg-[#13ec13] px-6 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
                             {readOnly
