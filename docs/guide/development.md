@@ -131,6 +131,19 @@ docker compose -f compose.test.yaml up -d app
 <a id="browser"></a>
 ### ブラウザ・実DB検証
 
+店舗保存の局所回帰は `node --import tsx --test tests/admin-shop-api.test.ts tests/shop-response.test.ts`。DB・Clerk・cacheは代用品であり、実DBの競合確認は別です。`node --import tsx scripts/check-shop-database.ts` は既存の専用ComposeまたはCI接続guardを最初に通し、架空User/Shopの作成・条件付き保存・同時read・所有状態変更・cache失敗・後始末を行います。通常環境では接続guardで停止します。CIは架空データ準備後にこのscriptを実行し、migration/reset/本番接続は追加しません。
+
+`node scripts/check-shop-save-browser.mjs` は実ShopEditClientを一時bundleにしたloopback専用fixtureで、不正200・競合・結果不明時の入力/画像保持、保存済み/反映未確認、送信中抑止、390/1440px・keyboardを検査し、JSONと画像を保存します。アプリ・DB・Clerk・Blobの起動は不要で、Nextとfetchは代用品です。既に準備した隔離Playwrightを `PLAYWRIGHT_MODULE_PATH`、必要なら対応ブラウザを `BROWSER_EXECUTABLE` / `PLAYWRIGHT_BROWSERS_PATH` に指定してください。アプリ依存へPlaywrightを追加しません。たとえば既存runnerを使うPowerShellの指定は次のとおりです。
+
+```powershell
+$env:PLAYWRIGHT_MODULE_PATH = Join-Path $env:TEMP 'clearallergy-browser-1.61.0\node_modules\playwright'
+$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $env:TEMP 'clearallergy-browser-1.61.0\browsers'
+$env:CLEARALLERGY_BROWSER_OUTPUT = Join-Path $env:TEMP 'clearallergy-shop-save-results'
+node scripts/check-shop-save-browser.mjs
+```
+
+同worktreeのbuild済みCSSが必要です。Webpackの `.next/static/css` と既定の `.next/static/chunks` を読めます。既存Windows依存をjunctionで共有してTurbopackがroot外として拒否する環境では、同一schemaの生成済みClientを確認したうえで `npm.cmd --ignore-scripts run build -- --webpack` を使い、共有Clientの再生成を省略したことを記録します。通常の独立環境/CIは従来の `npm run build` とPrisma生成を使います。[今回の結果と限界](../verification/shop-save-contract-20261015.md)を参照してください。
+
 ブラウザ回帰は `scripts/browser-runner.mjs` でPlaywright 1.61.0とChromiumを隔離して用意します。アプリの依存とlockfileは変更しません。既定の保存先はOSの一時ディレクトリ内の `clearallergy-browser-1.61.0` で、`CLEARALLERGY_BROWSER_RUNNER_DIR` で変更できます。初回の `install` はネットワークから検証ツールを取得するため、利用可能な環境で実行します。アプリの既存依存が必要です。
 
 ```powershell
@@ -182,7 +195,7 @@ CI定義は `.github/workflows/ci.yml`。main/develop向けPR、両ブランチ�
 
 依存配置 → Prisma生成・validate → 単体テスト → lint → 型確認 → CI専用DB準備 → 実DB回帰 → build → ブラウザランナー準備 → 起動 → 公開ブラウザ回帰 → 成果物保存。
 
-実DB回帰は `check-ci-database.ts` による制約・ロールバックと、`check-owned-menu-database.ts` による実メニュー更新・削除の所有店舗条件を順に検査します。いずれも接続先ガードを通った一時PostgreSQLに限定し、実Clerk認証は置き換えます。CIの公開画面回帰には実Clerk・Blobへの書込を含みません。
+実DB回帰は `check-ci-database.ts` による制約・ロールバック、`check-owned-menu-database.ts` による実メニュー更新・削除の所有店舗条件、`check-shop-database.ts` による店舗保存の競合・最終所有状態・保存後反映失敗を順に検査します。いずれも接続先ガードを通った一時PostgreSQLに限定し、実Clerk認証は置き換えます。CIの公開画面回帰には実Clerk・Blobへの書込を含みません。
 
 専用DB準備は `scripts/setup-ci-env.ts` / `ci-environment.ts` が固定した一時DBへの両接続URLと有効化フラグを検査し、既存マイグレーションを適用します。その後、既存ユーザー・店舗・メニューがあればfixture投入を拒否します。架空1店舗3メニューを用意し、GitHub Secretsや実Clerk・Blobを使いません。実DB回帰はマイグレーション由来の部分一意インデックスと制約トリガーも対象です。既存環境のリセットや本番DBの適用状況確認ではありません。
 

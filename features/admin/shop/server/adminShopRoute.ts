@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { Hono } from "hono";
-import { handleUnhandledApiError } from "@/lib/observability";
+import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { internalError, readJson, requireShopId } from "@/lib/auth/admin-api-utils";
@@ -35,6 +35,7 @@ app.onError(handleUnhandledApiError);
 
 const optionalText = z.string().nullable().optional();
 const shopUpdateSchema = z.object({
+    expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
     name: z.string(), description: optionalText, address: optionalText,
     prefecture: optionalText, city: optionalText, nearestStation: optionalText,
     category: optionalText, googlePlaceId: optionalText, hours: optionalText,
@@ -165,6 +166,7 @@ app.put("/api/admin/shop", async (c) => {
     const req = c.req.raw;
     let auditActorUserId: string | null = null;
     let auditShopId: string | null = null;
+    let saved = false;
     try {
         const originError = enforceSameOriginAdminMutation(req);
         if (originError) {
@@ -177,6 +179,10 @@ app.put("/api/admin/shop", async (c) => {
         }
         auditActorUserId = auth.appUser.id;
         auditShopId = auth.shopId;
+        const ownerClerkUserId = auth.appUser.clerkUserId;
+        if (!ownerClerkUserId) {
+            return NextResponse.json({ error: "shop setup required" }, { status: 403 });
+        }
 
         const portfolioAccess = await requirePortfolioMutationAccessApi();
         if (!portfolioAccess.ok) {
@@ -193,6 +199,13 @@ app.put("/api/admin/shop", async (c) => {
         }
 
         const body = parsedBody.data;
+        if (body.expectedUpdatedAt === undefined) {
+            return NextResponse.json(
+                { error: "編集版が必要です。入力を控えてから最新の店舗情報を読み直してください。" },
+                { status: 428 },
+            );
+        }
+        const expectedUpdatedAt = new Date(body.expectedUpdatedAt);
         const existing = await prisma.shop.findUnique({
             where: { id: auth.shopId },
             select: {
@@ -219,12 +232,19 @@ app.put("/api/admin/shop", async (c) => {
                 coverImageZoom: true,
                 coverImagePositionX: true,
                 coverImagePositionY: true,
+                updatedAt: true,
             },
         });
         if (!existing) {
             return NextResponse.json(
                 { error: "shop not found" },
                 { status: 404 },
+            );
+        }
+        if (existing.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+            return NextResponse.json(
+                { error: "別の変更が保存されています。入力を保持したまま最新の店舗情報を確認してください。" },
+                { status: 409 },
             );
         }
 
@@ -363,10 +383,17 @@ app.put("/api/admin/shop", async (c) => {
             );
         }
 
-        // where に auth.shopId を使うことで、必ず本人の店舗だけ更新します。
+        // 読取後の競合・所有者変更も、最終の原子的な条件付き書込で拒否します。
+        // 同じmillisecond・時計の後退でも、この経路のtokenを再利用しません。
         const shop = await prisma.shop.update({
-            where: { id: auth.shopId },
+            where: {
+                id: auth.shopId,
+                ownerClerkUserId,
+                isActive: true,
+                updatedAt: expectedUpdatedAt,
+            },
             data: {
+                updatedAt: new Date(Math.max(Date.now(), existing.updatedAt.getTime() + 1)),
                 name,
                 description,
                 address,
@@ -421,6 +448,7 @@ app.put("/api/admin/shop", async (c) => {
                 },
             },
         });
+        saved = true;
 
         await writeAdminAuditLog({
             req,
@@ -484,14 +512,25 @@ app.put("/api/admin/shop", async (c) => {
 
         const { menus, ...shopResponse } = shop;
 
-        revalidatePublicShopPaths(auth.shopId);
-        for (const menu of menus) {
-            revalidatePublicMenuPaths(auth.shopId, menu.id);
+        try {
+            revalidatePublicShopPaths(auth.shopId);
+            for (const menu of menus) {
+                revalidatePublicMenuPaths(auth.shopId, menu.id);
+            }
+        } catch (error) {
+            logOperationalError(error, { operation: "public_shop_refresh_after_commit" });
+            return NextResponse.json({ shop: shopResponse, publicRefreshPending: true });
         }
 
         return NextResponse.json({ shop: shopResponse });
     } catch (e) {
-        if (auditShopId) {
+        if (!saved && typeof e === "object" && e !== null && "code" in e && e.code === "P2025") {
+            return NextResponse.json(
+                { error: "店舗情報または所有状態が変わりました。入力を保持したまま最新内容を確認してください。" },
+                { status: 409 },
+            );
+        }
+        if (auditShopId && !saved) {
             await writeAdminAuditLog({
                 req,
                 actorUserId: auditActorUserId,
