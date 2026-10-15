@@ -6,10 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/auth/admin-auth";
 import MenuListPageClient from "@/features/admin/menus/components/MenuListPageClient";
 import CreateMenuButton from "@/features/admin/menus/components/CreateMenuButton";
-import {
-    createStatusBySlug,
-    getUnknownAllergenNames,
-} from "@/lib/allergens";
+import { adminMenuListSelect, toAdminMenuListRow } from "./menu-list-data";
 
 export default async function AdminMenusPage() {
     // 管理画面なので、未ログインや店舗未作成ならここでリダイレクトします。
@@ -25,45 +22,12 @@ export default async function AdminMenusPage() {
         prisma.menuItem.findMany({
             where: { shopId },
             orderBy: { updatedAt: "desc" },
-            select: {
-                id: true,
-                name: true,
-                category: true,
-                priceYen: true,
-                imageUrl: true,
-                isPublished: true,
-                version: true,
-                updatedAt: true,
-                allergenLinks: {
-                    select: {
-                        status: true,
-                        allergen: { select: { slug: true } },
-                    },
-                },
-            },
+            select: adminMenuListSelect,
         }),
     ]);
 
     // Date 型は Client Component で扱いにくいので、文字列に変換して渡します。
-    const initialMenus = menus.map((menu) => {
-        const statusBySlug = createStatusBySlug(allergens, menu.allergenLinks);
-        const unknownAllergenNames = getUnknownAllergenNames({
-            allergens,
-            statusBySlug,
-        });
-
-        return {
-            id: menu.id,
-            name: menu.name,
-            category: menu.category,
-            priceYen: menu.priceYen,
-            imageUrl: menu.imageUrl,
-            isPublished: menu.isPublished,
-            version: menu.version,
-            updatedAt: menu.updatedAt.toISOString(),
-            unknownAllergenNames,
-        };
-    });
+    const initialMenus = menus.map((menu) => toAdminMenuListRow(menu, allergens));
 
     return (
         <div className="min-h-screen bg-[#f5f7f4]">
@@ -78,7 +42,7 @@ export default async function AdminMenusPage() {
                         </h1>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
                             公開状態、価格、アレルゲン{allergens.length}
-                            品目の設定状況を一覧で確認できます。未設定があるメニューはカード上で注意表示します。
+                            品目の設定状況と食品確認の再確認待ちを一覧で確認できます。
                         </p>
                     </div>
 

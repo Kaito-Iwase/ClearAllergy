@@ -156,7 +156,7 @@ node scripts/browser-runner.mjs ui
 
 `node scripts/browser-runner.mjs demo` は公開画面と保存しない管理デモ、`node scripts/browser-runner.mjs admin` は専用環境の管理操作を確認します。後者はDB・開発用Clerk・Blobへの書込を伴い、専用アカウントと保存先の許可が必要です。ランナーの準備だけで認証情報やテストデータが作られるわけではありません。
 
-`node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォームを、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。320／390／768／1440pxの品目名・状態別件数・対象範囲・注意書き全文、個人設定とMAY_CONTAIN除外、補足元の非公開化、混在するUNKNOWN、新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスを確認します。食品確認の必須欄・履歴、保存競合時の入力保持、保存成功と公開反映失敗の表示、不正な成功DTO・作成IDと通信断、送信中の独自画像gestureによる変更拒否も確認します。既存TypeScriptとNext同梱webpackを使用し、依存を追加しません。Nextのリンク・画像・navigationと保存APIの応答をfixture用に置き換えるため、実ルート・公開データ取得・認証・DB保存・アップロードの確認とは区別します。ブラウザの外部通信を遮断し、保存操作で実DBやBlobへ書き込みません。
+`node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォーム、管理メニュー一覧を、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。320／390／768／1440pxの品目名・状態別件数・対象範囲・注意書き全文、個人設定とMAY_CONTAIN除外、補足元の非公開化、混在するUNKNOWN、新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスを確認します。食品確認の必須欄・履歴、保存競合時の入力保持、保存成功と公開反映失敗の表示、不正な成功DTO・作成IDと通信断、送信中の独自画像gestureによる変更拒否も確認します。管理一覧では品目未設定・現行確認・旧確認・最新未解決・記録なし・通常STOPを分け、件数・検索／filter・編集入口・版付き削除後の件数・空表示・保存しないdemoを検査します。既存TypeScriptとNext同梱webpackを使用し、依存を追加しません。Nextのリンク・画像・navigationと保存APIの応答をfixture用に置き換えるため、実ルート・公開データ取得・認証・DB保存・アップロードの確認とは区別します。ブラウザの外部通信を遮断し、保存操作で実DBやBlobへ書き込みません。
 
 `node scripts/browser-runner.mjs composition` は画像構図の実コンポーネントを一時ディレクトリでコンパイルし、使い捨てのloopbackサーバーで検証します。事前にアプリのビルド済みCSS（`.next/static/chunks`）と隔離ブラウザランナーが必要です。アプリ・DBの起動やClerk／Blobのキーは不要。新規依存は導入せず、既存TypeScript・Next同梱webpack・sharpを使用します。写真の目印の画素が指／マウスの方向に動くこと、拡大・余白・両プレビュー・端・元画像比較・390pxのタッチ／ピンチを確認し、終了時にブラウザとサーバーを閉じます。実管理画面での画像アップロードや保存の検証とは別です。
 
@@ -169,6 +169,7 @@ node scripts/browser-runner.mjs ui
 | `scripts/check-test-browser.mjs` | 固定localhost:3101、専用アカウントファイル、Dockerのテストアプリを使う。実Clerkログイン、店舗説明更新、メニュー作成・公開・編集・削除、Blob画像追加、別店舗拒否。許可した専用環境だけでランナーの `admin` を実行 |
 | `scripts/check-test-database.ts` | 専用DBガード後、共通の `scripts/database-regression.ts` で公開条件、リンク置換、メニュー移転後の店舗条件付き更新・削除と巻戻し、実ハンドラの移転/消失後404・両店舗fields/links不変・正常操作、pending招待の一意性、行ロック、受諾済み行への取消防止、招待置換失敗の巻戻しを確認。当該実行の一時店舗・監査記録だけを最後に削除。`docker compose -f compose.test.yaml exec app node --import tsx scripts/check-test-database.ts` |
 | `scripts/check-ci-database.ts` | CI専用接続先のガード後、同じ実DB回帰を実行。CIのfixture準備後に `node --import tsx scripts/check-ci-database.ts`。通常の開発DBや共有DBに接続先を差し替えて実行しない |
+| `scripts/check-admin-menu-list-database.ts` | CI/専用テストDBの既存接続ガードを通し、共有一覧select/DTOで未記録・現行公開・通常STOP・食品変更・最新未解決・UNKNOWNの6状態と私的記録の非転送を検査。今回作成した店舗と配下データだけを後始末。`node --import tsx scripts/check-admin-menu-list-database.ts`。CIは上の制約検証の直後、owned-menu検証の前に実行する。migration/reset/実Clerk/Blobはこのscriptの対象外 |
 | `scripts/cleanup-test-images.ts` | 記録ファイルのURLが専用店舗の画像か検証し、Blobから削除する。削除の許可があるときだけ `docker compose -f compose.test.yaml exec app node --import tsx scripts/cleanup-test-images.ts`。失敗時は記録ファイルを保持 |
 
 `public` / `demo` / `ui` は `CLEARALLERGY_BROWSER_BASE_URL` で接続先、`CLEARALLERGY_BROWSER_OUTPUT` で画像出力先を変更でき、ブラウザの外部通信を遮断します。これはアプリサーバーの外部通信まで止めるものではありません。`admin` の接続先はlocalhost:3101固定です。既存ブラウザを使う場合は `BROWSER_EXECUTABLE` に実在する実行ファイルを指定できます。既存スクリプトを直接起動する場合は従来どおり `PLAYWRIGHT_MODULE_PATH` 等の解決が必要です。
@@ -178,6 +179,12 @@ node scripts/browser-runner.mjs ui
 `node scripts/browser-runner.mjs qr` は実 `ShopQrCard` と実 `qrcode.react` のSVGを、架空URLの隔離loopback fixtureで検査します。`composition` と同じ隔離ブラウザ・ビルド済みCSSが必要で、アプリ・DB・Clerkの起動は不要です。320／390／1024／1440pxで正方形・選択サイズ比率・横はみ出し、プリセット・キーボード、印刷メディアのmm寸法と印刷後の解除を確認します。OSの印刷ダイアログだけを置き換え、A4・倍率100%のPDFを35／45／50／60mmで出力します。JSON寸法とスクリーンショット・PDFを確認してください。紙への印刷、カメラでの読取、実管理ルートでの操作は別確認です。
 
 ### 自動テストで置き換えられない手動確認
+
+一料理の材料変更を試すローカル演習は、[台本](../research/product/ingredient-change-trial-20261015.md)・[起動手順と架空資料](../research/product/ingredient-change-trial-fixture-20261015.md)・[匿名空票](../research/product/ingredient-change-trial-record-sheet-20261015.md)を一組で使います。build済みCSSがあるworktreeで `node scripts/ingredient-change-trial.mjs --serve --minutes 30` を実行すると127.0.0.1だけで起動し、時間終了またはCtrl+Cでメモリ内の架空保存を破棄します。実Clerk/DB/Blobへ接続しません。管理一覧・編集・公開表示は実部品、保存応答とNextのnavigationは代用品です。
+
+起動時に出るtoken付き進行役URLは初回回答者へ渡さず、回答者には条件別の資料だけを渡します。進行役の全資料・期待結果は別PCまたは専用の紙で管理し、PC・ブラウザ履歴・ターミナルを共有しません。tokenはこのfixture内の表示・制御の分離であり、同じOS利用者からの秘密保護を保証する仕組みではありません。
+
+`--check` は既存隔離Playwrightを `PLAYWRIGHT_MODULE_PATH`、必要なら対応するブラウザを `BROWSER_EXECUTABLE` / `PLAYWRIGHT_BROWSERS_PATH` に指定して、操作・状態・画像を自動確認し終了します。実Material Symbolsのローカルcacheを使う場合は `--icons-root` で既に取得したCSS/woff2のディレクトリを指定し、ブラウザの外部通信は遮断します。アプリ依存へ追加しません。[準備結果](../verification/ingredient-change-trial-preparation-20261015.md)は補助試験の範囲で、台本全分岐・実店舗の工数/理解度を合格にしません。
 
 - 公開側：スマホとPCで、検索→設定を1つ適用→後から2つ追加→一部解除→キャンセル→一覧→詳細をたどり、全確認対象の表示を比較する。TabキーとEnterでも操作する。
 - 登録側：専用環境で下書き保存→再読込→未設定の公開拒否→全品目を入力して公開→原材料変更時の確認→公開側への反映を確かめる。

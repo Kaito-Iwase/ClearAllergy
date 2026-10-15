@@ -155,7 +155,7 @@ try {
     await a.page.goto(base + '/admin/menus');
     const menuSearch = a.page.getByRole('searchbox', { name: '管理メニューを検索', exact: true });
     await menuSearch.fill(savedMenuName);
-    const draftFilter = a.page.getByRole('button', { name: /^下書き/ });
+    const draftFilter = a.page.getByRole('button', { name: /^非公開/ });
     await draftFilter.click();
     const deleteButton = a.page.getByRole('button', { name: savedMenuName + 'を削除', exact: true });
     const deleteUrl = base + '/api/admin/menus/' + id;

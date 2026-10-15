@@ -7,23 +7,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/lib/utils/api-error-message";
+import { menuFoodReviewText, type AdminMenuListRow } from "../menu-list";
 
 const DELETE_ERROR_MESSAGE =
     "削除結果を確認できません。メニュー一覧を再読み込みして確認してください。";
 
-type MenuRow = {
-    id: string;
-    name: string;
-    category: string | null;
-    priceYen: number | null;
-    imageUrl: string | null;
-    isPublished: boolean;
-    version?: number;
-    updatedAt: string;
-    unknownAllergenNames: string[];
-};
-
-type FilterKey = "all" | "published" | "draft" | "needsAllergen";
+type FilterKey = "all" | "published" | "draft" | "needsAllergen" | "needsFoodReview";
 
 function formatUpdatedAt(value: string) {
     const date = new Date(value);
@@ -67,12 +56,12 @@ export default function MenuListPageClient({
     readOnly = false,
     readOnlyEditHrefBase,
 }: {
-    initialMenus: MenuRow[];
+    initialMenus: AdminMenuListRow[];
     totalAllergenCount: number;
     readOnly?: boolean;
     readOnlyEditHrefBase?: string;
 }) {
-    const [menus, setMenus] = useState<MenuRow[]>(initialMenus);
+    const [menus, setMenus] = useState<AdminMenuListRow[]>(initialMenus);
     const [q, setQ] = useState("");
     const [filter, setFilter] = useState<FilterKey>("all");
     const [error, setError] = useState<string | null>(null);
@@ -89,6 +78,7 @@ export default function MenuListPageClient({
             published: menus.filter((menu) => menu.isPublished).length,
             draft: menus.filter((menu) => !menu.isPublished).length,
             needsAllergen: needsAllergenCount,
+            needsFoodReview: menus.filter((menu) => menu.foodReviewState !== "current").length,
         };
     }, [menus]);
 
@@ -98,6 +88,7 @@ export default function MenuListPageClient({
         return menus.filter((menu) => {
             if (filter === "published" && !menu.isPublished) return false;
             if (filter === "draft" && menu.isPublished) return false;
+            if (filter === "needsFoodReview" && menu.foodReviewState === "current") return false;
             if (
                 filter === "needsAllergen" &&
                 menu.unknownAllergenNames.length === 0
@@ -169,12 +160,13 @@ export default function MenuListPageClient({
     }> = [
         { key: "all", label: "すべて", count: stats.total },
         { key: "published", label: "公開中", count: stats.published },
-        { key: "draft", label: "下書き", count: stats.draft },
+        { key: "draft", label: "非公開", count: stats.draft },
         {
             key: "needsAllergen",
             label: "未設定あり",
             count: stats.needsAllergen,
         },
+        { key: "needsFoodReview", label: "食品確認の再確認待ち", count: stats.needsFoodReview },
     ];
 
     return (
@@ -196,10 +188,17 @@ export default function MenuListPageClient({
                                 アレルゲン未設定のメニューが {stats.needsAllergen} 件あります
                             </p>
                             <p className="mt-1 leading-6 text-amber-900">
-                                未設定が残っているメニューは、カード内に注意表示します。編集画面でアレルゲン{totalAllergenCount}品目を設定すると公開準備が完了します。
+                                未設定が残っているメニューは、カード内に注意表示します。公開にはアレルゲン{totalAllergenCount}品目の設定に加え、現行の食品内容に対応する未解決事項のない確認記録が必要です。
                             </p>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {stats.needsFoodReview > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                    <p className="font-bold">食品確認の再確認待ちが {stats.needsFoodReview} 件あります</p>
+                    <p className="mt-1 leading-6">記録なし・現在の食品内容との未対応・最新記録の未解決事項を含みます。「食品確認の再確認待ち」で絞り込み、各メニューの編集画面で確認してください。</p>
                 </div>
             )}
 
@@ -228,7 +227,7 @@ export default function MenuListPageClient({
                                 type="button"
                                 aria-pressed={selected}
                                 onClick={() => setFilter(item.key)}
-                                className={`inline-flex min-h-11 w-full shrink-0 items-center justify-between gap-2 rounded-xl px-4 py-2 text-sm font-bold transition sm:w-auto sm:rounded-full ${
+                                className={`inline-flex min-h-11 w-full shrink-0 items-center justify-between gap-2 rounded-xl px-4 py-2 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f4c2f] sm:w-auto sm:rounded-full ${
                                     selected
                                         ? "bg-[#0f4c2f] text-white shadow-sm"
                                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -249,7 +248,8 @@ export default function MenuListPageClient({
                     })}
                 </div>
 
-                <div className="text-xs font-medium text-gray-500">
+                <p className="text-xs leading-5 text-gray-600">公開状態と食品確認は別です。公開停止だけでは食品確認記録は失効しません。</p>
+                <div role="status" aria-live="polite" className="text-xs font-medium text-gray-500">
                     表示中 {filtered.length} 件 / 全 {stats.total} 件
                 </div>
             </div>
@@ -258,6 +258,9 @@ export default function MenuListPageClient({
                 {filtered.map((menu) => {
                     const unknownCount = menu.unknownAllergenNames.length;
                     const hasUnknown = unknownCount > 0;
+                    const needsFoodReview = menu.foodReviewState !== "current";
+                    const foodReview = menuFoodReviewText[menu.foodReviewState];
+                    const needsAttention = hasUnknown || needsFoodReview;
                     const unknownPreview = buildUnknownPreview(
                         menu.unknownAllergenNames,
                     );
@@ -269,7 +272,7 @@ export default function MenuListPageClient({
                         <article
                             key={menu.id}
                             className={`rounded-lg border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-4 ${
-                                hasUnknown
+                                needsAttention
                                     ? "border-amber-200 ring-1 ring-amber-100"
                                     : "border-gray-200"
                             }`}
@@ -324,7 +327,7 @@ export default function MenuListPageClient({
                                                     ? "visibility"
                                                     : "draft"}
                                             </span>
-                                            {menu.isPublished ? "公開中" : "下書き"}
+                                            {menu.isPublished ? "公開中" : "非公開"}
                                         </span>
 
                                         {hasUnknown ? (
@@ -362,10 +365,15 @@ export default function MenuListPageClient({
                                             <p className="mt-1 leading-6">
                                                 {menu.isPublished
                                                     ? "公開中ですが未設定があります。利用者に正確に伝えるため設定を完了してください。"
-                                                    : `アレルゲン${totalAllergenCount}品目を設定すると公開準備が完了します。`}
+                                                    : `公開にはアレルゲン${totalAllergenCount}品目の設定と、現行の食品確認記録が必要です。`}
                                             </p>
                                         </div>
                                     )}
+
+                                    <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${needsFoodReview ? "border-amber-200 bg-amber-50 text-amber-950" : "border-gray-200 bg-gray-50 text-gray-700"}`}>
+                                        <p className="font-bold">{foodReview.label}</p>
+                                        <p className="mt-1 leading-6">{foodReview.reason}</p>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap sm:justify-end">
@@ -382,18 +390,19 @@ export default function MenuListPageClient({
                                     ) : (
                                         <Link
                                             href={editHref}
-                                            className={`inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold transition sm:w-auto ${
-                                                hasUnknown
+                                            aria-label={`${menu.name}：${needsFoodReview ? "食品確認を見直す" : hasUnknown ? "アレルゲン設定" : "編集"}`}
+                                            className={`inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f4c2f] sm:w-auto ${
+                                                needsAttention
                                                     ? "bg-amber-600 text-white hover:bg-amber-700"
                                                     : "bg-[#0f4c2f] text-white hover:bg-[#0b3d25]"
                                             }`}
                                         >
                                             <span className="material-symbols-outlined text-[18px]">
-                                                {hasUnknown
+                                                {needsAttention
                                                     ? "notification_important"
                                                     : "edit"}
                                             </span>
-                                            {hasUnknown ? "アレルゲン設定" : "編集"}
+                                            {needsFoodReview ? "食品確認を見直す" : hasUnknown ? "アレルゲン設定" : "編集"}
                                         </Link>
                                     )}
 
