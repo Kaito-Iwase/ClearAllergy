@@ -4,6 +4,10 @@
 
 ここには、ClearAllergyを設計・検証するために調べた根拠、設計案、未確認事項を保存しています。まず下の「知りたいこと」から文書を選んでください。現在の操作や実装の仕様を知りたい場合は、研究資料より先に[現行ガイド](../guide/product.md)を読みます。
 
+## 2026-10-16の追加精査：実装候補と未完のテスト接続
+
+[3作業の結論](engineering/material-change-followup-20261016.md)から、[確認文の独立反証・隔離ブラウザ記録](../verification/material-change-confirmation-20261016.md)と[公開再取得・一料理E2Eの計画全文](product/public-refresh-and-change-e2e-plan-20261016.md)へ進めます。確認文の不一致は2条件を再現し、UNKNOWN条件は反証しました。アプリコードは未修正です。再取得UIと実認証E2Eの追加は提案・未実行で、既存の保存/確認/公開機能を未実装と扱いません。
+
 ## 現在の入口：公開資料の精査と友人テスト
 
 現段階では実店舗へ直接聞く手段がないため、店舗接触を実施順序の前提にしません。店舗側は公開資料・事例・シナリオを精査し、利用者の操作・理解は友人の架空課題で確認します。友人の店員役から店舗負担・継続・支払意思は実証できません。
@@ -11,10 +15,10 @@
 | 目的 | 読む文書 |
 | --- | --- |
 | 現在の方針と未検証の境界 | [調査・友人テスト方針](product/research-and-friend-testing-policy-20261015.md) → [次の判断](product/clearallergy-next-direction-20261015.md) |
-| 実施準備 | [友人テスト台本](product/friend-user-test-20261015.md) → [空の記録票](product/friend-user-test-record-sheet-20261015.md)。未実施 |
+| 実施準備 | [友人テスト台本](product/friend-user-test-20261015.md) → [空の記録票](product/friend-user-test-record-sheet-20261015.md)。草案。表示版・判定表・端末分離・同意/削除条件は未確定で、実施前確認が必要 |
 | 既存機能と提案を区別する | [cd502b時点の27 Issue監査](engineering/current-main-issue-audit-20261015.md) → [一料理の静的照合](product/one-dish-reconciliation-20261015.md) → [6領域の検証条件](product/next-verification-plan-20261015.md) |
 | 原稿の版・出典・独立レビュー | [提供計画の来歴](product/additional-plans-provenance-20261015.md) → [導入計画v2](literature/shop-adoption-plan-20261015.md) / [理解計画v2](literature/safety-understanding-plan-20261015.md) → [提供元レビュー](product/provided-plans-independent-review-20261015.md) / [照合資料レビュー](product/next-direction-independent-review-20261015.md) |
-| 文書を読むための補助 | [用語・時点・注意箇所](reading-guide.md) → [全文書の精査記録](../guide/document-audit-20261015.md) → [原稿保管](originals/README.md) |
+| 文書を読むための補助 | [用語・時点・注意箇所](reading-guide.md) → [10/15時点の全文書精査](../guide/document-audit-20261015.md) → [原稿保管](originals/README.md) |
 
 下の研究5稿とIssue照合は、e26b608時点または外部原稿作成時の記録です。#73/#74や#76の未merge記述を、cd502b以降の未実装へ読み替えません。古い店舗募集・聞き取り案は履歴として保持し、現在の順序は上記方針に従います。
 

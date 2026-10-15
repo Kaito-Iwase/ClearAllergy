@@ -1,0 +1,191 @@
+{
+  "task": "PR81 follow-up independent read-only documentation review",
+  "reviewer": "/root/pr81_docs_second_independent",
+  "reviewed_at_utc": "2026-10-15T15:36:54Z",
+  "outcome": "PASS",
+  "source_main": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "docs_head_before_followup": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+  "reviewed_scope": "HEAD後の未commit追補5資料、証拠の来歴、入口と旧監査の変更差分。",
+  "blocking_findings": [],
+  "unresolved_content_findings": [],
+  "full_text_read_records": [
+    {
+      "path": "docs/research/engineering/material-change-followup-20261016.md",
+      "full_text_read": true,
+      "lines": 43,
+      "sha256": "09d216a4571feb4f24252463180b248b778a9c6c617eebc3b6d8d43c2102b586"
+    },
+    {
+      "path": "docs/research/product/public-refresh-and-change-e2e-plan-20261016.md",
+      "full_text_read": true,
+      "lines": 102,
+      "sha256": "5e47c6862b16a497b37cf06e54da5162e70fab3b7c293023639e9e70439d8aa2",
+      "note": "本文を前半/後半に分けて全文読了。後から加わった配置注記も差分で全文確認。"
+    },
+    {
+      "path": "docs/verification/material-change-confirmation-20261016.md",
+      "full_text_read": true,
+      "lines": 53,
+      "sha256": "9b227e89666381efbb19b4f1735601185b44dbdcce734debcb8d3106be766fc8"
+    },
+    {
+      "path": "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt",
+      "full_text_read": true,
+      "lines": 89,
+      "sha256": "faef7309f1f34349a008397c62e34e1d84ba09a9238fde1a8b8b1213eb87a754"
+    },
+    {
+      "path": "docs/verification/evidence/20261016-material-change/runner-source.cjs.txt",
+      "full_text_read": true,
+      "lines": 21,
+      "sha256": "31ed4e59eb42250869582f6ba4d1c533dcbdd20df7ddbc30b7cda10b92657989"
+    }
+  ],
+  "existing_file_changes_reviewed": [
+    {
+      "path": "docs/research/README.md",
+      "change": "10/16追補への入口、2条件再現/UNKNOWN反証/未修正の区分、友人台本の準備未完了、10/15監査の時点を明示。"
+    },
+    {
+      "path": "docs/research/product/clearallergy-next-direction-20261015.md",
+      "change": "鶏料理B/Fは検討例、既存実施候補は小丼S0〜S7、同一F/F2条件未整備と明示。"
+    },
+    {
+      "path": "docs/research/product/one-dish-reconciliation-20261015.md",
+      "change": "鶏料理と小丼を同一条件へ置き換えず、F/F2工程条件と二軸表示の未整備を明示。"
+    },
+    {
+      "path": "docs/guide/document-audit-20261015.md",
+      "change": "129件は521c7fd時点の対象と明示。10/16追加5資料を別追補としてリンク。"
+    },
+    {
+      "path": "docs/verification/document-audit-20261015.json",
+      "change": "reviewed_snapshot_head/snapshot_note/followupだけを追記し、既存documentsの記録値・hashは差分で変更していない。"
+    }
+  ],
+  "substantive_checks": [
+    {
+      "name": "実行、反証、提案の区分",
+      "result": "PASS",
+      "locations": [
+        "docs/research/engineering/material-change-followup-20261016.md:9",
+        "docs/verification/material-change-confirmation-20261016.md:19",
+        "docs/research/product/public-refresh-and-change-e2e-plan-20261016.md:5"
+      ],
+      "evidence": "C1材料変更/C2申告のみが確認文とPUT falseの不一致、C3 UNKNOWNは実setOneで公開state=falseとなるため反証、C4取消/C5価格のみ/C6新確認は対照。A再取得UIとB実HTTPアプリ/PG/Clerk E2Eは草案・未実装・未実行と明記。",
+      "conclusion": "6件PASSを不具合修復や公開漏れ検出の成功に読み替えていない。"
+    },
+    {
+      "name": "6条件JSONと本文表",
+      "result": "PASS",
+      "evidence": "confirmation-check.jsonの全6ケースの実確認文、dialogs、PUT件数/isPublished、応答200、最終公開状態、review状態を本文表と照合。C1/C2はmismatch=trueかつfalse/outdated、C3はdialog0/PUTfalse、C4はPUT0/current公開維持、C5/C6はPUTtrue/current。",
+      "counts": {
+        "cases": 6,
+        "reproduced_mismatches": 2,
+        "counterexample": 1,
+        "controls": 3,
+        "page_errors": 0,
+        "external_requests_attempted": 0
+      },
+      "limits": "ブラウザを本レビューで再実行したものではない。実行証拠と、その記録を独立に読んだ作業を分ける。"
+    },
+    {
+      "name": "実ソースとのspot照合",
+      "result": "PASS",
+      "evidence": "MenuEditClientのfoodChanged/canPublish、UNKNOWN選択時のsetIsPublished(false)、getMenuReviewMessageへ渡すwillPublish:isPublished、PUTのcanPublish?isPublished:falseを直接読んだ。publication-review.tsの文言分岐とも一致。",
+      "source_paths": [
+        "features/admin/menus/components/MenuEditClient.tsx:179",
+        "features/admin/menus/components/MenuEditClient.tsx:214",
+        "features/admin/menus/components/MenuEditClient.tsx:322",
+        "features/admin/menus/components/MenuEditClient.tsx:355",
+        "features/admin/menus/publication-review.ts"
+      ],
+      "additional": "既存check-test-browser.mjs:139〜149が原材料と卵UNKNOWNを同時変更することを確認。Bが食品確認失効のみの接続を追加する計画であるという説明に根拠がある。"
+    },
+    {
+      "name": "driver/wrapperと実行環境",
+      "result": "PASS",
+      "evidence": "driverは条件ごとに別context、同一origin以外を遮断、実UIを操作、dialog/PUT/合成応答/fixture状態を記録する。wrapperは既存fixtureをscratchから起動し同じcontextのdriverへoriginを渡し、終了時に所有childを停止する。実HTTPアプリroute/PG/Clerk/Blobを通した証拠とはしていない。",
+      "limits": "C4のPUT0の待機は200ms、メモリ状態と保存操作の範囲。実DBの原子性や無制限時間の非送信保証には一般化しない。現行文書もその一般化をしていない。"
+    },
+    {
+      "name": "ソース380ファイルの独立再照合",
+      "result": "PASS",
+      "method": "git archive --format=tar cd502b... をstdoutからメモリ上に再生成し、System.Formats.Tarでregular fileを読み、scratchおよびsource-preservation.jsonの各SHA256へ直接比較。ソースファイルの作成・変更なし。",
+      "counts": {
+        "main_archive_regular_files": 380,
+        "archive_vs_scratch_mismatches": 0,
+        "archive_vs_record_sha256_mismatches": 0
+      },
+      "detail": "scratchには.gitがなく、manifest.sourceHeadが空という説明に対応する。manifestの14ソースに限らず、確認文helperを含む全tracked sourceの対応を別証拠で補う形は妥当。",
+      "line_endings": "Windowsのarchive/作業ファイルの改行変換とGit blob生byteは区別した。今回のbyte一致は再生成したarchiveからの展開byteとの一致。"
+    },
+    {
+      "name": "証拠コピーの保存元との一致",
+      "result": "PASS",
+      "counts": {
+        "copies_compared": 10,
+        "sha256_manifest_matches": 10,
+        "source_byte_matches": 10
+      },
+      "evidence": "provenance.jsonに列挙された各ファイルをtask-2の元の記録/driver/wrapperとGet-FileHash SHA256で直接比較。既存レビューJSONの元ファイルも保持され、新規follow-upレビューは別名で作成する。"
+    },
+    {
+      "name": "初期2回の環境失敗",
+      "result": "PASS",
+      "evidence": "attempt1はERR_NETWORK_ACCESS_DENIED、attempt2はERR_CONNECTION_TIMED_OUT、両方cases=[]/FAIL。本文はこれらを接続環境失敗として保管し、アプリ不具合や6件の成功へ含めていない。"
+    },
+    {
+      "name": "別担当の草案全文と配置注記",
+      "result": "PASS",
+      "evidence": "task-2/material-refresh-e2e-scope-20261016.mdと閲覧版をgit diff --no-index --ignore-space-at-eolで比較。閲覧用リンクと配置注記の追加のみで本文の削除なし。",
+      "resolved_note": "provenance.plan_view_changeはリンクだけという旧説明から、配置注記と全文保持を含む説明へ訂正済み。草案当時の作業差分なし/PR未変更を現在の取り込み状態へ読み替えない。"
+    },
+    {
+      "name": "旧129件監査と追補",
+      "result": "PASS",
+      "evidence": "MD/JSONとも521c7fd時点を示し、10/16の5資料を旧129件へ数え直していない。旧documents配列のhashを現在変更ファイルへ書き換えていない。",
+      "limits": "旧hashは当時の保存済み作業ファイルbyteを示す値。Git objectやcore.autocrlfの影響を受けたarchiveと常時同じhashという主張はしない。全129件を今回再読したという記録でもない。"
+    },
+    {
+      "name": "友人試験・実店舗の境界",
+      "result": "PASS",
+      "evidence": "今夜の6条件確認を友人用全条件・判定表・端末分離・同意/削除の準備完了へ広げない。UNKNOWN説明カード、二軸表示、G1訂正機能を既存機能と扱わず、実店舗接触を行わない方針と友人役割演技の限界を維持。",
+      "prior_suggestions_resolved": [
+        "索引で草案・準備未完了を明示",
+        "B/Fの例と既存S0〜S7の対応限界を明示"
+      ]
+    },
+    {
+      "name": "追加導線と包装",
+      "result": "PASS",
+      "counts": {
+        "reviewed_markdown_documents": 7,
+        "local_links_checked": 305,
+        "missing_local_targets": 0
+      },
+      "detail": "追加3Markdownと入口4Markdownの相対ファイルリンクを解決。計画の新見出しアンカーは対象見出しが存在。",
+      "packaging": "evidence配下は.gitignore:67の対象であることを親へ通知。最終確認では12 evidence pathがindexの追加一覧に存在することを確認。最終メタデータ修正のrestageとcommit/push後確認は親担当の範囲。"
+    }
+  ],
+  "performed_actions": [
+    "追加5資料の全文読了とSHA256/行数記録",
+    "既存5ファイルのHEADとの差分確認",
+    "証拠JSON・manifest・provenance・初期失敗記録の読取",
+    "確認文周辺と既存E2Eのソースを限定して読取照合",
+    "git archiveをメモリ上で再生成して380ファイルをbyte照合",
+    "証拠コピー10件の元ファイル比較",
+    "相対リンク305件の存在確認",
+    "git diff --check成功"
+  ],
+  "not_performed": [
+    "コード修復、DB/provider/本番操作、外部連絡",
+    "ブラウザ再実行、実HTTPアプリ/PG/Clerk/Blob E2E実行",
+    "外部資料再取得、人による理解・友人試験、実食品検証",
+    "lint/typecheck/test/build。文書のread-onlyレビューであり実行コード変更なし",
+    "git add/commit/push/merge。親が作成したstaging状態を読んだのみ"
+  ],
+  "remaining_blockers": [],
+  "implementation_status": "C1/C2未修復。A/Bは提案・未実行。これらはレビューのblockerではなく、文書が正しく明示している今後の作業。",
+  "report_preservation": "先のpr81-docs-second-independent-20261016.jsonを上書きせず、この新規ファイルへ保存。"
+}

@@ -4197,5 +4197,8 @@
     "external source pages: not all re-fetched",
     "source/config files outside prose-document scope"
   ],
-  "independent_review": "Separate fresh read-only reviewer; receipt stored separately after final review. This inventory is not an independent reread of every source page."
+  "independent_review": "Separate fresh read-only reviewer; receipt stored separately after final review. This inventory is not an independent reread of every source page.",
+  "reviewed_snapshot_head": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+  "snapshot_note": "10/15の129件の読了・hashはこのsnapshotに固定。10/16の追加5資料と再確認は別追補。現在ファイルとの継続的なhash一致を主張しない。",
+  "followup": "docs/research/engineering/material-change-followup-20261016.md"
 }
