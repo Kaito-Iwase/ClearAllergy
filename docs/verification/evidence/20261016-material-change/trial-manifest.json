@@ -1,0 +1,42 @@
+{
+  "createdAt": "2026-10-15T15:24:00.973Z",
+  "mode": "--serve",
+  "sourceHead": "",
+  "node": "v22.15.1",
+  "sourceFiles": {
+    "scripts/ingredient-change-trial.mjs": "691ebee90a50d2e6d5917e9c15745bcc8af35c829dfbc84b1a1e9c708bb74ffc",
+    "features/admin/menus/components/MenuListPageClient.tsx": "989493d014c0d8e116cfa5215d0b5561206e8e8030cab1ae5189c8baf44ffc86",
+    "features/admin/menus/components/MenuEditClient.tsx": "48c0a464adf6576c304b8d2db4db48dd27e82b619af15da0393dd35ebdb81b5a",
+    "features/admin/menus/components/MenuFoodReviewFields.tsx": "f811e2ed2b223c10df6d10a76676adc68baf613678eda2849cc5454811137a7e",
+    "features/admin/menus/menu-list.ts": "43392840ccbfc45d3901526c3c1e4a370c397b00337963dc317e5da397781fc8",
+    "features/admin/menus/server/menu-list-data.ts": "2687c949d1f86fc1cec276127c8090bb327377d30df5881dc2a03d0c78ec47b9",
+    "features/admin/menus/food-review.ts": "868f6bb210e77bf9dbc8bd8921f843d1b67d6fdd3fcc803d9c40c055e4f8487d",
+    "features/admin/menus/schemas/menu-input.ts": "bef5c37fe8bbc1f3ade364b96eb91610da36de5b2de913cafafbaada8888808c",
+    "features/admin/menus/schemas/menu-response.ts": "064789f4919ea1be9d9ca42e3756a78dc049d334cf838f9756d7f8a053325839",
+    "features/public/shops/components/ShopMenuListClient.tsx": "0766c8cd0f844693f2cd9f435fff3200b738d558d3cbc0cc8e59d677394da14a",
+    "features/public/shops/components/PublicMenuDetailBodyClient.tsx": "b045d7b3f8358fd9d505d19e1a1aa5eae00f6db95d0ba0acc94aaad4946ee572",
+    "lib/allergens.ts": "29da02601f845d918e9515be57da9fe79f6353ec4f8a8386c5f9b718cef1b50f",
+    "lib/constants/allergen-master.ts": "4ef29e313d6ac47f803f6779326d919eca7f9c1d65d0489d49efc12142b8a7c8",
+    "lib/utils/formatters.ts": "601f353ed7fc0520b17218c0a562ea1ffb55dcebb1ef8bd6cc1d79bf3d3afef5"
+  },
+  "assetsRoot": "C:\\Users\\kaito\\Documents\\Codex\\2026-10-14\\task-2\\clearallergy-issue-74",
+  "cssFiles": {
+    ".next\\static\\css\\1b874e0f2c4aff58.css": "451f9eb2d952bc4deaee202771e75098e9bac75effcab6f945cfcb4e0eeb31fb",
+    ".next\\static\\css\\e85e5795a3f40e36.css": "8a993cfaaf46195e2d4527513e4d109d61a4c5f322f9c2f0ff25bf75651f5b6a"
+  },
+  "icons": {
+    "mode": "decorative glyphs omitted; no external font requested"
+  },
+  "transport": "127.0.0.1 only; memory sessions; same-origin mutations; startup-only facilitator token; CSP self-only; Next/save adapters",
+  "limits": [
+    "No real server/DB/auth/Blob",
+    "No trigger/transaction/concurrency proof",
+    "No participant or timing study",
+    "No food/clinical/safety validation",
+    "No unreported physical-change detection",
+    "No delivery of corrections into existing tabs/paper/images",
+    "No claim that all 25 research tests passed",
+    "Facilitator token separates this fixture's presentation/controls; no OS, shared-PC, browser-history or developer-tools confidentiality guarantee",
+    "Facilitator screenshots and R3 truth-card evidence must not be shown before an unprompted response"
+  ]
+}

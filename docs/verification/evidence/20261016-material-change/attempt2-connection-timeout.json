@@ -1,0 +1,21 @@
+{
+  "startedAt": "2026-10-15T15:22:48.266Z",
+  "sourceMain": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "method": "unchanged current-main components bundled by existing loopback memory fixture",
+  "cases": [],
+  "blockedExternalRequests": [],
+  "errors": [],
+  "limits": [
+    "No real HTTP application route, PostgreSQL, Clerk, Blob or production",
+    "No participant study or food validation",
+    "Memory adapter is not database transaction/trigger proof",
+    "Prior existing CSS reused; no app build/install/generate"
+  ],
+  "corrections": [
+    "The earlier formula-only UNKNOWN mismatch assumed isPublished=true after choosing UNKNOWN. Actual setOne clears it; evaluate as counterexample."
+  ],
+  "browserVersion": "155.0.8059.40",
+  "status": "FAIL",
+  "failure": "page.goto: net::ERR_CONNECTION_TIMED_OUT at http://127.0.0.1:55187/admin/menus/trial-dish-one/edit\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:55187/admin/menus/trial-dish-one/edit\", waiting until \"load\"\u001b[22m\n\n    at one (C:\\Users\\kaito\\Documents\\Codex\\2026-10-14\\task-2\\material-confirmation-browser-20261016.cjs:24:16)\n    at async main (C:\\Users\\kaito\\Documents\\Codex\\2026-10-14\\task-2\\material-confirmation-browser-20261016.cjs:65:5)",
+  "completedAt": "2026-10-15T15:22:50.732Z"
+}

@@ -1,5 +1,7 @@
 # UI/UX精査記録
 
+本書は各節の日付・HEADに対する過去の画面改善と試験の記録です。「今回」「現在」はそれぞれの実行時点を指します。現在の操作は[操作とページ](product.md)、用語は[読むための案内](../research/reading-guide.md)を参照してください。FEは画面側の実装、fixtureは固定した試験データ、glyphは文字の字形、self reviewは実装者自身の確認を指します。
+
 [操作とページ](product.md) · [共通ルール](rules.md#allergens) · [変更対応表](change-map.md) · [検証手順](development.md#browser)
 
 ## 対象と根拠

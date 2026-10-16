@@ -1,16 +1,16 @@
 # Issue中心の自律開発
 
-[AGENTS.md](../AGENTS.md) · [README](../README.md) · [導入時監査](agentic-audit.md)
+[AGENTS.md](../AGENTS.md) · [README](../README.md) · [開発手順](guide/development.md) · [文書の保守](guide/maintenance.md) · [導入時監査](agentic-audit.md)
 
-このハーネスはCodexがGitHubの作業キューを読み、実装・検証・review・PR公開を繰り返すための手順と検証runnerである。GitHubを状態の正本とし、runnerは選択候補と検証結果を出す。Issueの文章をshell命令へ変換する機能、daemon、課金API、新しいframeworkは追加しない。次回のCodexに「AGENTS.mdの自律開発手順を再開して」と依頼すれば、Issue番号の指定は不要。セッションが動いていない間の実行には別途schedulerと実行環境が必要であり、この変更では導入しない。
+このハーネス（作業手順と検証をまとめた仕組み）は、CodexがGitHubの作業キューを読み、実装・検証・レビュー・PR（Pull Request、変更提案）の公開を繰り返すためのもの。手順とrunner（候補選択や検証を行うスクリプト）で構成する。GitHubを状態の正本とし、runnerは選択候補と検証結果を出す。Issueの文章をシェル命令へ変換する機能、常駐処理、課金API、新しいフレームワークは追加しない。次回のCodexに「AGENTS.mdの自律開発手順を再開して」と依頼すれば、Issue番号の指定は不要。セッションが動いていない間の実行には別途スケジューラーと実行環境が必要であり、この変更では導入しない。
 
 ## 再開と選別
 
-1. 現在のbranch/status/HEAD/remote、AGENTS.md、README、package/lock、CIを読む。guideが存在するcheckoutではREADMEの読む順番・変更対応表・関連仕様も読む。元の未commit変更と他のworktreeは保持する。mainとローカル未公開branchを同じ状態と扱わない。
-2. GitHub connectorの`list_issues`でopen Issue全ページ、`list_pull_requests`でopen PR全ページを取得する。Issue comments、依存先の状態、各PRのlinked Issue・変更ファイル・review threads・checksも取得する。native dependencies/sub-issuesが存在すれば照合し、本文の依存だけで判断しない。取得できない情報はUNKNOWNとして該当Issueをblockする。
+1. 現在のブランチ・作業状態・HEAD・remote、AGENTS.md、README、package/lock、CI（継続的な自動検証）を読む。guideが存在するcheckoutではREADMEの読む順番・変更対応表・関連仕様も読む。元の未コミット変更と他のworktree（ブランチごとに分離した作業ディレクトリ）は保持する。mainとローカル未公開branchを同じ状態と扱わない。
+2. GitHub connectorの`list_issues`でopen Issue全ページ、`list_pull_requests`でopen PR全ページを取得する。Issue comments、依存先の状態、各PRのlinked Issue・変更ファイル・review threads・checksも取得する。native dependencies/sub-issuesが存在すれば照合し、本文の依存だけで判断しない。取得できない情報はUNKNOWN（未確認）として該当Issueをblockする。
 3. Issue本文をコード・schema・testsと照合する。実装済み/重複/誤った前提なら変更を作らず証拠をコメントする。安全に補完できるAcceptance Criteriaのみ補う。製品仕様を発明しない。
 4. Problem → Evidence → Cause → Candidate solutions → Decision → Verificationをコメントに記録する。影響範囲、編集範囲、確認だけの範囲を分け、対象環境・副作用・依存・ownerを確定する。本文が`HUMAN_DECISION_REQUIRED`/Blockedならlabelで上書きしない。planning/research/evidence Issueの部分作業を実装許可や完了へ読み替えない。
-5. Readyの条件を満たすものだけ`agent-ready`とし、優先度はsecurity/safety → regression/bug → blocker → correctness → testability → maintainability → UX → feature → optimization。既存のpriority体系が導入されたらそれを照合して優先する。同順位は依存解消・影響・利用者価値を比較し、同価値の最後のtie-breakだけ番号を使う。
+5. Ready（着手可能）の条件を満たすものだけ`agent-ready`とし、優先度はsecurity/safety → regression/bug → blocker → correctness → testability → maintainability → UX → feature → optimization。既存のpriority体系が導入されたらそれを照合して優先する。同順位は依存解消・影響・利用者価値を比較し、同価値の場合に限り、最後の比較に番号を使う。
 6. runnerで候補を照合し、選んだIssue・comments・依存・PRをもう一度live取得する。着手宣言後に再取得し、他のowner/claim/PRが出現していたら停止する。claimコメントは排他ロックではない。既定の実装並列度は1。
 
 ## 状態と記録
@@ -18,7 +18,7 @@
 | GitHubの状態 | 意味・次の操作 |
 | --- | --- |
 | 未評価 | 定義・証拠・依存を調べる。labelなしは未許可 |
-| `agent-ready` + 有効なassessment | 安全な実装を開始可能。merge/deployの許可ではない |
+| `agent-ready` + 有効なassessment（Issueの評価記録） | 安全な実装を開始可能。merge/deployの許可ではない |
 | assessment `working` | owner/session、branch、worktree、base SHA、開始時刻、次の検証を記録。Ready labelを外す |
 | `agent-blocked` | 理由、必要な証拠/環境/依存、解除条件を記録。実行可能な他Issueは続行 |
 | `human-review` | 判断またはPR確認待ち。選択肢・利点・risk・推奨案を用意し、依存作業を止める |
@@ -31,7 +31,7 @@
 
 ## Queue runner
 
-GitHub connectorで取得した事実を以下のsnapshotへ正規化し、Git管理しない`.agent-runs/queue.json`へUTF-8で保存する。snapshotに秘密値・個人データは含めない。runnerはGitHubへ通信・書込せず、このfileを信用するsecurity boundaryでもない。取得漏れ、authorやURLの偽装、意図的に欠かした依存を自動発見できないため、Codexがlive原典との一致を確認する。snapshotは15分で失効する。
+GitHub connectorで取得した事実を以下のsnapshot（取得時点の写し）へ正規化し、Git管理しない`.agent-runs/queue.json`へUTF-8で保存する。snapshotに秘密値・個人データは含めない。runnerはGitHubへ通信・書込せず、このファイルの信頼性を保証する仕組みでもない。取得漏れ、authorやURLの偽装、意図的に欠かした依存を自動発見できないため、Codexがlive原典との一致を確認する。snapshotは15分で失効する。
 
 ```json
 {
@@ -85,21 +85,21 @@ assessmentは24時間で失効する。`implementationAllowed`は証拠を読ん
 node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json
 ```
 
-`selected: null`でも失敗ではない。理由を読み、No-Issue Modeへ進む。queue出力をそのままGitHubへ書かず、原典とコードを照合する。
+`selected: null`でも失敗ではない。理由を読み、[改善探索と次Issue](#改善探索と次issue)のReadyがない場合の手順へ進む。queue出力をそのままGitHubへ書かず、原典とコードを照合する。
 
 ## 実装と隔離
 
-1 Issue = 1 branch = 1 worktree = 1 PR。branchは`agent/issue-<number>-<slug>`。適切で使われていないworktreeは再利用し、新規はCodexのmanaged worktreeを優先する。canonical checkoutは調査入口であり、許可された隔離worktreeへの実装は可能。default branchを推測せずlive repo metadataと最新remote SHAを確認する。既存dirty checkoutのstash/reset/cleanは不要。
+1 Issue = 1 branch = 1 worktree = 1 PR。branchは`agent/issue-<number>-<slug>`。適切で使われていないworktreeは再利用し、新規はCodexのmanaged worktreeを優先する。canonical checkout（正規の作業コピー）は調査入口であり、許可された隔離worktreeへの実装は可能。default branchを推測せずlive repo metadataと最新remote SHAを確認する。既存dirty checkoutのstash/reset/cleanは不要。
 
 同じschema/migration/認証/中心部品/ドメイン規則を並列実装しない。既定は1、並列化は独立scopeを検証できた場合だけ。既存PRの変更とscopeが重なるIssueも待機する。複数のCodexがある場合はGitHub owner/claimとactive chatsを照合し、排他が保証できなければ並列化しない。
 
-最小変更を行う。bugは原則RED→実装→GREEN。局所変更を安全にする・検証可能にする・明白なbugを防ぐ以外の整理はfollow-upへ分離する。関連文書を本文全体で整合させる。code/schema/testsとdocsの矛盾は記録し、動いていることだけで承認済み仕様としない。
+最小変更を行う。bugは原則RED（修復前の回帰テスト失敗）→実装→GREEN（修復後の同じテスト成功）。局所変更を安全にする・検証可能にする・明白なbugを防ぐ以外の整理はfollow-upへ分離する。関連文書を本文全体で整合させる。code/schema/testsとdocsの矛盾は記録し、動いていることだけで承認済み仕様としない。
 
 ## 検証
 
 配備条件を確認するときは、[2026-10-04のEvidence ledger](verification/release-evidence-20261004.md)と[原典JSON](verification/release-evidence-20261004.json)を参照する。これは記載SHA・取得時点のrepository/CI/隔離DB証拠であり、production適用やrelease承認を示さない。次回は同じ対象・日時・出典・未確認事項を再取得する。
 
-package.jsonのscriptsとCIを毎回読み、コマンドと副作用を確認してから実行する。現在の必須scriptsはlint/typecheck/test/build。Prismaが配置されていればgenerate/validateもrunnerが実行する。missing scriptは失敗として止め、成功扱いでskipしない。依存変更は既存依存で合理的に解決できない場合だけ人間判断を経て行う。
+package.jsonのscriptsとCIを毎回読み、コマンドと副作用を確認してから実行する。現在の必須scriptsはlint/typecheck/test/build。Prismaが配置されていればgenerate/validateもrunnerが実行する。必須scriptがなければ失敗として止め、成功扱いでskipしない。依存変更は既存依存で合理的に解決できない場合だけ人間判断を経て行う。以降、次の段階へ進むために必須の検証をgateと呼ぶ。
 
 ```powershell
 node scripts/agent-harness.mjs verify --base origin/main --output verification.json
@@ -113,9 +113,9 @@ runnerは `scripts/npm-cli.mjs` で解決したNode配布またはnpm lifecycle�
 
 ## Self review → Independent review → Repair
 
-self reviewはdiff/checkと受け入れ条件を照合。independent reviewは実装の結論を渡さず、別のreviewerへIssue、base/head、diff、Invariant、検証結果を渡す。ユーザーまたは適用指示で委任が許可されていれば、履歴を共有しないread-only subagentを使う。許可がない環境では外部reviewer/別reviewセッションを待ち、self reviewを独立reviewと呼ばない。
+self review（自己レビュー）では、差分・空白エラーと受け入れ条件を照合する。independent review（独立レビュー）では実装の結論を渡さず、別のレビュー担当へIssue、base/head、diff、Invariant（変更しても守る条件）、検証結果を渡す。ユーザーまたは適用指示で委任が許可されていれば、履歴を共有しないread-only subagentを使う。許可がない環境では外部reviewer/別reviewセッションを待ち、self reviewを独立reviewと呼ばない。
 
-correctness/security/認可/allergen semantics/data integrity/互換性/error/UX/a11y/performance/coverage/複雑性/dead code/scope creepを、変更を壊す観点で確認する。指摘ごとにfile/trigger/impactを記録し、fix→関連gate→reviewを繰り返す。最大3 repair rounds、同じ重大問題が2回再発したら原因・選択肢を整理してblockする。reviewが未実施ならDraft PRまで公開可能だが完成扱いにしない。
+正しさ、セキュリティ、認可、アレルゲン状態の意味、データ整合性、互換性、エラー処理、利用体験（UX）、アクセシビリティ（a11y）、性能、テスト網羅性、複雑性、使われないコード、依頼範囲からの逸脱を、変更を壊す観点で確認する。指摘ごとにファイル・発生条件・影響を記録し、fix→関連gate→reviewを繰り返す。最大3 repair rounds、同じ重大問題が2回再発したら原因・選択肢を整理してblockする。reviewが未実施ならDraft PRまで公開可能だが完成扱いにしない。
 
 ## PRとmerge
 

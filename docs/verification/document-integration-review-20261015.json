@@ -1,0 +1,38 @@
+{
+  "reviewer": "docs_main_independent_review",
+  "independence": "fresh read-only agent with fork_turns=none; no implementation conversation history",
+  "base": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "reviewed_committed_head": "19cba01",
+  "additional_reviewed_scope": [
+    "docs/guide/document-audit-20261015.md",
+    "docs/verification/document-audit-20261015.json",
+    "evidence byte-preservation correction"
+  ],
+  "outcome": "PASS",
+  "unresolved_must_fix": [],
+  "resolved_findings": [
+    {
+      "finding": "X/INF glossary wrongly grouped external evidence IDs as counterexamples",
+      "repair": "X external-source IDs; INF inference; EX experiments distinguished"
+    },
+    {
+      "finding": "audit table displayed current documents as historical, exposed action arrays, and described safety rewrite as a proposed note",
+      "repair": "normalize final classifications/actions; retain original recommendations separately; describe actual safety rewrite and preserved source"
+    }
+  ],
+  "verified": [
+    "current no-restaurant-contact policy and friend script/blank sheet distinguish preparation, fictional conditions and unverified restaurant evidence",
+    "safety IDs/mappings/counterconditions preserved",
+    "7 research manuscripts and 16 saved source copies match recorded hashes",
+    "129 human documents equal inventory; 0 duplicate or missing read statuses; 128 nonself final hashes equal files",
+    "separate parallel reading reports consistent; independent reviewer did not reread all 129 documents",
+    "git diff --check passes; no runtime code/DB/settings changes"
+  ],
+  "limits": [
+    "no external original-source refetch",
+    "no rendered diagrams or accessibility review",
+    "no participant or restaurant testing",
+    "no application runtime tests"
+  ],
+  "receipt_note": "This records the completed review before packaging its receipt and validation metadata; the final committed tree is checked again and reported with the PR."
+}

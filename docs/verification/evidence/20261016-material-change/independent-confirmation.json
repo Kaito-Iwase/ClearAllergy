@@ -1,0 +1,454 @@
+{
+  "pureVerification": {
+    "method": "Source AST expressions and actual setOne/togglePublished handlers with local state setters; actual pure helper imports. No React rendering, DB, providers or network.",
+    "sourceExpressions": {
+      "foodChanged": "foodChangeReported || selectedFile !== null || foodContentChanged(savedFoodSnapshot, currentFoodSnapshot)",
+      "canPublish": "unknownAllergenNames.length === 0 && (recordingReview ? foodReviewDraftComplete(foodReview) : reviewCurrent && !foodChanged)",
+      "reviewMessage": "getMenuReviewMessage({\r\n            name,\r\n            willPublish: isPublished,\r\n            ingredientsChanged: ingredients.trim() !== savedIngredients,\r\n        })",
+      "requestedPublication": "canPublish ? isPublished : false",
+      "blockedReview": "recordingReview && (!foodReview.evidenceRefs.trim() || !foodReview.scope.trim() || !Number.isFinite(Date.parse(foodReview.checkedAt)))"
+    },
+    "cases": [
+      {
+        "id": "baseline",
+        "isPublished": true,
+        "foodChanged": false,
+        "canPublish": true,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": true,
+        "mismatch": false
+      },
+      {
+        "id": "ingredients_changed_no_review",
+        "isPublished": true,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": false,
+        "mismatch": true
+      },
+      {
+        "id": "food_change_reported_no_review",
+        "isPublished": true,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": false,
+        "mismatch": true
+      },
+      {
+        "id": "unknown_via_actual_setOne",
+        "isPublished": false,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": false,
+        "confirmation": "none",
+        "putIsPublished": false,
+        "mismatch": false
+      },
+      {
+        "id": "unknown_plus_ingredients",
+        "isPublished": false,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": false,
+        "confirmation": "unpublished",
+        "putIsPublished": false,
+        "mismatch": false
+      },
+      {
+        "id": "ingredients_then_toggle",
+        "isPublished": false,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": false,
+        "confirmation": "unpublished",
+        "putIsPublished": false,
+        "mismatch": false
+      },
+      {
+        "id": "reported_then_toggle",
+        "isPublished": false,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": false,
+        "confirmation": "none",
+        "putIsPublished": false,
+        "mismatch": false
+      },
+      {
+        "id": "whitespace_only_ingredients",
+        "isPublished": true,
+        "foodChanged": false,
+        "canPublish": true,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": true,
+        "mismatch": false
+      },
+      {
+        "id": "ingredients_restored",
+        "isPublished": true,
+        "foodChanged": false,
+        "canPublish": true,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": true,
+        "mismatch": false
+      },
+      {
+        "id": "report_flag_restored",
+        "isPublished": true,
+        "foodChanged": false,
+        "canPublish": true,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": true,
+        "mismatch": false
+      },
+      {
+        "id": "recording_incomplete",
+        "isPublished": true,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": true,
+        "confirmation": "none",
+        "putIsPublished": null,
+        "mismatch": false
+      },
+      {
+        "id": "recording_complete",
+        "isPublished": true,
+        "foodChanged": true,
+        "canPublish": true,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": true,
+        "mismatch": false
+      },
+      {
+        "id": "recording_unresolved",
+        "isPublished": true,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": false,
+        "mismatch": true
+      },
+      {
+        "id": "recording_unchecked_after_complete",
+        "isPublished": true,
+        "foodChanged": true,
+        "canPublish": false,
+        "blockedBeforeConfirm": false,
+        "confirmation": "publish",
+        "putIsPublished": false,
+        "mismatch": true
+      }
+    ]
+  },
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-15T15:25:01.552Z",
+  "auditKind": "独立した反証監査。コード実装なし。親・他エージェントの既存成果物を読まずソースを追跡。親との進捗連絡は別途あり。",
+  "worktree": "C:/Users/kaito/Documents/Codex/2026-10-14/task-2/clearallergy-docs-main-integration",
+  "sourceHead": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+  "mainComparison": {
+    "base": "cd502b2",
+    "command": "git diff --name-only cd502b2 HEAD -- app features components lib prisma tests scripts package.json package-lock.json",
+    "result": "出力なし。列挙した実行コード・テスト・依存ファイルの差分なし。"
+  },
+  "conclusion": {
+    "status": "CONFIRMED_IN_2_OF_3_REQUESTED_CONDITIONS",
+    "summary": "①原材料の実質変更、②foodChangeReportedのみtrueは、初期公開中・現行確認あり・新記録なし・公開切替なしで確認文が「公開する設定で」、PUTはisPublished:falseとなる。③UNKNOWNをUIから選ぶ場合はsetOneがisPublishedをfalseにするため同一の主張を反証する。",
+    "classification": "確認文と保存予定の公開状態の表示矛盾。指定2条件で公開停止を漏らしている証拠ではない。",
+    "publicationBoundary": "クライアントはfalseを送信し、サーバーも食品変更かつ記録なしを非公開へ落とす。保存成功・実DB確定・既存公開画面への反映はこの監査では未確認。保存前または確認キャンセル時に保存済み公開メニューが停止するとの主張はしない。",
+    "changedImplementation": false,
+    "changedRepositoryFiles": [],
+    "documents": "現行文書は読取のみ。挙動を変更していないため更新なし。監査証拠JSONだけをworktree外のtask-2へ保存。"
+  },
+  "reproductionPrerequisites": [
+    "通常の編集権限を持つ管理画面。readOnly=false。保存・作成・アップロード処理中ではない。",
+    "初期isPublished=true、現行全マスタ品目にUNKNOWN/欠損なし。初期foodVersionとreviewedFoodVersionが一致した現行記録あり。",
+    "メニュー名が空でなく、価格等が保存できる値。画像ファイルの追加なし。再現①②でアレルゲン状態の変更なし。",
+    "recordingReview=falseを維持し、編集後に公開切替・公開停止ボタンを操作せず保存する。",
+    "①ではtrim後も初期値と異なる原材料へ変更。②では文字欄を変えず食品変更申告checkboxのみtrueにする。",
+    "確認が出た後に承認した場合にPUTを構築する。キャンセルした場合はPUT・画像アップロードへ進まない。"
+  ],
+  "requestedConditions": [
+    {
+      "id": "1_ingredients",
+      "verdict": "CONFIRMED_STATIC_AND_PURE_EXECUTION",
+      "steps": [
+        "原材料をtrim後も異なる値へ変更",
+        "新記録を選択せず保存"
+      ],
+      "state": {
+        "isPublished": true,
+        "foodChanged": true,
+        "canPublish": false,
+        "recordingReview": false
+      },
+      "confirmation": "原材料を変更しています。…公開する設定で保存します。",
+      "putIsPublished": false,
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:649",
+        "features/admin/menus/components/MenuEditClient.tsx:179",
+        "features/admin/menus/components/MenuEditClient.tsx:184",
+        "features/admin/menus/components/MenuEditClient.tsx:324",
+        "features/admin/menus/components/MenuEditClient.tsx:355",
+        "features/admin/menus/publication-review.ts:11"
+      ]
+    },
+    {
+      "id": "2_report_only",
+      "verdict": "CONFIRMED_STATIC_AND_PURE_EXECUTION",
+      "steps": [
+        "食品変更申告checkboxのみtrue",
+        "新記録を選択せず保存"
+      ],
+      "state": {
+        "isPublished": true,
+        "foodChanged": true,
+        "canPublish": false,
+        "recordingReview": false
+      },
+      "confirmation": "公開する前に、…公開する設定で保存します。",
+      "putIsPublished": false,
+      "evidence": [
+        "features/admin/menus/components/MenuFoodReviewFields.tsx:49",
+        "features/admin/menus/components/MenuEditClient.tsx:766",
+        "features/admin/menus/components/MenuEditClient.tsx:179",
+        "features/admin/menus/components/MenuEditClient.tsx:324",
+        "features/admin/menus/components/MenuEditClient.tsx:355"
+      ]
+    },
+    {
+      "id": "3_unknown",
+      "verdict": "REFUTED_FOR_NORMAL_UI_TRANSITION",
+      "steps": [
+        "アレルゲン1品目を未設定へ変更",
+        "他欄は変更せず新記録なしで保存"
+      ],
+      "state": {
+        "isPublished": false,
+        "foodChanged": true,
+        "canPublish": false,
+        "recordingReview": false
+      },
+      "confirmation": null,
+      "putIsPublished": false,
+      "reason": "UNKNOWN選択buttonは必ずsetOneを通り、同じhandlerでsetIsPublished(false)を呼ぶ。willPublish=falseかつingredientsChanged=falseならgetMenuReviewMessageはnull。原材料変更を併用しても文言は「非公開のまま」。",
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:793",
+        "features/admin/menus/components/MenuEditClient.tsx:214",
+        "features/admin/menus/components/MenuEditClient.tsx:217",
+        "features/admin/menus/publication-review.ts:7"
+      ]
+    }
+  ],
+  "counterevidenceReviewed": [
+    {
+      "topic": "初期化",
+      "finding": "isPublishedはinitialIsPublishedかつ初期UNKNOWNなしでのみtrue。reviewCurrentは版の一致から初期化。公開中かつUNKNOWNなし・現行確認ありという前提はコンポーネント/APIに入力可能。初期UNKNOWNありならisPublished=falseで、今回の矛盾を再現できない。通常ページはDB値を対応propsへ渡す。",
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:151",
+        "features/admin/menus/components/MenuEditClient.tsx:172",
+        "features/admin/menus/server/AdminMenuEditPage.tsx:108",
+        "features/admin/menus/server/AdminMenuEditPage.tsx:136"
+      ]
+    },
+    {
+      "topic": "state/effect",
+      "finding": "原材料変更と変更申告はisPublishedを書き換えない。MenuEditClientのuseEffectはObject URL解放のみ。未保存保護hookは遷移・再読込確認であり公開状態を変更しない。canPublish=falseからisPublished=falseへ同期するeffectはない。",
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:205",
+        "features/admin/menus/components/MenuEditClient.tsx:649",
+        "features/admin/menus/components/MenuEditClient.tsx:766",
+        "features/admin/menus/components/useUnsavedMenuChanges.ts:8"
+      ]
+    },
+    {
+      "topic": "公開toggle",
+      "finding": "isPublished=trueのままcanPublish=falseでも、切替を1回押すとfalseへ反転する。その後①は非公開確認、②は確認なしとなり矛盾は消える。初期非公開から条件不足で公開へ切替する操作はエラーとなる。再現時に切替を触るという前提は誤り。",
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:222",
+        "features/admin/menus/components/MenuEditClient.tsx:225",
+        "features/admin/menus/components/MenuEditClient.tsx:233"
+      ]
+    },
+    {
+      "topic": "表示と保存ボタン到達",
+      "finding": "公開切替buttonのaria-pressedはisPublished&&canPublish、文言は「保存時は公開停止（再確認が必要）」。確認dialogだけがisPublished単独を使う。保存ボタンのdisabledにはcanPublishが入らない。外側はformではなくfieldsetで、保存buttonはtype=button。",
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:477",
+        "features/admin/menus/components/MenuEditClient.tsx:510",
+        "features/admin/menus/components/MenuEditClient.tsx:525",
+        "features/admin/menus/components/MenuEditClient.tsx:529",
+        "features/admin/menus/components/MenuEditClient.tsx:849"
+      ]
+    },
+    {
+      "topic": "cancel",
+      "finding": "確認をキャンセルすると327行でreturnし、setSaving・画像アップロード・body構築・PUTへ進まない。入力とisPublishedはそのままなので再度保存すると同じ確認になる。実ブラウザキャンセル操作は親の担当であり本監査では未実行。",
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:327",
+        "features/admin/menus/components/MenuEditClient.tsx:336",
+        "features/admin/menus/components/MenuEditClient.tsx:360"
+      ]
+    },
+    {
+      "topic": "recordingReview",
+      "finding": "初期false。選択なしなら空のfoodReview draftは検証されず、bodyにも記録を載せない。選択し必須欄不足なら確認前に停止。有効な新記録・未解決事項なしならcanPublish=trueとなり公開確認とPUTtrueが一致。入力後に記録checkboxを外すと記録は送られない。",
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:174",
+        "features/admin/menus/components/MenuEditClient.tsx:175",
+        "features/admin/menus/components/MenuEditClient.tsx:319",
+        "features/admin/menus/components/MenuEditClient.tsx:341",
+        "features/admin/menus/food-review.ts:24",
+        "features/admin/menus/components/MenuFoodReviewFields.tsx:54"
+      ]
+    },
+    {
+      "topic": "変更の戻し・空白",
+      "finding": "保存前に原材料を元へ戻す、変更申告をfalseへ戻す、trimで同値の空白だけを変更する場合はfoodChanged=falseとなり、現行確認があればcanPublish=true。これらは①②の再現に含められない。保存済みの旧食品版の復活を検証したものではない。",
+      "evidence": [
+        "features/admin/menus/food-review.ts:4",
+        "features/admin/menus/food-review.ts:9",
+        "features/admin/menus/food-review.ts:16",
+        "features/admin/menus/components/MenuEditClient.tsx:179"
+      ]
+    },
+    {
+      "topic": "保存成功後",
+      "finding": "応答のisPublishedをstateと保存済み公開設定へ反映し、reviewCurrentとsnapshotも更新、申告・記録draftをリセットする。応答falseを受ける成功経路で公開表示trueを維持する実装ではない。",
+      "evidence": [
+        "features/admin/menus/components/MenuEditClient.tsx:373",
+        "features/admin/menus/components/MenuEditClient.tsx:378",
+        "features/admin/menus/components/MenuEditClient.tsx:381",
+        "features/admin/menus/components/MenuEditClient.tsx:387"
+      ]
+    },
+    {
+      "topic": "サーバー防御",
+      "finding": "body.isPublished=falseを受け、食品変更または変更申告があり新記録なしならhasReview=false・nextIsPublished=false。トランザクションでfalseを保存し、制約解決後の実レコードを返す。実DB適用は未確認。",
+      "evidence": [
+        "features/admin/menus/server/adminMenuRoute.ts:361",
+        "features/admin/menus/server/adminMenuRoute.ts:390",
+        "features/admin/menus/server/adminMenuRoute.ts:392",
+        "features/admin/menus/server/adminMenuRoute.ts:395",
+        "features/admin/menus/server/adminMenuRoute.ts:448",
+        "features/admin/menus/server/adminMenuRoute.ts:489",
+        "features/admin/menus/server/adminMenuRoute.ts:491",
+        "features/admin/menus/server/food-review-save.ts:10"
+      ]
+    }
+  ],
+  "additionalBoundaryObservation": {
+    "status": "STATIC_AND_PURE_EXECUTION_ONLY",
+    "finding": "recordingReview=trueで根拠・範囲・日時が揃い未解決事項だけが残る場合も、事前検証は通りcanPublish=falseとなるため同型の文言矛盾がある。指定3条件とは別の境界として報告し、修正やブラウザ検証はしていない。",
+    "evidence": [
+      "features/admin/menus/components/MenuEditClient.tsx:319",
+      "features/admin/menus/food-review.ts:24"
+    ]
+  },
+  "existingCoverage": [
+    {
+      "path": "tests/publication-review.test.ts:5",
+      "finding": "helper単体でwillPublish/ingredientsChangedの組合せを確認。呼出側のcanPublishやPUTとの一致は未検査。",
+      "execution": "PASS 1 test"
+    },
+    {
+      "path": "tests/menu-food-review.test.ts:9",
+      "finding": "snapshot、食品変更、UNKNOWN、現行版の判定を確認。確認dialogとの一致は未検査。",
+      "execution": "PASS 4 tests"
+    },
+    {
+      "path": "scripts/check-allergen-cards-browser.mjs:98",
+      "finding": "dialogを一括accept。207行以降は公開中の価格だけの変更でPUTtrueを確認するが、①②のdialog/PUT比較はない。",
+      "execution": "NOT_RUN_BY_THIS_AGENT"
+    },
+    {
+      "path": "scripts/check-test-browser.mjs:139",
+      "finding": "原材料変更とUNKNOWNを併用し「原材料を変更」部分と404を確認するため、UNKNOWNのsetOneが公開stateを落とし①の単独経路を検査しない。公開/非公開の文末とPUTの一致も未検査。",
+      "execution": "NOT_RUN_BY_THIS_AGENT"
+    },
+    {
+      "path": "tests/admin-menu-api.test.ts:213",
+      "finding": "UNKNOWNの部分更新で非公開になるAPIモック検査。クライアントの文言検査ではない。",
+      "execution": "READ_ONLY_NOT_RUN"
+    }
+  ],
+  "verification": {
+    "existingPureTests": {
+      "command": "node --import 'file:///C:/Users/kaito/Documents/Github/ClearAllergy/node_modules/tsx/dist/loader.mjs' --test tests/publication-review.test.ts tests/menu-food-review.test.ts",
+      "node": "v22.15.1",
+      "pass": 5,
+      "fail": 0,
+      "exitCode": 0
+    },
+    "sourceExpressionMatrix": {
+      "cases": 14,
+      "assertions": "PASS。指定①②の矛盾、③の反証、公開toggle、変更の戻し、空白、新記録不足・完成・未解決・checkbox解除を評価。",
+      "method": "実ソースASTからfoodChanged/canPublish/reviewMessage/body.isPublished/事前検証の式を抽出。setOneとtogglePublishedは実handlerをローカルsetterのみで実行。helperはworktreeから直接ロード。React描画はしない。",
+      "fixture": "2品目の架空入力。実UIの現行全マスタ品目での再現はブラウザ担当へ残す。"
+    },
+    "harnessCorrection": "最初のstdin ESM named importはtsxがCommonJSを返すため失敗。createRequireで同じworktreeモジュールを読み直し、14ケース評価成功。製品コードの障害とは扱わない。",
+    "notRun": [
+      "ブラウザ描画と実イベント（親が担当）",
+      "アプリ通常起動",
+      "DB/provider/ネットワーク呼出",
+      "全件テスト・lint・typecheck・build（実装変更なし、依頼は読取監査と純関数検証に限定）"
+    ]
+  },
+  "acceptanceCriteria": [
+    {
+      "id": "AC1",
+      "criterion": "①原材料の実質変更・新記録なし・公開切替なしで、出る確認文の公開状態とPUT.isPublishedが一致する。",
+      "currentStatus": "FAIL",
+      "futureExpected": "公開する設定と説明しながらfalseを送らない。公開条件は緩和しない。"
+    },
+    {
+      "id": "AC2",
+      "criterion": "②変更申告のみtrue・新記録なし・公開切替なしで、出る確認文の公開状態とPUT.isPublishedが一致する。",
+      "currentStatus": "FAIL",
+      "futureExpected": "公開停止を伴う保存予定が正確に伝わる。"
+    },
+    {
+      "id": "AC3",
+      "criterion": "③UNKNOWNをUI選択した後はisPublished=falseとなり、公開する設定の誤案内が出ない。",
+      "currentStatus": "PASS_STATIC_AND_PURE_EXECUTION"
+    },
+    {
+      "id": "AC4",
+      "criterion": "確認キャンセルはPUT・画像アップロードを発生させず入力を保持する。",
+      "currentStatus": "PASS_STATIC_ONLY_BROWSER_UNVERIFIED"
+    },
+    {
+      "id": "AC5",
+      "criterion": "必須確認欄不足は保存前に止め、有効な新記録・未解決なしでは公開を維持できる。",
+      "currentStatus": "PASS_STATIC_AND_PURE_EXECUTION_BROWSER_UNVERIFIED"
+    },
+    {
+      "id": "AC6",
+      "criterion": "食品変更後に新記録がない保存を非公開とする既存クライアント/API条件を維持する。",
+      "currentStatus": "PASS_STATIC_ONLY_DB_UNVERIFIED"
+    },
+    {
+      "id": "AC7",
+      "criterion": "dialogの文末と捕捉PUTの一致を①②と③対照の実UI操作で確認する。",
+      "currentStatus": "UNVERIFIED_IN_THIS_INDEPENDENT_AUDIT",
+      "owner": "親エージェントのブラウザ検証"
+    }
+  ],
+  "remainingBlockers": [],
+  "unverified": [
+    "実ブラウザでの①②到達・文言・PUTと③対照",
+    "実DBのトランザクション/トリガー適用と公開反映",
+    "利用者が矛盾をどう解釈するか。ユーザーテスト未実施。"
+  ],
+  "independence": "親から監査対象の仮説とHEADを受領して開始。ソース・テストは自身で読取。親の保存済み監査結果・他エージェント成果物は参照せず、独立の純関数/式検証で結論。UNKNOWN反証は親へ先に連絡した。"
+}

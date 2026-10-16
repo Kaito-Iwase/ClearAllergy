@@ -1,0 +1,39 @@
+# PR #78の文書をmainへ反映するための案
+
+2026-10-15 07:03以降の状態確認では、PR #79/#80はmainへmerge済みで、mainは `cd502b2404f518975dc4243ab6c41a702e7aa226`。PR #78はMERGEDだが、merge先は `agent/research-followup-20261014` であり、mainへの取込ではない。
+
+PR #78の差分は、base `10945eb830d36171a2712ced306d36e5662fa6be` → head `bde6afa08ac70e73bb2b6526c277f26bc8ee6d90` の文書15ファイル・2451行追加。現mainとの照合では13ファイルが存在せず、2既存文書のblobが異なる。7受領原稿はこの差分に含まれるが、今回の可読性編集で書き直してはいない。
+
+## 新しいPRの候補
+
+タイトル案：`docs: mainへ追加調査とIssue照合記録を反映`
+
+最新mainから専用の文書branchを作り、上記headの文書差分だけを取り込む。7受領原稿はbyteを保ち、既存の研究/検証の入口は#79/#80の追加項目と併存させる。取込先はmain、アプリコード・DB・公開設定・既存PRの変更は含めない。
+
+三者のtreeを読むだけの比較では、`docs/guide/verification.md` に競合マーカーが出た。`docs/research/README.md` も両側で変更されているため、#74の演習入口と#78の研究入口を両方保持するよう照合する必要がある。この比較は実際のmerge・cherry-pickやCI成功の記録ではない。
+
+候補作成後は、原稿7本のSHA256/byte、15ファイルのscope、索引の全入口、相対リンク、日付/確認済み/未確認の区分を検査する。内容と差分を親に提示してから、commit/push/PR作成の段階へ進む。現時点ではこの新PRを作成・mergeしていない。
+
+可読性候補は現mainを基準に保全した。#78を先に反映する場合は、その後のmainへ候補を載せ直し、追加された研究入口が落ちないことを再照合する。分析本文の日本語改善と、未反映の原稿をmainへ保存する作業をひとつのPRに混ぜない。
+
+## 対象ファイルと現在のmainとの差
+
+`absent` はmainにファイルがないこと、`different blob` はファイルはあるが#78の保存内容と一致しないことを示す。後者だけから差分の全内容が未反映だと一般化せず、上記の来歴と各差分を併せて確認する。
+
+| ファイル | mainとの照合 |
+| --- | --- |
+| `docs/guide/verification.md` | different blob |
+| `docs/research/README.md` | different blob |
+| `docs/research/engineering/identity-operations-issues-20261015.md` | absent |
+| `docs/research/engineering/issue-document-references-20261015.md` | absent |
+| `docs/research/engineering/menu-contract-issues-20261015.md` | absent |
+| `docs/research/engineering/open-issues-current-code-20261015.md` | absent |
+| `docs/research/literature/ca-overnight-adoption.md` | absent |
+| `docs/research/literature/ca-overnight-competition.md` | absent |
+| `docs/research/literature/ca-overnight-discovery.md` | absent |
+| `docs/research/literature/ca-overnight-integrity.md` | absent |
+| `docs/research/literature/ca-overnight-security-operations.md` | absent |
+| `docs/research/product/ca-overnight-decision-memo.md` | absent |
+| `docs/research/product/ca-overnight-independent-review.md` | absent |
+| `docs/research/product/overnight-source-provenance-20261015.md` | absent |
+| `docs/verification/shop-menu-isolated-probe-20261015.md` | absent |

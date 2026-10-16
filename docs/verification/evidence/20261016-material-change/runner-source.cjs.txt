@@ -1,0 +1,21 @@
+const { spawn } = require('node:child_process');
+const path = require('node:path');
+const fs = require('node:fs');
+const base = __dirname;
+const source = path.join(base, 'material-flow-isolated-20261016');
+const output = path.join(base, 'material-confirmation-browser-20261016');
+const child = spawn(process.execPath, ['scripts/ingredient-change-trial.mjs', '--serve', '--minutes', '5', '--assets-root', path.join(base, 'clearallergy-issue-74'), '--output', output], { cwd: source, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+let startup = '', started = false, driver, finished = false;
+const timer = setTimeout(() => { console.error('Fixture did not start within one minute'); child.kill(); process.exitCode = 1; }, 60000);
+child.stderr.on('data', chunk => process.stderr.write(chunk));
+child.stdout.on('data', chunk => {
+  startup += chunk;
+  const match = startup.match(/Fictional trial: (http:\/\/127\.0\.0\.1:\d+)/);
+  if (!match || started) return;
+  started = true; clearTimeout(timer);
+  const origin = match[1];
+  console.log('Scratch loopback fixture ready: ' + origin);
+  driver = spawn(process.execPath, [path.join(base, 'material-confirmation-browser-20261016.cjs')], { cwd: base, windowsHide: true, env: { ...process.env, MATERIAL_FIXTURE_ORIGIN: origin }, stdio: 'inherit' });
+  driver.on('exit', code => { finished = true; process.exitCode = code || 0; child.kill(); });
+});
+child.on('exit', code => { clearTimeout(timer); if (!finished) { if (driver) driver.kill(); process.exitCode = code || 1; } console.log('Owned fixture stopped; memory sessions discarded.'); });

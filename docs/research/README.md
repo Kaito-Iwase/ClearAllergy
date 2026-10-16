@@ -1,16 +1,76 @@
-# ClearAllergy evidence-driven research
+<a id="clearallergy-evidence-driven-research"></a>
+
+# ClearAllergyの研究資料：目的に合わせて読む入口
+
+ここには、ClearAllergyを設計・検証するために調べた根拠、設計案、未確認事項を保存しています。まず下の「知りたいこと」から文書を選んでください。現在の操作や実装の仕様を知りたい場合は、研究資料より先に[現行ガイド](../guide/product.md)を読みます。
+
+## 2026-10-16の追加精査：実装候補と未完のテスト接続
+
+[3作業の結論](engineering/material-change-followup-20261016.md)から、[確認文の独立反証・隔離ブラウザ記録](../verification/material-change-confirmation-20261016.md)と[公開再取得・一料理E2Eの計画全文](product/public-refresh-and-change-e2e-plan-20261016.md)へ進めます。確認文の不一致は2条件を再現し、UNKNOWN条件は反証しました。アプリコードは未修正です。再取得UIと実認証E2Eの追加は提案・未実行で、既存の保存/確認/公開機能を未実装と扱いません。
+
+## 現在の入口：公開資料の精査と友人テスト
+
+現段階では実店舗へ直接聞く手段がないため、店舗接触を実施順序の前提にしません。店舗側は公開資料・事例・シナリオを精査し、利用者の操作・理解は友人の架空課題で確認します。友人の店員役から店舗負担・継続・支払意思は実証できません。
+
+| 目的 | 読む文書 |
+| --- | --- |
+| 現在の方針と未検証の境界 | [調査・友人テスト方針](product/research-and-friend-testing-policy-20261015.md) → [次の判断](product/clearallergy-next-direction-20261015.md) |
+| 実施準備 | [友人テスト台本](product/friend-user-test-20261015.md) → [空の記録票](product/friend-user-test-record-sheet-20261015.md)。草案。表示版・判定表・端末分離・同意/削除条件は未確定で、実施前確認が必要 |
+| 既存機能と提案を区別する | [cd502b時点の27 Issue監査](engineering/current-main-issue-audit-20261015.md) → [一料理の静的照合](product/one-dish-reconciliation-20261015.md) → [6領域の検証条件](product/next-verification-plan-20261015.md) |
+| 原稿の版・出典・独立レビュー | [提供計画の来歴](product/additional-plans-provenance-20261015.md) → [導入計画v2](literature/shop-adoption-plan-20261015.md) / [理解計画v2](literature/safety-understanding-plan-20261015.md) → [提供元レビュー](product/provided-plans-independent-review-20261015.md) / [照合資料レビュー](product/next-direction-independent-review-20261015.md) |
+| 文書を読むための補助 | [用語・時点・注意箇所](reading-guide.md) → [10/15時点の全文書精査](../guide/document-audit-20261015.md) → [原稿保管](originals/README.md) |
+
+下の研究5稿とIssue照合は、e26b608時点または外部原稿作成時の記録です。#73/#74や#76の未merge記述を、cd502b以降の未実装へ読み替えません。古い店舗募集・聞き取り案は履歴として保持し、現在の順序は上記方針に従います。
+
+
+## 知りたいことから選ぶ
+
+| 知りたいこと | 最初に読む文書 | 読んだ後に確認できること |
+| --- | --- | --- |
+| 現在のアプリは何を表示し、どの条件で公開するのか | [操作とページ](../guide/product.md) → [状態・公開・権限](../guide/rules.md) | 現行仕様。コードやテストまで追う場合は[変更対応表](../guide/change-map.md)へ進む |
+| なぜ店舗の更新負担や利用者の読み取りを調べるのか | [追加調査の読む入口と検証計画](product/clearallergy-followup-20261014.md) | 2026-10-14の調査テーマ、根拠、残る検証課題 |
+| どのような状況が利用者や店舗の被害につながるのか | [被害と、その原因になる状況](safety/losses-hazards.md) → [防ぐための条件・要件](safety/safety-constraints.md) | 2026-09-28の危険の候補と対応する条件。最初の文書で専門用語も説明する |
+| 主張の出典や、根拠の限界を確かめたい | [根拠の一覧](03-evidence-register.md) → [主張と根拠の対応](04-claim-register.md) | 論文・公式資料・コード・実験の区別、確認した範囲、未確認の範囲 |
+| どの判断がまだ必要で、どこまで検証したのか | [人による判断が必要な事項](open-questions.md) → [研究時点の検証と判断条件](implementation/readiness.md) | 研究時点の未決事項。現在の実装・検証結果は[現行の検証記録の入口](../guide/verification.md)へ照合する |
+
+## 研究資料を読むときに区別すること
+
+**確認した事実**は、どの資料・コード・実験で、何を確かめたかを指します。**設計案**は、今後どうするかという提案です。提案を記載しただけで、採用・実装したことにはしません。**検証計画**と**実行結果**も分けます。試験方法が書いてあっても、実行して合格したという意味ではありません。
+
+各資料の日付と状態を確認してください。過去の本文にある「現在」「本日」や未コミット・未pushなどの記述は、その調査・実行時点の記録です。後続の修正がある場合も、過去の観察を現在の不具合や未実施事項として読み替えません。現行仕様の正本は[状態・公開・権限](../guide/rules.md)です。
+
+2026-10-15の日本語改善は、この入口と[被害・危険の説明](safety/losses-hazards.md)の候補から始め、今回の[全文書精査](../guide/document-audit-20261015.md)へ広げました。既存の研究全体を短く要約する編集ではありません。書き直す前の索引・分析原稿は[原稿保管先](originals/README.md)へ残し、以下の出典・ID・当時の結果・未決事項は引き続き保持します。
+
+## 2026-10-15 の調査5稿・統合メモと現行Issue照合
+
+[次の開発・現場検証を決める統合メモ](product/ca-overnight-decision-memo.md)は公開資料からの研究入口です。続けて[27件のIssueと現行コードの照合](engineering/open-issues-current-code-20261015.md)を読み、原稿担当が未確認だった機能と、今回確認した固定mainの実装・限定実行を区別してください。前者を後者で省略せず、両方を残しています。
+
+| 原稿・記録 | 役割と残す詳細 |
+| --- | --- |
+| [競争比較](literature/ca-overnight-competition.md) | CAN EAT MAP等の発表時点、現在の未確認範囲、同じ3ケース、差別化を否定する条件、一次資料S1–S10 |
+| [小規模店の導入・継続](literature/ca-overnight-adoption.md) | 店のA〜D分類、非誘導20問、同じ情報品質での人・分と待ち時間、拒否・離脱・支払主体・支援原価 |
+| [発見・絞り込みと理解度](literature/ca-overnight-discovery.md) | 架空S1–S6、文言比較、自由回答、採点・分母・重大誤認・アクセシビリティ・未完了 |
+| [情報整合性](literature/ca-overnight-integrity.md) | 出典・対象・時点、11シナリオ、T01–T25、未申告変更・材料欠落・同一料理AND・将来日・表示への過信 |
+| [権限・公開範囲・個人情報・障害運用](literature/ca-overnight-security-operations.md) | 公開DTOと原本、健康情報最小化、保持/削除/復元、権限、停止・訂正、PPC/RFC/Chromeと適用限界 |
+| [統合メモ全文](product/ca-overnight-decision-memo.md) | 比較・採否、掲載継続/保留/訂正表、D01–D06、役割別負担、店舗側でのみ得られる証拠 |
+| [研究5稿の独立・反証レビュー全文](product/ca-overnight-independent-review.md) | R1–R11、一次資料スポット監査の限界、17試験初版と25試験版の区別、最終4修正の反映確認 |
+| [別担当のIssue棚卸し原稿（Library）](https://chatgpt.com/api/library/files/libfile_92bf9b64a8688191b8dbe573f09a06a9/download) | アクセス権が必要な補助記録。15:12–15:15 UTCの27件/PR/SHA対応で、GitHub閲覧の必須根拠にしない。後続の受入・実行・承認状態は今回照合に収録 |
+| [今回の27件コード照合](engineering/open-issues-current-code-20261015.md) | 全Issueの現在地、受入・次手・依存・優先度、#73/#74の具体案と副作用、11件/14件詳細・全参照表への入口 |
+| [#73/#74の隔離実行と方法レビュー](../verification/shop-menu-isolated-probe-20261015.md) | 実処理＋メモリ/React代用7ケース、全コード・全JSON・23source hashes、安全値の固定/実測区別と未実施 |
+
+Library原稿は全文を保持しています。各稿の「最小」「P0」等は研究上の提案・対象用途前の判断順であり、既存製品の欠陥、現在の必須実装、法的義務、採用決定ではありません。原稿担当の「現行実装は不明」を「ない機能」に変換しません。メニューCAS・食品確認・STOP・snapshot・pending等は現行実装の証拠と対応付けましたが、実食品・理解度・店舗負担・全本番の証拠とは別です。
+
+10:00 JSTは報告時刻であり作業打切り期限ではありません。T01–T25、D01–D06の増補・修正は試験の実施/合格ではありません。今回の7ケース、過去CI/実DB/復旧記録、原稿の公的資料、将来の店舗/利用者調査を混ぜず、実装・Issue close・merge・公開・外部連絡は別の承認範囲として扱います。現行仕様の正本は[共通ルール](../guide/rules.md)、作業文書の更新先は[保守](../guide/maintenance.md#update-map)です。
+
+
+[取得・Library identity・全文byte保持の記録](product/overnight-source-provenance-20261015.md)を参照してください。
+
 
 ## 2026-10-15 一料理の材料変更を使う検証準備
 
 [進行台本](product/ingredient-change-trial-20261015.md)、[ローカル操作画面・架空資料](product/ingredient-change-trial-fixture-20261015.md)、[匿名の空記録票](product/ingredient-change-trial-record-sheet-20261015.md)を一組で使います。[準備の実行記録](../verification/ingredient-change-trial-preparation-20261015.md)は実コンポーネントの隔離ブラウザと起動・終了を扱い、参加者観察・店舗工数・理解度測定の実施記録ではありません。
 
 通常STOP、食品変更後の旧確認、最新未解決、未申告変更、旧新在庫、複合材料の抜けと既存画面の限界を分けて観察する計画です。材料・在庫モデルやゲスト申告・グループ適合判定をアプリへ追加する仕様ではありません。
-
-2026-09-28 / working tree `improve/prototype-usability-ci` / HEAD `64163cc` + 調査開始前からの未コミット変更。**判定: PARTIALLY_READY**。Production code・test code・schemaは変更していない。GitHub Issue作成・commit・pushは未実施。
-
-後続の実装runでI01とI02をローカル修正し、[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)と[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)を起票した。2026-09-28の整理でI01を`111817e`、I02を`03d39d4`、関連するDB/CI回帰定義を`242a0c9`にlocal commitした。I03–I12とHD-01–HD-09もGitHub Issueへ起票済み。pushは未実施。2026-09-30にI01の境界ケースを補強し、I02の隔離PostgreSQL・実ハンドラ回帰18項目を確認した。追検証差分は未コミット。[I01結果](implementation/i01-result.md)と[I02結果](implementation/i02-result.md)を参照。上のfreezeと以下のExecutive Summaryは**研究run時点の記録**であり、後続のコード状態を説明する文ではない。全体の設計判定PARTIALLY_READYは継続。
-
-本書は研究/設計案の入口。現行仕様は [guide/rules](../guide/rules.md)、[変更対応表](../guide/change-map.md)。ここでRECOMMENDED/OPENとした設計を現行仕様へ昇格しない。[Gate判定と検証結果](implementation/readiness.md) / [Issue台帳](implementation/backlog.md) / [提案Milestone](implementation/migration-plan.md#proposed-milestones) / [Traceability](traceability-matrix.md) / [人の判断待ち](open-questions.md)。
 
 ## 2026-10-14 の追加調査（訂正統合版）
 
@@ -36,7 +96,17 @@
 
 Big Tech版・国内事例版も、公開資料からの未採用提案として保存しています。本文の「採用」「今やる」や工数・成功条件は調査上の推奨・概算であり、CAでの採用決定・実行結果・効果保証ではありません。各社の手順やコマンドをCAの指示として扱わず、現行の文書更新ルールは別の明示依頼に基づく最小変更として管理します。
 
-以下の Executive summary、Navigation と冒頭のブランチ・HEAD・判定は、2026-09-28 の研究と記載済み後続作業の履歴です。2026-10-14 の原稿や現在のコード状態へ読み替えません。
+## 2026-09-28の研究と、その後の実装記録
+
+以下のブランチ・判定・実行結果は、各記載日の履歴です。現在の開発状況を示す見出しではありません。
+
+2026-09-28 / working tree `improve/prototype-usability-ci` / HEAD `64163cc` + 調査開始前からの未コミット変更。**判定: PARTIALLY_READY**。Production code・test code・schemaは変更していない。GitHub Issue作成・commit・pushは未実施。
+
+後続の実装runでI01とI02をローカル修正し、[GitHub Issue #37](https://github.com/Kaito-Iwase/ClearAllergy/issues/37)と[GitHub Issue #38](https://github.com/Kaito-Iwase/ClearAllergy/issues/38)を起票した。2026-09-28の整理でI01を`111817e`、I02を`03d39d4`、関連するDB/CI回帰定義を`242a0c9`にlocal commitした。I03–I12とHD-01–HD-09もGitHub Issueへ起票済み。pushは未実施。2026-09-30にI01の境界ケースを補強し、I02の隔離PostgreSQL・実ハンドラ回帰18項目を確認した。追検証差分は未コミット。[I01結果](implementation/i01-result.md)と[I02結果](implementation/i02-result.md)を参照。上のfreezeと以下のExecutive Summaryは**研究run時点の記録**であり、後続のコード状態を説明する文ではない。全体の設計判定PARTIALLY_READYは継続。
+
+本書は研究/設計案の入口。現行仕様は [guide/rules](../guide/rules.md)、[変更対応表](../guide/change-map.md)。ここでRECOMMENDED/OPENとした設計を現行仕様へ昇格しない。[Gate判定と検証結果](implementation/readiness.md) / [Issue台帳](implementation/backlog.md) / [提案Milestone](implementation/migration-plan.md#proposed-milestones) / [Traceability](traceability-matrix.md) / [人の判断待ち](open-questions.md)。
+
+以下の Executive summary（当時の主要な結論）と Navigation / artifact map（文書一覧）は、2026-09-28の研究と記載済み後続作業の履歴です。2026-10-14の原稿や現在のコード状態へ読み替えません。
 
 
 ## Executive summary

@@ -1,0 +1,40 @@
+# 10月15日17:16 JST時点：CAの次手・文書計画の整理結果
+
+> 配置注記：2026-10-15 17:16 JST時点までに作成した資料の保存版です。元の全文は[原稿コピー](../research/originals/20261015-main-integration/ca-next-result-20261015.md.txt)に保持し、この版はrepo内の参照先だけを整えています。実店舗接触を次手とする当時の提案は、現在の[調査・検証方針](../research/product/research-and-friend-testing-policy-20261015.md)で更新されています。
+
+**推奨は、一料理の現物・店の記録・CA入力・表示を照合し、次に許可後の一変更の工程探索へ進むこと。** 今回、机上の対応表は作成済み。機能数、文献数、CI成功から、継続負担・支払・初見理解・事故低減を実証したとは扱わない。
+
+## 成果物
+
+| 入口・ファイル | 内容 |
+| --- | --- |
+| [次の方針](../research/product/clearallergy-next-direction-20261015.md) | 現在、進む順序、進める/縮小/保留の条件、文書の入口。まず読む文書 |
+| [一料理の照合表](../research/product/one-dish-reconciliation-20261015.md) | 提供された鶏料理のA〜Gに、現物・店舗把握/記録・入力・表示・許される説明・不足証拠を対応。実行結果ではない |
+| [現行mainと27 Issue](../research/engineering/current-main-issue-audit-20261015.md) | 修復済み、既存実装＋残証拠、人の判断、未実施を分離。固定コード/CIへ接続 |
+| [6領域の次の検証](../research/product/next-verification-plan-20261015.md) | 入口・保存・一覧・材料変更・公開・権限ごとに、既存の土台、次の操作、前提、完了条件、依存Issue |
+| [日本語改善の展開計画](../research/originals/20261015-main-integration/ja-readability-rollout-plan-20261015.md.txt) | README/研究索引/verification→product/rules→architecture/development→研究判断→詳細台帳の順。対象段落、意味保持、検証方法。本文追加編集はしていない |
+| [受領原稿と版の入口](../research/product/additional-plans-provenance-20261015.md) | 2計画のv1/v2全文、最終レビューと初回履歴。旧版を保持し、修正版を照合対象にした。Libraryバイト照合とメッセージ本文取得を区別 |
+| [今回の独立レビュー](../research/product/next-direction-independent-review-20261015.md) | 履歴非共有read-only担当。P2 1件→修復→round2で解消・追加must-fixなし。元の2計画のレビューとは別 |
+
+すべてtask-2内の新規ファイル。既存のrepo日本語改善候補7ファイルには書き込んでいない。repoへの採用はまだ行わず、既存`docs/research/product/`等への配置案を方針文書に残した。#78のmain取込も[別計画](../research/originals/20261015-main-integration/ja-readability-pr78-main-plan.md.txt)のまま。
+
+## 主な結論と残件
+
+- #73/#74は#79/#80でmainへ反映済み。メニューCAS/食品版/確認記録/STOP/保存後cache失敗の扱いも既存。Issueがopenであることを未実装の根拠にしない。
+- #44/#50のverified identity条件は現在も未確定・専用tenantで未実証。#43/#49の実配信鮮度、#42/#53の担当/停止/復旧訓練、#41/#51の現場確認と保持/復元、#39/#52の対象/同意/採点と人の理解は残る。
+- 無信号の未登録変更は検知不能の負の対照であり、実運用の検知率ではない。資料を取得したことと現物への適用、構成品の全把握、工程の情報を別に扱う。
+- Fでは、既知の器具共用等の混入懸念を現行MAY_CONTAIN＋理由へ対応させた。FREE＋注意書きだけと読める初稿の説明を独立レビューに基づき修正。二軸表示案は未採用であり、元原稿へ遡って書き換えていない。
+- 通常公開の停止と、信頼できる訂正への到達は別の論点。G1の新経路は現在の通常公開で確認できておらず、製品/運用判断が必要。現行notFoundを未承認の提案と違うという理由だけで不具合と認定しない。
+- 「口頭回答・資料散在の小規模店」は探索対象の候補。市場性・工数・継続・価格優位は未確認。紙で十分、支援条件を変える、対象を絞る、開発を止める判断も許容する。
+
+## 検証と保全
+
+**PASS（今回の読取・文書確認）**：liveのopen27 Issue＋全40コメント、PR merge先、固定main46ソースを照合。最終mainは同じ`cd502...`、27 Issueの番号/updatedAtに変化なし。ローカルinlineリンク、固定commitのコードファイルと行番号、27件の網羅、原稿/候補のhashを検査し欠損なし。正確な最終件数とファイルhashは[文書検査JSON](evidence/20261015-next-direction/ca-next-documents-check-20261015.json)へ保存した。
+
+**PASS（取得した既存CI）**：同じmainの[run38696206166](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/38696206166) completed/success。通常203 tests、lint/typecheck/Prisma/build、実PGの制約・食品確認・rollback、一覧7、所有メニュー5組、店舗保存8、公開Chromium8群。今回ローカルで新しく実行したapp試験ではない。[CI JSON](evidence/20261015-next-direction/ca-next-main-ci-final-20261015.json)・[ログ](evidence/20261015-next-direction/ca-next-main-ci-final-20261015.log)を保持。
+
+**PASS（保全）**：17:16 JSTにcanonicalの358ファイル・9既存差分、branch/HEAD/indexが開始時と一致。[保全JSON](evidence/20261015-next-direction/ja-readability-canonical-preservation.json)。日本語候補7ファイルはmanifestと全hash一致、index空、`git diff --check` exit0（既存改行警告のみ）。元7原稿は受領保管先と旧research worktreeの両方でhash一致。既存のZIP/diff/原稿・過去作業を保持。
+
+**UNVERIFIED／未実施**：人への試験、店舗接触、実食品、工数/継続/支払、全境界、実Clerk/Blobを通す管理E2E、現在配備のSHA/制約/backup/通知、実配信の鮮度保証。受領した外部資料は今回原典を再監査していない。これらを今回のFAIL/未実装へ置き換えず、次の前提と証拠にした。
+
+文書・読取だけのため、ローカルlint/typecheck/tests/build/Prisma生成/実DB/browserは再実行していない。アプリコード・DB・設定・公開状態・GitHub本文/stateの変更、店舗/利用者連絡、commit/push/PR/mergeはない。自動的な23時再確認を設定した記録でもない。23時の報告に使う際は、この時点の証拠と、それ以後に得た情報を区別する。

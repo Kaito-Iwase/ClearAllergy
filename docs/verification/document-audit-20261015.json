@@ -1,0 +1,4204 @@
+{
+  "date": "2026-10-15",
+  "base": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "scope": "repository human documents plus separately classified canonical ignored history",
+  "human_document_count": 129,
+  "full_text_read_count": 129,
+  "unread": [],
+  "groups": {
+    "現行ガイド・入口・作業指示・テンプレート": 16,
+    "研究・計画・索引": 79,
+    "原稿コピー": 18,
+    "実行・検証記録": 16
+  },
+  "documents": [
+    {
+      "path": ".github/ISSUE_TEMPLATE/agent-task.md",
+      "classification": "current",
+      "findings": [
+        {
+          "location": "Evidence／Affected Area / Scope／Dependencies / Blockers / Ownership",
+          "detail": "base SHA/file/function・non-goals・Ownershipの短文を日本語で補足し、影響/編集/確認だけ/対象外と担当者を読み取りやすくした。"
+        },
+        {
+          "location": "Verification Plan／末尾",
+          "detail": "RED/GREEN・mock・rollback・Ready/assessmentを初出で説明し、live assessmentをGitHub最新情報で行う意味を自然な日本語にした。"
+        }
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "GitHub上でのテンプレート表示・connector実行・Issue作成は今回行っていない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "99f030e1095c7558e9865a5a2a2fff7d3b434d5f468e05d9583407d4b1a2ea3f",
+      "line_count": 39,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "可読性のみ修正。frontmatter、見出し、検証・副作用・承認の条件、Ready条件、既存手順URLを保持する。",
+      "reviewed_final_sha256": "99f030e1095c7558e9865a5a2a2fff7d3b434d5f468e05d9583407d4b1a2ea3f",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "classification": "current",
+      "findings": [
+        {
+          "location": "What／Evidence／Independent review／Risk",
+          "detail": "base/head SHA・runtime・PASS/FAIL/UNVERIFIED・mock・self review・gate・UI Evidence・rollbackを日本語で補足した。自己レビューと独立レビュー、実DB/browser/GitHubを区別する既存要件は保持する。"
+        },
+        {
+          "location": "Documentationチェック項目",
+          "detail": "コード表示だけだった保守ルールをGitHub main上の同じ文書・update-mapへのリンクにした。PR本文でも参照先を解決できるよう絶対URLを用いた。"
+        }
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "GitHub PR本文上の実表示、外部URL疎通、PR作成/CI/merge/deployは今回行っていない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "ef02713853868b7a470b6ffe80c5b3a333f7948ee1c6c9fa7ab04df66681c2f9",
+      "line_count": 30,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "可読性・参照のクリック化のみ修正。見出し、全チェック条件、Draft/auto merge/通常PR未mergeの意味を保持する。",
+      "reviewed_final_sha256": "ef02713853868b7a470b6ffe80c5b3a333f7948ee1c6c9fa7ab04df66681c2f9",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "AGENTS.md",
+      "full_text_read": true,
+      "classification": "current",
+      "full_text_read_line_count": 296,
+      "findings": [
+        "入口・作業範囲・状態/公開/所有権の不変条件・検証・報告・判断条件の順で整理され、文書のみの変更と動作検証の区別も明示されている。",
+        "自律開発ハーネス節のlive/Ready/canonical checkout/claim/Invariant/snapshot等の英語略記が集中し、その節だけは初心者が意味を追いにくい。現行の詳しいハーネス説明へのリンクはある。",
+        "現段階は実店舗へ接触せず公開資料・事例・シナリオを精査し、友人の店員役から実店舗の負担・継続・支払・運用可能性を結論づけない方針が79行に明示されている。",
+        "作業先、必須コマンド、安全/法務/認証/認可/DBの判断条件は実行上の規則であり、今回の可読性精査を理由に変えない。末尾の判断条件まで全文を確認した。"
+      ],
+      "action": "現在の調査方針を追記。その他の作業ルールを保持。",
+      "unverified": [
+        "現行規則やコマンドを実行検証した監査ではない。アプリ・DB・外部サービス・依存・Git更新を伴う操作は行っていない。",
+        "親担当による後続変更の最終文言・最終候補は、この読了時点以後のため未確認。"
+      ],
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "1–100、101–200、201–296行の3区間に分け、末尾を含めて再読了した。",
+        "文書は編集していない。親担当が全体整合を担当するため、ハーネス節の略語集中と新しい調査方針の明確さを報告した。"
+      ],
+      "reviewed_final_sha256": "a18a6de1d6eeac6b9e136731840bba8616211fc52982d0c5cf0ce912ede8d4d7",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "README.md",
+      "full_text_read": true,
+      "classification": "current",
+      "full_text_read_line_count": 131,
+      "findings": [
+        "目的・制作背景・利用者別機能・設計・構成・デモ/起動・検証境界・読む順番が連続しており、プロトタイプと食品安全の限界も冒頭に明示されている。",
+        "UI/API/DB、トランザクション、Server/Client Component、モック、CI等は初出の説明が少ない。使用技術の表と現行ガイドへのリンクはあるため、入口に短い説明を足す候補。",
+        "100行の「利用者・店舗担当者による操作レビュー」は、現在実施できる友人の利用者テストと、実店舗の入力負担・継続価値の未検証を区別すると、現在の調査方針と対応づけやすい。",
+        "102行の「同時編集と複数担当者の運用」は、既存の版付き保存による競合拒否と、未対応の複数担当者モデルの課題の区別が弱い。設計表40行には既存の競合拒否が明記されているため、残課題の表現を合わせる候補。"
+      ],
+      "action": "読む目的の入口、用語、既存の競合拒否、現方針への案内を更新。",
+      "unverified": [
+        "現在の候補の文章を読む監査のみ。デモ操作・起動・最新CI・外部サービス・配備・利用者理解度・実店舗運用は今回確認していない。",
+        "親担当による後続変更の最終文言・最終候補は、この読了時点以後のため未確認。"
+      ],
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "131行を省略なく全文読了した。文書は編集していない。",
+        "親担当へ用語補足、友人テストと店舗実証の区別、既存の競合拒否と将来課題の区別を所見として報告した。"
+      ],
+      "reviewed_final_sha256": "917cc95bb59ffc6331c16ee11523b970572bfc9a3ca1c843cbf0009e9b9b2d2e",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/agentic-audit.md",
+      "classification": "導入時の歴史的監査snapshot（原文保持）",
+      "findings": [
+        {
+          "location": "冒頭／調査結果",
+          "detail": "2026-10-04のmain 27d3…とcanonical f1f…を明示。未公開guide/researchやruntime/npm・依存版、CI件数、owner等は当時の状態であり現在へ読み替えない。"
+        },
+        {
+          "location": "選別と設計判断／残る不一致と運用上の限界",
+          "detail": "label単独の許可を防ぎ、research/planningを実装許可にしない。repo settings・本番migration/backup/alerts・実service/UXをUNKNOWNで残している。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "現在GitHub Queue/PR/設定・依存・サービス・未公開作業の状態を今回再取得していない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "223d69b390b4fa6d41ff38ae4a5526d9fffe0230d736d180102ece0459a78a22",
+      "line_count": 38,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。導入時の調査結果・選別・制約を保持する。",
+      "reviewed_final_sha256": "223d69b390b4fa6d41ff38ae4a5526d9fffe0230d736d180102ece0459a78a22",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/agentic-development.md",
+      "classification": "current",
+      "findings": [
+        {
+          "location": "冒頭／再開と選別／状態と記録／Queue runner",
+          "detail": "ハーネス・runner・PR・CI・worktree・UNKNOWN・Ready・assessment・snapshotの略記が説明なしで集中していた。初出に短い日本語を追加し、開発手順/保守への入口も追加した。"
+        },
+        {
+          "location": "selected:null後の案内／実装と隔離／検証／Self review",
+          "detail": "未定義のNo-Issue Modeを既存『改善探索と次Issue』へ接続。RED/GREEN・canonical checkout・gate・Invariantを説明し、レビュー観点の英語列挙を日本語へ整えた。"
+        }
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "GitHub live実行、runner実行、現在CI/DB/browser/サービス、独立レビューの再実施は今回行っていない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "e69e68715e611ca801f98cb60c41f1497a3646e6ac079f267fb7ced0eef1b3d7",
+      "line_count": 138,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "可読性のみ修正。コマンド、JSONコードフェンス、ID、必須手順、停止・承認・review条件、並列度・回数制限を保持する。",
+      "reviewed_final_sha256": "e69e68715e611ca801f98cb60c41f1497a3646e6ac079f267fb7ced0eef1b3d7",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/architecture.md",
+      "full_text_read": true,
+      "classification": "current",
+      "findings": [
+        "技術用語の説明がシステム構成図の説明より後にあり、Server/Client Component・HTTP・DBの役割を知らずに読む順序だった。",
+        "transaction client、FK/cascade、DTO、snapshot、pool、token/writer等が説明なく混在し、取得と保存の段落が長かった。"
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "可読性の文書精査のみ。アプリ・DB・外部サービス・依存パッケージを起動/変更していない。lint・型検査・自動テスト・ビルド・ブラウザ操作は実行していない。",
+        "既存説明の全仕様と現行コードの網羅的な再照合、実配備設定・実データ・実食品の正確性、利用者の理解度・実店舗の負担/運用実証は今回の対象外。過去の実行結果を再実行済みとはしていない。"
+      ],
+      "validation": {
+        "fenced_code_blocks_unchanged": true,
+        "headings_unchanged": true,
+        "explicit_anchors_unchanged": true,
+        "link_targets_unchanged": true,
+        "numeric_tokens_not_removed": true,
+        "inline_code_tokens_not_removed": true,
+        "table_column_counts_unchanged": true,
+        "utf8_no_bom": true,
+        "original_worktree_crlf_preserved": true,
+        "local_link_targets_and_anchors_resolve": true,
+        "local_link_count": 14,
+        "anchor_reference_count": 7,
+        "external_link_count_not_fetched": 0
+      },
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "既存の技術用語説明を図の前へ移し、HTTP・DBと実装用語を短く補足した。",
+        "同時更新読取を段落分割し、token/writer等の略記を日本語にした。"
+      ],
+      "reviewed_final_sha256": "1c242f871e32a2584b4247255246cba4783e7bfde65939a6439f408530ad5a10",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/change-map.md",
+      "full_text_read": true,
+      "classification": "current",
+      "findings": [
+        "API・DB・CI・モック・fixtureの説明が初出時に足りず、研究の英語の対応関係も読み取りにくかった。",
+        "ブラウザ回帰の対象が一段落に密集し、取得項目や店舗保存条件の表現が英語の略記に偏っていた。"
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "可読性の文書精査のみ。アプリ・DB・外部サービス・依存パッケージを起動/変更していない。lint・型検査・自動テスト・ビルド・ブラウザ操作は実行していない。",
+        "既存説明の全仕様と現行コードの網羅的な再照合、実配備設定・実データ・実食品の正確性、利用者の理解度・実店舗の負担/運用実証は今回の対象外。過去の実行結果を再実行済みとはしていない。"
+      ],
+      "validation": {
+        "fenced_code_blocks_unchanged": true,
+        "headings_unchanged": true,
+        "explicit_anchors_unchanged": true,
+        "link_targets_unchanged": true,
+        "numeric_tokens_not_removed": true,
+        "inline_code_tokens_not_removed": true,
+        "table_column_counts_unchanged": true,
+        "utf8_no_bom": true,
+        "original_worktree_crlf_preserved": true,
+        "local_link_targets_and_anchors_resolve": true,
+        "local_link_count": 84,
+        "anchor_reference_count": 69,
+        "external_link_count_not_fetched": 0
+      },
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "略語・検証用語と研究の対応関係を補足した。",
+        "ブラウザ回帰を対象別に段落分割し、表内の略記を意味を保って日本語にした。"
+      ],
+      "reviewed_final_sha256": "e86ad2f51899c75e6085099126b28a5faa752beaa49789fd09d796c24e08c4de",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/development.md",
+      "full_text_read": true,
+      "classification": "current",
+      "findings": [
+        "過去の依存更新記録がナビゲーションより前に置かれ、現在の手順との関係が分かりにくかった。",
+        "環境選択とブラウザ検証の長い段落にCLI、fixture、loopback、DTO、worktree、junction等が混在していた。"
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "可読性の文書精査のみ。アプリ・DB・外部サービス・依存パッケージを起動/変更していない。lint・型検査・自動テスト・ビルド・ブラウザ操作は実行していない。",
+        "既存説明の全仕様と現行コードの網羅的な再照合、実配備設定・実データ・実食品の正確性、利用者の理解度・実店舗の負担/運用実証は今回の対象外。過去の実行結果を再実行済みとはしていない。",
+        "外部URLの到達性と内容の再取得は未実施。既存の引用・確認段落の原文は保持した。"
+      ],
+      "validation": {
+        "fenced_code_blocks_unchanged": true,
+        "headings_unchanged": true,
+        "explicit_anchors_unchanged": true,
+        "link_targets_unchanged": true,
+        "numeric_tokens_not_removed": true,
+        "inline_code_tokens_not_removed": true,
+        "table_column_counts_unchanged": true,
+        "utf8_no_bom": true,
+        "original_worktree_crlf_preserved": true,
+        "local_link_targets_and_anchors_resolve": true,
+        "local_link_count": 17,
+        "anchor_reference_count": 4,
+        "external_link_count_not_fetched": 5
+      },
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "ナビゲーションを先頭へ戻し、過去記録の原文を保持したまま区分を示した。",
+        "環境と検証説明の段落を分け、技術用語を補足した。CDの既存説明を節の冒頭へ移した。"
+      ],
+      "reviewed_final_sha256": "6c85e874bf6c230ebaf5043c68f0af089052cad23fbdafd9714145cd5505ea66",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/document-audit-20261015.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "本棚卸しの説明。自身は執筆担当の全文確認であり独立した全件再監査ではない。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "本棚卸しの説明。自身は執筆担当の全文確認であり独立した全件再監査ではない。",
+      "reviewed_final_sha256": null,
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/maintenance.md",
+      "full_text_read": true,
+      "classification": "current",
+      "findings": [
+        "API・DB・SHA・package.jsonのscriptsに初出の説明が足りなかった。",
+        "実装担当とレビュー担当の役割が一段落に集中し、更新/不要理由と全docsが略記されていた。箇条書き直前の空行も不足していた。"
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "可読性の文書精査のみ。アプリ・DB・外部サービス・依存パッケージを起動/変更していない。lint・型検査・自動テスト・ビルド・ブラウザ操作は実行していない。",
+        "既存説明の全仕様と現行コードの網羅的な再照合、実配備設定・実データ・実食品の正確性、利用者の理解度・実店舗の負担/運用実証は今回の対象外。過去の実行結果を再実行済みとはしていない。"
+      ],
+      "validation": {
+        "fenced_code_blocks_unchanged": true,
+        "headings_unchanged": true,
+        "explicit_anchors_unchanged": true,
+        "link_targets_unchanged": true,
+        "numeric_tokens_not_removed": true,
+        "inline_code_tokens_not_removed": true,
+        "table_column_counts_unchanged": true,
+        "utf8_no_bom": true,
+        "original_worktree_crlf_preserved": true,
+        "local_link_targets_and_anchors_resolve": true,
+        "local_link_count": 16,
+        "anchor_reference_count": 1,
+        "external_link_count_not_fetched": 0
+      },
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "略語とscriptsの意味を補足し、担当者の責務の段落・略記・箇条書きの空行を整えた。"
+      ],
+      "reviewed_final_sha256": "b85c83514361c886d616d08cea45ae7796839530c071bf3669a6292a1bb74c52",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/product.md",
+      "full_text_read": true,
+      "classification": "current",
+      "findings": [
+        "DBの説明が初出より後にあり、公開APIと更新競合の409の説明も不足していた。",
+        "駅名検索の制約、登録状態と他メニュー由来の補足、画像構図、食品確認履歴の説明が長い段落にまとまっていた。"
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "可読性の文書精査のみ。アプリ・DB・外部サービス・依存パッケージを起動/変更していない。lint・型検査・自動テスト・ビルド・ブラウザ操作は実行していない。",
+        "既存説明の全仕様と現行コードの網羅的な再照合、実配備設定・実データ・実食品の正確性、利用者の理解度・実店舗の負担/運用実証は今回の対象外。過去の実行結果を再実行済みとはしていない。"
+      ],
+      "validation": {
+        "fenced_code_blocks_unchanged": true,
+        "headings_unchanged": true,
+        "explicit_anchors_unchanged": true,
+        "link_targets_unchanged": true,
+        "numeric_tokens_not_removed": true,
+        "inline_code_tokens_not_removed": true,
+        "table_column_counts_unchanged": true,
+        "utf8_no_bom": true,
+        "original_worktree_crlf_preserved": true,
+        "local_link_targets_and_anchors_resolve": true,
+        "local_link_count": 15,
+        "anchor_reference_count": 9,
+        "external_link_count_not_fetched": 0
+      },
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "DBの定義を初出へ移し、公開APIと409を補足した。",
+        "検索・表示・画像操作・食品確認履歴を意味のまとまりごとに段落分割した。"
+      ],
+      "reviewed_final_sha256": "982827acb07f013bd27498cf2675a4824bd6b7f058385ed570e11282cbb10512",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/rules.md",
+      "full_text_read": true,
+      "classification": "current",
+      "findings": [
+        "DB・API・SSO・JSONおよびnot-found/noindex、CSP/HSTSの用語説明が不足していた。",
+        "公開判定の処理・店舗一覧の条件・不一致の訂正が一段落に集中し、認証監査もサーバー確認とクライアント申告の説明が続いていた。"
+      ],
+      "action": "用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。",
+      "unverified": [
+        "可読性の文書精査のみ。アプリ・DB・外部サービス・依存パッケージを起動/変更していない。lint・型検査・自動テスト・ビルド・ブラウザ操作は実行していない。",
+        "既存説明の全仕様と現行コードの網羅的な再照合、実配備設定・実データ・実食品の正確性、利用者の理解度・実店舗の負担/運用実証は今回の対象外。過去の実行結果を再実行済みとはしていない。"
+      ],
+      "validation": {
+        "fenced_code_blocks_unchanged": true,
+        "headings_unchanged": true,
+        "explicit_anchors_unchanged": true,
+        "link_targets_unchanged": true,
+        "numeric_tokens_not_removed": true,
+        "inline_code_tokens_not_removed": true,
+        "table_column_counts_unchanged": true,
+        "utf8_no_bom": true,
+        "original_worktree_crlf_preserved": true,
+        "local_link_targets_and_anchors_resolve": true,
+        "local_link_count": 7,
+        "anchor_reference_count": 4,
+        "external_link_count_not_fetched": 0
+      },
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "実装・通信・セキュリティ用語に短い補足を付けた。",
+        "公開判定と認証監査を段落分割した。状態表、公開4条件、権限の列挙、法令・食品安全の限界を述べる原文を保持した。"
+      ],
+      "reviewed_final_sha256": "b14a166db5dd0cc473425be07b28666b5683d2caed2c01d8802408afe5193a56",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/ui-ux-review.md",
+      "full_text_read": true,
+      "classification": "historical",
+      "full_text_read_line_count": 325,
+      "findings": [
+        "2026-10-07と2026-10-09の複数の試験・追加修正が集約され、それぞれ異なるHEAD、Node/npm、架空データ、検証領域を使っている。「今回」「現在」は各記録時点を指し、現行mainの一括合格とは読めないよう入口で区別するとよい。",
+        "試験日、環境差、初回失敗・再実行、fixtureと実サービス、self reviewと独立review、実機・理解度・本番反映の未確認は具体的に残っている。結果や件数を現在へ読み替えず原文を保存する必要がある。",
+        "FE、HEAD、CI、DB/API、fixture、props、glyph、fingerprint、loopback、self review等の略語・英語が説明なく集中する。歴史本文の意味を再構成せず、冒頭の短い用語説明または現行ガイドへの案内で補う候補。",
+        "P1/P2/P3等の重要度、複数時点の「追加修正」「今回の検証」の並びを読む必要がある。日付と対象コミットを先に確認する読み方を入口で案内すると追いやすい。"
+      ],
+      "action": "対象時点と現行入口・用語を補足。過去の技術説明・実行結果を保持。",
+      "unverified": [
+        "この追加監査は読み取り専用の可読性精査。記載された試験、画面取得、プロダクト監査、外部URL再取得、実DB・実Clerk・Blob・本番・実食品・実利用者の確認は今回行っていない。",
+        "ローカル証跡・画像・実行ログの再取得や全コードとの再照合はしていない。過去の試験結果を再実行済みとしていない。"
+      ],
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "全文を1–80、81–160、161–240、241–325行の4区間に分け、出力の省略なく読了した。",
+        "文書は編集していない。歴史資料としての位置づけと用語・時点の所見を親担当へ報告し、既存JSONに追記した。"
+      ],
+      "reviewed_final_sha256": "dc55a65ec485d07a4e31028307601c5640962987949d68b4cae6eb43183549cc",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/guide/verification.md",
+      "full_text_read": true,
+      "classification": "current",
+      "full_text_read_line_count": 103,
+      "findings": [
+        "現在の確認入口と日付付きの過去結果が同じ文書にある。冒頭の2026-10-15固定main e26b6088の限定確認は、統合基準cd502b2404f518975dc4243ab6c41a702e7aa226での実行結果とは区別が必要。",
+        "2026-09-20の件数・PRテンプレート不在などは当時の結果と明示されている。「現在の制約」節も2026-09-20/22を起点にするため、どの時点の懸念か冒頭から案内するとよい。",
+        "synthetic React、fixture、RED/GREEN、owner取消race、fields/links、Origin/scheme/host/portなどの英語略記に説明が少ない。過去結果の原文は保持し、現在の案内で意味を補う候補。",
+        "ナビゲーションが複数の更新・検証記録の後にあり、初見では読む範囲を選びにくい。日付・対象・実行した範囲・未確認を区別する方針自体は明示されている。"
+      ],
+      "action": "過去e26bの結果と後続cd502監査を区別する入口を追加。当時の結果は保持。",
+      "unverified": [
+        "過去試験の再実行、現在の外部設定・実データ・本番・食品の正確性、画面・DB・Clerk・Blobの確認は今回行っていない。",
+        "読了後に親担当が加える入口の最終文言と全文の最終整合は、この追加監査の読了対象には含めていない。"
+      ],
+      "reviewer": "docs_guides_audit",
+      "audit_recommendation": [
+        "103行を省略なく全文読了した。文書は編集していない。",
+        "e26bの記録と最新cd502の区別は親担当が入口へ追加予定であることを確認し、所見のみ報告した。"
+      ],
+      "reviewed_final_sha256": "dc1940cd7fbd17bc16d91573d8acc553368cd04a59bec74ae170829ca5e85af6",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/interview/design-decisions.md",
+      "classification": "historical",
+      "findings": [
+        {
+          "location": "使い方／Q5・Q6・Q15／Q25",
+          "detail": "全文1422行を読了。基準64163ccの調査と『現行』『今なら』が並び、食品確認未導入・公開静的cache等を現在の仕様と誤読し得た。時点注記と現行guideへの入口を追加し、技術本文は当時の説明として保持する。"
+        },
+        {
+          "location": "表題／用語／Q2・Q21・Q25・Q26／早見表",
+          "detail": "日本語表題、UI/API/DB/CI・enum/ORM/TTL/E2Eの短い説明を追加し、RDBMSの略記を平易化した。本人の動機・CONFIRMED/INFERRED/UNKNOWN・当時の店舗試験案を現在の計画や許可へ昇格しない。"
+        }
+      ],
+      "action": "対象時点と現行入口・用語を補足。過去の技術説明・実行結果を保持。",
+      "unverified": [
+        "本人の動機・当時の比較実績、外部URLの疎通、現在の全コード・配備や実サービス、利用者理解は今回未確認。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "0f2da27c9fc48f19616e919822b61e5405c894fa315fc14d03cfc0a94082af3e",
+      "line_count": 1428,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "可読性・導線・時点の読み方のみ修正。Q1〜Q30の結論、比較案、履歴・SHA・状態/API/DB仕様・実施/未実施を保持する。",
+      "reviewed_final_sha256": "0f2da27c9fc48f19616e919822b61e5405c894fa315fc14d03cfc0a94082af3e",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/00-protocol.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L55"
+      ],
+      "classification": "2026-09-28の研究手順・作業境界の歴史資料",
+      "assessment": {
+        "日本語": "説明と英語の研究・開発用語が交互に現れる。",
+        "略語初出": "RQ、TDD、RED/GREEN等の前提知識が必要。",
+        "主語条件結論": "当該runの対象・変更範囲・未承認判断は明示。",
+        "入口リンク": "現行rules/change-mapと研究READMEへのリンクあり。",
+        "冗長さ": "研究手順として必要な密度だが専門語の列挙が重い。",
+        "情報保持": "証拠区分・反証・未確認・当時の制限を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L5,L47,L49-L55",
+          "finding": "Issue作成等を行わない、本runではRED設計のみ、という記述は当時の作業範囲。後続のIssue作成・実装結果や今回の権限へ読み替えると誤る。",
+          "entry_note_candidate": "研究索引で2026-09-28の手順記録と明記し、後続結果・現行ガイドとは別時点として案内する。"
+        },
+        {
+          "location": "L9-L17,L39-L47,L53",
+          "finding": "RQ/E1-E7、criteria、invariant、TDD、RED/GREEN、G1-G6が連続し、初読では本文より用語解読の負担が大きい。",
+          "entry_note_candidate": "研究入口に主要な証拠ID・状態ラベル・開発略語の読み方を置く候補。歴史本文の意味は書き換えない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "3d843b7fa74d94e177b6f61d3f09871452d9ece322df7ae6c9faacd4b55a4e4c",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/01-system-boundary.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L32"
+      ],
+      "classification": "研究当時のシステム境界・責任分担案",
+      "assessment": {
+        "日本語": "保証する対象と対象外は読み分けやすい。",
+        "略語初出": "CA、FREE、E7、HD、QR等を本文だけでは説明しない。",
+        "主語条件結論": "店舗・運営・利用者の責任と保証候補を区別。",
+        "入口リンク": "研究入口・現行目的へのリンクあり。",
+        "冗長さ": "短く、Actor表も有用。",
+        "情報保持": "保証対象外・未確認・責任分担案を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L7,L15-L26",
+          "finding": "日付のない『現在は』、1 owner/1 shop等は研究当時の観察。単独で開くと現在の製品・配備状態の説明に見える。",
+          "entry_note_candidate": "研究索引から当時の境界として案内し、現行の目的・共通ルールへ照合する旨を添える。"
+        },
+        {
+          "location": "L28-L32",
+          "finding": "店舗が変更通知を担う案と、実店舗利用の判断待ちが記録されている。店舗調査や実運用の承認・実施記録ではない。",
+          "entry_note_candidate": "現行の店舗側検討は公開資料・事例・シナリオによる精査で、接触・実査は行わないと区別する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "7873d5c9eae7338548039ef3d0032d102d06e4c51b997eaf980c57514f9b4546",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/02-research-questions.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L26"
+      ],
+      "classification": "2026-09-28と一部後続更新を含む研究質問台帳",
+      "assessment": {
+        "日本語": "問いは具体的だが英日混在の7列表。",
+        "略語初出": "RQ/E5/RUN/EX/T/HD/I、認可・配備用語の凡例なし。",
+        "主語条件結論": "証拠の確度と食品安全の確度を冒頭で区別。",
+        "入口リンク": "単独読者向けの研究索引・証拠台帳リンクがない。",
+        "冗長さ": "台帳の各列は必要。略語圧縮で読解負担が増える。",
+        "情報保持": "各質問の時点・反証・gapを残す。"
+      },
+      "findings": [
+        {
+          "location": "L10",
+          "finding": "RQ-04は実DB/Clerk未確認の時点を記録する一方、03-evidence-registerのRUN05は2026-09-30の隔離実DB18 PASSを記録しており、履歴の時点を読む必要がある。",
+          "entry_note_candidate": "後続追検証はRUN05・I02結果へ進むと研究索引で案内する。表を現在状態の一覧へ読み替えない。"
+        },
+        {
+          "location": "L5-L26",
+          "finding": "Evidence、Status、Confidence、GapがIDだけで相互参照される。初読の読者は何を先に開くべきか分かりにくい。",
+          "entry_note_candidate": "研究入口で『用語・証拠台帳→質問/主張→詳細結果』の読み順とID凡例を示す候補。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "76e28a033cbb44d752bf7b0866460b51a053e78ad1b724e89fcc9a242e7097f6",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/03-evidence-register.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L44"
+      ],
+      "classification": "出典・コード観察・実験・後続追検証を保存する歴史的証拠台帳",
+      "assessment": {
+        "日本語": "母集団と限界は具体的だが9列表が高密度。",
+        "略語初出": "E/R/EX/RUN/X/INF、ASVS/SSDF/STPA/OCC等に前提あり。",
+        "主語条件結論": "外部研究・合成実験・観察範囲を丁寧に区別。",
+        "入口リンク": "詳細証拠・検証計画へのリンクあり。研究索引への直接リンクなし。",
+        "冗長さ": "必要な留保が多く、削減すると証拠の意味を損ねる。",
+        "情報保持": "日付・母集団・範囲・反証・限界を全て保持する。"
+      },
+      "findings": [
+        {
+          "location": "L25,L26,L43",
+          "finding": "RUN03/RUN04/RUN05は見出し9列に対して8セル。結果、適用範囲、限界の列の対応がずれて見える。実際の区切り数を確認した。",
+          "entry_note_candidate": "歴史本文は変更せず、読み方を入口で補足する候補。親が書式修正を別途選ぶ場合も、元の結果・範囲・限界を一切落とさない。"
+        },
+        {
+          "location": "L3,L23-L26,L43",
+          "finding": "『本日』『現行regression baseline』は2026-09-28等の記録時点であり、現在のテスト数・脆弱性・DB確認の保証ではない。RUN05は後日の別run。",
+          "entry_note_candidate": "研究索引で歴史的runの数値と明記し、現行検証結果への案内を分ける。"
+        },
+        {
+          "location": "L27-L42",
+          "finding": "行政・研究・規格・公式技術資料の適用限界は既に詳しく残っている。今回の文章監査を原典再監査の証拠にできない。",
+          "entry_note_candidate": "入口の監査範囲に『可読性と導線の確認。原典・医療・法的判断の再検証ではない』と明記する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "2f83c1b2ccf520ff1d8d837a8573958de1ec7a313ef5f1bb152de4303f6e1629",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/04-claim-register.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L28"
+      ],
+      "classification": "研究の強い主張を支持・反証する歴史的主張台帳",
+      "assessment": {
+        "日本語": "主張と反証を対にする構成は明快。",
+        "略語初出": "CA、C/R/X/RUN/T/HD、API等は他文書前提。",
+        "主語条件結論": "反証・限定支持・未実証を明示。",
+        "入口リンク": "証拠台帳へのリンクあり。研究索引・現行仕様への直接リンクなし。",
+        "冗長さ": "必要な比較列。専門語の混在が主な負担。",
+        "情報保持": "支持・反証・適用限界・falsifierを保持する。"
+      },
+      "findings": [
+        {
+          "location": "L8,L25-L26",
+          "finding": "研究時点のC02と後続C19/C20が同じ表にある。対象経路・実DB・配備の違いは説明されているが、日付を入口なしで読むと現状の不具合一覧と誤解しやすい。",
+          "entry_note_candidate": "当時の仮説検証と後続の限定結果を残す台帳として案内し、現行状態の再確認先を示す。"
+        },
+        {
+          "location": "L5-L26",
+          "finding": "Status/Confidenceの英語ラベルと大量の参照IDに、ファイル内凡例がない。",
+          "entry_note_candidate": "研究入口で00-protocolの状態定義と03-evidence-registerへ先に進める。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "9d196fbf8fe5f1418f77f11d7f7bb683c11318a6b498996647696a48b96f9365",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/README.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "代表例の日本語候補を保持して統合し、全原稿と現在の方針・検証・精査結果を接続。歴史部分は維持。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "代表例の日本語候補を保持して統合し、全原稿と現在の方針・検証・精査結果を接続。歴史部分は維持。",
+      "reviewed_final_sha256": "64d9a5d68c60679ac674c6113f9443eb13b5040d494e02a5b33941fbda690f04",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/architecture/adversarial-review.md",
+      "full_text_read": true,
+      "classification": "歴史的な研究設計・自己反証記録（2026-09-28）",
+      "findings": [
+        {
+          "location": "冒頭・表L7-L20",
+          "kind": "入口・用語",
+          "finding": "A1/D01/R/EX/HD等の参照ID、CAS/ISR/SLA等が説明・リンクなしで登場する。L3は独立reviewではないことを明示しており、この区別は明確。",
+          "recommendation": "研究索引と共通用語案内を入口へ示す。本文のKEEP/MODIFY/OPENと独立性の限定を保持する。"
+        },
+        {
+          "location": "L7-L13・L22",
+          "kind": "時点",
+          "finding": "研究設計の当時の評価で、後続実装や現在の未実装一覧ではないが、文書内に対象日の明記がない。",
+          "recommendation": "2026-09-28の設計記録とわかる入口注記から現行ガイド・最新監査へ導く。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "本文は改稿せず、対象時点・索引・用語案内の入口注記を推奨。",
+      "reviewed_final_sha256": "d2e5408a07123921b0ecbfbc7514672f5ec7d3ac264be95db7ffc8286aae38ab",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/architecture/alternatives.md",
+      "full_text_read": true,
+      "classification": "歴史的なアーキテクチャ比較・推奨案",
+      "findings": [
+        {
+          "location": "L3-L5・L24-L33",
+          "kind": "入口・結論",
+          "finding": "A0-A3の違いとA1選択理由、測定ではない限定は明確。E7/INF01/HDの参照先が本文上でつながらない。",
+          "recommendation": "研究索引・証拠/判断ID案内を入口へ示す。"
+        },
+        {
+          "location": "L11・L14・L20",
+          "kind": "用語",
+          "finding": "E2E/CORS/OCC/RTT、policy/layer/adapter等が説明なしで集中する。",
+          "recommendation": "共通用語案内へ導き、比較表の粒度・条件・未測定の区別を保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "原比較表・未測定の限定を保持し、日付と用語/証拠IDの案内だけを入口へ補う。",
+      "reviewed_final_sha256": "51b911e58517e9be9b6b92a02ec302f7fafb2b09f0ff6287578de7fe8aa03a7a",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/architecture/current-architecture.md",
+      "full_text_read": true,
+      "classification": "歴史的な実装構成snapshot",
+      "findings": [
+        {
+          "location": "L1-L3・L38-L48・L89",
+          "kind": "時点",
+          "finding": "研究snapshotとは明記されるが、対象日がなく、CurrentやUI-only review/id-only write/unknown fallbackが現在も成立するように読まれ得る。",
+          "recommendation": "2026-09-28の再構成図であることを入口に明記し、現在の構成ガイドと2026-10-15監査を示す。図を現在化しない。"
+        },
+        {
+          "location": "L27・L58・L89",
+          "kind": "用語・読み順",
+          "finding": "DDD/RSC/TXと英日混在の処理語が初出説明なし。図→本文の構造は追える。",
+          "recommendation": "共通用語案内を入口に置き、図のsourceと歴史的な観察範囲を維持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "図と歴史本文を保持。日付・現行説明・用語案内を入口に補う。",
+      "reviewed_final_sha256": "add057feed98d38decfdd14c14dbc7a4aceaa6cfcd3fcec137057429f5e805a0",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/architecture/decisions/ADR-001.md",
+      "full_text_read": true,
+      "classification": "歴史的な推奨ADR（未承認技術設計）",
+      "findings": [
+        {
+          "location": "L3-L13",
+          "kind": "入口・用語",
+          "finding": "2026-09-28/RECOMMENDED/承認ではないという限定と再開条件は明確。ADR、R/EX/D/HD/A各ID、DDD等の文脈は他文書を前提にする。",
+          "recommendation": "研究索引・用語/ID案内への入口を追加し、RECOMMENDEDを採用済みへ書き換えない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "本文更新不要。対象日と未承認の区別は既存記載を保持し、索引・用語への入口のみ推奨。",
+      "reviewed_final_sha256": "67374594eac3a477cc4f27ef2f93a1abaa462302dac9898f0975ac2e6ab56e05",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/architecture/target-architecture.md",
+      "full_text_read": true,
+      "classification": "歴史的な条件付き目標設計",
+      "findings": [
+        {
+          "location": "L3・L27-L40",
+          "kind": "時点・情報保持",
+          "finding": "導入済みではないと明記されるが、D01/D02先行やrevision未導入という当時の計画を現在の実装欠落と取り違え得る。",
+          "recommendation": "設計時点を入口で固定し、後続実装と最新監査への案内を置く。配置案を現在のtreeへ書き換えない。"
+        },
+        {
+          "location": "L8-L15・L43-L45",
+          "kind": "用語",
+          "finding": "DTO/CAS、semantic policy、predicate、atomicity等の説明がない。",
+          "recommendation": "共通用語案内へ導く。責務/禁止事項/条件付き抽出の理由は保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "本文・配置案を保持し、研究時点と用語/現行説明への入口を推奨。",
+      "reviewed_final_sha256": "f8b607f9d18f731622f9615c73e2739df22b4562596c20c296c81f50ab8b90a2",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/audit-observability.md",
+      "full_text_read": true,
+      "classification": "歴史的な監査・運用観測の設計記録",
+      "findings": [
+        {
+          "location": "L3-L6・L10",
+          "kind": "時点・主語",
+          "finding": "現在できる/証明できないという見出しが対象日なしで並び、review record未導入等の研究時点の条件が現在の説明に見える。",
+          "recommendation": "研究時点の観察と条件付き案である入口注記を置き、現行運用/最新監査へ導く。"
+        },
+        {
+          "location": "L3・L8・L12",
+          "kind": "用語",
+          "finding": "best effort、tx、retention、backfill、orphan、SaaSやR/OPS/I/HD IDが説明なし。",
+          "recommendation": "用語・ID案内を入口へ示す。架空incident・机上/隔離・通知未実施の限定を残す。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "当時の運用案として本文保持。日付・用語・現行運用への入口注記を推奨。",
+      "reviewed_final_sha256": "ec2f7811b275c3dd403994abb5161c72d0c566c2a72d4062060d9754e4a1363d",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/authorization.md",
+      "full_text_read": true,
+      "classification": "歴史的な認可/mutation台帳＋2026-09-30追検証への案内",
+      "findings": [
+        {
+          "location": "L5・L10-L11・L31",
+          "kind": "情報保持",
+          "finding": "研究時点のid-only writeと後続I02の実装/限定DB証拠が明確に区別される。古い表を現在の欠陥として書き換える必要はない。",
+          "recommendation": "表を保持し、最新mainでの現在地は別監査へ案内する。"
+        },
+        {
+          "location": "L3・L7-L25・L33",
+          "kind": "用語",
+          "finding": "Authentication/Authorization、mutation、portfolio、SSO、DDL、ACL等が説明なし。",
+          "recommendation": "研究索引と用語案内を入口へ示す。認証と認可の違い、server/clientの主語は本文の区別を保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "表と後続結果への限定を保持。共通入口・用語・最新監査への案内のみ推奨。",
+      "reviewed_final_sha256": "ea5df24df47521f071eb63bcb5eb8d7ef88b640e29ff9244b9c1698a7084a285",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/cache-freshness.md",
+      "full_text_read": true,
+      "classification": "歴史的なcache観察と測定設計",
+      "findings": [
+        {
+          "location": "L3・L11-L15",
+          "kind": "時点",
+          "finding": "force-static/revalidate=60、別query、dynamic条件付きtargetは研究時点の前提。対象日が本文にないため現mainの欠陥へ誤読され得る。",
+          "recommendation": "研究時点を入口で明示し、現在のdynamic/同一DB時点の説明は最新監査・現行ガイドへ導く。歴史本文は保持する。"
+        },
+        {
+          "location": "L3・L13-L15",
+          "kind": "用語・結論",
+          "finding": "ISR/TTL/HD/spikeなどは説明なし。一方、食品・server・clientの3時間差と未測定/数値未決の区別は明確。",
+          "recommendation": "共通用語案内へ導き、3種類の時間差と観測最大≠保証という限定を保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "本文を保持。日付・最新監査・用語案内の入口注記を推奨。",
+      "reviewed_final_sha256": "37e53db81fdf2675f8babc148c5aeae792e63cce739e92148680cdf1b0d60c41",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/current-main-issue-audit-20261015.md",
+      "full_text_read": true,
+      "classification": "対象SHA/日時を固定した現mainの読取監査・保存版",
+      "findings": [
+        {
+          "location": "L3-L7・L17-L23",
+          "kind": "入口・条件",
+          "finding": "保存版、08:01 UTCのcd502b2、CI証拠と新規動作試験の区別、整理候補の意味が明確。現調査方針への入口もある。",
+          "recommendation": "既存の保存注記と限定を保持する。"
+        },
+        {
+          "location": "L27-L53・L61-L72",
+          "kind": "用語・可読性",
+          "finding": "同じ表内にCAS/DTO/ISR/a11y/E2E/PG、token/snapshot/cascade等が集中し、非技術読者は結論へ至りにくい。E01等は文書固有の索引である。",
+          "recommendation": "共通用語案内を入口へ補い、E番号の意味はこの文書の固定ソース表に従うと案内する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "記載されたCI203件・GitHub27件/40コメント・固定コード証拠はこの監査では再取得していない。親が作成予定の調査方針リンクはローカル存在再検査待ち。外部URL・アンカー・描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "本文更新不要。保存注記を保持し、用語案内の追加を推奨。",
+      "reviewed_final_sha256": "6d52e0fc77a04858e03f983a63e41473bfede333ec7549bd08cd5cf377a6d7cb",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/failure-model.md",
+      "full_text_read": true,
+      "classification": "歴史的な障害モデルと候補挙動",
+      "findings": [
+        {
+          "location": "L5-L20",
+          "kind": "時点",
+          "finding": "Current evidence/Desired behaviorの区別はあるが対象日なし。EX01/T01 READY、60 ISR、review record候補等を現在の未修復と誤読し得る。",
+          "recommendation": "研究snapshotの日付と後続実装への入口を示し、最新監査へ案内する。"
+        },
+        {
+          "location": "L3・L7-L22",
+          "kind": "用語・意味",
+          "finding": "fail closedは冒頭で定義され、全読取停止との混同も防げる。negative/tx/degraded/ISR/fail-open等は用語案内が必要。",
+          "recommendation": "fail closedの説明を保持し、未確認を含まない表示へ変換しない意味を共通用語から追えるようにする。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "表を現在化せず、研究時点・最新監査・用語案内を入口へ補う。",
+      "reviewed_final_sha256": "c0977812b9eb347705d75c3764e8837adc67044623f42caea2d4bb9d14e1cb90",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/identity-operations-issues-20261015.md",
+      "full_text_read": true,
+      "classification": "旧main e26b608基準のIssue照合保存版",
+      "findings": [
+        {
+          "location": "L7-L13・L32・L164-L174",
+          "kind": "時点",
+          "finding": "固定SHAと静的調査の限定は明確。ただし#76/PR77のOPEN/Draft/main未反映は当時の状態で、最新状態の説明ではない。",
+          "recommendation": "保存時点と最新current-main-issue-auditへの入口注記を追加。過去のPR-only分類を改稿しない。"
+        },
+        {
+          "location": "L86-L94・L168-L174",
+          "kind": "現在の調査方針・用語",
+          "finding": "当事者/保護者/店舗の募集案を次手として記す。ITT/per-protocol、rubric/counterbalance、cascade等の説明がなく、現在の友人協力テスト方針との違いも入口にない。",
+          "recommendation": "実店舗接触を伴う案は当時の提案として保持し、現調査方針と用語案内へ入口で導く。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "原稿保存版として本文保持。最新監査・現調査方針・用語の入口注記を推奨。",
+      "reviewed_final_sha256": "bb60cae0afc14fa01b98a1b8fd11923226c5fc98bf9d2f710025d785f358a496",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/inventory.md",
+      "full_text_read": true,
+      "classification": "2026-09-28の静的依存抽出一覧",
+      "findings": [
+        {
+          "location": "L3",
+          "kind": "入口",
+          "finding": "日付・静的棚卸し・全分岐/実行済みではない限定は明確。一方『本文のflow』の参照先がリンクされていない。",
+          "recommendation": "repository-evidenceまたはcurrent-architectureへの入口を示す。"
+        },
+        {
+          "location": "L180（20260420130000 SQL行）",
+          "kind": "表の読み方",
+          "finding": "Direct dependencies欄に定休日/電話/備考の正規表現リテラルが掲載され、import依存だけを表すと読むと誤解する。今回コードを再調査していないため抽出法の正しさは未判定。",
+          "recommendation": "履歴一覧は修正せず、字句抽出には依存以外の文字列を含み得る参考一覧であることを入口で補足する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "222対象ファイルのコード・依存抽出法・当時の行数を再検証していない。ローカル相対リンクの存在だけを検査し、リンク先の内容/全分岐/動作を保証しない。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "歴史表・当時の行数/リンクを保持。flowへの具体リンクと抽出一覧の読み方だけを入口へ補う。",
+      "reviewed_final_sha256": "2d8e27cb76dfcd9e490b64c57b5f5823fd617efb18d4fa54c757fbb8f83e7ed5",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/issue-document-references-20261015.md",
+      "full_text_read": true,
+      "classification": "旧main/PR77の字句抽出・Git存在照合保存版",
+      "findings": [
+        {
+          "location": "L3-L7・L122-L125",
+          "kind": "時点",
+          "finding": "固定SHA・分類合計・字句照合の限定は明確。『現在の存在』『PR77のみ4件』はe26b608/10945eb時点の分類で、現在のmain分類ではない。",
+          "recommendation": "旧時点の存在照合保存版と明記し、最新監査/研究索引へ入口を置く。分類表は上書きしない。"
+        },
+        {
+          "location": "L128-L135",
+          "kind": "結論・情報保持",
+          "finding": "存在と意味/受入/削除意図を分け、過去本文を削除しない方針は明確。文書カテゴリ表現やブランチ名を壊れたリンク扱いしていない。",
+          "recommendation": "本文更新不要。PR-only/SHAなどの用語は共通案内から説明する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "全118組の表を保持。時点・最新監査・用語案内の入口注記を推奨。",
+      "reviewed_final_sha256": "b2ee2ca8b207c689c3546c69054c3a2952d21071c13456f09c1f129a4cdfaa8d",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/menu-contract-issues-20261015.md",
+      "full_text_read": true,
+      "classification": "旧main e26b608基準のメニュー契約Issue照合保存版",
+      "findings": [
+        {
+          "location": "L1-L3・L15-L21・L141-L151",
+          "kind": "時点・主語",
+          "finding": "対象SHA・静的調査/過去証拠の限定は明確。親担当への確認事項や#73別経路未修復という記述は当時の統合runに属する。",
+          "recommendation": "保存版と最新監査への入口を追加し、親担当/今回という主語を当時の調査runとして固定する。"
+        },
+        {
+          "location": "L9・L29-L39・L75-L85・L137",
+          "kind": "用語・現在の調査方針",
+          "finding": "CAS/DTO/SLO/FK、RepeatableRead、backfill/cascade、token等が集中する。店舗taskを次手とする案は現方針への案内が必要。",
+          "recommendation": "用語案内と現調査方針へ入口で導く。保持・責任・現場証拠の未確認は維持し、友人テストで店舗負担を実証した扱いにしない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "全文・限定・採用済み/残条件の区別を保持。保存時点・最新監査・調査方針・用語への入口注記を推奨。",
+      "reviewed_final_sha256": "8ebefecf34f8ae13be2114693122c4b26c673135bfc075ffcb20129bf11e8fb9",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/open-issues-current-code-20261015.md",
+      "full_text_read": true,
+      "classification": "旧main e26b608基準の27Issue調査・限定probe保存版",
+      "findings": [
+        {
+          "location": "L3・L7-L9・L28・L60-L62・L70-L99・L118-L122",
+          "kind": "時点",
+          "finding": "SHA固定の限定はあるが、#73/#74修復前、#77未merge、Draft PRのみ承認という当時の現在形が残る。これを現在の欠陥/承認範囲へ読み替えると誤る。",
+          "recommendation": "保存版として冒頭で時点を固定し、#79/#80反映後のcurrent-main-issue-auditへ導く。反例と当時の承認記録は保持する。"
+        },
+        {
+          "location": "L7-L9・L82-L85・L106-L120",
+          "kind": "用語・現調査方針",
+          "finding": "CAS/DTO/ABA/bfcache、projection/rubric、counterbalance等の説明がなく、実店舗募集を含む将来案と現方針の区別が入口にない。",
+          "recommendation": "用語・ID案内と公開資料調査/友人協力テスト方針へのリンクを入口に追加する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "原稿の反例・比較案・未確認は保持。時点・最新監査・調査方針・用語案内の入口注記を推奨。",
+      "reviewed_final_sha256": "14310dd9d0274b7012da80232f9c35b17ef377f8d08869116919f26d2af5fd78",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/repository-evidence.md",
+      "full_text_read": true,
+      "classification": "歴史的なコード証拠snapshot＋後続I01への案内",
+      "findings": [
+        {
+          "location": "L3・L7・L9・L27-L35",
+          "kind": "時点・情報保持",
+          "finding": "snapshot/後続I01/当時の行番号/dirty tree/現在版への誤用防止は明確。Current stack見出しの版情報やR14の文書矛盾等は研究時点の記録。",
+          "recommendation": "対象日と最新監査への入口を加え、過去の版/コード観察を更新しない。"
+        },
+        {
+          "location": "L13-L25・L31・L37-L53",
+          "kind": "用語",
+          "finding": "COMMIT/tx/SDK/CSP/HSTS/ISRやSUPPORTED/CONTRADICTEDの判定語が集中する。",
+          "recommendation": "共通用語・証拠ID案内へ導く。静的に観察したことと未実行範囲の区別は保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "証拠表・版・判定の歴史情報を保持。日付/用語/現行監査への入口のみ推奨。",
+      "reviewed_final_sha256": "c47019ea5002a0649c5842dfb5d0e617ee08426701faeca07e561a086f211239",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/security.md",
+      "full_text_read": true,
+      "classification": "歴史的なセキュリティ/品質観点照合",
+      "findings": [
+        {
+          "location": "L3-L17・L19-L25",
+          "kind": "用語・入口",
+          "finding": "ASVS/SSDF/ISO、SSDF PO/PS/PW/RV、CSP/DoS等が初出説明なし。非適合宣言の限定、CSP欠落だけで攻撃成立としない限定は明確。",
+          "recommendation": "用語案内と研究索引へ入口を追加。規格の詳細/適合評価を新たに補完しない。"
+        },
+        {
+          "location": "L23-L25",
+          "kind": "時点",
+          "finding": "依存『現状』『最新advisory』『tests GREENでもEX01』はRUN02/研究runの時点であり、現在の脆弱性や現コードの未修復を示さない。",
+          "recommendation": "研究日を入口で固定し、現在の依存/修復状態は現行記録へ導く。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "当時の品質照合として本文保持。日付・用語・現行記録の入口注記を推奨。",
+      "reviewed_final_sha256": "d1d365ffc8e977493a19d58793047ed8cd91ef336dd3b8edca4be0ba8919cfef",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/engineering/transactions-concurrency.md",
+      "full_text_read": true,
+      "classification": "歴史的な原子性/競合/再試行の研究設計",
+      "findings": [
+        {
+          "location": "L3・L7-L15・L19-L23",
+          "kind": "時点",
+          "finding": "revisionなし・id-only・commit後500は当時の観察/設計候補。『未実DB再現』は明記されるが対象日なし。",
+          "recommendation": "2026-09-28研究記録と最新監査への入口を追加し、反例/候補を現在の欠陥にしない。"
+        },
+        {
+          "location": "L3・L7-L21",
+          "kind": "用語・結論",
+          "finding": "Atomicityとlost updateの違いは具体例で追える。tx/idempotency/row lock/NOWAIT/compare-and-swap等は説明なし。",
+          "recommendation": "共通用語案内へ導き、例のA/Bの条件と未再現の限定を保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "本文とinterleaving例を保持。日付・用語・最新監査の入口を推奨。",
+      "reviewed_final_sha256": "6edb888991897b2dddaa4366ab97f7cb8fe903d9ecc96fd5a13470ce99791467",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/backlog.md",
+      "full_text_read": true,
+      "classification": "歴史的なIssue仕様/ゲート台帳＋局所実装結果への案内",
+      "findings": [
+        {
+          "location": "L3-L20・L34-L40・L63",
+          "kind": "時点・情報保持",
+          "finding": "I番号とGitHub番号、提案Milestone、研究時点仕様と後続I01/I02結果の区別は明確。ただし『現在のゲート』『未push』『BLOCKED』は当時の台帳。",
+          "recommendation": "研究runの対象日と最新Issue監査への入口を示し、旧Issue受入条件を現在仕様に置き換えない。"
+        },
+        {
+          "location": "L49-L56・L89-L104・L164-L175",
+          "kind": "用語・現調査方針",
+          "finding": "TDD/RED/GREEN/CAS/OCC/DTO等と研究IDが密集し、I07の募集人数・店舗参加案は現在の実施方針ではない。",
+          "recommendation": "共通用語/ID案内と現調査方針を入口に追加。募集案は当時の設計として保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "全12Issueの原仕様・人数・条件・未確認を保持。日付・最新監査・用語・現調査方針への入口注記を推奨。",
+      "reviewed_final_sha256": "f149c649ba7764c3dc885d5b06de361da6cfac4ffafadf1c4d95c835fb9f7755",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/detailed-design.md",
+      "full_text_read": true,
+      "classification": "歴史的なD01-D12設計台帳",
+      "findings": [
+        {
+          "location": "L3-L5・L17・L23-L56",
+          "kind": "時点・入口",
+          "finding": "D/Iの1対1、未承認、研究時点とI01/I02後続結果は明確。後続のversion/食品確認等を取り込む設計正本として扱う文書ではない。",
+          "recommendation": "研究日と最新監査/現行ガイドへ入口で導く。"
+        },
+        {
+          "location": "L13・L19-L21・L38・L54-L60",
+          "kind": "用語・現調査方針",
+          "finding": "TDD/characterization/ACL/OCC/DTO等が未説明。店舗実験で負担確認する案は当時の提案。",
+          "recommendation": "用語案内・現調査方針の入口を追加。店舗負担の未実証は保持し、友人テストで代替実証しない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "設計本文・候補message/API・承認条件を保持。日付/用語/最新監査/現調査方針への入口を推奨。",
+      "reviewed_final_sha256": "a28c4643a3ca77f41515b3f3166d39cd1e53723f8d595a2b94947c5aa276e5b2",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/i01-result.md",
+      "full_text_read": true,
+      "classification": "2026-09-28実装・2026-09-30追検証の歴史的実行記録",
+      "findings": [
+        {
+          "location": "L1-L11・L19-L27・L31-L35",
+          "kind": "時点・情報保持",
+          "finding": "日付、対象commit、テスト件数、合成入力/専用DB/実環境未確認、後続結果と当時結果が明確。未pushは当時の状態として保持すべき。",
+          "recommendation": "本文更新不要。研究索引と現在地への入口から歴史記録であると案内する。"
+        },
+        {
+          "location": "L3・L15-L25",
+          "kind": "用語",
+          "finding": "LOCAL_IMPLEMENTED、RED/GREEN、DB-like、migration、Prisma Client等が未説明。",
+          "recommendation": "共通用語案内への入口を置く。実行記録を新しい実行結果へ読み替えない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "実行件数・commit・限定を保持。本文改稿不要で、共通の歴史資料/用語入口のみ推奨。",
+      "reviewed_final_sha256": "a34293a3f01f13cfc9ce89030a5bd2efc2621d868d0bdfa4c9ef8ce9c8f11d11",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/i02-result.md",
+      "full_text_read": true,
+      "classification": "2026-09-28実装・2026-09-30専用DB追検証の歴史記録",
+      "findings": [
+        {
+          "location": "L1-L5・L11-L28・L43-L51",
+          "kind": "時点・情報保持",
+          "finding": "当時UNVERIFIEDと後続実DB18PASS、mock/provider/CI/配備の限界が明確。現在のデプロイ/未commit状態を説明する記録ではない。",
+          "recommendation": "本文の時系列/件数/代用品の限定を保持し、研究索引・最新監査へ入口で導く。"
+        },
+        {
+          "location": "L13-L16・L26-L34",
+          "kind": "用語",
+          "finding": "DTO/mutation probe/CAS相当の最終条件/fixture/transaction/rollback等の説明がない。",
+          "recommendation": "共通用語案内への入口を追加する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "当時の環境・コマンド・件数・未実施は保持。本文改稿不要で、歴史資料/用語/現在地の入口を推奨。",
+      "reviewed_final_sha256": "6381f6ddfbf3f3f3aca5de35f7042961cadf94290ea4c80371688ddc920f3734",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/migration-plan.md",
+      "full_text_read": true,
+      "classification": "歴史的な提案Milestone/段階移行計画",
+      "findings": [
+        {
+          "location": "L3-L8・L12-L27",
+          "kind": "時点・条件",
+          "finding": "GitHub未設定・2026-09-28の0件・実装許可でない限定は明確。P0-P8は現在の未実装順序ではない。",
+          "recommendation": "研究時点の計画として入口を固定し、最新監査/現行移行記録へ導く。"
+        },
+        {
+          "location": "L13・L22-L26・L29",
+          "kind": "用語・現調査方針",
+          "finding": "vertical slice/characterization/token/cutover/real DB/UX等が密集。募集/店舗UXは過去計画。",
+          "recommendation": "用語案内・現調査方針へ入口で案内し、実店舗が参加可能という前提へ読み替えない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "提案表/依存/rollback/当時の状態は保持。日付・最新監査・用語・現調査方針の入口を推奨。",
+      "reviewed_final_sha256": "bd512e2de6c4fd91d310aaada27c192382ab49e15a0e914de51a97299ccea959",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/readiness.md",
+      "full_text_read": true,
+      "classification": "2026-09-28の研究ゲート判定＋後続局所結果の歴史記録",
+      "findings": [
+        {
+          "location": "L3-L5・L14-L25・L27-L45",
+          "kind": "時点・情報保持",
+          "finding": "判定日、後続I01/I02、freezeと実行記録の研究run限定が明確。Current verificationやclosureの未commit/未公開は当時の範囲。",
+          "recommendation": "本文を現在へ更新せず、最新監査/現行検証記録の入口を示す。"
+        },
+        {
+          "location": "L9-L22・L47",
+          "kind": "用語",
+          "finding": "RQ/E/SC/INV/TDD/A11Y/RED/GREEN等のID/略語が説明なし。",
+          "recommendation": "研究IDと用語案内への入口を追加。PARTIALLY_READYを現在製品の総合判定として使わない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "当時のPASS/PARTIAL/UNVERIFIEDと件数を保持。本文更新不要、用語と現在地の入口のみ推奨。",
+      "reviewed_final_sha256": "4e4aae33f61564c7f4d1e61890bcc3e87728e448b32d64e80b000a7f60d42ed1",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/rollout-rollback.md",
+      "full_text_read": true,
+      "classification": "歴史的な条件付き展開/切戻し設計",
+      "findings": [
+        {
+          "location": "L3-L7・L10-L19",
+          "kind": "時点・主語",
+          "finding": "『本run』の対象日がなく、現行の実施権限/採用契約として読まれ得る。提案監視・停止基準は当時の設計。",
+          "recommendation": "研究日と未採用計画の入口注記を置き、現行運用/最新監査へ導く。"
+        },
+        {
+          "location": "L5・L10-L17",
+          "kind": "用語",
+          "finding": "characterization/RED/GREEN/revert/TTL/retention/feature detection等が未説明。",
+          "recommendation": "用語案内へ入口で導き、不可逆Blob削除等の意味・条件は保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "本文の条件・禁止・残課題を保持。日付・用語・現行運用への入口注記を推奨。",
+      "reviewed_final_sha256": "62e50d057c35e041f825783c98944fd7ab4ecfe164947109fee33a4a47a22ade",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/target-schema.md",
+      "full_text_read": true,
+      "classification": "歴史的な未採用・承認条件付きDB設計",
+      "findings": [
+        {
+          "location": "L1-L3・L9-L19・L25-L35・L41",
+          "kind": "時点・情報保持",
+          "finding": "migration未実行・承認後候補は明確。ただしCurrent revisionなし/候補revision1開始等は当時の設計で、現在schemaとの不一致を欠陥にしない。",
+          "recommendation": "研究日と最新監査/現schemaへの入口で区別する。候補DDL/旧writer条件は現在化しない。"
+        },
+        {
+          "location": "L16-L19・L27-L39",
+          "kind": "用語",
+          "finding": "CAS/OCC/FK/PK/DDL、backfill/cascade/tombstone/fingerprint等の説明がない。",
+          "recommendation": "共通用語案内へ入口で導く。未確認を埋めたDDLを作らない限定を保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "候補model・未決・当時未実行の記録を保持。日付・用語・現行schema/監査の入口を推奨。",
+      "reviewed_final_sha256": "01d209579ba6d8acb70da3e51f9e0a4fae33e44d02e3924fe2e392c73f3718d1",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/implementation/verification-plan.md",
+      "full_text_read": true,
+      "classification": "研究run時点の検証設計/限定実行記録",
+      "findings": [
+        {
+          "location": "L3-L11・L17-L30・L44",
+          "kind": "時点・情報保持",
+          "finding": "RED設計とEX01合成実験/後続T01/T09の実行区別は明確。表のrevisionなし/ISR前提/未実行は歴史的条件。",
+          "recommendation": "研究日と最新監査/現行検証記録の入口を補い、旧設計を今回試験済みにしない。"
+        },
+        {
+          "location": "L15-L40",
+          "kind": "用語・現調査方針",
+          "finding": "TDD、test double、characterization、fault injection、deferred trigger等が未説明。UX01/T11の店舗manualは当時の計画。",
+          "recommendation": "共通用語・ID案内と現調査方針へ入口で導く。人の理解と店舗工数の未実証を保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典・live GitHub・コード・DB・アプリ・外部providerの新規検証は依頼範囲外のため未実施。外部URL到達・アンカー・Markdown/Mermaid描画は未検査。"
+      ],
+      "reviewer": "docs_engineering_audit",
+      "audit_recommendation": "全期待値・反例・計画/実行/未実施の区別を保持。日付・用語・最新監査・現調査方針の入口を推奨。",
+      "reviewed_final_sha256": "60aea5fb378746eee3dffd42d7d5c915d3648fc681907d8de87de0ccdb978215",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/allergen-information-controls-20261014.md",
+      "full_text_read": true,
+      "classification": "歴史資料・追加文献調査と設計仮説",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 154,
+      "bytes": 18414,
+      "sha256": "2c9f9da38a5309e1695ec9ccce71d574dfd0410dee8b12130e232e3ddc39aca7",
+      "findings": [
+        "冒頭に調査日・未採用/未実装・原典再取得の限界がある。分母と海外資料の適用限界、注文/厨房/配膳を現在範囲へ追加しない境界は明確。",
+        "RCT、ITT、PPDS、OCR等の略語が多く、非専門読者には共通用語案内が必要。",
+        "55行の対照群30.5%（165/541）と、clearallergy-research-20261014.md:722 の30.0%に原稿間差がある。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "30.0%と30.5%の差は今回の全文閲読で検出したが、原著・公的報告のどの集計を指すかは未再照合。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 5,
+          "target": "../product/clearallergy-followup-20261014.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "本文・出典URLを保存。原稿間の数値差を訂正候補として明示し、判断に使う前に原典を照合する。",
+        "現場パイロットの案を現行の必須次手と読ませず、実店舗接触なし・友人理解テストの方針へ入口から案内する。"
+      ],
+      "reviewed_final_sha256": "2c9f9da38a5309e1695ec9ccce71d574dfd0410dee8b12130e232e3ddc39aca7",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/big-tech-context-practices-20261014.md",
+      "full_text_read": true,
+      "classification": "歴史資料・公開技術資料からの適用提案",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 189,
+      "bytes": 18395,
+      "sha256": "884fa763048c836bb7d12f6958e001249cdfa1d8964d583232d2b592706ac5ad",
+      "findings": [
+        "調査自体ではrepo/CIを確認していないと明示し、会社事例・公式推奨・公開実物・製品機能を区別している。",
+        "採用という判定語が文書内の推奨を指すため、現在repoへ実施済みと誤解しない状態案内が必要。CA/CL/RAG/MCP/PIM等は共通用語案内が有用。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "原稿を保存し、現行AGENTS・保守ガイドと本監査へリンクする。概算時間・成功条件を各社実測値に昇格させない。"
+      ],
+      "reviewed_final_sha256": "884fa763048c836bb7d12f6958e001249cdfa1d8964d583232d2b592706ac5ad",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/ca-overnight-adoption.md",
+      "full_text_read": true,
+      "classification": "歴史資料・店舗導入仮説と未実施の面談計画",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 156,
+      "bytes": 19473,
+      "sha256": "06808348176fea516d5b1c7f8fe72c5cc67366d31d91973d712dc51b7ddf7b07",
+      "findings": [
+        "日付と店舗連絡未実施は明確。A〜Dの研究上分類、20問台本、実作業/待ち、支払主体、離脱の扱いを全文保持する価値がある。",
+        "§6は机上調査停止・許可後の現場検証を次手としており、実店舗接触できないという最新制約との差が大きい。SME/FBO/ITT/SaaS等の専門語がある。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "本文を歴史資料として保存。現行索引・方針で店舗側は公開資料/事例/シナリオの精査、友人は操作理解のみとする。実測負担・継続・支払意思は未検証のまま残す。"
+      ],
+      "reviewed_final_sha256": "06808348176fea516d5b1c7f8fe72c5cc67366d31d91973d712dc51b7ddf7b07",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/ca-overnight-competition.md",
+      "full_text_read": true,
+      "classification": "歴史資料・公開情報による競争比較",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 100,
+      "bytes": 17775,
+      "sha256": "929f46068f6d361fda6572f972f6667f63902b89cec4afd950161b5466139e14",
+      "findings": [
+        "当時の発表、現行案内、未確認の稼働/契約を区別し、紙/Excel/電話を一括して劣位としない。",
+        "CASE A〜CとS1〜S10の識別子は文書内で完結しているが他原稿の同名IDとは別体系。§4の実店舗実測は現行の必須次手ではない。裸URLが多くMarkdown相対リンク検査だけでは出典監査にならない。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "本文を保存し、調査時点と現在の調査・友人テスト方針を索引で案内する。競合の価格・現行稼働・機能の不存在を未確認のまま扱う。"
+      ],
+      "reviewed_final_sha256": "929f46068f6d361fda6572f972f6667f63902b89cec4afd950161b5466139e14",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/ca-overnight-discovery.md",
+      "full_text_read": true,
+      "classification": "歴史資料・未実施の利用者理解テスト案",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 243,
+      "bytes": 25328,
+      "sha256": "a1891eeb245fbd069b2544432454e4a3b09363bee11ae516ad8a97c00c903abc",
+      "findings": [
+        "研究案/架空画面/現行コード未確認を冒頭で区別。自由回答→構造化質問→学習後の順序、肯定命題、未完了・分母・支援技術が具体的。",
+        "冒頭課題の来週という予定とS4の現在時点は試験目的を混ぜやすい。後続v2計画では12:00現在主課題と未来追加課題が分離されている。12〜18名例は現在の友人テストの必須人数にしない。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "本稿の画面文言・検索案は未承認で、現行CAの状態を表すものではない。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "元の全文を保存。現行手順は後続v2と友人テスト用手順を参照し、初見回答と構造化質問後の回答、現在と未来の課題を分ける。"
+      ],
+      "reviewed_final_sha256": "a1891eeb245fbd069b2544432454e4a3b09363bee11ae516ad8a97c00c903abc",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/ca-overnight-integrity.md",
+      "full_text_read": true,
+      "classification": "歴史資料・11シナリオと25試験の設計提案",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 272,
+      "bytes": 32404,
+      "sha256": "4f9ef0ca60e12a2f4ec0aaeb02dbb4597df5811f72a32b3ca09f69a4316af9a3",
+      "findings": [
+        "原稿単体の現行実装判定はすべて不明と明示。当日後続の静的監査と矛盾する実装評価ではない。変更と訂正、時間軸、現物と入力、未知を区別している。",
+        "208行T17と210行T18の間に空行があり、Markdown表が分断してT18以降が表として表示されない可能性がある。",
+        "T01〜T25と他原稿のT/IDを区別する用語案内、現在mainを確認した別監査への導線が必要。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "表の実際のGitHub描画は今回レンダリングしていない。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "提供原稿とバイト同一を維持。表分断は原稿の書式上の留保として記録し、閲覧版を別に整える場合も原本は変更しない。",
+        "現行の実装評価はcurrent-main-issue-auditを参照させ、原稿の未確認を現在の機能欠落と扱わない。"
+      ],
+      "reviewed_final_sha256": "4f9ef0ca60e12a2f4ec0aaeb02dbb4597df5811f72a32b3ca09f69a4316af9a3",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/ca-overnight-security-operations.md",
+      "full_text_read": true,
+      "classification": "歴史資料・旧mainを二次参照したセキュリティ/運用案",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 206,
+      "bytes": 26658,
+      "sha256": "64e5b4554911ca9a8c37e31f5c629efe416d7a0c8ba7d7b39b177ec6fab92fd5",
+      "findings": [
+        "19行でe26b6088…を対象mainと固定。#73/#74の残差を挙げるが、その後cd502b…で修復済みになった時点差を入口で示す必要がある。",
+        "P0/P1/P2は本文で定義される。DTO/CAS/EXIF/bfcache/SDK/SLA等、食品情報とは別分野の略語が集中する。個人情報・法令は個別該当性を保留している。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "本監査は個人情報保護法・PPC記載の最新性/適用性を再検証していない。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "歴史本文を保存し、最新main監査へ案内する。法令の速報/確報期限を食品訂正・復旧SLAへ流用しないという原稿の区別を維持する。"
+      ],
+      "reviewed_final_sha256": "64e5b4554911ca9a8c37e31f5c629efe416d7a0c8ba7d7b39b177ec6fab92fd5",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/clearallergy-research-20261014.md",
+      "full_text_read": true,
+      "classification": "歴史資料・出典付き調査集成",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 787,
+      "bytes": 85370,
+      "sha256": "5b5c3215b1cc80d0a3b503bb3b2140e386e4457edb8e4dbcdea552eaddf5c1f0",
+      "findings": [
+        "全787行を4分割で読了。調査の読み方、店舗負担/需要、事故/制度、データ資源/競合/研究、非機能要件まで省略せず収録。",
+        "章ごとに # と ## の番号が再開し、資料A-H、S、D、C、Rの識別子が独立している。章別の読む目的とID説明があると追跡しやすい。",
+        "722行の対照群30.0%とallergen-information-controls-20261014.md:55 の165/541=30.5%に差がある。",
+        "店舗質問票と実作業観察は歴史提案。現段階で実店舗接触を必須作業にしない。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "全過去会話の逐語保存ではないという原稿の完全性限界を維持。",
+        "制度品目・価格・API・ライセンス等の時点依存情報は今回外部再確認していない。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "本文を省略せず保持し、研究索引/共通読み方から各章の目的と現行方針へ案内する。",
+        "数値差を訂正候補として追跡し、未再照合のまま一方を正しい現在値と断定しない。"
+      ],
+      "reviewed_final_sha256": "5b5c3215b1cc80d0a3b503bb3b2140e386e4457edb8e4dbcdea552eaddf5c1f0",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/information-integrity-patterns-20261014.md",
+      "full_text_read": true,
+      "classification": "歴史資料・英語の比較設計批評",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 134,
+      "bytes": 19382,
+      "sha256": "92c6c79e3a8e736fe0785782b7db04072628e3d5694a0e739f7129c0db7d4c76",
+      "findings": [
+        "英語全文のため日本語の通常ガイドと読者前提が異なる。Adopt/Defer/Rejectは推奨で、CA導入済みとは書いていない。",
+        "PIM/MDG/GDSN/EPCIS/GTIN/CMS/SRE/CDN/TTL等の専門語が多い。企業事例と食品の現物・厨房の真実を区別する論旨は明確。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "英語原稿と出典を保存。日本語索引に読む目的と主要用語を置き、現行採用ルールの正本はguide/rulesへ案内する。"
+      ],
+      "reviewed_final_sha256": "92c6c79e3a8e736fe0785782b7db04072628e3d5694a0e739f7129c0db7d4c76",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/information-operations-followup-20261014.md",
+      "full_text_read": true,
+      "classification": "歴史資料・情報継続管理の文献調査",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 158,
+      "bytes": 18361,
+      "sha256": "c95351c4121634798925e363db1ae904567acd2f6c6553734397cc945896d0e9",
+      "findings": [
+        "冒頭で調査日・未採用/未実装・独立レビューの限界を明示。資料ごとの発行/参照日、適用地域、現物と最新供給元の差、許諾と技術可否を分ける。",
+        "最後の3〜5店・仕入先確認案は現行の必須次手ではない。PPDS/GDSN/PAL/GTIN/TTL等の略語が多い。Nutritics2ページの独立再確認不能を適切に留保している。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 5,
+          "target": "../product/clearallergy-followup-20261014.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "本文保存。現行方針で実店舗/仕入先接触は予定せず、公開事例とシナリオの精査へ振り分け、原情報取得率・負担は未検証のまま残す。"
+      ],
+      "reviewed_final_sha256": "c95351c4121634798925e363db1ae904567acd2f6c6553734397cc945896d0e9",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/japan-context-practices-20261014.md",
+      "full_text_read": true,
+      "classification": "歴史資料・国内公開事例の適用提案",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 206,
+      "bytes": 22250,
+      "sha256": "3571670f2ee22b6186d6f9b390e9e4a288c9a9aee0e69dcb4415c1c52c42339d",
+      "findings": [
+        "事例の対象チーム・公開時点、CA未監査、工数は独自概算を明示。現行文書と歴史の分離、一つの正本、不要な文書増加を避ける説明は具体的。",
+        "ADR/PRD/RAG/MCP/linter等の用語は非開発読者向けの案内が有用。公開AGENTSのmain可変性と初出/別表示日を留保している。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "歴史本文を保存。今回実施した文書整備は別の検証記録へ残し、本稿の未実施提案を現在の実施結果へ書き換えない。"
+      ],
+      "reviewed_final_sha256": "3571670f2ee22b6186d6f9b390e9e4a288c9a9aee0e69dcb4415c1c52c42339d",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/restaurant-burden-followup-20261014.md",
+      "full_text_read": true,
+      "classification": "歴史資料・店舗負担の追加文献調査",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 91,
+      "bytes": 12705,
+      "sha256": "930722abb2794d221211f08eb3575cb583d5f0599086b37d4b1ffd6b1a5d156f",
+      "findings": [
+        "冒頭の時点/状態/調査限界は明確。1842件と個人店、30→5分と受発注120時間、表示と調理対応を分けている。",
+        "店舗ヒアリングで残る問いは現段階の実施予定ではない。長い裸URL、略語、資料の確認強度を索引の共通案内で補助するとよい。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 4,
+          "target": "../product/clearallergy-followup-20261014.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "原稿・出典を保持。店舗の実負担/支払意思は公開資料で埋まらない未確認として残し、友人の店員役から推定しない。"
+      ],
+      "reviewed_final_sha256": "930722abb2794d221211f08eb3575cb583d5f0599086b37d4b1ffd6b1a5d156f",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/safety-understanding-plan-20261015.md",
+      "full_text_read": true,
+      "classification": "歴史資料・提供v2の独立シナリオ/初見理解計画",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 379,
+      "bytes": 38051,
+      "sha256": "d6c7233166fe73f45f5b29ab8adddcbd5ed59504188ba1ecaa1a2b62726debb5",
+      "findings": [
+        "全380行を2分割で読了。配置注記が原稿コピーと現行方針を示す。A〜G独立台帳、C0/C1/C2、F/F2、G1〜G3、現在/未来、分母、初見/学習後を分けている。",
+        "§8の運用探索→初見理解という当時の順序は現在の友人テストを店舗接触の後へ待たせない。",
+        "Fの原材料/工程二段表示、G1訂正画面は研究案。現行CAのMAY_CONTAIN方針や通常STOPで訂正到達できるかの照合とは別。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "計画本文の原典再確認は当時の著者記録であり、本監査による再確認ではない。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 3,
+          "target": "../originals/20261015-main-integration/received-safety-understanding-plan-20261015-v2.md.txt",
+          "file_exists": true
+        },
+        {
+          "line": 3,
+          "target": "../product/research-and-friend-testing-policy-20261015.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "全文・原稿コピーを保持。現行の友人向け台本は少数の固定ケースから始め、FはMAY_CONTAIN＋理由/UNKNOWNの現行対応と未採用表示案を区別する。"
+      ],
+      "reviewed_final_sha256": "d6c7233166fe73f45f5b29ab8adddcbd5ed59504188ba1ecaa1a2b62726debb5",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/search-strategy.md",
+      "full_text_read": true,
+      "classification": "歴史資料・2026-09-28の検索/選別記録",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 51,
+      "bytes": 6833,
+      "sha256": "cbc10334c0736d226f0ebe0f11e40ba06ee35599322b06f7ab862535a2c2c13a",
+      "findings": [
+        "全検索日と検索経路、非PRISMA/検索件数未保存、本文/抄録/画像未確認、Context7の版差を具体的に残している。",
+        "RQ/X/E/HD等は別台帳への参照を前提とし、STPA/ASVS/SSDF/OCC/PPDS等の略語と英日混在が初読の負担。2026-09-28の取得失敗と10月14日の後続取得を矛盾としない日付案内が必要。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 3,
+          "target": "../03-evidence-register.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "実際の検索語・取得限界を保存。共通読み方から識別子体系と時点差を説明し、外部検索未実施を現在実施済みへ昇格しない。"
+      ],
+      "reviewed_final_sha256": "cbc10334c0736d226f0ebe0f11e40ba06ee35599322b06f7ab862535a2c2c13a",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/shop-adoption-plan-20261015.md",
+      "full_text_read": true,
+      "classification": "歴史資料・提供v2の店舗導入/継続計画",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 185,
+      "bytes": 22880,
+      "sha256": "61109a6b828e3af0a331d0d08d009898512100c3f64120519117e99806743260",
+      "findings": [
+        "冒頭配置注記に原稿コピーと現行方針がある。現行CA/研究者代行/将来案/紙の比較対象、募集と作業の分母、実作業と待ちを明確にしている。",
+        "§8は追加検索停止→一変更運用探索という歴史順序。現在は店舗側の精査を続け、友人理解テストを別経路で準備する。",
+        "末尾のLibrary更新予定は当時の保存時点の記録であり、現在のLibrary更新完了を示さない。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 3,
+          "target": "../originals/20261015-main-integration/received-shop-adoption-plan-20261015-v2.md.txt",
+          "file_exists": true
+        },
+        {
+          "line": 3,
+          "target": "../product/research-and-friend-testing-policy-20261015.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "本文・末尾変更記録を保持。現行索引で当時の店舗接触提案を更新し、採用/負担/支払/継続の未確認を維持する。"
+      ],
+      "reviewed_final_sha256": "61109a6b828e3af0a331d0d08d009898512100c3f64120519117e99806743260",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/literature/synthesis.md",
+      "full_text_read": true,
+      "classification": "歴史資料・旧研究の根拠統合と反証",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 13,
+      "bytes": 2780,
+      "sha256": "fc207b265c193daccefd8e35c20d5ff008c83198acd64fd76e98ffd00359c41f",
+      "findings": [
+        "13行に7論点を詰め、E7/HD-03/HD-05/R04/UX01等の参照体系と英日混在が読者前提になっている。検索記録/claim registerのリンクはある。",
+        "real DB検証が必要というR04評価は2026-09-28頃の調査体系の記録。後続RUN/CIの合格とは時点が異なる。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 3,
+          "target": "search-strategy.md",
+          "file_exists": true
+        },
+        {
+          "line": 3,
+          "target": "../04-claim-register.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "原稿保存。研究索引と読み方に時点・ID対応・後続main監査への導線を置き、旧未確認を現在の未実装と断定しない。"
+      ],
+      "reviewed_final_sha256": "fc207b265c193daccefd8e35c20d5ff008c83198acd64fd76e98ffd00359c41f",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/open-questions.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L31"
+      ],
+      "classification": "2026-09-28時点の人間判断・未確認事項キュー",
+      "assessment": {
+        "日本語": "選択肢と結果・可逆性を比較できる。",
+        "略語初出": "HD/R/INV/T/UX/OPS、CAS/ISR等は未展開。",
+        "主語条件結論": "提案と承認、製品判断と技術的未知を明確に区別。",
+        "入口リンク": "判断Issueの外部リンクはあるが研究索引への直接リンクなし。",
+        "冗長さ": "8列表で高密度。判断材料の削除は不適切。",
+        "情報保持": "未決事項・選択肢・当時の保留状態を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L3-L17",
+          "finding": "『statusは全件HUMAN_DECISION_REQUIRED』『blocked implementationを開始しない』は当時のキュー説明。現在の依頼・合意やGitHub状態をこの歴史資料だけで上書きする根拠ではない。",
+          "entry_note_candidate": "当時の判断記録であり、現行の承認状況は別に確認するという研究入口注記。"
+        },
+        {
+          "location": "L9,L11,L25",
+          "finding": "実店舗pilotや店舗UXを選択肢・必要証拠として挙げるが、現行方針は店舗接触なし。実店舗調査が現在の必須作業に見えない導線が必要。",
+          "entry_note_candidate": "店舗側は公開資料・事例・シナリオ精査、利用者側は友人協力を検討する現行方針を入口で分離する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "dbcf56e9c00977b48d31616f0874c7a73989d3cd0384086b35572da7c8c28c5f",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-ja-readability/losses-hazards.md.txt",
+      "full_text_read": true,
+      "classification": "書換前の安全分析原稿（2026-09-28研究snapshot）",
+      "read_evidence": {
+        "lines": 22,
+        "bytes": 3067,
+        "sha256_after_full_read": "68948dde11991fb1b085ba197be06bb0c84122faeda18c72e39cb2e0a10b669a",
+        "read_ranges": [
+          "1-22"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "冒頭・H01-H10表・末尾反証",
+          "finding": "当時の危険候補、STPA-inspired限定、発生確率未測定を保持する原稿。未知値fallback、review証跡なし、ISR等は研究時点であり、現在の未修復・事故実績ではない。"
+        },
+        {
+          "location": "H04-H07・全文",
+          "finding": "英日混在・略語の密度は派生日本語本文で説明する対象。原稿そのものの用語追加/短縮は行わない。実店舗・厨房観察を実施した記録ではなく、現在の公開資料/シナリオ調査と矛盾しない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "現在の被害分析閲覧版は別ファイル。原稿内にローカルMarkdownリンクはない。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "68948dde11991fb1b085ba197be06bb0c84122faeda18c72e39cb2e0a10b669a",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-ja-readability/research-index.md.txt",
+      "full_text_read": true,
+      "classification": "書換前の研究索引・複数時点の研究履歴",
+      "read_evidence": {
+        "lines": 83,
+        "bytes": 15985,
+        "sha256_after_full_read": "d916c72626cdcc67a55b7a6951dca0984c2eab67adecca53edf9cec133c4e767",
+        "read_ranges": [
+          "1-83"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "冒頭・Executive summary 1-22",
+          "finding": "2026-10-15演習入口、2026-10-14調査、2026-09-28/30の研究・局所実装を併載。旧『現在』『未push』『9件判断待ち』は当時の状態として保持する。"
+        },
+        {
+          "location": "演習入口・UX/店舗負担・Navigation",
+          "finding": "準備と参加者観察/店舗工数を区別している。現方針の友人協力テストで確認できる範囲と、実店舗負担/継続未実証は閲覧版・方針文書で案内する。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "product/...、../guide/...等は元のdocs/research/README.md起点。保管先で解決しないことは原稿不備ではない。",
+          "relative_inline_link_count": 67,
+          "unresolved_from_archive_count": 67,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "d916c72626cdcc67a55b7a6951dca0984c2eab67adecca53edf9cec133c4e767",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ca-current-main-issue-audit-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "08:01 UTC固定main・27Issue照合の原稿保存版",
+      "read_evidence": {
+        "lines": 76,
+        "bytes": 17487,
+        "sha256_after_full_read": "102b62e20f745aaeb2e82f927a138a2625d2a7ae43e25379ca8c88ababbe1b07",
+        "read_ranges": [
+          "1-76"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "対象時点・技術的証拠・27件表",
+          "finding": "cd502b2、203CI、27Issue/40コメントの当時の読取結果。既存実装・技術修復と残る判断/実環境証拠を明確に区別する。今回の新規動作確認として扱わない。"
+        },
+        {
+          "location": "mainにない文書を混ぜない・最終段落",
+          "finding": "『#78はmainにない』『task-2内だけ』『候補未commit』は統合前の状態。現在の統合作業を禁止/完了とする指示ではない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "同じtask-2に置かれたca-*.md/証拠JSON/logを指す元の相対リンクを保持。閲覧版はengineering/current-main-issue-audit-20261015.md。",
+          "relative_inline_link_count": 10,
+          "unresolved_from_archive_count": 10,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "102b62e20f745aaeb2e82f927a138a2625d2a7ae43e25379ca8c88ababbe1b07",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ca-next-direction-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "一料理照合と次手に関する統合前の提案原稿",
+      "read_evidence": {
+        "lines": 67,
+        "bytes": 10378,
+        "sha256_after_full_read": "ff1ce64ad406d23b2a1b37381defdd3ce34869a6fa4e478e30d641bd3c294c0c",
+        "read_ranges": [
+          "1-67"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "冒頭・これからの順序・事業として何を確かめたいか",
+          "finding": "机上照合→別途許可後の一店/最近の一変更の運用探索を推奨した当時の計画。現在は実店舗接触できず公開資料/事例/シナリオ調査、利用者確認は友人協力の方向。原稿の店舗接触順序は現在の作業指示にしない。"
+        },
+        {
+          "location": "残る判断・文書維持・末尾",
+          "finding": "工数/継続/支払/初見理解/訂正到達は未実証。#78の未反映、7候補未編集、repo採用は配置案という記述は統合前履歴。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "ca-*.md/received-*.md/ja-readability-*.mdの元task-2起点リンクを保持。現在の入口はproduct/clearallergy-next-direction-20261015.mdと調査方針。",
+          "relative_inline_link_count": 16,
+          "unresolved_from_archive_count": 16,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "ff1ce64ad406d23b2a1b37381defdd3ce34869a6fa4e478e30d641bd3c294c0c",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ca-next-independent-review-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "4照合資料の独立レビュー原記録・2ラウンド",
+      "read_evidence": {
+        "lines": 30,
+        "bytes": 3510,
+        "sha256_after_full_read": "fe5b77844be8fd3971089ce94e2b48bccf95ae22a1bf15765e7ccddcfafe5d0d",
+        "read_ranges": [
+          "1-30"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "Round 1・修復と確認・Round 2",
+          "finding": "F条件に現行MAY_CONTAINの対応が欠けたP2を記録し、修復後は解消・追加must-fixなしと結論。初回指摘だけを現在の残件へ戻さない。"
+        },
+        {
+          "location": "対象・実施範囲",
+          "finding": "履歴非共有の読取レビューと、元2研究計画のレビューを区別。独立レビュー通過はアプリ/DB/provider試験・店舗/友人テストの実施ではない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "対象パスはbacktickの原稿名/行参照で、ローカルMarkdownリンクはない。修復を原稿へ遡及反映する指示ではない。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "fe5b77844be8fd3971089ce94e2b48bccf95ae22a1bf15765e7ccddcfafe5d0d",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ca-next-result-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "17:16 JST時点の次手整理・保全結果原稿",
+      "read_evidence": {
+        "lines": 38,
+        "bytes": 5985,
+        "sha256_after_full_read": "82bc03252f2e3b51a5e944e3d628f4e997d5fa34c4bcf6002f42063b34ceb2d4",
+        "read_ranges": [
+          "1-38"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "推奨・成果物・主な結論",
+          "finding": "一料理の机上照合から許可後の工程探索へ進む当時の提案。現方針では実店舗接触を次手にせず、友人の初見理解と店舗効果を区別する。"
+        },
+        {
+          "location": "検証と保全・末尾",
+          "finding": "当時のCI取得/保全PASSと新規app実行なしを分離。全成果task-2内、repo未採用、23時自動再確認ではないという記述はその時点の記録。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "当時同じtask-2にあるmd/JSON/logを指す相対リンクを保持。現在の閲覧版はverification/next-direction-documents-20261015.md。",
+          "relative_inline_link_count": 12,
+          "unresolved_from_archive_count": 12,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "82bc03252f2e3b51a5e944e3d628f4e997d5fa34c4bcf6002f42063b34ceb2d4",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ca-next-verification-plan-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "六領域の未実行検証計画・原稿保存版",
+      "read_evidence": {
+        "lines": 90,
+        "bytes": 13074,
+        "sha256_after_full_read": "b07886dcf767838d5a45d08cdc1be087d6ef4e371fc34c9ca972190c6929b1a9",
+        "read_ranges": [
+          "1-90"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "進める順序・4材料変更",
+          "finding": "一店への接触・現物資料取得・実例工程観察を許可後の段階とした旧計画。現在の接触不能/公開資料精査と友人協力テストの方針へは閲覧版から導く。"
+        },
+        {
+          "location": "1入口〜6権限・実施判断の節",
+          "finding": "既存の土台/次の確認/前提/完了条件/依存が明確。専用DB/Clerk/providerやfault注入は計画条件で、原稿保存は実行許可ではない。MAY_CONTAIN/UNKNOWN、通常STOP、結果不明を区別する。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "ca-*.mdと導入v2の元task-2起点リンクを保持。現在の閲覧版はproduct/next-verification-plan-20261015.md。",
+          "relative_inline_link_count": 4,
+          "unresolved_from_archive_count": 4,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "b07886dcf767838d5a45d08cdc1be087d6ef4e371fc34c9ca972190c6929b1a9",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ca-one-dish-reconciliation-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "架空鶏料理A-Gの机上照合原稿",
+      "read_evidence": {
+        "lines": 43,
+        "bytes": 10685,
+        "sha256_after_full_read": "e9248c454c00c3f530aba6323de3ca65546938239d7c50841228d5ee705479d9",
+        "read_ranges": [
+          "1-43"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "独立条件と現在CAの対応・F/G",
+          "finding": "現物/店舗把握/CA入力/表示/許される説明を分離。FのMAY_CONTAIN＋理由/資料不足UNKNOWNと未採用二軸表示を区別し、G訂正到達の提案を現行不具合へしない。"
+        },
+        {
+          "location": "次に埋める証拠・末尾",
+          "finding": "実店舗一変更の運用探索は当時の許可後案。現在は資料/シナリオ精査で現物・店舗の実工数を実証せず、友人確認も人の理解の範囲に限定する。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "ca-*.md/received-v2.mdとclearallergy-docs-ja-main/...の元task-2起点リンクを保持。現在の閲覧版はproduct/one-dish-reconciliation-20261015.md。",
+          "relative_inline_link_count": 6,
+          "unresolved_from_archive_count": 6,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "e9248c454c00c3f530aba6323de3ca65546938239d7c50841228d5ee705479d9",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ja-readability-content-map.md.txt",
+      "full_text_read": true,
+      "classification": "代表日本語候補の用語・情報保持照合原稿",
+      "read_evidence": {
+        "lines": 45,
+        "bytes": 6605,
+        "sha256_after_full_read": "47ed245bd2fafc5177549eb3c0e85cbb8bf48eae99f3c392aceda20eb441d031",
+        "read_ranges": [
+          "1-45"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "専門用語表・原稿→本文表",
+          "finding": "STPA/Loss/Hazard等の説明とH01-H10/L01-L04/要件の保持を当時の派生候補へ対応付ける。機械照合と文章/意味レビュー、実参加者評価未実施を分ける。"
+        },
+        {
+          "location": "冒頭・末尾",
+          "finding": "cd502b2の代表候補に対する記録であり、現在の全リポジトリ全文精査や全文章の改稿完了を示すものではない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "MIT等の外部リンクを原文保持。ローカルMarkdownリンクはなく、backtickのworktree/原稿パスは作成時点の文脈。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "47ed245bd2fafc5177549eb3c0e85cbb8bf48eae99f3c392aceda20eb441d031",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ja-readability-pr78-main-plan.md.txt",
+      "full_text_read": true,
+      "classification": "PR78のmain取込前の計画原稿",
+      "read_evidence": {
+        "lines": 39,
+        "bytes": 3469,
+        "sha256_after_full_read": "c8be94606e9025d24881e63edee5486527d6e8c437bf72cea9c79512213890e7",
+        "read_ranges": [
+          "1-39"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "冒頭・新しいPR候補・対象表",
+          "finding": "#78の旧branch merge、13absent/2different blob、15文書2451行という取込前の棚卸し/計画。現在作業により取り込む対象と当時の状態を区別する。"
+        },
+        {
+          "location": "検査・提示後のcommit/push/PR段階",
+          "finding": "原稿内の判断待ち/作業分割は当時の計画。現在の直接ユーザー指示・承認を上書きする権限規則として扱わない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "Markdown相対リンクはない。対象tableは原稿内の文字列として保存し、現在の欠損一覧へ変換しない。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "c8be94606e9025d24881e63edee5486527d6e8c437bf72cea9c79512213890e7",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ja-readability-result-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "代表候補7ファイルの日本語改善結果・統合前記録",
+      "read_evidence": {
+        "lines": 79,
+        "bytes": 9706,
+        "sha256_after_full_read": "cdcaec1905c5a7db3ec60460ce0500f49e1e3c6e4f6f14d3f1f2d22fda95c61c",
+        "read_ranges": [
+          "1-79"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "基準・編集代表文書・保全/検証",
+          "finding": "3文書＋保存用4ファイルの未commit候補と旧候補、38ID/リンク/原稿保持等の当時の確認記録。全docsへの適用や実参加者の可読性評価は未実施と明記。"
+        },
+        {
+          "location": "PR78別取込・差分/ZIP・見本",
+          "finding": "13文書未反映、親確認前の未push、task-2/worktreeのZIP/diff配布は当時の状況。現在の統合作業完了/未完了は別記録で追う。見本H04は歴史的危険シナリオで現在の未修復としない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "当時のworktree/JSON/diff/ZIP/レビュー原稿へ向く元task-2起点相対リンクを保持。",
+          "relative_inline_link_count": 18,
+          "unresolved_from_archive_count": 18,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "cdcaec1905c5a7db3ec60460ce0500f49e1e3c6e4f6f14d3f1f2d22fda95c61c",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/ja-readability-rollout-plan-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "日本語改善の段階展開・意味保持手順の旧計画",
+      "read_evidence": {
+        "lines": 123,
+        "bytes": 22551,
+        "sha256_after_full_read": "206c119347994cc36a1f542d9890370c85f51927fcb3a088b884a3abbc1894e6",
+        "read_ranges": [
+          "1-65",
+          "66-123"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "優先順1-5・一編集単位・完了基準",
+          "finding": "入口→操作/ルール→内部/開発→研究判断→台帳の段階案。全文保持・否定/条件/例外/主語/時系列/根拠を逆向きに照合する考えを記す。"
+        },
+        {
+          "location": "冒頭・L83・PR78・末尾",
+          "finding": "1〜3文書目安、入口3文書から、今回は計画のみ/既存候補追加編集なし等は当時の進め方案。今回のユーザーによる全文書精査・統合の承認を制限する現行指示ではない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "clearallergy-docs-ja-main/...とtask-2生成原稿/manifestへ向く元起点相対リンクを保持。",
+          "relative_inline_link_count": 27,
+          "unresolved_from_archive_count": 27,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "206c119347994cc36a1f542d9890370c85f51927fcb3a088b884a3abbc1894e6",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/received-plans-independent-review-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "受領した最終レビューと初回/中間レビューの原文履歴",
+      "read_evidence": {
+        "lines": 192,
+        "bytes": 20165,
+        "sha256_after_full_read": "8308152fe07cf9e4021ea956c6e6b0b62004b7d02dc106db11f425e715d9f2ff",
+        "read_ranges": [
+          "1-96",
+          "97-192"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "冒頭最終結論・必須5項目・軽微編集",
+          "finding": "16:49/16:52 JSTの最終判定は必須5件解消・文書上残件なし。採用できるは今後方針としての判断で、製品技術合格/実店舗効果/公開承認ではない。"
+        },
+        {
+          "location": "L33以後の中間・初回履歴・最小次手",
+          "finding": "後段の残件3点/必要追記/旧F条件指摘は当時の履歴で、現在の未解決としない。一店実例接触の許可後案は現方針で更新される。スポットチェックは当時の外部確認として保存する。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "外部sourceリンクのみでローカルMarkdownリンクはない。READMEと受領状況から最終判定/履歴・閲覧版へ導く。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "8308152fe07cf9e4021ea956c6e6b0b62004b7d02dc106db11f425e715d9f2ff",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/received-research-status-20261015.md.txt",
+      "full_text_read": true,
+      "classification": "7受領原稿の版・取得来歴の記録",
+      "read_evidence": {
+        "lines": 15,
+        "bytes": 2711,
+        "sha256_after_full_read": "f10070de09d11e122d237ce33d1428863d6b9cca593995f454026676b26bc533",
+        "read_ranges": [
+          "1-15"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "v1/v2状態表・最終レビュー扱い",
+          "finding": "v1は旧版、v2は文書上の必須指摘解消、最終reviewを現在とし後段を履歴にする区分が明確。これは受領時の文書状態で、実店舗/友人テスト実施ではない。"
+        },
+        {
+          "location": "本文共有/復元/照合記録",
+          "finding": "Library新規取得・byte一致ではなく、保存メッセージ全文/20,000文字＋続きからの取得範囲を区別。原稿の採用/機能変更を承認しない限定を保持する。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "当時同一task-2にあるreceived-*.mdと照合JSONへの相対リンクを保持。保管先は.md.txtであり非解決は仕様。",
+          "relative_inline_link_count": 7,
+          "unresolved_from_archive_count": 7,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "f10070de09d11e122d237ce33d1428863d6b9cca593995f454026676b26bc533",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/received-safety-understanding-plan-20261015-v1.md.txt",
+      "full_text_read": true,
+      "classification": "安全・初見理解計画の旧受領版v1（後続修正版あり）",
+      "read_evidence": {
+        "lines": 285,
+        "bytes": 24069,
+        "sha256_after_full_read": "3304c2151e02cb2cc8b3b7b2b7dcd94eb2191a084378b6841581d93ae9445e5f",
+        "read_ranges": [
+          "1-145",
+          "146-285"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "共通台帳・C/E/F/G・主課題・§8",
+          "finding": "連続台帳に沿うF条件、明日課題、Cの繁忙/不在/無信号、最小試験の一括性は後続reviewで修正対象となった旧表現。現在の正解台帳/未解決課題として再使用しない。"
+        },
+        {
+          "location": "全体・出典・技術/食品境界",
+          "finding": "未採用表示候補/訂正経路の研究案で現行CA/CAN EATを検証していない。既知使用を残す案と現行公開ゲートの差は仕様欠陥と認定しない。店舗接触/実食/人試験は未実施。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "外部リンクのみ。原稿は訂正せず、v2・最終review・閲覧版と現調査方針へREADMEから導く。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "3304c2151e02cb2cc8b3b7b2b7dcd94eb2191a084378b6841581d93ae9445e5f",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/received-safety-understanding-plan-20261015-v2.md.txt",
+      "full_text_read": true,
+      "classification": "安全・初見理解計画の修正受領版v2（未実行研究提案）",
+      "read_evidence": {
+        "lines": 378,
+        "bytes": 37203,
+        "sha256_after_full_read": "4286a521f8e423112c6182863cb37e0d596e5b6a4cbf4458e7c5b2de940c5c2f",
+        "read_ranges": [
+          "1-126",
+          "127-252",
+          "253-378"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "§2・§3C・§5・§6・§8/改訂記録",
+          "finding": "A-G独立台帳、F/F2、E範囲不足/完全欠落、12:00現在、G1-G3、C0-C2、分母/初見と援助後、段階/停止対象の修正が実際に本文にある。旧版指摘を未解決へ戻さない。"
+        },
+        {
+          "location": "§3F/G・段階2-4・冒頭",
+          "finding": "二軸表示や訂正到達経路は未採用研究案。現行MAY_CONTAIN方針への対応は別の一料理照合で行う。一店運用探索/当事者/支援技術対象の将来計画は、現在の公開資料調査・友人協力方向と分け、店舗負担/事故低減を実証した扱いにしない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "外部リンクのみ。原稿を現在方針へ改稿せず、README経由でv2閲覧版・技術照合・調査方針へ導く。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "4286a521f8e423112c6182863cb37e0d596e5b6a4cbf4458e7c5b2de940c5c2f",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/received-shop-adoption-plan-20261015-v1.md.txt",
+      "full_text_read": true,
+      "classification": "店舗導入・更新継続計画の旧受領版v1",
+      "read_evidence": {
+        "lines": 138,
+        "bytes": 15695,
+        "sha256_after_full_read": "3412ee9b6d0dec7c53a44c4bcb206efe00256fd6ecb3b32da2314c39a2c335c5",
+        "read_ranges": [
+          "1-138"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "§4-7",
+          "finding": "一店実例、比較CA案/現行CA、順序交換、辞退店の分母、誤認時停止は後続reviewで明確化された旧版。現在の未解決指摘や実施台本へそのまま使わない。"
+        },
+        {
+          "location": "§1-3・§8・出典",
+          "finding": "A-C分類/時短/支払/競合優位は仮説・未実証。実店舗接触を許可後の次手とする当時案は現在方針で更新。競合発表は当時の出典として保存し、最新価格/効果へ格上げしない。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "外部URLのみ。相対リンクの修正は不要。v2/最終review/現方針への案内をREADME側で示す。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "3412ee9b6d0dec7c53a44c4bcb206efe00256fd6ecb3b32da2314c39a2c335c5",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/20261015-main-integration/received-shop-adoption-plan-20261015-v2.md.txt",
+      "full_text_read": true,
+      "classification": "店舗導入・継続計画の修正受領版v2（未実行提案）",
+      "read_evidence": {
+        "lines": 183,
+        "bytes": 22417,
+        "sha256_after_full_read": "1af435bd82092603fe16d6948367bb02c38cd06bc8a111aefdc5f26066b73d7e",
+        "read_ranges": [
+          "1-94",
+          "95-183"
+        ],
+        "method": "UTF-8の本文を実際に出力して全文精査。複製でも個別に読んだ。hashは読了後の保管状態記録で、全文読了の代用ではない。"
+      },
+      "findings": [
+        {
+          "location": "段階表・比較固定・分母/未完了・停止・変更記録",
+          "finding": "現行CA/研究者代行/将来案/紙を分離、学習の限界、募集と着手/完了の分母、問い合わせ増加・移行退出費用、実公開と模擬原因調査の停止対象が明記される。文書修正を実施結果へしない。"
+        },
+        {
+          "location": "段階2・店への質問・停止点",
+          "finding": "許可後の一店/実例観察を次手にした当時提案。現在は接触不能のため公開資料/シナリオで精査し、友人理解確認から実店舗の工数/継続/支払を推定しない。Library更新予定も当時の状態として保持。"
+        },
+        {
+          "location": "相対リンクの保存仕様",
+          "finding": "外部URLのみ。原文は修正せず、閲覧版・受領状態・現調査方針へREADMEから導く。",
+          "relative_inline_link_count": 0,
+          "unresolved_from_archive_count": 0,
+          "classification": "元起点のままの原文保存。保管先からの非解決を閲覧版のリンク不備として数えない。"
+        }
+      ],
+      "action": "本文・改行・byteを保持。閲覧版への導線をoriginals/READMEへ追加。",
+      "unverified": [
+        "外部原典・live GitHub・実装/DB/provider/ブラウザの新規検証、実参加者/実店舗/実食品試験は未実施。本文の過去の実行/原典確認/レビュー報告はその時点の記録として読んだ。実際の一般読者の理解度は未評価。"
+      ],
+      "reviewer": "docs_originals_audit",
+      "audit_recommendation": "原稿本文・改行・URL・相対リンクを一切変更しない。docs/research/originals/README.mdから原稿/閲覧版/版の状態と、現在の調査・友人テスト方針へ案内する。",
+      "reviewed_final_sha256": "1af435bd82092603fe16d6948367bb02c38cd06bc8a111aefdc5f26066b73d7e",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/originals/README.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "原稿18件の保存目的、16件のhash、閲覧版対応、相対リンクが元起点のままである理由を記載。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "原稿18件の保存目的、16件のhash、閲覧版対応、相対リンクが元起点のままである理由を記載。",
+      "reviewed_final_sha256": "8c468958c9a1bd6181411d64fbd14a45f594b20ebe0808de39dfe51f32a1fac4",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/additional-plans-provenance-20261015.md",
+      "full_text_read": true,
+      "classification": "歴史資料・追加2計画の受領/版対応台帳",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 17,
+      "bytes": 3362,
+      "sha256": "a35f8b6c65eb26427213a737ada4ad400760f841b9cf1df2f7ec371670721ca3",
+      "findings": [
+        "v1旧版/v2解消/最終レビューを明確に区別。Library再取得でなく親本文共有、部分取得の接続と22,775文字の照合、byte同一と文字同一の差を残している。",
+        "当時の既存docs候補には書き込んでいないという記録と、今回repoへ収録した事実は配置注記で区別される。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "保存メッセージやLibrary identityの再取得は今回行っていない。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 3,
+          "target": "../originals/20261015-main-integration/received-research-status-20261015.md.txt",
+          "file_exists": true
+        },
+        {
+          "line": 3,
+          "target": "../product/research-and-friend-testing-policy-20261015.md",
+          "file_exists": true
+        },
+        {
+          "line": 9,
+          "target": "../originals/20261015-main-integration/received-safety-understanding-plan-20261015-v1.md.txt",
+          "file_exists": true
+        },
+        {
+          "line": 10,
+          "target": "../originals/20261015-main-integration/received-shop-adoption-plan-20261015-v1.md.txt",
+          "file_exists": true
+        },
+        {
+          "line": 11,
+          "target": "../literature/safety-understanding-plan-20261015.md",
+          "file_exists": true
+        },
+        {
+          "line": 12,
+          "target": "../literature/shop-adoption-plan-20261015.md",
+          "file_exists": true
+        },
+        {
+          "line": 13,
+          "target": "provided-plans-independent-review-20261015.md",
+          "file_exists": true
+        },
+        {
+          "line": 17,
+          "target": "../../verification/evidence/20261015-next-direction/ca-received-original-check-20261015.json",
+          "file_exists": true
+        },
+        {
+          "line": 17,
+          "target": "../../verification/evidence/20261015-next-direction/ca-received-v2-text-provenance-20261015.json",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "v1/v2/レビュー/受領照合JSONへの導線を保持し、文字の復元確認をLibrary原ファイルのbyte一致へ昇格しない。"
+      ],
+      "reviewed_final_sha256": "a35f8b6c65eb26427213a737ada4ad400760f841b9cf1df2f7ec371670721ca3",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/allergen-semantics.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L13"
+      ],
+      "classification": "研究当時のアレルゲン状態の意味・実装gap記録",
+      "assessment": {
+        "日本語": "状態の違いは日本語の括弧で補足され分かりやすい。",
+        "略語初出": "EX/D/X、API/SQLや関数名は他文書前提。",
+        "主語条件結論": "登録値・証拠軸・店舗補足・到達性の違いを明示。",
+        "入口リンク": "現行rulesへのリンクあり。研究索引や後続結果へのリンクなし。",
+        "冗長さ": "短く、意味保持に必要な説明。",
+        "情報保持": "FREEの限界、STORE_HANDLEDの意味、対象外と反例の条件を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L9-L11",
+          "finding": "EX01とD01改善案を現在形で述べるが、研究索引・主張台帳には後続I01結果がある。歴史的gapと現在の状態を区別する必要がある。",
+          "entry_note_candidate": "当時の意味分析として案内し、後続I01・現行rulesへの照合先を添える。"
+        },
+        {
+          "location": "L13",
+          "finding": "29/9+20とX16は研究時点の対象と制度資料の説明。現行の品目数や法的適合を今回再確認した説明ではない。",
+          "entry_note_candidate": "固定数値は記録時点であり、現行対象は共通ルール/マスターで確認すると入口で案内する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "5fa51e236180369ddeeca602997764b3a45de11ba1ece175b89f702b71816368",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/ca-overnight-decision-memo.md",
+      "full_text_read": true,
+      "classification": "歴史資料・夜間5原稿を統合した意思決定メモ",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 201,
+      "bytes": 32503,
+      "sha256": "7b53a324224b7333c2175dcfb788ed955865f386483194101b88585c30582808",
+      "findings": [
+        "対象main e26b6088…、報告10:00 JSTの当時記録。冒頭/§5/§8で#73/#74を次の改修として提案しており、現在cd502b…とは進捗が異なる。",
+        "入口の統合稿と原稿の全文保持の関係は明示。§7は元ファイル名の文字列で、相対リンクではないため索引経由の導線が必要。",
+        "CAS/DTO/STOP/SLA/bfcache/AND/HD等の語が多い。現在の店舗接触なし条件と、過去の限定現場案を分ける必要がある。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "統合稿を歴史資料として省略せず保持。現行索引から最新方向性・main監査・友人テストへ優先して案内し、#73/#74を再実装候補に戻さない。"
+      ],
+      "reviewed_final_sha256": "7b53a324224b7333c2175dcfb788ed955865f386483194101b88585c30582808",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/ca-overnight-independent-review.md",
+      "full_text_read": true,
+      "classification": "歴史資料・夜間調査5稿の反証レビュー",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 151,
+      "bytes": 18688,
+      "sha256": "22e781017c81ebebfb507542677b908685c8b293eb5ec0accbb8a3457f20a4a1",
+      "findings": [
+        "初回R1〜R11と00:35/00:36 JSTの改稿確認が併存するが、17試験→25試験の時点差や修復済みを末尾で説明している。",
+        "外部スポット監査と全原典/コード/本番未監査を区別。103行に現行法より電話が減るという語があり、前後文脈では現行方式との比較の意図に見えるが、法制度比較と紛らわしい。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "103行の現行法が誤記かどうかは提供者へ未確認。"
+      ],
+      "local_inline_link_file_checks": [],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "全文を履歴として保持し、後段の最終確認を読める入口を示す。現行法という語の解釈を採用判断の根拠にせず、原稿の軽微な表記留保として記録する。"
+      ],
+      "reviewed_final_sha256": "22e781017c81ebebfb507542677b908685c8b293eb5ec0accbb8a3457f20a4a1",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/clearallergy-followup-20261014.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L87"
+      ],
+      "classification": "2026-10-14追加調査の訂正統合版・未採用検証提案の入口",
+      "assessment": {
+        "日本語": "平易な日本語で、読む順序・支持範囲・限界が明確。",
+        "略語初出": "FSA/RCT/ITT/OR/GS1/OCR等の展開がない。",
+        "主語条件結論": "事実・研究の効果・推論・未採用を明確に分離。",
+        "入口リンク": "3詳細文書、先行原稿、現行ガイドへの導線が充実。",
+        "冗長さ": "出典の境界を繰り返すが誤読防止に意味がある。",
+        "情報保持": "訂正の条件・母集団・数値・原典未再取得の留保を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L61-L85",
+          "finding": "3〜5店の探索、原情報の取得、実店舗の継続観察という将来案がある。L57で実行指示でないと明示済みだが、現行検証順序として取り込むと店舗接触を伴う。",
+          "entry_note_candidate": "上位の研究入口で『当時の検証提案を保持。現在は店舗へ接触せず、店舗側は公開資料・事例・シナリオ、利用者側は友人協力の探索』と区別する。"
+        },
+        {
+          "location": "L12,L45-L49,L67",
+          "finding": "FSA RCT、ITT、OR、GS1、OCRを初読で理解できる説明はない。統計上の留保自体は具体的。",
+          "entry_note_candidate": "研究入口に略語と比較対象の簡単な説明を置く候補。出典照合結果や数値は削らない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "963a36c33cb12b18d223ccfbabcb22229a12498240e13626687783814bd23e49",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/clearallergy-next-direction-20261015.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "元の全文を原稿に保存し、現在の次手を公開資料精査・友人テストへ本文更新。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "元の全文を原稿に保存し、現在の次手を公開資料精査・友人テストへ本文更新。",
+      "reviewed_final_sha256": "844fad01f4b5c324374274f30eb9ad97fa7ad1460b412f4f433e0a01a25c6930",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/clearallergy-update-workflow-20261014.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L120",
+        "L121-L231"
+      ],
+      "classification": "2026-10-14原稿を全文保存した未採用の更新運用設計案",
+      "assessment": {
+        "日本語": "場面別の責任者・根拠・影響・保留・再公開は具体的で自然。",
+        "略語初出": "OWASP/OCR/AI/CDN/HACCP等の展開なし。",
+        "主語条件結論": "確認事実・提案・未検証を分離し条件付きの判断を明示。",
+        "入口リンク": "原稿自体に研究索引・現行ガイドへの導線なし。出典は末尾に保持。",
+        "冗長さ": "冒頭にH1が3つ連続。場面ごとの同じ項目は比較に有用。",
+        "情報保持": "原稿全文と出典・例外・限界を削減しない。"
+      },
+      "findings": [
+        {
+          "location": "L1,L6,L8",
+          "finding": "原稿の外側のタイトルと内部の大見出しが連続し、何の階層か初読で迷いやすい。全文保存資料として本文を整理し直さない。",
+          "entry_note_candidate": "研究入口で『原稿を全文収録した参考資料』と示し、要点は1節、検証候補は8節へ案内する候補。"
+        },
+        {
+          "location": "L45-L76,L162-L176,L210-L222",
+          "finding": "公開・作業の新状態、多店舗・承認・検索索引・CDNへの反映を設計候補として列挙する。現行機能・必須測定・今回の作業範囲ではない。",
+          "entry_note_candidate": "上位入口に未採用の業務案であり現行rulesと照合すること、店舗実査・接触を今は行わないことを示す。"
+        },
+        {
+          "location": "L206,L222-L231",
+          "finding": "店舗試用後に品質/負担の数値を決める提案と専門家確認の必要性が残る。今回の文章監査から効果・適法性を確認済みとしない。",
+          "entry_note_candidate": "未測定・未検証の留保を入口でも保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "fe7258e360deccecb33082e79b53326e658eb1b276f6976002d1188c572ed137",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/friend-user-test-20261015.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "既存小丼を使う未実施の手順。初回・標準質問・援助、真値分離、記録と削除の案を具体化。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "既存小丼を使う未実施の手順。初回・標準質問・援助、真値分離、記録と削除の案を具体化。",
+      "reviewed_final_sha256": "80b75c8f3ac79b80cd056f26fda32310c255e8eaa1384eecb477022dba14fc6c",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/friend-user-test-record-sheet-20261015.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "未実施の匿名空票。役割・版・初回・援助・判定不能を分離し、回答をGit管理しない。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "未実施の匿名空票。役割・版・初回・援助・判定不能を分離し、回答をGit管理しない。",
+      "reviewed_final_sha256": "431a9e81b46d84c4c3440036754f4396acc3e2dda5ef060bee0f5e2539516479",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/ingredient-change-trial-20261015.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L80",
+        "L81-L160"
+      ],
+      "classification": "2026-10-15一料理演習の進行役用草案・補助確認の記録",
+      "assessment": {
+        "日本語": "目的・準備・条件・期待結果・未実施を具体的に説明。",
+        "略語初出": "fixture/loopback/DTO/CAS/SHA/STOP/nav、#73/#74等に技術前提あり。",
+        "主語条件結論": "操作者と進行役、初回と補助後、部品確認と参加者実施を明確に分離。",
+        "入口リンク": "fixture・空票・研究索引へリンクあり。D/U参照の定義は末尾まで辿る必要。",
+        "冗長さ": "同じ留保を複数章で繰り返すが観察を誤計上しない目的がある。",
+        "情報保持": "架空資料・初回回答分離・全分岐・未測定・固定SHAを保持する。"
+      },
+      "findings": [
+        {
+          "location": "L23-L41,L95-L104,L145-L160",
+          "finding": "進行役用の技術資料であり、初読者にはfixture/loopback/DTO/CAS/STOP、D/Uの参照が重い。ID群の出所は末尾で区別されている。",
+          "entry_note_candidate": "入口に『進行役用。操作者へ丸ごと配らない』と明示し、fixture=隔離した演習画面、STOP=公開停止など主要語の読み方を短く添える候補。"
+        },
+        {
+          "location": "L65,L137-L145",
+          "finding": "参加者実施・同意等は未了、13群は合成データの補助確認である。固定SHA・#73/#74の照合条件もあり、現在すぐ実施済みと扱えない。",
+          "entry_note_candidate": "現行入口で準備済みと参加者実施未了を分け、友人協力は現行の検討方向であると示す。人数・対象者・実施条件をこの草案だけで確定しない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "c38f3bdb00e9f40aaa26085ec09fc011432b4356d2fc13c9a51d7437b67c9b8d",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/ingredient-change-trial-fixture-20261015.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L65",
+        "L66-L128"
+      ],
+      "classification": "2026-10-15演習fixtureの設計・限定実行記録",
+      "assessment": {
+        "日本語": "操作条件と検証限界は具体的。実装者向け用語が多い。",
+        "略語初出": "DTO/CAS/SHA/HTTP/CSS/GET/POST等の展開なし。",
+        "主語条件結論": "実コンポーネント・合成保存・真値台帳・実DBの境界を明示。",
+        "入口リンク": "台本・空票・実行記録・研究索引・開発手順へリンクあり。",
+        "冗長さ": "隔離条件の繰り返しは漏洩防止・証拠区分に意味がある。",
+        "情報保持": "状態表・通信条件・実行時点・hash・未実施範囲を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L3,L37,L76,L85,L93,L116-L120",
+          "finding": "実装/補助検証済みの記録と『#74で確定する』『後続実装で決める』等の設計時文が同居する。どれが現在の起動条件か単独読者には追いにくい。",
+          "entry_note_candidate": "入口で設計と当日の実行記録を保存する文書と示し、起動手順と準備実行記録を分けて案内する。今回コードを再実行して確認済みとはしない。"
+        },
+        {
+          "location": "L77",
+          "finding": "S7のラベル『公開下書き』に対し説明は『最初から未公開』。公開中の下書きと誤読しやすい。",
+          "entry_note_candidate": "本文は改稿せず、入口でS7は未公開・確認記録なしの条件と補足する候補。"
+        },
+        {
+          "location": "L25-L29,L98-L99",
+          "finding": "token/DTO/loopback等の分離説明は実装者向け。操作者用の読み物として配ると技術用語と採点条件が混ざる。",
+          "entry_note_candidate": "進行役/実装者用資料と明示し、操作者へ渡すのは条件に割り当てたカードだけと入口で案内する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "bd43bae2f6d3629f48f28e4860d1767ccb36cee08c975f7b499da11195a3c004",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/ingredient-change-trial-record-sheet-20261015.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L103"
+      ],
+      "classification": "演習の匿名空記録票・結果未記入の原票",
+      "assessment": {
+        "日本語": "記入項目と注意が具体的で自然。",
+        "略語初出": "SHA/fixture/loopback/token等は併用台本・設計書を前提。",
+        "主語条件結論": "空票・予行・参加者観察・初回/補助後・未実施を明確に区別。",
+        "入口リンク": "台本・設計書へ直ちに進める。",
+        "冗長さ": "必要数複製と計測時のみ記入を明示。誤計上防止の注意は保持が適切。",
+        "情報保持": "匿名化・未完了の分母・真値台帳・観察限界を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L3-L7,L13-L25,L69,L101-L103",
+          "finding": "未記入、役割、同意、任意の時間測定、未実施・判定不能の扱いが明確で、独立した可読性上の重大欠落は見つからない。",
+          "entry_note_candidate": "本文は保持でよい。上位の演習入口で友人の店舗作業役と実店舗担当者の参加を混同しないよう案内する。"
+        },
+        {
+          "location": "L71-L87",
+          "finding": "現物相当のカードとアプリ状態を別欄で残す設計は、実物確認・実DB・実連絡を実施したと誤ることを防いでいる。",
+          "entry_note_candidate": "この区分を簡略化で削除しない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "保持",
+      "reviewed_final_sha256": "06db8ba635056616896fbccd1aa3a83181918f73c026c22d97b0c3c8ad068c44",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/next-direction-independent-review-20261015.md",
+      "full_text_read": true,
+      "classification": "歴史資料・cd502b固定の次手照合レビュー",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 32,
+      "bytes": 3969,
+      "sha256": "ca01fbfe6f260fe1b108ddd6827d8f35218c9e871c2d90ba963ca6c8ca4f10a5",
+      "findings": [
+        "固定main/レビュー範囲/読取専用/未実行を明示。Round1のF条件P2とRound2解消を併記し、現在の未解決として再掲しない。",
+        "元ca-*.md名と行番号は17:16 JST時点の対象原稿を指す。repo配置後のファイル名・新配置注記で行番号はずれるため索引から現行派生先へ案内が必要。",
+        "11文書/67リンク/28コード参照の件数は当時の静的検査で、今回の全repo精査やCI結果ではない。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 3,
+          "target": "../originals/20261015-main-integration/ca-next-independent-review-20261015.md.txt",
+          "file_exists": true
+        },
+        {
+          "line": 3,
+          "target": "../product/research-and-friend-testing-policy-20261015.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "当時の修復履歴を保持。最新PRの独立レビューと静的検査は別記録に残し、過去の解消判定を今回の全差分合格として再利用しない。"
+      ],
+      "reviewed_final_sha256": "ca01fbfe6f260fe1b108ddd6827d8f35218c9e871c2d90ba963ca6c8ca4f10a5",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/next-verification-plan-20261015.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "6領域の実装・未確認を保持し、実店舗探索を現在の必須次手から外した。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "6領域の実装・未確認を保持し、実店舗探索を現在の必須次手から外した。",
+      "reviewed_final_sha256": "0882742b2ea8d53dd78b96596c5b03b45fc5bce6c61f63575f33a76c227decfe",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/one-dish-reconciliation-20261015.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "A〜Gの静的照合と実行済み小丼の区別を保持。次の証拠取得順序を現在方針へ更新。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "A〜Gの静的照合と実行済み小丼の区別を保持。次の証拠取得順序を現在方針へ更新。",
+      "reviewed_final_sha256": "51662d2b18de0620d0566ecfbd264638bee5ddc0646a8bc062e2dd1086dc0de1",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/overnight-source-provenance-20261015.md",
+      "full_text_read": true,
+      "classification": "歴史資料・7原稿のLibrary取得/保持台帳",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 19,
+      "bytes": 3544,
+      "sha256": "0c54f06ccc106194fd1b06549fb99e1969e2ec9e9bf1a00dd05f9a483f4ecb48",
+      "findings": [
+        "Library identity/版/byte/SHA256とWindows/WSLの保存境界を明示。全原典再監査ではないこと、原稿の未確認を現行欠落としないこともある。",
+        "byte同一を維持する7原稿と、後続の現行監査を分ける重要な入口。xattrs/helper等の保存用語は一般読者向け用語案内があるとよい。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。",
+        "本監査はLibrary/WSLメタデータを再取得していない。ここでの読了は来歴の独立実証ではない。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 9,
+          "target": "../literature/ca-overnight-competition.md",
+          "file_exists": true
+        },
+        {
+          "line": 10,
+          "target": "../literature/ca-overnight-adoption.md",
+          "file_exists": true
+        },
+        {
+          "line": 11,
+          "target": "../literature/ca-overnight-discovery.md",
+          "file_exists": true
+        },
+        {
+          "line": 12,
+          "target": "../literature/ca-overnight-integrity.md",
+          "file_exists": true
+        },
+        {
+          "line": 13,
+          "target": "../literature/ca-overnight-security-operations.md",
+          "file_exists": true
+        },
+        {
+          "line": 14,
+          "target": "ca-overnight-decision-memo.md",
+          "file_exists": true
+        },
+        {
+          "line": 15,
+          "target": "ca-overnight-independent-review.md",
+          "file_exists": true
+        },
+        {
+          "line": 19,
+          "target": "../engineering/open-issues-current-code-20261015.md",
+          "file_exists": true
+        },
+        {
+          "line": 19,
+          "target": "../README.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "台帳と7原稿の本文ハッシュを統合担当の保持検証と照合する。既存記録を現在の新規Library取得と説明しない。"
+      ],
+      "reviewed_final_sha256": "0c54f06ccc106194fd1b06549fb99e1969e2ec9e9bf1a00dd05f9a483f4ecb48",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/provenance-freshness.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L12"
+      ],
+      "classification": "研究当時の食品確認根拠・情報経過時間の設計候補",
+      "assessment": {
+        "日本語": "更新日時と食品確認日時の違いは明快。",
+        "略語初出": "R/X/HD、revision/metadata等が未説明。",
+        "主語条件結論": "A/B/Cの条件・費用・判断保留を区別。",
+        "入口リンク": "研究索引・現行公開ルール・ID定義へのリンクなし。",
+        "冗長さ": "短く、候補比較も必要な範囲。",
+        "情報保持": "日時の違い・未申告変更・未承認期限・候補の留保を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L3-L12",
+          "finding": "『現在のupdatedAt』と再確認メタデータの候補は研究当時の説明。日付と現行ガイドへのリンクがなく、現在の食品確認機能を説明する文書に見えやすい。",
+          "entry_note_candidate": "研究入口で当時の設計案と明記し、現行の食品確認・公開ルールを別に案内する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "7ec1cdc0c20dc342a90d1f4376782f28838cdef06ba8f4d9932ff22b77c8df4e",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/provided-plans-independent-review-20261015.md",
+      "full_text_read": true,
+      "classification": "歴史資料・提供2計画の最終/中間/初回レビュー",
+      "reviewer": "docs_literature_audit",
+      "review_completed_utc": "2026-10-15T14:42:17.740332+00:00",
+      "review_scope": "実際の全文閲読。外部原典の再調査・アプリ/DB/providerの実行検証は含めない。",
+      "lines": 194,
+      "bytes": 20631,
+      "sha256": "4e1883c9f1cafafac126dcd5f4f6442338407ad3a2d482bd864bd8e4b20c69bf",
+      "findings": [
+        "冒頭に16:49/16:52 JSTの最終解消を置き、後段の初回/中間残件は当時の記録と明示する。二つの現在という語が時点の違う節にあり、最終冒頭を優先して読む案内を維持する必要がある。",
+        "今後方針として採用できるという当時の文書判定は、店舗実施/技術合格/公開承認ではない。追加反復レビュー不要という文は当時の計画指摘5項目に限定される。",
+        "引用案が &gt; の文字で保持されており、Markdown blockquoteとしては描画されないが原稿の履歴は読める。"
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部URLの到達、引用先の本文・数値・現行性は今回再調査していない。文献原稿を読了したことを全原典の再検証と同一視しない。",
+        "アプリ、DB、認証provider、実店舗、人への試験、食品安全、公開状態の確認はこの監査の対象外。",
+        "下記のローカルリンク検査はinline Markdownリンクの参照ファイル実在のみ。見出しanchor、裸のパス・ファイル名、外部URLは別途確認が必要。"
+      ],
+      "local_inline_link_file_checks": [
+        {
+          "line": 3,
+          "target": "../originals/20261015-main-integration/received-plans-independent-review-20261015.md.txt",
+          "file_exists": true
+        },
+        {
+          "line": 3,
+          "target": "../product/research-and-friend-testing-policy-20261015.md",
+          "file_exists": true
+        }
+      ],
+      "local_inline_link_missing_files": [],
+      "repository_files_modified": false,
+      "audit_recommendation": [
+        "最終判定・指摘理由・中間履歴をすべて保持。現在の実店舗接触なし条件は現行方針に反映し、この原稿の追加レビュー不要を最新PRの独立レビュー禁止と解釈しない。"
+      ],
+      "reviewed_final_sha256": "4e1883c9f1cafafac126dcd5f4f6442338407ad3a2d482bd864bd8e4b20c69bf",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/publication-model.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L22"
+      ],
+      "classification": "研究当時の公開遷移・権限モデルと文書不一致記録",
+      "assessment": {
+        "日本語": "保存と公開の違いは簡潔だが図・後半は技術用語中心。",
+        "略語初出": "D/HD、SQL/DB/enum/backfill等は未説明。",
+        "主語条件結論": "明示trueと省略時の違い、triggerとread判定の範囲を明示。",
+        "入口リンク": "現行公開ルールへのリンクあり。研究索引への直接リンクなし。",
+        "冗長さ": "図と補足に必要な範囲。",
+        "情報保持": "分岐・条件・旧記録補完の禁止・当時の不一致を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L7-L20",
+          "finding": "図が英語ラベル中心で、D03/D06の承認前の候補状態を後半で述べる。研究当時のモデルを現在の機能説明にしない読み方が必要。",
+          "entry_note_candidate": "研究索引で当時の公開モデルと案内し、現行ルールへの照合を促す。"
+        },
+        {
+          "location": "L22",
+          "finding": "HD-08の0件404/guideの不一致は当時の記録。今回の監査では現コード・guideやIssueの未解決状態を再判定していない。",
+          "entry_note_candidate": "当時の不一致として保持し、現在の製品判断待ちと断定しない注記。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "ba7c1bb82bcbb5cc6e8c8bc93f053110d896ca25bdbf816fe654f4cb820fce20",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/research-and-friend-testing-policy-20261015.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "最新ユーザー制約と、実店舗でしか確認できない未検証事項を現行方針として明記。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "最新ユーザー制約と、実店舗でしか確認できない未検証事項を現行方針として明記。",
+      "reviewed_final_sha256": "57c633c15999fc80e3fa23b9d74b286fc67d724fe3776cf28514275ddb4114f0",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/product/ux-risk.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L25"
+      ],
+      "classification": "研究当時の利用者理解・アクセシビリティ試験の未実施計画",
+      "assessment": {
+        "日本語": "狙い・課題・測定・倫理は整理されているが見出しが英語中心。",
+        "略語初出": "UX/TDD/A11Y/RQ/WCAG、power/sample/rubric等が未展開。",
+        "主語条件結論": "仮説・反対仮説・計画・実測未了・判断保留を明確化。",
+        "入口リンク": "研究索引・現行演習へのリンクなし。",
+        "冗長さ": "測定と倫理の留保は必要。初回の小演習には詳細な旧募集案。",
+        "情報保持": "母集団一般化の禁止・初回/補助後・同意・未実証を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L9-L11",
+          "finding": "当事者6–8人、保護者4–6人、店舗担当4–6人の募集計画と店舗側操作を挙げる。これは当時の案であり、現行の店舗接触なし・友人協力による利用者探索と一致しない。",
+          "entry_note_candidate": "現行入口で『店舗へ接触せず公開資料・事例・シナリオで店舗側を精査し、利用者試験は友人への協力依頼を検討する。旧人数・募集対象は採用済みでない』と明記する最重要候補。"
+        },
+        {
+          "location": "L13-L25",
+          "finding": "counterbalance、coding rubric、acceptance threshold、debrief等は専門語のまま。方法の留保は有用なので削除より入口での読み替えが適切。",
+          "entry_note_candidate": "研究入口の簡単な用語説明と、現行一料理演習へのリンクを置く候補。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "9fa18f9bc2d7cdd2cd9ae6777614803c97a04153e0eec84ec98d7f51721f5f18",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/reading-guide.md",
+      "full_text_read": true,
+      "classification": "current",
+      "reviewer": "root (authored/whole-text review)",
+      "findings": [],
+      "action": "略語・ID・時点と具体的な読み取り注意を説明。Xは外部出典であると独立レビューで修正。",
+      "unverified": [
+        "外部原典の再取得・実動作・参加者観察は未実施。独立レビューの範囲は別記録。"
+      ],
+      "audit_recommendation": "略語・ID・時点と具体的な読み取り注意を説明。Xは外部出典であると独立レビューで修正。",
+      "reviewed_final_sha256": "0abda354a371bbeebb0e1e2367fe9df307af87c7a5935bb7082951c85308ee94",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/safety/losses-hazards.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L22"
+      ],
+      "classification": "historical_derivative",
+      "assessment": {
+        "日本語": "Loss説明と表は圧縮が強く英日混在。",
+        "略語初出": "STPA、X10、SC/SR/SEC/DR、ISR等の初出説明がない。",
+        "主語条件結論": "将来scenario・発生確率未測定・反対例を明示。",
+        "入口リンク": "X10や研究索引・制約台帳へ直接進むリンクがない。",
+        "冗長さ": "短いがLoss4件を一段落へ詰めて読解負担がある。",
+        "情報保持": "L01-L04、H01-H10、反対例、未測定留保の保持が必要。"
+      },
+      "findings": [
+        {
+          "location": "L3-L5",
+          "finding": "分析手法・証拠IDの定義がないまま、Loss4件が一段落で列挙される。何を失うかとどの危険が対応するかを初読で追いにくい。",
+          "entry_note_candidate": "親の既存改稿候補に委ねる。旧本文はここでは変更しない。研究入口には分析時点・非実証の範囲を残す。"
+        },
+        {
+          "location": "L9-L22",
+          "finding": "H01の歴史的反例やH05の当時の確認記録不足は、現在の不具合断定へ読み替えない。通常経路の遮断・prototypeの限界を示す反対例は重要。",
+          "entry_note_candidate": "研究時点の危険分析として案内し、現行仕様と後続結果の照合先を置く。"
+        }
+      ],
+      "action": "原稿を別保存し、全文の平易な解説へ改稿。L/H/SC/要件ID・対応・未確認・反証条件を保持。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "48a895d66dd5c5c9cf94708781f32d61537ebb92243b9f8fc32a71b0e8048e9e",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/safety/safety-case.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L22"
+      ],
+      "classification": "研究と限定的な後続結果を結ぶ安全性の論証記録",
+      "assessment": {
+        "日本語": "保証しない範囲と限定的な主張が分かりやすい。",
+        "略語初出": "GSN、G/S/C/R/RUN/T/HD、scope等に前提あり。",
+        "主語条件結論": "Goal・仮定・限界・残存リスクを明示。",
+        "入口リンク": "研究索引・主張/証拠台帳へのリンクなし。",
+        "冗長さ": "短く、留保は削るべきでない。",
+        "情報保持": "保証対象外・否定例・検証の進展条件を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L9,L18,L20",
+          "finding": "後続C19を対象経路でSUPPORTEDとしながら、反対論は歴史的EX01を挙げ、Contextは未コミットsnapshotを指す。時点を知らない読者は現在も同じ反例が残ると受け取り得る。",
+          "entry_note_candidate": "研究と後続限定結果を記録する論証として案内し、主張台帳とRUN日付へ進ませる。"
+        },
+        {
+          "location": "L1-L5,L22",
+          "finding": "GSNの初出展開や文書の読み順はないが、G0の限定目標と証拠更新条件は明確。",
+          "entry_note_candidate": "入口でGSN-inspiredを論証の整理枠組みと説明し、安全保証・適法性の証明ではない点を維持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "9402a55274f89df368b85c638b48b2862a9cdea5623c52f59a6f12c4bb87a8e3",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/safety/safety-constraints.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L49"
+      ],
+      "classification": "研究当時の要求・不変条件と未承認候補台帳",
+      "assessment": {
+        "日本語": "SCの一段落列挙と表内の英日混在が高密度。",
+        "略語初出": "SC/SR/PR/SEC/DR/OR/AR、INV、SLA等の凡例なし。",
+        "主語条件結論": "候補の未承認状態・責任箇所・迂回経路・失敗時挙動を明示。",
+        "入口リンク": "危険分析・対応表へリンクあり。研究索引や証拠定義への直接リンクなし。",
+        "冗長さ": "情報量は必要。初読には要求表と不変条件表の順序説明が欲しい。",
+        "情報保持": "要求・例外・候補状態・機械/人の検証分類を全保持する。"
+      },
+      "findings": [
+        {
+          "location": "L5,L11-L28,L32-L47",
+          "finding": "SC01-SC10を一段落にまとめ、続けて16要求・14不変条件をID中心の表で示す。略語の初出説明やID群の見取り図がない。",
+          "entry_note_candidate": "研究入口に『危険→要求→不変条件→確認方法』の読み方とID凡例を置く候補。"
+        },
+        {
+          "location": "L9,L18-L19,L37-L49",
+          "finding": "確認revision等を未承認候補として扱う当時の状態。後続実装の存在と切り離し、現在の未承認条件をこの台帳だけで決めない。",
+          "entry_note_candidate": "研究時点の要求設計であり現行ガイド・合意と照合する旨を入口で明記する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "dfe00c1fa3333243bf1860815cae430ce5362514c794dade5c4afc731cd57414",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/safety/system-control-structure.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L25"
+      ],
+      "classification": "研究当時の制御・応答・信頼境界図",
+      "assessment": {
+        "日本語": "図の関係は明快だがラベルと後半の文章は技術用語中心。",
+        "略語初出": "CA、DB、Clerk、API、mutation等に前提あり。",
+        "主語条件結論": "制御・応答・欠けた経路・信頼境界を分離。",
+        "入口リンク": "研究索引・system-boundary・証拠台帳へのリンクなし。",
+        "冗長さ": "図と短い補足で適切。",
+        "情報保持": "人とシステムの経路・不足する応答・境界を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L5-L23",
+          "finding": "『運営』『運用者』やowner/applicationの役割を別文書の定義なしで読む必要がある。図のsupplier変更連動等の不足は当時の観察である。",
+          "entry_note_candidate": "研究入口から01-system-boundaryと併読する図として案内し、用語・時点を補う。"
+        },
+        {
+          "location": "L23-L25",
+          "finding": "技術イベント追加より先に責任と経路を定義する結論は明確。人の調査や実店舗接触の実施命令として扱わない。",
+          "entry_note_candidate": "現行の店舗側の公開資料・事例・シナリオ精査へ接続し、実接触なしを明記する候補。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "d9f4ba020721915d6b19b0e3ecccfe353618c492dcb27978fca86d4349c99b00",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/threats-to-validity.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L18"
+      ],
+      "classification": "元研究runの妥当性・限界の記録",
+      "assessment": {
+        "日本語": "限界の列は簡潔。英語の妥当性分類・測定語が多い。",
+        "略語初出": "EX/RUN/T/UX/HD、SRやauth/authz等に外部前提あり。",
+        "主語条件結論": "結論の限界を表末尾で明示。",
+        "入口リンク": "研究索引・元protocolへのリンクなし。",
+        "冗長さ": "短く、各限界は必要。",
+        "情報保持": "元runで未読・未実行だった範囲を改変しない。"
+      },
+      "findings": [
+        {
+          "location": "L9-L14",
+          "finding": "『全file逐語未読』『本runで実DB/browser未実行』『独立reviewerではない』は元研究の限界。この全文監査や後続追検証の未実施を指す文ではない。",
+          "entry_note_candidate": "2026-09-28の研究runの限界を読む文書として入口から案内する。今回の全文監査の結果と混ぜない。"
+        },
+        {
+          "location": "L3-L18",
+          "finding": "妥当性の英語分類と参照IDを解読する導線がなく、単独読者には適用対象がつかみにくい。",
+          "entry_note_candidate": "研究索引からprotocol・証拠台帳とセットで読む順序を示す候補。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "4532fb90adb0560e9bd333ab4a44c1fc7b4ef196d73521844fb8a70de80fb6cd",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/research/traceability-matrix.md",
+      "full_text_read": true,
+      "read_ranges": [
+        "L1-L26"
+      ],
+      "classification": "研究設計から検証・Issueへの歴史的対応表",
+      "assessment": {
+        "日本語": "冒頭で対応関係の目的を説明。表内は英語・ID中心。",
+        "略語初出": "SR/SEC/DR/INV/D/T/I/HD等のID凡例はない。",
+        "主語条件結論": "設計上の対応付けとpassing evidenceを区別。",
+        "入口リンク": "Issueリンクはあるが各IDの定義へのリンクが乏しい。",
+        "冗長さ": "9列表は参照には有用。初読の順路には重い。",
+        "情報保持": "行ごとの証拠・制限・未実行・closure条件を保持する。"
+      },
+      "findings": [
+        {
+          "location": "L5-L22",
+          "finding": "参照IDが定義文書へのリンクなしで並び、Expected TestとIssueの状態は後続結果の記録時点に依存する。",
+          "entry_note_candidate": "研究入口でこの表は通読用ではなく対応確認用と示し、証拠→危険→制約→検証の各台帳へ案内する。"
+        },
+        {
+          "location": "L24-L26",
+          "finding": "設計traceabilityを実行証拠としない留保とclosure条件は重要。表の簡略化で削除すると誤読が増える。",
+          "entry_note_candidate": "入口の要約にも『対応表の存在だけでは未実施の検証をPASSにしない』を保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "外部原典・医療的妥当性・法的妥当性・実店舗運用・配備の再検証はしていない。",
+        "現行コード・DB・provider・GitHubの状態を再検証していない。リンク先はローカルMarkdown参照先の存在のみ確認し、外部URL・アンカーは未確認。"
+      ],
+      "reviewer": "docs_research-history_audit",
+      "audit_recommendation": "入口注記候補",
+      "reviewed_final_sha256": "9bf71da828b11873e837cfd8767f51997b8510ce4a5b50b1961494e448921578",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/admin-menu-review-queue-20261015.md",
+      "classification": "日付付き実装・検証記録（原文保持）",
+      "findings": [
+        {
+          "location": "問題・原因・採用した変更／今回の自動回帰",
+          "detail": "最新未解決優先、記録欠損・別版の追加反例、192件から194件への更新を順に説明している。通常STOPと再確認待ちを分け、公開ゲートの変更と混同していない。"
+        },
+        {
+          "location": "一覧projectionの実DB回帰の追加／文書と未確認事項",
+          "detail": "実SQL7検査はfreeze時点UNVERIFIEDとし、架空画面検査から実店舗工数・理解・食品の正確性を推論しない。過去の件数・未確認を現行結果へ書き換えない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原ログ・画像・最終PR CIの再取得、実DB7検査の再実行、実Clerk/Blob・店舗工数・参加者理解は今回確認していない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "86cd7e9ab932151e1d882c6f3e8bc3a8671e04d6e49cc165e97bc4c2c1bf6e95",
+      "line_count": 79,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。日付・対象base・修復順・当時の未確認範囲を保持する。",
+      "reviewed_final_sha256": "86cd7e9ab932151e1d882c6f3e8bc3a8671e04d6e49cc165e97bc4c2c1bf6e95",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/admin-menu-review-queue-independent-20261015.md",
+      "classification": "独立レビュー原記録（原文保持）",
+      "findings": [
+        {
+          "location": "結論／最終追記／追加反例による2回目修復の再レビュー",
+          "detail": "最初のP2見逃し、再読と192件・194件の別時点、source hashの切替を保持している。途中の承認を後続ソースへ流用していない。"
+        },
+        {
+          "location": "追加委任: PostgreSQL一覧projection回帰とCI配線",
+          "detail": "guard拒否・型検査・lintの証拠と、実PostgreSQL未実行を分離している。略語や英語は多いが、原レビューの判断・射程を変えない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "独立レビューで参照した外部ログ・manifestの再照合、実DB/CI実行は今回行っていない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "f674964c38091ea2aa7e4794640689a0b6a9389bb0c7aab5475e6a66be70bffd",
+      "line_count": 181,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。raw review、時刻、指摘・訂正・未実施を原文のまま保持する。",
+      "reviewed_final_sha256": "f674964c38091ea2aa7e4794640689a0b6a9389bb0c7aab5475e6a66be70bffd",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/ingredient-change-trial-independent-20261015.md",
+      "classification": "独立レビュー原記録（原文保持）",
+      "findings": [
+        {
+          "location": "round 1 Must-fix／round 2・最終",
+          "detail": "資料先読み・価格固定・在庫カードのP2 3件と、その後の解消根拠を同一視せず保持している。提供13群/8画像は独立再実行と呼んでいない。"
+        },
+        {
+          "location": "維持する限界",
+          "detail": "tokenは同じOS・共有PCからの秘密保護ではなく、実店舗・参加者・時間・理解改善・工数削減は未実施と明記する。友人の店員役から実店舗運用を実証したとする記述はない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "画像の独立目視、提供ログの再採取、実参加者・実店舗・実サービスは今回未確認。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "9547b8a1be7a10e6b17d68dc53a622add983bd7f47a6916c7108924e6766f3bd",
+      "line_count": 120,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。初回指摘と修復後の原記録を保持する。",
+      "reviewed_final_sha256": "9547b8a1be7a10e6b17d68dc53a622add983bd7f47a6916c7108924e6766f3bd",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/ingredient-change-trial-preparation-20261015.md",
+      "classification": "日付付き演習準備・技術検証記録（原文保持）",
+      "findings": [
+        {
+          "location": "成果物／実行結果",
+          "detail": "repo内文書とtask-2内JSON・画像・ログの所在を分け、実行例の絶対パスを別PC共通の手順としない。13群は実部品＋合成保存の技術確認であり参加者結果ではない。"
+        },
+        {
+          "location": "未実施と残る判断",
+          "detail": "実DB・実Clerk/Blob・実公開ルート・人の観察と時間測定を未実施とし、研究25試験の合格へ拡張しない。対象者・同意等の未決も残す。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "過去の13群・8画像・serve終了を再実行していない。参加者運用・独立採点・理解・工数は今回未確認。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "9f7800cfe7f9c1e0f5d50f1d5bd15b61f9e371df5dffeac379320d809649b528",
+      "line_count": 92,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。演習準備の当時の範囲・実行パス・未実施を保持する。",
+      "reviewed_final_sha256": "9f7800cfe7f9c1e0f5d50f1d5bd15b61f9e371df5dffeac379320d809649b528",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/issue-37.md",
+      "classification": "日付付き局所修復・検証記録（原文保持）",
+      "findings": [
+        {
+          "location": "Verification／Review / Remaining gates",
+          "detail": "RED28件中4失敗、GREEN28件、全62件と当時main56件を区別し、未知値の表示反例をSQL enumへの保存実証としない。"
+        },
+        {
+          "location": "末尾段落",
+          "detail": "mainにguide/researchが存在しない旨は2026-10-04基点の事情であり、現行リポジトリの欠損と読み替えない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "最終PR CI、現在の実DB/実Clerk/Blob/配備・利用者理解を今回再取得していない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "b220b7d7c7919a302ee93aeb71cb1767133b973295a66dfbaf53959b9b856c43",
+      "line_count": 36,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。対象SHA・件数・当時の公開状態を保持する。",
+      "reviewed_final_sha256": "b220b7d7c7919a302ee93aeb71cb1767133b973295a66dfbaf53959b9b856c43",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/issue-38.md",
+      "classification": "日付付き局所修復・検証記録（原文保持）",
+      "findings": [
+        {
+          "location": "動作と境界／検証",
+          "detail": "最終writeの所有店舗条件・P2025・rollbackを限定して説明し、通常移転APIや実環境の越権成立を主張しない。API14件と実PGの対象ケースを分ける。"
+        },
+        {
+          "location": "文書の扱い",
+          "detail": "未公開guide/research、#60/#54、通常PR未mergeは当時の再開入口と運用記録として保持する必要がある。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "当時のPR/CI・実管理認証ブラウザ・現在の所有権全経路は今回再検証していない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "1e59eb5540cc6dd409e4d9cae7ef11754f42e1c2add5d4a8b794f128b3db2bcb",
+      "line_count": 27,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。過去の検証範囲・文書配置・公開条件を保持する。",
+      "reviewed_final_sha256": "1e59eb5540cc6dd409e4d9cae7ef11754f42e1c2add5d4a8b794f128b3db2bcb",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/issue-65.md",
+      "classification": "日付付き入力境界・検証記録（原文保持）",
+      "findings": [
+        {
+          "location": "変更と維持する境界／RED → GREEN",
+          "detail": "空Fileだけを拒否し、5組のRED/GREENとstub・DB mockの射程を明示する。初期fixture不足の403をRED根拠に含めない。"
+        },
+        {
+          "location": "未確認・範囲外",
+          "detail": "実Blob保存・全画像decode・破損やMIME偽装・機密性を未確認/対象外として残しており、画像安全性の保証としない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "過去テスト・実Clerk/Blob・管理ブラウザ・現在の配備を今回再実行していない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "ccafe72551cfef864b382bf85d23950089ef33f95d3155fbc2691c31978ca03f",
+      "line_count": 38,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。入力境界の当時の結果・制約を保持する。",
+      "reviewed_final_sha256": "ccafe72551cfef864b382bf85d23950089ef33f95d3155fbc2691c31978ca03f",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/menu-food-review-20261009.md",
+      "classification": "日付付き初回実装・検証記録（原文保持）",
+      "findings": [
+        {
+          "location": "冒頭／実際の結果",
+          "detail": "初回185件と後続独立レビューへの導線を分ける。静的ページの古い食品返却、動的化後のstreaming/not-found期待修正を失敗ごと保持する。"
+        },
+        {
+          "location": "残る限界と未確認",
+          "detail": "食品確認記録は入力者申告の固定で、実物・資料の真実や開いた画面への到達を証明しないと明記する。実装完了を本番運用準備へ拡張していない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "過去の実DB/ブラウザ/画面画像・現配備・食品の事実・専門家内容レビューは今回未確認。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "90f3c64495a6c6c19bcf50020af16069818b9afd7ad824fef5dae251fe058a3c",
+      "line_count": 80,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。初回時点のソース・件数・未commit/未配備と後続記録の関係を保持する。",
+      "reviewed_final_sha256": "90f3c64495a6c6c19bcf50020af16069818b9afd7ad824fef5dae251fe058a3c",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/menu-food-review-adversarial-20261009.md",
+      "classification": "敵対的レビュー・修復原記録（原文保持）",
+      "findings": [
+        {
+          "location": "レビュー方法と指摘／再レビューと判定",
+          "detail": "R1〜R3の7反例、主担当の実DBとreviewer静的確認・12テストを分離する。ローカル未コミット差分のAPPROVEを本番や実食品へ広げない。"
+        },
+        {
+          "location": "最終検証",
+          "detail": "187件と各DB/ブラウザ群、指定Node/npm版との差、ローカル成果物の所在・cleanupを具体化する。過去の承認を現在のHEADへ流用しない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原ログ・hashの再照合、現在の実Clerk/Blob・本番負荷/配備・実物確認は今回行っていない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "e58fc4878d3662f4c6f6fee088a4d069e11b9669a9727bececc0eb052b2c0942",
+      "line_count": 72,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。指摘・修復・再承認の原文と保証限界を保持する。",
+      "reviewed_final_sha256": "e58fc4878d3662f4c6f6fee088a4d069e11b9669a9727bececc0eb052b2c0942",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/next-direction-preparation-20261015.md",
+      "classification": "過去時点の文書計画・読取結果の保存版（親担当が配置）",
+      "findings": [
+        {
+          "location": "配置注記／成果物表後の段落",
+          "detail": "17:16 JST時点保存版と原稿コピーを明示する。『task-2内』『repoへの採用はまだ』は当時の記録であり、今回のrepo配置現況へ読み替えない。"
+        },
+        {
+          "location": "配置注記の現方針リンク（最終再読）",
+          "detail": "初回検査で未配置だった現方針へのリンクは、親担当が ../research/product/research-and-friend-testing-policy-20261015.md に修正・配置済み。修正後の全文を再読し、最終21件・ローカルリンク64件で対象ファイル/アンカー欠損0を確認した。"
+        },
+        {
+          "location": "検証と保全",
+          "detail": "main cd502…の既存CI203件取得と今回の読取・文書確認を区別し、人・店舗・工数・継続・支払を未実施に残す。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "既存CIや原典の再取得、現在配備・実Clerk/Blob・実店舗/利用者試験は今回再実行していない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "11daefd630a4d58c205f50491455bc15d099de41353431b01d056b6316c05fd7",
+      "line_count": 40,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "原文保持。配置注記と現方針への導線を最終再読し、ローカルリンク欠損なしを確認した。",
+      "reviewed_final_sha256": "11daefd630a4d58c205f50491455bc15d099de41353431b01d056b6316c05fd7",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/release-evidence-20261004.md",
+      "classification": "過去release対象の証拠台帳（原文保持）",
+      "findings": [
+        {
+          "location": "対象・出典・変更範囲／T02",
+          "detail": "同一main SHAのCI、collectorの別worktree、CRLF生byteとLF Git blobのhashを分け、PG9組を全DB回帰やproduction適用証明にしない。"
+        },
+        {
+          "location": "再取得方法・副作用／未確認の配備条件",
+          "detail": "同一入力の照合後にのみ旧collectorを使う条件と専用DBへの書込を明示する。現在のreleaseへ値・件数・承認を持ち越さない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原典JSON内部の全hash再計算、CI再取得、現在の配備SHA/DB/backup/alerts・実サービスは今回未確認。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "e45ae7ea605a6680f068a5f3ec2f2466f4249c37576992019c06ca905eb24330",
+      "line_count": 74,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。旧SHA・出典・collector条件・未確認を保持する。",
+      "reviewed_final_sha256": "e45ae7ea605a6680f068a5f3ec2f2466f4249c37576992019c06ca905eb24330",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/security-release-20261007.md",
+      "classification": "日付付き依存対処・承認経緯の原記録（原文保持）",
+      "findings": [
+        {
+          "location": "対象と公開の判断／現在の検証",
+          "detail": "監査13件→最初の対処10件→最終0件と、162/168件の試験を区別する。audit対象をapp lock全体に限定し、global npmや別prefix Chromiumを確認済みとしない。"
+        },
+        {
+          "location": "commit操作と公開保留の段落",
+          "detail": "当時の自動承認拒否、後のcommit/push/PR更新承認、本番公開保留を分けている。現在のGit操作許可として転用しない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "依存監査の現在結果・advisory最新状態・過去CI/Preview・現配備は今回再取得していない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "5d564b116bdd7853f89830371fad34096c6c9b58e7757a3e5510e8761f0cca57",
+      "line_count": 65,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。依存版・実行結果・当時の承認履歴を保持する。",
+      "reviewed_final_sha256": "5d564b116bdd7853f89830371fad34096c6c9b58e7757a3e5510e8761f0cca57",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/shop-menu-isolated-probe-20261015.md",
+      "classification": "隔離プローブ・方法レビュー・実行コード/JSONの原記録（親担当が配置）",
+      "findings": [
+        {
+          "location": "7ケースの結果／遮断・実測・固定値の区別",
+          "detail": "e26b6088時点のメモリPrisma・synthetic Reactの観察で、現在cd502b24への不具合認定やPG同時実行・DOM実証へ拡張しない。接続数等の一部定数と実counterを分ける。"
+        },
+        {
+          "location": "独立方法レビュー全文／隔離実行コード全文／実行結果JSON全文",
+          "detail": "全464行を読み、古い全フォームの両順序で別項目喪失、F3の成功応答限定、#74正の描画対照補強と未実施補強案を確認した。絶対パス・旧ID・コードは当日記録として保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "旧コードの再実行、現在mainの実DB/DOM/Clerk/配備・食品安全・故障頻度は今回未確認。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "266c0aaeb6fa6cd9289b5f3e0100bdae97c471e0add119f8511857e5357f8248",
+      "line_count": 464,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。実行コードとJSONを含む原文を保持する。",
+      "reviewed_final_sha256": "266c0aaeb6fa6cd9289b5f3e0100bdae97c471e0add119f8511857e5357f8248",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/shop-save-contract-20261015.md",
+      "classification": "日付付き保存契約・検証記録（原文保持）",
+      "findings": [
+        {
+          "location": "Candidate solutions → Decision／実装と維持する条件",
+          "detail": "updatedAtの当該PUT限定CASと1ms増分、旧client428・混在server非対応、結果不明時の入力保持を限定する。意味・schema・全writer保証を変えない。"
+        },
+        {
+          "location": "RED / GREEN と実行の範囲／未確認・変更しないもの",
+          "detail": "196 unit・18群の代替通信ブラウザと実DB未実行を分け、popup成功を最新DB取得へ拡張しない。研究25ケース・実店舗時短の証拠としない。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "原ブラウザ/DBログ・現在CI/実PostgreSQL・実Clerk/Blob・店舗負担/理解は今回未確認。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "55c7815b7a77de3cdcae766fd932932dedc514b1c29c09cac8db249a9d31a4e0",
+      "line_count": 55,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。当時のfreeze・検証結果・未確認を保持する。",
+      "reviewed_final_sha256": "55c7815b7a77de3cdcae766fd932932dedc514b1c29c09cac8db249a9d31a4e0",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/shop-save-independent-review-20261015.md",
+      "classification": "独立レビュー原記録（原文保持）",
+      "findings": [
+        {
+          "location": "結論／証拠の照合",
+          "detail": "コードmust-fix0と実環境検証未完了を区別し、読んだログをreviewerの独立再実行と呼ばない。最終18群と旧7/18を別時点にしている。"
+        },
+        {
+          "location": "文書・保証範囲の最終再読／残る未確認境界",
+          "detail": "当該PUT限定token、全writer日時保証なし、実DB最終HEAD/CIが必要という射程を保持する。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "元のcode/diff/logの再レビュー、現在CI/DB/実provider/本番を今回検証していない。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "80ea61ef7e75f1ea2ce535e02964881f5a14c2a4142600ead3ebf9846ef3a789",
+      "line_count": 69,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。独立読取の原記録と未確認の射程を保持する。",
+      "reviewed_final_sha256": "80ea61ef7e75f1ea2ce535e02964881f5a14c2a4142600ead3ebf9846ef3a789",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    },
+    {
+      "path": "docs/verification/shops-recovery-20261010.md",
+      "classification": "承認付き本番復旧の過去運用記録（原文保持）",
+      "findings": [
+        {
+          "location": "対象と原因／復旧とデータの保持／0件表示からの架空デモ再公開",
+          "detail": "当時の本番DBへの明示承認、2 migration・32非公開化と別承認の32再公開、5架空店舗を具体化する。実食品確認記録を捏造した扱いにせず、架空表示用と明記する。"
+        },
+        {
+          "location": "今回の検証と残る範囲",
+          "detail": "本番復旧結果は当日の対象SHA・データに限定。Neon拡張・ACL・roleの復元除外、実Clerk管理保存等未確認も残す。"
+        }
+      ],
+      "action": "原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。",
+      "unverified": [
+        "現在の本番状態、Git除外backupの存在/復元、実Clerk/Blob全工程は今回未確認。"
+      ],
+      "full_text_read": true,
+      "read_sha256": "e425710a4c786a261606aa171b6d406da648943c506bd57529815dd623583f65",
+      "line_count": 86,
+      "reviewer": "docs_operations_audit",
+      "audit_recommendation": "変更なし。過去の本番操作・承認・hash・対象データを原文保持する。",
+      "reviewed_final_sha256": "e425710a4c786a261606aa171b6d406da648943c506bd57529815dd623583f65",
+      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
+    }
+  ],
+  "local_history": [
+    {
+      "path": "C:/Users/kaito/Documents/Github/ClearAllergy/docs/audits/clearallergy-first-use-improvements-20260912.md",
+      "full_text_read": true,
+      "classification": "Git管理外の歴史的検証原稿（2026-09-12、develop時点）",
+      "findings": [
+        {
+          "location": "冒頭／選定した3つの改善／主要フローと受入結果",
+          "detail": "当時のdevelopと専用テスト環境を対象に、モバイル検索・設定部分解除・メニュー未保存保護の修正と実画面結果を記録する。実Clerk認証、架空メニュー1件の保存/公開/削除、QR表示と実印刷未確認を区別している。"
+        },
+        {
+          "location": "検証環境・コマンド／残る確認と限界",
+          "detail": "Node18での53成功1失敗とNode22/locked依存での54成功、代替ブラウザ/一時Dockerの条件、実機・Safari/Firefox・読み上げ・複数人初回レビューの未確認を保持する必要がある。本文の『現在』や過去の承認を現main・現在の許可へ読み替えない。"
+        },
+        {
+          "location": "確認した画面／docs配下.gitignoreの記述",
+          "detail": "画像フォルダと旧/tmpログはそのローカル環境の参照で、新規cloneや現mainに同梱される根拠ではない。リンク画像や原ログの存在・内容は今回検査していない。"
+        }
+      ],
+      "action": "read-onlyで全文読了。本文・canonicalを変更せず、repoへ取り込まない。現mainの仕様・検証結果・実店舗負担の根拠には使わない。",
+      "unverified": [
+        "過去の54テスト・ブラウザ8群・実認証/DB/QR・画像/ログを再実行または再採取していない。",
+        "現mainへの適用・現在のCI/本番/実サービス状態、実利用者理解・実店舗運用は今回未確認。"
+      ],
+      "hash": "28a1c44aa30832251ce8c696e811a3f4e7a0261ec0619a7064eed37c87236ce6",
+      "original_unchanged": true,
+      "line_count": 88,
+      "checked_at_utc": "2026-10-15T14:47:19.2926626Z"
+    },
+    {
+      "path": "C:/Users/kaito/Documents/Github/ClearAllergy/docs/audits/clearallergy-product-ux-audit.md",
+      "full_text_read": true,
+      "classification": "Git管理外の歴史的静的プロダクト・仕様・UX監査（調査日2026-07-17）",
+      "findings": [
+        {
+          "location": "1. 監査概要／2. エグゼクティブサマリー／4. 現行機能一覧",
+          "detail": "実ブラウザ・スクリーンショット・認証後実DB操作・Places/画像実送信が未実施と明記する。一方で『正常に機能』『店舗負担が最も大きい』『確認済み』等の表現が強く、当時の静的コード確認・推定の範囲を超えて実利用成功や負担実測と読まない。"
+        },
+        {
+          "location": "6. 詳細問題台帳 ISSUE-01〜12／9. 店舗運用負荷／10. 仕様の矛盾",
+          "detail": "READMEの地図/旧表示、未保存警告なし、確認日なし、29品目入力、提供状態案は当時の対象と判断。後続に食品確認記録・保存競合対策等があるため、現mainの未実装/欠陥一覧へ転記しない。"
+        },
+        {
+          "location": "12. 新機能提案／15. ユーザーテスト計画／16. 次の仕様判断",
+          "detail": "複製・最終確認日・確認文・提供状態の提案と店舗担当者テスト/ヒアリングは未実施の当時案。成功指標・参加人数は採択済み基準や観察結果ではなく、現在の実店舗接触不可/公開資料・事例・シナリオ精査/友人協力の方針に優先しない。"
+        }
+      ],
+      "action": "read-onlyで全文読了。旧ISSUE/FEATURE ID・評価・案・文言・日付を原文保持し、repoへ取り込まない。現行仕様や実店舗効果を証明する文書としない。",
+      "unverified": [
+        "当時のコード・画面・test定義・外部資料を現状に照合していない。",
+        "当時の『確認済み』『正常』評価の実行裏付け、利用者誤認率・店舗負担/継続・提案効果は今回未確認。"
+      ],
+      "hash": "75c08910900da82d366db04537360f86a778ea827bf3cc6cda490189df8c2735",
+      "original_unchanged": true,
+      "line_count": 705,
+      "checked_at_utc": "2026-10-15T14:47:19.3001722Z"
+    },
+    {
+      "path": "C:/Users/kaito/Documents/Github/ClearAllergy/docs/audits/clearallergy-user-centered-audit.md",
+      "full_text_read": true,
+      "classification": "Git管理外の歴史的ユーザー中心UX監査・未実施研究計画（本文に調査日/SHAの明示なし）",
+      "findings": [
+        {
+          "location": "1.3 証拠区分／1.5 制約／2. 事実と仮説",
+          "detail": "画面確認0件、ブラウザ接続不能、実利用者・DB書込・実機・専門家未実施を明示し、コードで分かるのは機能/分岐で感情/理解/行動ではないと分ける。本文に調査日や対象SHAの明示がなく、当時の『現行』を現mainへ同定できない。"
+        },
+        {
+          "location": "4〜14. 状況・JTBD・Journey A〜D・UC-P01〜04/UC-S01〜04・例外/アクセシビリティ",
+          "detail": "旧FREE緑表示、無動作共有、確認日なし、未保存保護/版付き競合なし等を前提にした静的評価である。現在の未実装や実店舗課題の実測として扱わない。『高/最優先』や『完了可能』も当時コード＋UX仮説の暫定判定。"
+        },
+        {
+          "location": "15. H1〜H15／16. インタビュー計画／17. Test 1〜6／18. 測定指標",
+          "detail": "各群6〜8名・計18〜24名面談、店舗担当者Test5/6、15%/80%等の支持/成功基準は計画案で、参加者実施・合意済み受入閾値・実運用効果ではない。友人店員役から店舗負担/資料充足/継続/問い合わせの実証へ拡張できない。"
+        },
+        {
+          "location": "19. 提言／20. 最終結論",
+          "detail": "UNKNOWN等の意味や危険側表示・URL/認証/データ契約を仮説で弱めない、摂食を伴わない架空シナリオ、推測で文言を確定しない境界を残している。当時の店舗面談/専門家への手順を現在の募集・連絡・変更許可にしない。"
+        }
+      ],
+      "action": "read-onlyで全854行を読了。分析・仮説・計画・暫定閾値を含む原文を保持し、canonicalを編集せずrepoへ取り込まない。現在の研究方針・現main根拠とは別区分にする。",
+      "unverified": [
+        "原稿の正確な調査日・対象SHA・初回作成環境を本文だけでは特定できない。",
+        "原参照コードの当時/現在照合、全Test1〜6・面談・店舗負担/誤認率・実機/視覚/読み上げ・専門家確認は今回未実施。"
+      ],
+      "hash": "bc14bff5a976b205bdc42962a4e5d7089055b8aaea2baf48bdac13b15d12d112",
+      "original_unchanged": true,
+      "line_count": 854,
+      "checked_at_utc": "2026-10-15T14:47:19.3015007Z"
+    },
+    {
+      "path": "C:/Users/kaito/Documents/Github/ClearAllergy/docs/audits/clearallergy-v1-remediation-status.md",
+      "full_text_read": true,
+      "classification": "Git管理外の歴史的v1修正・検証結果（2026-09-06）",
+      "findings": [
+        {
+          "location": "冒頭／H1〜M8／内部状態と公開表示",
+          "detail": "当時『ほぼ完成、v1完成未判定』とし、表示/入力/公開確認、専用DBと実Clerk/Blob操作を記録。PASSはその記載範囲であり食品正確性・専門家確認・実運用安全を保証しない。"
+        },
+        {
+          "location": "専用テスト環境／検証コマンドと結果／依存脆弱性の解消",
+          "detail": "専用PGと既存Clerk/Blob利用は完全分離でないこと、47件・部分的44件・専用DB4検証・browser9群と日時を区別する。deepmerge-ts限定override/audit0、起動中3101、承認経緯は当時の記録であり現在の依存安全性・サービス状態・書込許可ではない。"
+        },
+        {
+          "location": "v1 Definition of Done／全残課題4分類／主な根拠",
+          "detail": "複数人レビュー未実施を残し、実店舗導入・一般公開・本番・課金等は当時の対象外。『競合更新は完成後でもよい』等の旧優先度を現main仕様/現在の完了判断へ適用しない。/tmp成果物とGit管理外原稿は現main可搬の証拠ではない。"
+        }
+      ],
+      "action": "read-onlyで全文読了。日付・過去承認・H/M ID・PASS件数・未実施と原文を保持し、repoへ取り込まない。現在の完成/依存/実店舗運用判断の根拠にしない。",
+      "unverified": [
+        "当時ログ・専用環境/アカウント・47件/DB4/browser9群/Blob cleanup/auditの再採取は行っていない。",
+        "現在の実装・lock/依存監査・CI・外部サービス・本番や利用者レビューは今回未確認。"
+      ],
+      "hash": "f7d506703cf1ae1966dc88a8041bdc950f578bf8160c6647de42ec8d859e083f",
+      "original_unchanged": true,
+      "line_count": 210,
+      "checked_at_utc": "2026-10-15T14:47:19.3024097Z"
+    }
+  ],
+  "visual_support": [
+    {
+      "path": "docs/guide/diagrams/clearallergy-architecture.drawio",
+      "rendered_review": false
+    },
+    {
+      "path": "docs/guide/diagrams/clearallergy-architecture.svg",
+      "rendered_review": false
+    }
+  ],
+  "machine_evidence_paths": [
+    "docs/research/baseline-files.json",
+    "docs/verification/document-audit-20261015.json",
+    "docs/verification/document-integration-review-20261015.json",
+    "docs/verification/document-integration-validation-20261015.json",
+    "docs/verification/evidence/20261015-next-direction/ca-next-documents-check-20261015.json",
+    "docs/verification/evidence/20261015-next-direction/ca-next-issue-comments-20261015.json",
+    "docs/verification/evidence/20261015-next-direction/ca-next-main-ci-final-20261015.json",
+    "docs/verification/evidence/20261015-next-direction/ca-next-main-ci-final-20261015.log",
+    "docs/verification/evidence/20261015-next-direction/ca-next-open-issues-20261015-start.json",
+    "docs/verification/evidence/20261015-next-direction/ca-next-prs-20261015-start.json",
+    "docs/verification/evidence/20261015-next-direction/ca-next-static-evidence-20261015.json",
+    "docs/verification/evidence/20261015-next-direction/ca-received-original-check-20261015.json",
+    "docs/verification/evidence/20261015-next-direction/ca-received-v2-text-provenance-20261015.json",
+    "docs/verification/evidence/20261015-next-direction/ja-readability-canonical-preservation.json",
+    "docs/verification/release-evidence-20261004.json"
+  ],
+  "scope_exclusions": [
+    "dependencies/node_modules including bundled Playwright skills",
+    "installed Codex external skills",
+    "external source pages: not all re-fetched",
+    "source/config files outside prose-document scope"
+  ],
+  "independent_review": "Separate fresh read-only reviewer; receipt stored separately after final review. This inventory is not an independent reread of every source page.",
+  "reviewed_snapshot_head": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+  "snapshot_note": "10/15の129件の読了・hashはこのsnapshotに固定。10/16の追加5資料と再確認は別追補。現在ファイルとの継続的なhash一致を主張しない。",
+  "followup": "docs/research/engineering/material-change-followup-20261016.md"
+}

@@ -1,0 +1,144 @@
+{
+  "atUtc": "2026-10-15T08:17:20.520Z",
+  "files": [
+    {
+      "file": "ca-next-result-20261015.md",
+      "sha256": "82bc03252f2e3b51a5e944e3d628f4e997d5fa34c4bcf6002f42063b34ceb2d4",
+      "bytes": 5985
+    },
+    {
+      "file": "ca-next-direction-20261015.md",
+      "sha256": "ff1ce64ad406d23b2a1b37381defdd3ce34869a6fa4e478e30d641bd3c294c0c",
+      "bytes": 10378
+    },
+    {
+      "file": "ca-current-main-issue-audit-20261015.md",
+      "sha256": "102b62e20f745aaeb2e82f927a138a2625d2a7ae43e25379ca8c88ababbe1b07",
+      "bytes": 17487
+    },
+    {
+      "file": "ca-one-dish-reconciliation-20261015.md",
+      "sha256": "e9248c454c00c3f530aba6323de3ca65546938239d7c50841228d5ee705479d9",
+      "bytes": 10685
+    },
+    {
+      "file": "ca-next-verification-plan-20261015.md",
+      "sha256": "b07886dcf767838d5a45d08cdc1be087d6ef4e371fc34c9ca972190c6929b1a9",
+      "bytes": 13074
+    },
+    {
+      "file": "ca-next-independent-review-20261015.md",
+      "sha256": "fe5b77844be8fd3971089ce94e2b48bccf95ae22a1bf15765e7ccddcfafe5d0d",
+      "bytes": 3510
+    },
+    {
+      "file": "received-research-status-20261015.md",
+      "sha256": "f10070de09d11e122d237ce33d1428863d6b9cca593995f454026676b26bc533",
+      "bytes": 2711
+    },
+    {
+      "file": "received-safety-understanding-plan-20261015-v1.md",
+      "sha256": "3304c2151e02cb2cc8b3b7b2b7dcd94eb2191a084378b6841581d93ae9445e5f",
+      "bytes": 24069
+    },
+    {
+      "file": "received-safety-understanding-plan-20261015-v2.md",
+      "sha256": "4286a521f8e423112c6182863cb37e0d596e5b6a4cbf4458e7c5b2de940c5c2f",
+      "bytes": 37203
+    },
+    {
+      "file": "received-shop-adoption-plan-20261015-v1.md",
+      "sha256": "3412ee9b6d0dec7c53a44c4bcb206efe00256fd6ecb3b32da2314c39a2c335c5",
+      "bytes": 15695
+    },
+    {
+      "file": "received-shop-adoption-plan-20261015-v2.md",
+      "sha256": "1af435bd82092603fe16d6948367bb02c38cd06bc8a111aefdc5f26066b73d7e",
+      "bytes": 22417
+    },
+    {
+      "file": "received-plans-independent-review-20261015.md",
+      "sha256": "8308152fe07cf9e4021ea956c6e6b0b62004b7d02dc106db11f425e715d9f2ff",
+      "bytes": 20165
+    },
+    {
+      "file": "ja-readability-rollout-plan-20261015.md",
+      "sha256": "206c119347994cc36a1f542d9890370c85f51927fcb3a088b884a3abbc1894e6",
+      "bytes": 22551
+    }
+  ],
+  "localLinks": 82,
+  "externalLinksNotFetched": 72,
+  "commitCodeLinksChecked": 28,
+  "issueCount": 27,
+  "issueSnapshotUnchanged": true,
+  "candidateChecks": [
+    {
+      "file": "README.md",
+      "unchanged": true
+    },
+    {
+      "file": "docs/research/README.md",
+      "unchanged": true
+    },
+    {
+      "file": "docs/research/safety/losses-hazards.md",
+      "unchanged": true
+    },
+    {
+      "file": "docs/research/originals/.gitattributes",
+      "unchanged": true
+    },
+    {
+      "file": "docs/research/originals/20261015-ja-readability/losses-hazards.md.txt",
+      "unchanged": true
+    },
+    {
+      "file": "docs/research/originals/20261015-ja-readability/research-index.md.txt",
+      "unchanged": true
+    },
+    {
+      "file": "docs/research/originals/README.md",
+      "unchanged": true
+    }
+  ],
+  "oldSourceChecks": [
+    {
+      "source": "ca-overnight-competition.md",
+      "originalUnchanged": true,
+      "repoCopyUnchanged": true
+    },
+    {
+      "source": "ca-overnight-adoption.md",
+      "originalUnchanged": true,
+      "repoCopyUnchanged": true
+    },
+    {
+      "source": "ca-overnight-discovery.md",
+      "originalUnchanged": true,
+      "repoCopyUnchanged": true
+    },
+    {
+      "source": "ca-overnight-integrity.md",
+      "originalUnchanged": true,
+      "repoCopyUnchanged": true
+    },
+    {
+      "source": "ca-overnight-security-operations.md",
+      "originalUnchanged": true,
+      "repoCopyUnchanged": true
+    },
+    {
+      "source": "ca-overnight-decision-memo.md",
+      "originalUnchanged": true,
+      "repoCopyUnchanged": true
+    },
+    {
+      "source": "ca-overnight-independent-review.md",
+      "originalUnchanged": true,
+      "repoCopyUnchanged": true
+    }
+  ],
+  "failures": [],
+  "limits": "Static inline Markdown/files/approximate anchors, exact-commit code paths/line bounds, hash/snapshot checks. External reachability, rendered Markdown, app execution and study outcomes are not tested."
+}

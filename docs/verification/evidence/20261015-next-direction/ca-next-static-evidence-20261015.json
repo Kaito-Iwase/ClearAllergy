@@ -1,0 +1,251 @@
+{
+  "collectedAtUtc": "2026-10-15T08:01:37.6055614Z",
+  "sourceRoot": "C:\\Users\\kaito\\Documents\\Codex\\2026-10-14\\task-2\\clearallergy-docs-ja-main",
+  "head": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "scope": "read-only static reconciliation; no app/DB/provider execution",
+  "sourceFiles": [
+    {
+      "path": "features/admin/shop/server/adminShopRoute.ts",
+      "sha256": "D4B4FC86F65F36B3DCC59D4C46C10C815DA41C9B31B3FA74E05A036704953510",
+      "lines": 550
+    },
+    {
+      "path": "features/admin/shop/schemas/shop-response.ts",
+      "sha256": "B915E9D5A79AEC71C09115C6858CDC58973FA64C08F354AA679CBC75E08B4CCB",
+      "lines": 32
+    },
+    {
+      "path": "features/admin/shop/components/ShopEditClient.tsx",
+      "sha256": "69650DC81B31E6A5AC22B7397179C431453BB08D66668C00BA269F468BC3B5A8",
+      "lines": 1278
+    },
+    {
+      "path": "features/admin/menus/menu-list.ts",
+      "sha256": "43392840CCBFC45D3901526C3C1E4A370C397B00337963DC317E5DA397781FC8",
+      "lines": 38
+    },
+    {
+      "path": "features/admin/menus/server/menu-list-data.ts",
+      "sha256": "2687C949D1F86FC1CEC276127C8090BB327377D30DF5881DC2A03D0C78EC47B9",
+      "lines": 27
+    },
+    {
+      "path": "features/admin/menus/components/MenuListPageClient.tsx",
+      "sha256": "989493D014C0D8E116CFA5215D0B5561206E8E8030CAB1AE5189C8BAF44FFC86",
+      "lines": 442
+    },
+    {
+      "path": "features/admin/menus/server/adminMenuRoute.ts",
+      "sha256": "291149169453A3AB7998F5ACA16DDF2693C6BAAB662069CE325A210D5A0FBF09",
+      "lines": 675
+    },
+    {
+      "path": "features/admin/menus/server/adminMenusRoute.ts",
+      "sha256": "15A1DE46CB162ADE5574461A87265779516C527B4A4D931AA55B13AF1BD90679",
+      "lines": 348
+    },
+    {
+      "path": "features/admin/menus/food-review.ts",
+      "sha256": "868F6BB210E77BF9DBC8BD8921F843D1B67D6FDD3FCC803D9C40C055E4F8487D",
+      "lines": 27
+    },
+    {
+      "path": "features/admin/menus/server/food-review-save.ts",
+      "sha256": "6B0B52FBFCBA35986D7540BF7250E2AB63B975E171199839DFB930FE43EFAF05",
+      "lines": 34
+    },
+    {
+      "path": "features/admin/menus/schemas/menu-input.ts",
+      "sha256": "BEF5C37FE8BBC1F3ADE364B96EB91610DA36DE5B2DE913CAFAFBAADA8888808C",
+      "lines": 42
+    },
+    {
+      "path": "features/admin/menus/schemas/menu-response.ts",
+      "sha256": "064789F4919EA1BE9D9CA42E3756A78DC049D334CF838F9756D7F8A053325839",
+      "lines": 23
+    },
+    {
+      "path": "features/admin/menus/components/MenuEditClient.tsx",
+      "sha256": "48C0A464ADF6576C304B8D2DB4DB48DD27E82B619AF15DA0393DD35EBDB81B5A",
+      "lines": 874
+    },
+    {
+      "path": "features/public/shops/server/PublicShopDetailPage.tsx",
+      "sha256": "577A25F18D915E9B2DDD80A6F0BD4789F4FE3DC815D9D0379106AB8651405258",
+      "lines": 458
+    },
+    {
+      "path": "features/public/shops/server/PublicMenuDetailPage.tsx",
+      "sha256": "DF475C837BBA947453C1586D4E52BF2120B8F686121296BA4CAA3CC107F2E5EB",
+      "lines": 203
+    },
+    {
+      "path": "features/public/shops/server/public-read-snapshot.ts",
+      "sha256": "BB9BC2DD2F054887A23914C7BF76620E20C6804EE2C4BA0D4ACF848E3774076C",
+      "lines": 16
+    },
+    {
+      "path": "lib/allergens.ts",
+      "sha256": "29DA02601F845D918E9515BE57DA9FE79F6353EC4F8A8386C5F9B718CEF1B50F",
+      "lines": 625
+    },
+    {
+      "path": "lib/auth/getCurrentAppUser.ts",
+      "sha256": "B77F4FB02A1D30447BCBC477F0CBAC89F3470A904C2D56ABC3BF192004C7EA9D",
+      "lines": 133
+    },
+    {
+      "path": "features/admin/invitations/server/acceptInvitationRoute.ts",
+      "sha256": "83F2926B8093DD10C43F88D341CAF37FCBD885E501207B0B79220F13E474A166",
+      "lines": 120
+    },
+    {
+      "path": "lib/auth/invitations.ts",
+      "sha256": "7DB65C00A1FDF56675FA09D23D11D44454730F03587EC8D8817970E10594B296",
+      "lines": 302
+    },
+    {
+      "path": "lib/auth/admin-auth.ts",
+      "sha256": "77B3AC2ACE04FEC01271695F0DB6C3A8F7C0948F13AA78A5EE8EC706A0E4CF06",
+      "lines": 154
+    },
+    {
+      "path": "lib/auth/admin-api-utils.ts",
+      "sha256": "9D67CB027F097BDF1788E9783D9D0C095DFAB649A6C548E03C0DF9E084F238A5",
+      "lines": 72
+    },
+    {
+      "path": "lib/storage/upload-images.ts",
+      "sha256": "51CBD38DAE6A243DE250B9E5AF747863D2804B202F3B139E7FF01E0D9007C85E",
+      "lines": 116
+    },
+    {
+      "path": "scripts/npm-cli.mjs",
+      "sha256": "50E26F74E0B82C7A636CE840D6DC973ACCF8D5FE940C53528E7E2433081E9E98",
+      "lines": 26
+    },
+    {
+      "path": "scripts/agent-harness.mjs",
+      "sha256": "C90B86AA3A29778AD45939DAC6506E8D4FB224A6604C72145AFC5C22C6BA0501",
+      "lines": 255
+    },
+    {
+      "path": "prisma/schema.prisma",
+      "sha256": "6AD85C81E2283F3DC39A2A647752F8539CA2AEE38C90388F520A0842A376C6B2",
+      "lines": 190
+    },
+    {
+      "path": "prisma/migrations/20261009000000_menu_food_review/migration.sql",
+      "sha256": "F76B6AD0251904E87FD078776687BA81C56629393C11548E725A46FFDC2D2E3A",
+      "lines": 135
+    },
+    {
+      "path": "scripts/check-ci-database.ts",
+      "sha256": "849CB906B516C4ECD1D079D67FE59F74BD346E3669F81DF23AAC28E967DB49F2",
+      "lines": 12
+    },
+    {
+      "path": "scripts/check-owned-menu-database.ts",
+      "sha256": "1B3A8E778D43C309982C834D5844CF9542574D9C1621937C57203D4C69C0E572",
+      "lines": 113
+    },
+    {
+      "path": "scripts/check-shop-database.ts",
+      "sha256": "6BE6A8979FAEAD278E18C9E905D22AF805C2D72C7C07F922A8AACB5DD1368BC9",
+      "lines": 169
+    },
+    {
+      "path": "scripts/check-admin-menu-list-database.ts",
+      "sha256": "26D0C095CC370611912B333E573C07DB43A2DA554225DACAE97ABD25AE68F022",
+      "lines": 147
+    },
+    {
+      "path": "scripts/food-review-database-regression.ts",
+      "sha256": "6126C19892408859217BAFB49B3B20DD5F776DA21EB4D594C6B6496E1D6278C1",
+      "lines": 161
+    },
+    {
+      "path": "scripts/check-publication-propagation.ts",
+      "sha256": "C3F74CBDE9272174F3C3E9E6D793F6624328E91C530D2EFD803FB857DE550E43",
+      "lines": 111
+    },
+    {
+      "path": "scripts/check-public-read-snapshot.ts",
+      "sha256": "D601BDA2669578BEFE792DF7E5D30761F8050095DD1B7DE1FC5CC213CD1F4894",
+      "lines": 86
+    },
+    {
+      "path": "scripts/ingredient-change-trial.mjs",
+      "sha256": "691EBEE90A50D2E6D5917E9C15745BCC8AF35C829DFBC84B1A1E9C708BB74FFC",
+      "lines": 441
+    },
+    {
+      "path": "docs/guide/product.md",
+      "sha256": "2F5D69944A6721F45B3075C4B6E89DCF1F4598215EF324226EF35521FDCDFD5C",
+      "lines": 116
+    },
+    {
+      "path": "docs/guide/rules.md",
+      "sha256": "DDDE68D1F7BB656FF2E79A3248629EA64FBDBC4C35769F2C4AFBEA4AC2127149",
+      "lines": 110
+    },
+    {
+      "path": "docs/guide/architecture.md",
+      "sha256": "CCEEDEBC160F1FCA44E6D8012DDA8605A6189B3E00A3ACD1B8B832113516D451",
+      "lines": 156
+    },
+    {
+      "path": "docs/guide/development.md",
+      "sha256": "093C0E995564382B697F5BEC2B0092C1C9B3436E182832042C3BA1F1311A55E8",
+      "lines": 272
+    },
+    {
+      "path": "docs/verification/shop-save-contract-20261015.md",
+      "sha256": "55C7815B7A77DE3CDCAE766FD932932DEDC514B1C29C09CAC8DB249A9D31A4E0",
+      "lines": 55
+    },
+    {
+      "path": "docs/verification/admin-menu-review-queue-20261015.md",
+      "sha256": "86CD7E9AB932151E1D882C6F3E8BC3A8671E04D6E49CC165E97BC4C2C1BF6E95",
+      "lines": 79
+    },
+    {
+      "path": "docs/verification/ingredient-change-trial-preparation-20261015.md",
+      "sha256": "9F7800CFE7F9C1E0F5D50F1D5BD15B61F9E371DF5DFFEAC379320D809649B528",
+      "lines": 92
+    },
+    {
+      "path": "docs/research/product/ingredient-change-trial-fixture-20261015.md",
+      "sha256": "BD43BAE2F6D3629F48F28E4860D1767CCB36CEE08C975F7B499DA11195A3C004",
+      "lines": 128
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "8CCEF480E9BACF4BF983EFDEF0E77B6ED7575D9AAEC71B90A0A13AD2467A7BF4",
+      "lines": 127
+    },
+    {
+      "path": "Dockerfile",
+      "sha256": "A1034816686FD3B60F5FC421516A25E798860FC82DB5967BC3A1DB7E17BC2547",
+      "lines": 21
+    },
+    {
+      "path": "package.json",
+      "sha256": "5A420E62A77D3458851697356923AF693FD6091E7D8F5E63F1A1277CC539FD05",
+      "lines": 61
+    }
+  ],
+  "executableDiffEmpty": true,
+  "ciRun": "https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/38696206166",
+  "ciConclusion": "success",
+  "openIssueCount": 27,
+  "commentCount": 40,
+  "sourceCommentScope": "27 open issues; full response stored separately",
+  "candidateStatus": [
+    " M README.md",
+    " M docs/research/README.md",
+    " M docs/research/safety/losses-hazards.md",
+    "?? docs/research/originals/"
+  ],
+  "indexEmpty": true
+}

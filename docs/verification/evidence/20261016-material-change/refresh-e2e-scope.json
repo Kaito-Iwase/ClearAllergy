@@ -1,0 +1,295 @@
+{
+  "status": "DRAFT_COMPLETE_READ_ONLY",
+  "reviewedAtUtc": "2026-10-15T15:23:29Z",
+  "reviewedAtJst": "2026-10-16T00:23:29+09:00",
+  "repo": "C:\\Users\\kaito\\Documents\\Codex\\2026-10-14\\task-2\\clearallergy-docs-main-integration",
+  "docsHead": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+  "codeMain": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "productionCodeDiffBetweenHeads": false,
+  "repoStatusAtStart": [],
+  "repoStatusAtEnd": [],
+  "draft": "C:\\Users\\kaito\\Documents\\Codex\\2026-10-14\\task-2\\material-refresh-e2e-scope-20261016.md",
+  "conclusion": "Aは既存公開取得の明示的な再実行、Bは既存admin実認証ブラウザ回帰への連続操作追加。既存dynamic/RepeatableRead/CAS/食品確認/STOP/publicRefreshPendingを再実装しない。",
+  "existingMechanisms": [
+    {
+      "name": "公開3ページのforce-dynamic",
+      "source": "features/public/shops/server/PublicShopListPage.tsx:7"
+    },
+    {
+      "name": "RepeatableRead公開snapshot",
+      "source": "features/public/shops/server/public-read-snapshot.ts:7"
+    },
+    {
+      "name": "expectedVersion CASと428/409",
+      "source": "features/admin/menus/server/adminMenuRoute.ts:244"
+    },
+    {
+      "name": "食品変更時の確認失効と版別記録",
+      "source": "features/admin/menus/server/food-review-save.ts:16"
+    },
+    {
+      "name": "missing/outdated/unresolved/current管理一覧",
+      "source": "features/admin/menus/server/menu-list-data.ts:5"
+    },
+    {
+      "name": "フォーム独立STOP",
+      "source": "features/admin/menus/server/adminMenuRoute.ts:652"
+    },
+    {
+      "name": "postcommit publicRefreshPending",
+      "source": "features/admin/menus/server/adminMenuRoute.ts:520"
+    }
+  ],
+  "candidates": {
+    "A": {
+      "status": "UNIMPLEMENTED_CANDIDATE",
+      "chosenMinimum": "共通の「画面を再読み込み」ボタンで現在URLをdocument reload。既存dynamic SSRを使用。",
+      "changeFiles": [
+        "features/public/shops/components/PublicDataReloadButton.tsx (new)",
+        "features/public/shops/components/PublicShopListClient.tsx",
+        "features/public/shops/server/PublicShopDetailPage.tsx",
+        "features/public/shops/server/PublicMenuDetailPage.tsx",
+        "features/public/shops/components/PublicDataUnavailable.tsx",
+        "scripts/check-publication-propagation.ts"
+      ],
+      "relatedIssues": [
+        43,
+        49
+      ],
+      "acceptance": [
+        "公開3画面・取得不能表示で390/1440pxとkeyboardから操作",
+        "現在URLを維持して新しいdocument取得を起こし、保存APIを呼ばない",
+        "停止前から保持した画面の明示reload後、停止料理本文が消えてnot-found",
+        "streamingによるページHTTP200/404を区別し、本文/noindex/API404を確認",
+        "補足も既存snapshot経路で置換し、最新/安全/確認済みの成功断定を追加しない"
+      ],
+      "sideEffects": [
+        "操作ごとの公開DB読取",
+        "未保存検索入力・現在地並べ替え・個人設定未保存入力等の初期化の可能性"
+      ],
+      "prerequisite": "親セッションの既存合意を優先。local state保持が必須ならrouter.refresh候補へ置換し、その停止・取得不能・state保持検査を定義。",
+      "rejectedFromMinimum": [
+        "polling",
+        "SSE",
+        "focus自動更新",
+        "経過時間/取得成功時刻",
+        "新公開JSON endpoint",
+        "TTL/dynamic再変更"
+      ],
+      "unverified": [
+        "実装・実ブラウザ",
+        "障害/offline/back/focus",
+        "Vercel",
+        "負荷",
+        "利用者の発見/理解",
+        "許容age契約"
+      ]
+    },
+    "B": {
+      "status": "UNIMPLEMENTED_CONNECTION_TEST",
+      "chosenMinimum": "scripts/check-test-browser.mjsの同じ架空一料理に、全品目設定済みの材料変更による確認失効から再公開までを追加。",
+      "changeFiles": [
+        "scripts/check-test-browser.mjs"
+      ],
+      "relatedIssues": [
+        41,
+        51,
+        43,
+        49,
+        47,
+        57
+      ],
+      "flow": [
+        "既存fixtureの公開一料理を匿名tabで開く",
+        "実フォームでソースA→B・乳FREE→CONTAINS、全品目設定済み、新確認なしで実PUT保存",
+        "保存後GET/再読込でfoodVersion増加・旧確認失効・非公開",
+        "実管理一覧で固有名検索→再確認待ちoutdated→既存見直しリンク",
+        "fresh匿名API404・詳細not-found・店舗メニューから対象料理除外",
+        "同じ料理の保存済みBを確認し、新しい架空根拠/版/範囲/確認日時を入力して再公開",
+        "保存後GETの現行版対応・旧履歴保持、一覧current、匿名詳細/APIにBと乳CONTAINS",
+        "既存の版付きcleanupと従来UNKNOWN非公開回帰を維持"
+      ],
+      "sideEffects": [
+        "既存admin回帰全体の専用店舗説明更新・架空料理作成/削除・実Blob画像追加",
+        "追加Bは同じ料理を再利用し、新画像uploadや新アカウントは増やさない"
+      ],
+      "prerequisites": [
+        "許可された専用Compose DB",
+        "対応app",
+        "既存専用アカウント",
+        "開発Clerk",
+        "既存隔離Playwright",
+        "既存回帰が使うBlob保存先許可"
+      ],
+      "rejectedFromMinimum": [
+        "SQLでフォーム成功を代用",
+        "正常保存をroute.fulfillで合成",
+        "新review/CAS/schema",
+        "DB競合/rollback行列の全ブラウザ重複"
+      ],
+      "unverified": [
+        "連続E2E実行",
+        "現在の実Clerk/proxy/PG/公開画面の同一run接続",
+        "実環境準備状況"
+      ]
+    }
+  },
+  "evidenceLayers": [
+    {
+      "source": "scripts/ingredient-change-trial.mjs",
+      "alreadyConnectsFlow": true,
+      "real": [
+        "UI部品",
+        "pure policy",
+        "loopback HTTP"
+      ],
+      "simulated": [
+        "メモリ保存",
+        "CAS",
+        "版の加算",
+        "Next navigation"
+      ],
+      "absent": [
+        "本番server",
+        "PG/SQL trigger/locks",
+        "Clerk",
+        "Blob"
+      ]
+    },
+    {
+      "source": "scripts/admin-menu-database-regression.ts / scripts/food-review-database-regression.ts",
+      "real": [
+        "PG",
+        "実route handler (admin regression)",
+        "CAS",
+        "記録rollback",
+        "pending",
+        "STOP"
+      ],
+      "simulated": [
+        "Clerk session",
+        "Next cache"
+      ],
+      "absent": [
+        "実HTTP app browser flow",
+        "実ClerkログインUI"
+      ]
+    },
+    {
+      "source": "scripts/check-admin-menu-list-database.ts",
+      "real": [
+        "guard済みPG",
+        "共通一覧select/DTO",
+        "6状態",
+        "私的情報非転送"
+      ],
+      "absent": [
+        "実管理画面",
+        "Clerk"
+      ]
+    },
+    {
+      "source": "scripts/check-publication-propagation.ts",
+      "real": [
+        "loopback production build",
+        "guard済みCI PG",
+        "fresh HTTP",
+        "任意fresh browser"
+      ],
+      "absent": [
+        "管理フォーム",
+        "Clerk",
+        "既存tabの自動更新"
+      ]
+    },
+    {
+      "source": "scripts/check-test-browser.mjs",
+      "real": [
+        "HTTP app",
+        "Clerkログイン",
+        "専用DB",
+        "Blob"
+      ],
+      "alreadyCovered": [
+        "確認欄付き新規作成",
+        "公開200",
+        "他店舗拒否",
+        "原材料+UNKNOWNによる404",
+        "版付きcleanup"
+      ],
+      "missingConnection": "全状態設定済みの食品確認失効→管理一覧→新確認→再公開"
+    }
+  ],
+  "issuesLive": [
+    {
+      "number": 43,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/43"
+    },
+    {
+      "number": 49,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/49"
+    },
+    {
+      "number": 47,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/47"
+    },
+    {
+      "number": 57,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/57"
+    },
+    {
+      "number": 41,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/41"
+    },
+    {
+      "number": 51,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/51"
+    },
+    {
+      "number": 52,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/52"
+    },
+    {
+      "number": 42,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/42"
+    },
+    {
+      "number": 53,
+      "state": "OPEN",
+      "url": "https://github.com/Kaito-Iwase/ClearAllergy/issues/53"
+    }
+  ],
+  "issueInterpretation": "主に2026-10-04/1830a98基点の未実装記述を現在へ適用しない。コード存在とIssue全体の受入/人間判断は別。本草案でclose/Ready/新承認を成立させず、既存の人間承認の再要求理由にも使わない。",
+  "parentSteering": {
+    "source": "root message",
+    "observedByThisAgent": false,
+    "note": "rootは別途browser6条件で不一致2件を再現し、その案内/PUT整合を第一修復候補に指定。A/Bは別の将来候補・接続検査として保存。本担当はその再現を独立実行していない。"
+  },
+  "constraints": [
+    "実店舗へ接触しない",
+    "友人の店員役から実店舗負担/継続/支払/運用可能性を推論しない",
+    "未申告の現物変更を自動検知したことにしない",
+    "材料欄だけで構成網羅性/製品版/提供分一致を確認したことにしない",
+    "人の理解・実食品安全・本番鮮度を自動E2E成功から推論しない"
+  ],
+  "verification": {
+    "staticReview": "PASS",
+    "existingPathsChecked": 29,
+    "missingExistingPaths": [],
+    "codeChanged": false,
+    "databaseChanged": false,
+    "providerChanged": false,
+    "issueOrPrChanged": false,
+    "testsRun": [],
+    "testsStatus": "UNVERIFIED — read-only planning",
+    "blockerToDraftCompletion": null
+  }
+}

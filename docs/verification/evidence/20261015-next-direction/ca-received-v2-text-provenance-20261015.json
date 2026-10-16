@@ -1,0 +1,12 @@
+{
+  "sourceThread": "01a138ae-49df-7075-b4b3-172dc6a430da",
+  "source": "same-thread stored cloud_threads.send_message output, plus continuation already delivered in current turn",
+  "originalMessageUtf16Chars": 22775,
+  "reconstructedMessageUtf16Chars": 22775,
+  "originalReadPrefixUtf16Chars": 20000,
+  "prefixMatches": true,
+  "trailingFileNewlineExcluded": true,
+  "adoption": "entire body extracted from stored message",
+  "safety": "sections 1–6 and all independent case definitions extracted from stored message; sections 7–8 and revision record copied from received continuation",
+  "boundary": "text capture; not a Library file byte-for-byte validation; original v1 retained; no independent external-source re-audit"
+}

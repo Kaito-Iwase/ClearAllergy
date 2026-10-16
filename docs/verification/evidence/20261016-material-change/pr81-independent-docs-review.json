@@ -1,0 +1,250 @@
+{
+  "task": "PR81 independent read-only documentation review",
+  "reviewer": "/root/pr81_docs_second_independent",
+  "reviewed_at_utc": "2026-10-15T15:22:53Z",
+  "outcome": "PASS_WITH_NONBLOCKING_SUGGESTIONS",
+  "base": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "head": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+  "worktree": "C:\\Users\\kaito\\Documents\\Codex\\2026-10-14\\task-2\\clearallergy-docs-main-integration",
+  "branch": "agent/docs-main-integration-20261015",
+  "independence": {
+    "method": "対象本文、base→HEAD差分、保存元ファイル、少数の実コードを直接照合して結論を出した。",
+    "prior_review_receipts": "既存レビューの記録ファイルは監査文書の導線確認として閲覧したが、必須修正の有無、保持、準備状態の判定根拠には採用していない。",
+    "no_claim_of_full_corpus_reread": "129件の再読レビューではない。重点文書と差分の独立レビュー。既存監査の全件読了という主張を再実施・追認したものではない。"
+  },
+  "instructions": {
+    "agents_read_in_full": [
+      "AGENTS.md"
+    ],
+    "nested_agents": [],
+    "task_scope": "read-only。レビュー結果JSONの作成のみ許可された成果物として実施。",
+    "constraints_preserved": [
+      "実店舗への接触・募集・聞き取りを行わない。",
+      "店舗側の検討は公開資料・事例・独立シナリオの精査。友人は架空課題の操作・理解に限定。",
+      "原稿全文・出典・事実/提案/未確認を保持する。",
+      "コード実装、DB、provider書込、本番操作、外部連絡、commit/push/mergeを行わない。"
+    ]
+  },
+  "blocking_findings": [],
+  "nonblocking_suggestions": [
+    {
+      "id": "N1",
+      "priority": "P3",
+      "path": "docs/research/README.md",
+      "lines": [
+        14
+      ],
+      "title": "入口の「未実施」に、準備も草案であることを一言添える",
+      "evidence": "索引の実施準備欄は「友人テスト台本→空の記録票。未実施」。リンク先台本3・32〜39行と空票23〜30行は、版・判定表・分離方法等が未固定/未作成/未確認であることを明示している。",
+      "reason": "本文まで読めば誤認は生じにくく必須修正ではない。ただし索引だけを読む人には「準備は完成し、実施だけが未了」と短絡する余地が残る。今回の重要な区別を入口でも見えるようにできる。",
+      "minimal_change": "索引の末尾を「草案。表示版・判定表・端末分離・同意/削除条件は未確定、実施前確認が必要」等にする。原稿は変更しない。"
+    },
+    {
+      "id": "N2",
+      "priority": "P3",
+      "path": "docs/research/product/one-dish-reconciliation-20261015.md",
+      "lines": [
+        40
+      ],
+      "related_locations": [
+        {
+          "path": "docs/research/product/clearallergy-next-direction-20261015.md",
+          "lines": [
+            21
+          ]
+        },
+        {
+          "path": "docs/research/product/friend-user-test-20261015.md",
+          "lines": [
+            105,
+            114
+          ]
+        }
+      ],
+      "title": "次に選ぶ例のB/Fと、既存小丼で実際に使える条件を入口で結ぶ",
+      "evidence": "次手は「例えばB/F」を挙げるが、現行友人台本の実条件はS0〜S7。友人台本114行は、小丼のS0/B5はF/F2と同じ条件ではないと正しく留保している。",
+      "reason": "全体は机上照合と未実装表示を明確に区別しており矛盾ではない。ただ、B/Fという例をそのまま既存fixtureで実施できると読む人は、後段の対応限界まで移動する必要がある。",
+      "minimal_change": "「B/Fは鶏料理の検討例。既存小丼で実施する条件はS0〜S7から選び、F/F2の同一条件は未整備」と短く添えるか、台本§鶏料理A〜Gとの関係への見出しリンクを追加する。新しいF画面や採点基準をこの修正で採用しない。"
+    }
+  ],
+  "preparation_readiness_assessment": {
+    "conclusion": "「全部のテスト準備が終わった」という結論は支持しない。現行本文は手順・空票の草案、未固定条件、未実行を明示している。",
+    "explicit_evidence": [
+      {
+        "path": "docs/research/product/friend-user-test-20261015.md",
+        "lines": [
+          3,
+          32,
+          35,
+          36,
+          38,
+          39
+        ],
+        "meaning": "草案。コード/資料/判定表等の版、初見回答用端末の分離、保存/削除の具体条件が確定前。分離できなければ開発者予行に留める。"
+      },
+      {
+        "path": "docs/research/product/friend-user-test-record-sheet-20261015.md",
+        "lines": [
+          3,
+          14,
+          16,
+          19,
+          20,
+          21,
+          23,
+          24,
+          30
+        ],
+        "meaning": "日付、同意、記録場所、削除日、版、判定表、分離確認が未定・未合意・未固定。"
+      },
+      {
+        "path": "docs/research/product/next-verification-plan-20261015.md",
+        "lines": [
+          5,
+          22,
+          34,
+          46,
+          58,
+          70,
+          82,
+          90
+        ],
+        "meaning": "6領域は未実行の計画であり、それぞれ実施前提と副作用の境界がある。"
+      },
+      {
+        "path": "docs/research/product/one-dish-reconciliation-20261015.md",
+        "lines": [
+          7,
+          13,
+          27,
+          31,
+          33,
+          35
+        ],
+        "meaning": "鶏料理は静的照合。小丼の過去ブラウザ結果と実HTTP/DB/Clerk/Blobや人の理解を区別。"
+      },
+      {
+        "path": "docs/guide/document-audit-20261015.md",
+        "lines": [
+          3,
+          20,
+          30,
+          36
+        ],
+        "meaning": "読了の完了は文書棚卸しの範囲。人の理解・実店舗・アプリ再検証の完了を意味しない。"
+      }
+    ],
+    "outstanding_before_friend_session": [
+      "対象者・役割・選ぶ条件・順序・実施担当の確定",
+      "実際に用いるコードSHA、fixture/CSS/資料のhash/版と実表示の照合",
+      "参加者に見える情報だけに対応した条件別判定表と援助順序の確定",
+      "進行役token・履歴・台帳の漏えいを避ける端末/資料/条件切替方法の予行",
+      "同意、任意中止・削除依頼、非公開記録先、具体的削除日・担当の確定"
+    ]
+  },
+  "verified": [
+    {
+      "check": "最新方針と歴史資料",
+      "result": "PASS",
+      "detail": "policy・索引・reading-guide・更新版nextdirection/nextverification/onedishの入口は、現在の接触なし方針を示す。旧店舗募集・最近の一変更を聞く案は保存時点の提案として案内され、友人の店員役を実店舗の工数/継続/支払意思へ換算していない。"
+    },
+    {
+      "check": "原稿16件の独立byte確認",
+      "result": "PASS",
+      "detail": "docs/research/originals/20261015-main-integration/*.md.txt 16件をtask-2に残る同名.md原本とGet-FileHash SHA256で比較し16/16一致。記録済み検証JSONのpass値を転記したものではない。"
+    },
+    {
+      "check": "研究7稿の独立byte確認",
+      "result": "PASS",
+      "detail": "literature/ca-overnight-*5稿とproduct/ca-overnight-decision-memo.md・ca-overnight-independent-review.mdをtask-2/overnight-source-draftsの保存元とSHA256比較し7/7一致。全文・URL・数値・留保がbyteとして保持されている。"
+    },
+    {
+      "check": "旧索引と安全分析の原稿保持",
+      "result": "PASS_WITH_LINE_ENDING_DISTINCTION",
+      "detail": "baseの研究索引83行・安全分析22行と対応.md.txtの全行内容が一致。原稿コピーはCRLF、Git base blobはLFのためGit blob ID自体は一致しない。本文の欠落ではない。"
+    },
+    {
+      "check": "v2受領原稿の閲覧版",
+      "result": "PASS",
+      "detail": "保存原稿→閲覧版のgit diff --no-index --ignore-space-at-eolを直接確認。店舗導入v2は配置注記の追加のみ、安全理解v2は配置注記追加と末尾空行の差のみ。fact/proposal/unverifiedや出典の削除はない。"
+    },
+    {
+      "check": "安全分析の日本語解説",
+      "result": "PASS",
+      "detail": "元22行と書換え後本文を直接読んで、L01〜L04、H01〜H10、SC/要件との対応、通常入力防御、二タブ、未測定の頻度、prototypeの身体被害経路の限定を保持していることを確認。現行未修正欠陥の一覧とはしていない。"
+    },
+    {
+      "check": "重点入口の相対リンク",
+      "result": "PASS",
+      "counts": {
+        "documents": 11,
+        "local_links": 404,
+        "missing_files": 0
+      },
+      "detail": "README、研究索引、reading-guide、原稿README、audit、policy、nextdirection、nextverification、onedish、友人台本、空票のMarkdownリンクを解決。外部URLとアンカーの描画/到達を今回検証したものではない。"
+    },
+    {
+      "check": "文書差分と境界",
+      "result": "PASS",
+      "detail": "base→HEADはdocs、README、AGENTS、2つの文書テンプレートのみ。git diff --checkは終了0。開始・終了のgit status --shortは空。文書本体に変更を加えていない。"
+    },
+    {
+      "check": "技術記述の独立spot-check",
+      "result": "PASS",
+      "detail": "食品snapshotは価格/構図を含めず、一覧状態はmissing/outdated/unresolved/currentを分け、共通DTOは根拠・操作者・snapshot・未解決本文を返さない。public-read-snapshotはRepeatableReadとP2028の取得不能化を持つ。identity helperにprimary→先頭fallbackがありverification/auth ID一致の明示検査がない、という静的説明は一致。実用上の悪用可能性を実証したとは書いていない。",
+      "source_paths": [
+        "features/admin/menus/food-review.ts",
+        "features/admin/menus/menu-list.ts",
+        "features/admin/menus/server/menu-list-data.ts",
+        "features/public/shops/server/public-read-snapshot.ts",
+        "lib/auth/getCurrentAppUser.ts"
+      ]
+    }
+  ],
+  "scope_read": {
+    "full_focus_documents": [
+      "AGENTS.md",
+      "README.md",
+      "docs/research/README.md",
+      "docs/research/reading-guide.md",
+      "docs/research/originals/README.md",
+      "docs/research/product/research-and-friend-testing-policy-20261015.md",
+      "docs/research/product/clearallergy-next-direction-20261015.md",
+      "docs/research/product/next-verification-plan-20261015.md",
+      "docs/research/product/one-dish-reconciliation-20261015.md",
+      "docs/research/product/friend-user-test-20261015.md",
+      "docs/research/product/friend-user-test-record-sheet-20261015.md",
+      "docs/research/product/additional-plans-provenance-20261015.md",
+      "docs/research/product/overnight-source-provenance-20261015.md",
+      "docs/research/engineering/current-main-issue-audit-20261015.md",
+      "docs/research/safety/losses-hazards.md",
+      "docs/research/originals/20261015-ja-readability/losses-hazards.md.txt",
+      "docs/guide/document-audit-20261015.md"
+    ],
+    "diff_review": [
+      ".github/ISSUE_TEMPLATE/agent-task.md",
+      ".github/pull_request_template.md",
+      "docs/guide/development.md",
+      "docs/guide/maintenance.md",
+      "docs/guide/rules.md",
+      "docs/guide/product.md",
+      "docs/guide/architecture.md",
+      "docs/guide/verification.md"
+    ],
+    "evidence_limit": "129文書の所在数はgit ls-filesから再計数して一致。全129件を本レビューで全文再読したわけではない。"
+  },
+  "unverified": [
+    "外部の一次資料本文・医療/法的正確性・現在価格/仕様の再取得。原稿は出典と限界を保持しているが、その再監査は行っていない。",
+    "実ブラウザ・実アプリ・DB・Clerk・Blob・本番/Previewの動作。親が別作業として担当する反証・再取得/E2E案と分離する。",
+    "参加者への連絡・同意・友人試験・実店舗の負担/継続/支払意思。",
+    "図・Mermaidの描画、スクリーンリーダーや人による文書理解。",
+    "既存の文書監査129件それぞれの全文読了の再現。今回の独立レビューの対象外。"
+  ],
+  "execution_notes": [
+    "rgはこのPowerShell環境で未導入だったため、Get-ChildItem/Get-Content/Select-String相当とgitを用いた。",
+    "UTF-8を明示して読取。初回AGENTS読取の文字化けはUTF-8で全文再読し解消。",
+    "git diff --no-indexは差分が存在するため終了1。検査失敗ではなく、原稿→閲覧版の差分確認として使用。",
+    "lint/typecheck/test/buildはread-only文書レビューにつき実行しない。過去CIを今回の実行結果へ流用しない。"
+  ],
+  "remaining_blockers": []
+}

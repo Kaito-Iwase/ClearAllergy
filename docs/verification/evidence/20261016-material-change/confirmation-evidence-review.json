@@ -1,0 +1,135 @@
+{
+  "generatedAt": "2026-10-15T15:36:21.977Z",
+  "scope": "独立監査完了後の証拠整合レビュー。資料は読取のみ。ブラウザはrootが実行した結果として照合し、この担当は再実行していない。",
+  "status": "PASS",
+  "originalIndependentJson": {
+    "path": "material-confirmation-independent-20261016.json",
+    "sha256": "b2736c80c43dbbde9a566bcee2365acfa4d081c6ce3de6d1e47ea462477f7fdb",
+    "preserved": true,
+    "repositoryCopyByteIdentical": true
+  },
+  "reviewed": [
+    "clearallergy-docs-main-integration/docs/verification/material-change-confirmation-20261016.md",
+    "clearallergy-docs-main-integration/docs/verification/evidence/20261016-material-change/confirmation-check.json",
+    "clearallergy-docs-main-integration/docs/verification/evidence/20261016-material-change/source-preservation.json",
+    "clearallergy-docs-main-integration/docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt",
+    "clearallergy-docs-main-integration/docs/verification/evidence/20261016-material-change/runner-source.cjs.txt"
+  ],
+  "checks": [
+    {
+      "status": "PASS",
+      "item": "C1/C2の公開確認・PUTfalse・保存後falseは独立静的結論、文書、driver、記録JSONで一致。公開切替を操作しない前提も明記。",
+      "evidence": [
+        "docs/verification/material-change-confirmation-20261016.md:17",
+        "docs/verification/material-change-confirmation-20261016.md:21",
+        "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt:65",
+        "docs/verification/evidence/20261016-material-change/confirmation-check.json:7",
+        "docs/verification/evidence/20261016-material-change/confirmation-check.json:253"
+      ]
+    },
+    {
+      "status": "PASS",
+      "item": "C3はUNKNOWN選択でsetOneが公開stateをfalseにしdialog0、PUTfalse。先の3条件という主張の前提誤りを撤回し、修復対象をC1/C2へ限定している。",
+      "evidence": [
+        "docs/verification/material-change-confirmation-20261016.md:23",
+        "docs/verification/material-change-confirmation-20261016.md:32",
+        "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt:67",
+        "docs/verification/evidence/20261016-material-change/confirmation-check.json:499"
+      ]
+    },
+    {
+      "status": "PASS",
+      "item": "C4取消はPUT0・保存済みmenu不変、C5価格だけとC6有効新記録はPUTtrue・保存後currentを維持。driverの操作とassert、記録JSON、表の内容が一致。",
+      "evidence": [
+        "docs/verification/material-change-confirmation-20261016.md:24",
+        "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt:33",
+        "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt:51",
+        "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt:68",
+        "docs/verification/evidence/20261016-material-change/confirmation-check.json:739",
+        "docs/verification/evidence/20261016-material-change/confirmation-check.json:756",
+        "docs/verification/evidence/20261016-material-change/confirmation-check.json:1002"
+      ]
+    },
+    {
+      "status": "PASS",
+      "item": "6条件PASSは現象再現・反証・対照の成立として明示され、修復成功と扱っていない。公開漏れでなく表示矛盾、コード未修正、合成保存と実DB未検証の区別も明確。",
+      "evidence": [
+        "docs/verification/material-change-confirmation-20261016.md:3",
+        "docs/verification/material-change-confirmation-20261016.md:11",
+        "docs/verification/material-change-confirmation-20261016.md:28",
+        "docs/verification/material-change-confirmation-20261016.md:38",
+        "docs/verification/material-change-confirmation-20261016.md:53"
+      ]
+    },
+    {
+      "status": "PASS",
+      "item": "独立担当の14式/handler条件・5純関数項目とrootブラウザ実行を区別。独立担当自身の実ブラウザ/DB実施を誤って主張していない。",
+      "evidence": [
+        "docs/verification/material-change-confirmation-20261016.md:34"
+      ]
+    },
+    {
+      "status": "PASS",
+      "item": "保存された6条件のエラー0・外部要求試行0、driverの外部origin遮断、runnerのfixture起動/終了処理と文書の環境説明が一致。プロセス終了をこの担当が新たに実行・実測したとの主張はしない。",
+      "evidence": [
+        "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt:12",
+        "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt:79",
+        "docs/verification/evidence/20261016-material-change/runner-source.cjs.txt:7",
+        "docs/verification/evidence/20261016-material-change/runner-source.cjs.txt:19",
+        "docs/verification/evidence/20261016-material-change/confirmation-check.json:1418"
+      ]
+    },
+    {
+      "status": "PASS",
+      "item": "記録380ファイル全てをscratchで再hashし一致。manifestの14ソースはmain Git blobをCRLFへ正規化すると全て一致。確認helperの記録hashもscratch・現在worktreeのCRLFバイトに一致。改行以外のソース変更の証拠なし。",
+      "evidence": [
+        "docs/verification/material-change-confirmation-20261016.md:40",
+        "docs/verification/evidence/20261016-material-change/source-preservation.json:7"
+      ]
+    },
+    {
+      "status": "PASS",
+      "item": "失敗記録の参照名2件が収録名へ揃った。両ファイルが存在し、元ブラウザ出力領域のコピーとバイト一致。",
+      "files": [
+        {
+          "name": "attempt1-sandbox-network-denied.json",
+          "exists": true,
+          "taskCopyExists": true,
+          "sameAsTaskCopy": true
+        },
+        {
+          "name": "attempt2-connection-timeout.json",
+          "exists": true,
+          "taskCopyExists": true,
+          "sameAsTaskCopy": true
+        }
+      ],
+      "evidence": [
+        "docs/verification/evidence/20261016-material-change/source-preservation.json:1915"
+      ]
+    }
+  ],
+  "mustFix": [],
+  "limitations": [
+    "証拠整合レビューでありブラウザの独立再実行ではない。",
+    "実DB・provider・本番・既存画面への公開停止反映はこのレビューでも検証していない。"
+  ],
+  "changedImplementation": false,
+  "resolvedFindings": [
+    {
+      "priority": "P3",
+      "category": "収録証拠のファイル名参照",
+      "location": "docs/verification/evidence/20261016-material-change/source-preservation.json:1916",
+      "relatedLocation": "docs/verification/evidence/20261016-material-change/source-preservation.json:1917",
+      "finding": "failed_environment_attempts_preservedの2つのファイル名は収録ディレクトリに存在しない。収録名からconfirmation-check-が除かれている。文書45行のリンクは正しい。",
+      "expected": [
+        "attempt1-sandbox-network-denied.json",
+        "attempt2-connection-timeout.json"
+      ],
+      "impact": "過去の環境失敗記録をJSONから辿る場合だけの参照不整合。C1〜C6の結論や原ソース保持の結論を覆さない。",
+      "requestedCorrection": "この配列の2名称を実際の収録名へ揃える。記録本体や元の独立JSONは変更しない。",
+      "resolution": "親が収録名へ参照を訂正。再読取で両ファイルの存在と元ブラウザ出力領域のコピーとのバイト一致を確認。",
+      "status": "RESOLVED"
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "checked_at_utc": "2026-10-15T15:42:14.512115+00:00",
+  "source_main": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "docs_head_before_followup": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+  "phase": "precommit document packaging; final commit and CI are reported in PR #81",
+  "result": "PASS",
+  "read_scope": {
+    "old_audit_snapshot_head": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+    "old_audit_human_documents": 129,
+    "additional_human_support_texts": 5,
+    "current_human_support_texts": 134,
+    "current_set_equals_old_plus_five": true,
+    "additional_full_text_read": [
+      "docs/research/engineering/material-change-followup-20261016.md",
+      "docs/research/product/public-refresh-and-change-e2e-plan-20261016.md",
+      "docs/verification/material-change-confirmation-20261016.md",
+      "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt",
+      "docs/verification/evidence/20261016-material-change/runner-source.cjs.txt"
+    ],
+    "old_129_independently_reread_this_followup": false
+  },
+  "additional_final_worktree_hashes": [
+    {
+      "path": "docs/research/engineering/material-change-followup-20261016.md",
+      "sha256": "c7a5798980e56d81448dea61ced222b20e87ef71c44b5ccc669256f40296cbd0"
+    },
+    {
+      "path": "docs/research/product/public-refresh-and-change-e2e-plan-20261016.md",
+      "sha256": "5e47c6862b16a497b37cf06e54da5162e70fab3b7c293023639e9e70439d8aa2"
+    },
+    {
+      "path": "docs/verification/material-change-confirmation-20261016.md",
+      "sha256": "ee5e57bdf4d04a8c9b86f8b4976ef31220bfc30fea8f33d84474ae9b05fafae6"
+    },
+    {
+      "path": "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt",
+      "sha256": "faef7309f1f34349a008397c62e34e1d84ba09a9238fde1a8b8b1213eb87a754"
+    },
+    {
+      "path": "docs/verification/evidence/20261016-material-change/runner-source.cjs.txt",
+      "sha256": "31ed4e59eb42250869582f6ba4d1c533dcbdd20df7ddbc30b7cda10b92657989"
+    }
+  ],
+  "review_hash_note": "Review receipts retain review-time hashes. Subsequent navigation-only links are separately checked; review JSONs are not rewritten.",
+  "review_outcomes": {
+    "counterexample_evidence": "PASS; unresolved 0",
+    "pr81_followup": "PASS; no required repairs",
+    "final_navigation_only_additions": "Reviewer separately confirmed the three added passages PASS; validation target creation and final link resolution are root checks. This field records the reviewer message, not a new independent run."
+  },
+  "plan_source_nonblank_omissions": [],
+  "evidence_copies": {
+    "count": 12,
+    "all_source_and_manifest_bytes_equal": true,
+    "provenance": "provenance.json"
+  },
+  "links": {
+    "markdown_files": 114,
+    "local_links": 1114,
+    "missing_files": [],
+    "anchor_candidates_needing_review": [],
+    "external_links_not_refetched": 556,
+    "raw_original_links": "Excluded .md.txt: original locations deliberately retained; originals/README provides view mapping."
+  },
+  "original_29_hash_failures": [],
+  "old_candidate_7_hash_failures": [],
+  "old_evidence_10_index_mismatches": [],
+  "safety_identifiers_equal": true,
+  "old_index_nonblank_omissions": [],
+  "runtime_path_changes": [],
+  "canonical_preservation": {
+    "utc": "2026-10-15T15:40:47.6762808Z",
+    "files": 358,
+    "oldChanges": 9,
+    "head": "f5ec73b69c91f3c19d516f131a14c7f644fe8f32",
+    "branch": "docs/shops-recovery-20261010",
+    "differences": [],
+    "result": "PASS"
+  },
+  "isolated_browser": {
+    "conditions": 6,
+    "mismatches_reproduced": 2,
+    "earlier_claim_refuted": 1,
+    "controls": 3,
+    "page_errors": 0,
+    "external_requests_attempted": 0,
+    "code_repaired": false,
+    "real_app_pg_clerk_blob_e2e": false
+  },
+  "limits": [
+    "No app implementation, database/provider/production operation, restaurant contact, participant test, or merge.",
+    "CI on the follow-up head is checked after commit/push; this receipt does not claim its outcome.",
+    "All external sources were not re-fetched; human understanding and real-food correctness remain unverified."
+  ]
+}

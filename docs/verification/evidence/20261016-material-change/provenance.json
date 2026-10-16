@@ -1,0 +1,84 @@
+{
+  "date_jst": "2026-10-16",
+  "source_main": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "docs_head_before": "521c7fd05ff757c8366ff0f12b448a7b9249cd5c",
+  "files": [
+    {
+      "source": "material-confirmation-browser-20261016/confirmation-check.json",
+      "path": "docs/verification/evidence/20261016-material-change/confirmation-check.json",
+      "sha256": "a5ca2325f82f882c3047ad1b3d4e1733d7546e232eba22de73d97cd052a9fd57",
+      "exact_bytes": true
+    },
+    {
+      "source": "material-confirmation-browser-20261016/trial-manifest.json",
+      "path": "docs/verification/evidence/20261016-material-change/trial-manifest.json",
+      "sha256": "e757adab808df9c3d1b76f270affdcc796abec6aa2d2974f9ac622d0eeec6874",
+      "exact_bytes": true
+    },
+    {
+      "source": "material-confirmation-browser-20261016/source-preservation.json",
+      "path": "docs/verification/evidence/20261016-material-change/source-preservation.json",
+      "sha256": "db2d0a3db691415ece65cf09d60cde4d335bd35cf8039c3ee6f199fd88d6de6c",
+      "exact_bytes": true
+    },
+    {
+      "source": "material-confirmation-browser-20261016/confirmation-check-attempt1-sandbox-network-denied.json",
+      "path": "docs/verification/evidence/20261016-material-change/attempt1-sandbox-network-denied.json",
+      "sha256": "f235e153213907dffc43e95c48cfcce7e97e73f7e2d0ad51fbe4a1de9c908a96",
+      "exact_bytes": true
+    },
+    {
+      "source": "material-confirmation-browser-20261016/confirmation-check-attempt2-connection-timeout.json",
+      "path": "docs/verification/evidence/20261016-material-change/attempt2-connection-timeout.json",
+      "sha256": "018a050d9d15daa7244147629e2d0589dec0a42ad39f925cd3a45a1f7826d708",
+      "exact_bytes": true
+    },
+    {
+      "source": "material-confirmation-independent-20261016.json",
+      "path": "docs/verification/evidence/20261016-material-change/independent-confirmation.json",
+      "sha256": "b2736c80c43dbbde9a566bcee2365acfa4d081c6ce3de6d1e47ea462477f7fdb",
+      "exact_bytes": true
+    },
+    {
+      "source": "pr81-docs-second-independent-20261016.json",
+      "path": "docs/verification/evidence/20261016-material-change/pr81-independent-docs-review.json",
+      "sha256": "3109bf4ec5fcb649e7ad2a815980dfb804ece064144065a0ee74beb95d54157a",
+      "exact_bytes": true
+    },
+    {
+      "source": "material-refresh-e2e-scope-20261016.json",
+      "path": "docs/verification/evidence/20261016-material-change/refresh-e2e-scope.json",
+      "sha256": "f9616e66d416cd952fbfe04a0e312b42987c3ad164cbab58177c34f8a1d0dd5d",
+      "exact_bytes": true
+    },
+    {
+      "source": "material-confirmation-browser-20261016.cjs",
+      "path": "docs/verification/evidence/20261016-material-change/browser-driver.cjs.txt",
+      "sha256": "faef7309f1f34349a008397c62e34e1d84ba09a9238fde1a8b8b1213eb87a754",
+      "exact_bytes": true
+    },
+    {
+      "source": "run-material-confirmation-isolated-20261016.cjs",
+      "path": "docs/verification/evidence/20261016-material-change/runner-source.cjs.txt",
+      "sha256": "31ed4e59eb42250869582f6ba4d1c533dcbdd20df7ddbc30b7cda10b92657989",
+      "exact_bytes": true
+    },
+    {
+      "source": "material-confirmation-evidence-review-20261016.json",
+      "path": "docs/verification/evidence/20261016-material-change/confirmation-evidence-review.json",
+      "sha256": "6114a45850ff3c06ff76fb3f259d87f39eb12ebc324c2f78ac16a0fb2f92fdd3",
+      "exact_bytes": true
+    },
+    {
+      "source": "pr81-docs-followup-review-20261016.json",
+      "path": "docs/verification/evidence/20261016-material-change/pr81-docs-followup-review.json",
+      "sha256": "19dd7e7861112c31a7fa96363f224fb7332cd63f1f6fd06e93b493b14e23c2e3",
+      "exact_bytes": true
+    }
+  ],
+  "plan_source_sha256": "3a32462088cba9fe3d841477eb5a469ae06fcefe52011a39c01e32f83c79f214",
+  "plan_view_change": "Added local navigation links and a placement note distinguishing draft-time clean/PR status from later document import; every nonblank source line retained.",
+  "originals_modified": false,
+  "application_code_changed": false,
+  "packaging_note": "source-preservationの初期失敗ログ参照名を収録名へ整備。元のログ内容とソースhashは不変、整備前metadataはtask-2へ保持。"
+}

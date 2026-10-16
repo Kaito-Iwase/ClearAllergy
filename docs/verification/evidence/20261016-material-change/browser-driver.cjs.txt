@@ -1,0 +1,89 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const { chromium } = require('C:/Users/kaito/Documents/Github/ClearAllergy/.codex/agent/browser-1.61.0/node_modules/playwright');
+const origin = process.env.MATERIAL_FIXTURE_ORIGIN || 'http://127.0.0.1:55187';
+const output = 'C:/Users/kaito/Documents/Codex/2026-10-14/task-2/material-confirmation-browser-20261016';
+const result = { startedAt: new Date().toISOString(), sourceMain: 'cd502b2404f518975dc4243ab6c41a702e7aa226', method: 'unchanged current-main components bundled by existing loopback memory fixture', cases: [], blockedExternalRequests: [], errors: [], limits: ['No real HTTP application route, PostgreSQL, Clerk, Blob or production', 'No participant study or food validation', 'Memory adapter is not database transaction/trigger proof', 'Prior existing CSS reused; no app build/install/generate'], corrections: ['The earlier formula-only UNKNOWN mismatch assumed isPublished=true after choosing UNKNOWN. Actual setOne clears it; evaluate as counterexample.'] };
+fs.mkdirSync(output, { recursive: true });
+let browser;
+async function one(id, change, expected, cancel = false) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 900 }, timezoneId: 'Asia/Tokyo' });
+  await context.route('**/*', route => {
+    if (new URL(route.request().url()).origin === origin) return route.continue();
+    result.blockedExternalRequests.push(route.request().url());
+    return route.abort();
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  const dialogs = [], puts = [];
+  page.on('pageerror', error => result.errors.push({ id, message: error.message }));
+  page.on('dialog', async dialog => { dialogs.push({ type: dialog.type(), message: dialog.message(), accepted: !cancel }); await (cancel ? dialog.dismiss() : dialog.accept()); });
+  page.on('request', request => { if (request.method() === 'PUT') puts.push(JSON.parse(request.postData())); });
+  try {
+    await page.goto(origin + '/admin/menus/trial-dish-one/edit');
+    await page.getByLabel('🧺 原材料名', { exact: true }).waitFor();
+    await page.getByText('保存済みの公開設定：公開', { exact: false }).waitFor();
+    const before = await (await context.request.get(origin + '/__trial__/state')).json();
+    assert.equal(before.menu.isPublished, true);
+    await change(page);
+    const expectedButton = await page.getByRole('button', { name: /保存時(?:は|に)/ }).innerText();
+    await page.screenshot({ path: path.join(output, id + '-before.png'), fullPage: true });
+    let response;
+    if (cancel) {
+      await page.getByRole('button', { name: '保存する', exact: true }).click();
+      await page.waitForTimeout(200);
+      assert.equal(puts.length, 0);
+    } else {
+      const waiting = page.waitForResponse(r => r.request().method() === 'PUT' && r.url() === origin + '/api/admin/menus/trial-dish-one');
+      await page.getByRole('button', { name: '保存する', exact: true }).click();
+      const r = await waiting; response = { status: r.status(), body: await r.json() };
+      await page.getByText('保存しました。', { exact: true }).waitFor();
+      assert.equal(response.status, 200);
+      assert.equal(puts.length, 1);
+      assert.equal(puts[0].isPublished, expected.published);
+      assert.equal(response.body.menu.isPublished, expected.published);
+    }
+    const after = await (await context.request.get(origin + '/__trial__/state')).json();
+    assert.equal(dialogs.length, expected.dialogs);
+    const saysPublish = dialogs.some(d => d.message.includes('公開する設定で'));
+    assert.equal(saysPublish, expected.saysPublish);
+    if (cancel) assert.deepEqual(after.menu, before.menu);
+    const mismatch = !cancel && saysPublish && puts[0].isPublished === false;
+    assert.equal(mismatch, expected.mismatch);
+    await page.screenshot({ path: path.join(output, id + '-after.png'), fullPage: true });
+    const row = { id, expectedButton, dialogs, requests: puts, response, finalPublicSetting: after.menu.isPublished, finalReviewState: after.listRow.foodReviewState, finalPublicVisible: after.publicVisible, mismatch, status: 'PASS' };
+    result.cases.push(row); console.log('PASS ' + id + ': mismatch=' + mismatch + ', dialogs=' + dialogs.length + ', PUT=' + puts.length);
+  } finally { await context.close(); }
+}
+async function main() {
+  try {
+    browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
+    result.browserVersion = browser.version();
+    const ingredients = async page => page.getByLabel('🧺 原材料名', { exact: true }).fill('【架空 R2】米、きのこ、ソースB、白ごまの飾り');
+    const declaration = async page => page.getByRole('checkbox', { name: /入力文字が同じでも/ }).check();
+    await one('C1-ingredient-change', ingredients, { published: false, dialogs: 1, saysPublish: true, mismatch: true });
+    await one('C2-declaration-only', declaration, { published: false, dialogs: 1, saysPublish: true, mismatch: true });
+    await one('C3-unknown-counterexample', async page => page.getByRole('group', { name: '乳', exact: true }).getByRole('button', { name: '未設定', exact: true }).click(), { published: false, dialogs: 0, saysPublish: false, mismatch: false });
+    await one('C4-cancel', ingredients, { dialogs: 1, saysPublish: true, mismatch: false }, true);
+    await one('C5-price-only', async page => page.getByLabel('価格（税込・円）', { exact: true }).fill('710'), { published: true, dialogs: 1, saysPublish: true, mismatch: false });
+    await one('C6-valid-new-review', async page => {
+      await ingredients(page);
+      await page.getByRole('group', { name: '乳', exact: true }).getByRole('button', { name: '含む', exact: true }).click();
+      await page.getByRole('checkbox', { name: '今回の提供内容と原資料を照合した記録を保存する', exact: true }).check();
+      await page.getByLabel('根拠資料・製品識別・資料の版', { exact: true }).fill('架空 B-1 / R2');
+      await page.getByLabel('確認した提供内容・バリエーション・構成品・対象アレルゲンの範囲', { exact: true }).fill('架空の小丼全構成・全品目。工程は未確認');
+      const time = await page.evaluate(() => new Date(Date.now() - 60000).toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16));
+      await page.getByLabel('食品根拠を確認した日時', { exact: true }).fill(time);
+    }, { published: true, dialogs: 1, saysPublish: true, mismatch: false });
+    assert.deepEqual(result.errors, []);
+    result.status = 'PASS';
+  } catch (error) { result.status = 'FAIL'; result.failure = error.stack || error.message; process.exitCode = 1; }
+  finally {
+    result.completedAt = new Date().toISOString();
+    fs.writeFileSync(path.join(output, 'confirmation-check.json'), JSON.stringify(result, null, 2));
+    if (browser) await browser.close();
+    console.log(JSON.stringify({ status: result.status, cases: result.cases.length, mismatches: result.cases.filter(c => c.mismatch).map(c => c.id), failure: result.failure }));
+  }
+}
+main();

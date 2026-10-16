@@ -1,10 +1,16 @@
-# Design & Implementation Decisions Interview Q&A
+# 設計・実装の判断を説明する面接Q&A
+
+[README](../../README.md) · [現行の共通ルール](../guide/rules.md) · [現行の内部処理](../guide/architecture.md) · [現在の確認範囲](../guide/verification.md)
 
 ## 使い方
 
 就職活動の面接で「何を作ったか」より「なぜそう判断したか」を自分の言葉で話すための練習帳。まず20秒回答を声に出し、突っ込まれたら60秒回答と追加質問へ進む。**「本人が単独で決めた」「実環境で安全を証明した」とは、この資料だけを根拠に言わない。** 最終的な本人の動機は本人が確認する。
 
+用語は、UIが画面や操作部分、APIがアプリ間で要求・応答をやり取りする入口、DBがデータベース、CIが継続的な自動検証を指す。
+
 調査基準は2026-09-26の `improve/prototype-usability-ci`、HEAD `64163cc` と、その時点の未コミット変更を含む作業ツリー。README、`docs/guide/`、`AGENTS.md`、依存・lock、スキーマとmigration、画面・API・認証・テスト・CI・環境変数例、ローカルGit履歴とblameを確認した。`docs/audits/` のローカル監査も読んだがGit管理外なので、持ち運べる根拠にはしない。GitHub上のIssue/PR本文は取得できず、PR番号・表題はローカルmerge commitで分かる範囲に限る。ローカル履歴ではPR #26/#27がアレルゲンの公開条件、#29がCI、#34が可読性、#36がプロトタイプ改善に関連するが、**PR本文の設計議論を読めたという意味ではない**。ここでのPASSは資料とコードの照合を意味し、画面や本番サービスの動作確認ではない。
+
+**以下の「現行」「現在」「今なら」は、この調査基準時点を指す。** 食品確認記録・公開ページの取得方式など、その後の変更は上の現行ガイドで確認する。「今ならどうする？」は当時の検討案であり、現在の実施計画や許可を示さない。
 
 - **CONFIRMED**：README・文書・コメント・commit messageに理由が明記されている。ただし後年の説明を「初期選定時に比較した証拠」と読み替えない。
 - **INFERRED**：構造からの解釈。回答に必ず「推測ですが」を入れる。
@@ -71,7 +77,7 @@ READMEに「店舗側が更新し、利用者側が事前に確認」と明記�
 
 ### 60秒回答
 
-二値だと不確実・未入力が「含まない」に紛れる危険があります。現行DB enumは `CONTAINS/FREE/MAY_CONTAIN/UNKNOWN` の4状態で、TypeScriptも同じ文字列unionです。`MAY_CONTAIN` は不確実さを明示した登録として注意を付けて公開でき、`UNKNOWN` は未設定なので公開できません。状態が増えた分、UI、API、DB、テストの整合を保つ手間があります。
+二値だと不確実・未入力が「含まない」に紛れる危険があります。現行DBの列挙型（enum）は `CONTAINS/FREE/MAY_CONTAIN/UNKNOWN` の4状態で、TypeScriptも同じ文字列unionです。`MAY_CONTAIN` は不確実さを明示した登録として注意を付けて公開でき、`UNKNOWN` は未設定なので公開できません。状態が増えた分、UI、API、DB、テストの整合を保つ手間があります。
 
 ### 詳細
 
@@ -932,7 +938,7 @@ DB運用・接続・migration適用・復元訓練が必要。マネージドサ
 ### 他の選択肢
 
 - 生SQLと手書き型。
-- Drizzle等の別ORM。
+- Drizzle等の別ORM（オブジェクトとDBを対応付ける道具）。
 - DBクライアントと手動migration。
 
 ### なぜ他の選択肢ではなかったのか
@@ -1112,7 +1118,7 @@ DBとBlobの原子性がなく、孤立ファイル回収が必要。サービ�
 ### 他の選択肢
 
 - 毎回DBを読み、キャッシュしない。
-- TTLだけに頼り、更新APIから無効化しない。
+- TTL（キャッシュの有効期間）だけに頼り、更新APIから無効化しない。
 - tag単位の再検証やデータキャッシュへ再設計する。
 
 ### なぜ他の選択肢ではなかったのか
@@ -1157,7 +1163,7 @@ DBとBlobの原子性がなく、孤立ファイル回収が必要。サービ�
 ### 他の選択肢
 
 - 単体テストのみ。
-- 全操作を実サービスE2Eへ寄せる。
+- 全操作を実サービスE2E（画面操作からサービスまでを通す試験）へ寄せる。
 - 手動ブラウザ確認だけにする。
 
 ### なぜ他の選択肢ではなかったのか
@@ -1378,7 +1384,7 @@ Google店舗候補は管理者が店舗情報を入力する補助です。公�
 | Tailwind CSS | 二面の表示を調整 → utility class | CSS Modules、UIライブラリ | classの長文化 | **CONFIRMED**：旧README選定表、Q11 |
 | Hono | HTTP処理の機能別実装 → ルートと共通エラー処理 | Next.js標準Route Handler、別API | 二つのAPI流儀 | **UNKNOWN**：移行commit `6dc7d57` はあるが理由比較なし、Q14 |
 | Zod | 外部JSONを実行時に検査 → schemaの `safeParse` | 手書き検証、他のschemaライブラリ | 個別検証との重複 | **INFERRED**：推測ですが、APIの型・文字数をまとめて検査するため。採用比較記録はなし、Q16 |
-| PostgreSQL | 関係・一意性・トランザクション → スキーマとSQL制約 | SQLite、別RDBMS | DB運用が必要 | **CONFIRMED**：旧READMEの関連データ理由、Q20 |
+| PostgreSQL | 関係・一意性・トランザクション → スキーマとSQL制約 | SQLite、別のリレーショナルDB | DB運用が必要 | **CONFIRMED**：旧READMEの関連データ理由、Q20 |
 | Neon | PostgreSQLの配備先候補 → 接続URL | 他社managed PostgreSQL、自前 | サービス依存 | **UNKNOWN**：PostgreSQLとの併記はあるがNeon固有の比較理由なし、Q20 |
 | Prisma | 型付きクエリ・migration → Clientとschema | 生SQL、Drizzle | 生成・ORM外SQLの二重管理 | **CONFIRMED**：旧README選定表、Q21 |
 | Clerk | 認証・セッション → サーバーの本人ID | 自前認証、他社認証 | 外部設定・DBとの同期 | **CONFIRMED**：旧README選定表と移行履歴、Q22 |

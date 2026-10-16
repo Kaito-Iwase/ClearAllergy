@@ -1,0 +1,1432 @@
+{
+  "startedAt": "2026-10-15T15:24:01.616Z",
+  "sourceMain": "cd502b2404f518975dc4243ab6c41a702e7aa226",
+  "method": "unchanged current-main components bundled by existing loopback memory fixture",
+  "cases": [
+    {
+      "id": "C1-ingredient-change",
+      "expectedButton": "保存時は公開停止（再確認が必要）",
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "「架空・きのこの小丼」\n原材料を変更しています。アレルゲン全品目と注意書きを見直してください。\n\n公開する設定で保存します。入力内容を確認しましたか？",
+          "accepted": true
+        }
+      ],
+      "requests": [
+        {
+          "expectedVersion": 5,
+          "foodChangeReported": false,
+          "name": "架空・きのこの小丼",
+          "description": "一料理・一材料変更の隔離演習",
+          "priceYen": 700,
+          "category": "架空の丼",
+          "ingredients": "【架空 R2】米、きのこ、ソースB、白ごまの飾り",
+          "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+          "imageUrl": null,
+          "imageFrame": "wide",
+          "imageFit": "contain",
+          "imagePosition": "center",
+          "imageZoom": 100,
+          "imagePositionX": 50,
+          "imagePositionY": 50,
+          "isPublished": false,
+          "allergenStatusBySlug": {
+            "shrimp": "FREE",
+            "crab": "FREE",
+            "walnut": "FREE",
+            "wheat": "CONTAINS",
+            "buckwheat": "FREE",
+            "egg": "FREE",
+            "milk": "FREE",
+            "peanut": "FREE",
+            "almond": "FREE",
+            "abalone": "FREE",
+            "squid": "FREE",
+            "salmon_roe": "FREE",
+            "orange": "FREE",
+            "cashew": "FREE",
+            "kiwifruit": "FREE",
+            "beef": "FREE",
+            "sesame": "CONTAINS",
+            "salmon": "FREE",
+            "mackerel": "FREE",
+            "soybean": "CONTAINS",
+            "chicken": "FREE",
+            "banana": "FREE",
+            "pork": "FREE",
+            "macadamia_nut": "FREE",
+            "peach": "FREE",
+            "apple": "FREE",
+            "yam": "FREE",
+            "gelatin": "FREE",
+            "pistachio": "FREE"
+          }
+        }
+      ],
+      "response": {
+        "status": 200,
+        "body": {
+          "menu": {
+            "id": "trial-dish-one",
+            "version": 6,
+            "foodVersion": 2,
+            "reviewedFoodVersion": null,
+            "isPublished": false,
+            "imageUrl": null,
+            "foodReviews": [
+              {
+                "id": "synthetic-1-5",
+                "foodVersion": 1,
+                "evidenceRefs": "架空資料 A-1 / R1（実食品の確認ではない）",
+                "scope": "架空の小丼の全構成・マスター全品目。工程の交差接触は未確認",
+                "checkedAt": "2026-10-15T15:24:02.374Z",
+                "recordedAt": "2026-10-15T15:24:02.374Z",
+                "unresolvedIssues": null,
+                "contentSnapshot": {
+                  "name": "架空・きのこの小丼",
+                  "description": "一料理・一材料変更の隔離演習",
+                  "category": "架空の丼",
+                  "ingredients": "【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り",
+                  "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+                  "imageUrl": null,
+                  "allergens": [
+                    {
+                      "slug": "abalone",
+                      "nameJa": "あわび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "almond",
+                      "nameJa": "アーモンド",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "apple",
+                      "nameJa": "りんご",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "banana",
+                      "nameJa": "バナナ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "beef",
+                      "nameJa": "牛肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "buckwheat",
+                      "nameJa": "そば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "cashew",
+                      "nameJa": "カシューナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "chicken",
+                      "nameJa": "鶏肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "crab",
+                      "nameJa": "かに",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "egg",
+                      "nameJa": "卵",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "gelatin",
+                      "nameJa": "ゼラチン",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "kiwifruit",
+                      "nameJa": "キウイフルーツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "macadamia_nut",
+                      "nameJa": "マカダミアナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "mackerel",
+                      "nameJa": "さば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "milk",
+                      "nameJa": "乳",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "orange",
+                      "nameJa": "オレンジ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peach",
+                      "nameJa": "もも",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peanut",
+                      "nameJa": "落花生（ピーナッツ）",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pistachio",
+                      "nameJa": "ピスタチオ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pork",
+                      "nameJa": "豚肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon",
+                      "nameJa": "さけ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon_roe",
+                      "nameJa": "いくら",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "sesame",
+                      "nameJa": "ごま",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "shrimp",
+                      "nameJa": "えび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "soybean",
+                      "nameJa": "大豆",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "squid",
+                      "nameJa": "いか",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "walnut",
+                      "nameJa": "くるみ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "wheat",
+                      "nameJa": "小麦",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "yam",
+                      "nameJa": "やまいも",
+                      "status": "FREE"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "finalPublicSetting": false,
+      "finalReviewState": "outdated",
+      "finalPublicVisible": false,
+      "mismatch": true,
+      "status": "PASS"
+    },
+    {
+      "id": "C2-declaration-only",
+      "expectedButton": "保存時は公開停止（再確認が必要）",
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "「架空・きのこの小丼」\n公開する前に、原材料・アレルゲン全品目・注意書きを見直してください。\n\n公開する設定で保存します。入力内容を確認しましたか？",
+          "accepted": true
+        }
+      ],
+      "requests": [
+        {
+          "expectedVersion": 5,
+          "foodChangeReported": true,
+          "name": "架空・きのこの小丼",
+          "description": "一料理・一材料変更の隔離演習",
+          "priceYen": 700,
+          "category": "架空の丼",
+          "ingredients": "【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り",
+          "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+          "imageUrl": null,
+          "imageFrame": "wide",
+          "imageFit": "contain",
+          "imagePosition": "center",
+          "imageZoom": 100,
+          "imagePositionX": 50,
+          "imagePositionY": 50,
+          "isPublished": false,
+          "allergenStatusBySlug": {
+            "shrimp": "FREE",
+            "crab": "FREE",
+            "walnut": "FREE",
+            "wheat": "CONTAINS",
+            "buckwheat": "FREE",
+            "egg": "FREE",
+            "milk": "FREE",
+            "peanut": "FREE",
+            "almond": "FREE",
+            "abalone": "FREE",
+            "squid": "FREE",
+            "salmon_roe": "FREE",
+            "orange": "FREE",
+            "cashew": "FREE",
+            "kiwifruit": "FREE",
+            "beef": "FREE",
+            "sesame": "CONTAINS",
+            "salmon": "FREE",
+            "mackerel": "FREE",
+            "soybean": "CONTAINS",
+            "chicken": "FREE",
+            "banana": "FREE",
+            "pork": "FREE",
+            "macadamia_nut": "FREE",
+            "peach": "FREE",
+            "apple": "FREE",
+            "yam": "FREE",
+            "gelatin": "FREE",
+            "pistachio": "FREE"
+          }
+        }
+      ],
+      "response": {
+        "status": 200,
+        "body": {
+          "menu": {
+            "id": "trial-dish-one",
+            "version": 6,
+            "foodVersion": 2,
+            "reviewedFoodVersion": null,
+            "isPublished": false,
+            "imageUrl": null,
+            "foodReviews": [
+              {
+                "id": "synthetic-1-5",
+                "foodVersion": 1,
+                "evidenceRefs": "架空資料 A-1 / R1（実食品の確認ではない）",
+                "scope": "架空の小丼の全構成・マスター全品目。工程の交差接触は未確認",
+                "checkedAt": "2026-10-15T15:24:04.280Z",
+                "recordedAt": "2026-10-15T15:24:04.280Z",
+                "unresolvedIssues": null,
+                "contentSnapshot": {
+                  "name": "架空・きのこの小丼",
+                  "description": "一料理・一材料変更の隔離演習",
+                  "category": "架空の丼",
+                  "ingredients": "【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り",
+                  "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+                  "imageUrl": null,
+                  "allergens": [
+                    {
+                      "slug": "abalone",
+                      "nameJa": "あわび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "almond",
+                      "nameJa": "アーモンド",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "apple",
+                      "nameJa": "りんご",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "banana",
+                      "nameJa": "バナナ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "beef",
+                      "nameJa": "牛肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "buckwheat",
+                      "nameJa": "そば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "cashew",
+                      "nameJa": "カシューナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "chicken",
+                      "nameJa": "鶏肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "crab",
+                      "nameJa": "かに",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "egg",
+                      "nameJa": "卵",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "gelatin",
+                      "nameJa": "ゼラチン",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "kiwifruit",
+                      "nameJa": "キウイフルーツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "macadamia_nut",
+                      "nameJa": "マカダミアナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "mackerel",
+                      "nameJa": "さば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "milk",
+                      "nameJa": "乳",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "orange",
+                      "nameJa": "オレンジ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peach",
+                      "nameJa": "もも",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peanut",
+                      "nameJa": "落花生（ピーナッツ）",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pistachio",
+                      "nameJa": "ピスタチオ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pork",
+                      "nameJa": "豚肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon",
+                      "nameJa": "さけ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon_roe",
+                      "nameJa": "いくら",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "sesame",
+                      "nameJa": "ごま",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "shrimp",
+                      "nameJa": "えび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "soybean",
+                      "nameJa": "大豆",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "squid",
+                      "nameJa": "いか",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "walnut",
+                      "nameJa": "くるみ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "wheat",
+                      "nameJa": "小麦",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "yam",
+                      "nameJa": "やまいも",
+                      "status": "FREE"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "finalPublicSetting": false,
+      "finalReviewState": "outdated",
+      "finalPublicVisible": false,
+      "mismatch": true,
+      "status": "PASS"
+    },
+    {
+      "id": "C3-unknown-counterexample",
+      "expectedButton": "保存時は公開停止（再確認が必要）",
+      "dialogs": [],
+      "requests": [
+        {
+          "expectedVersion": 5,
+          "foodChangeReported": false,
+          "name": "架空・きのこの小丼",
+          "description": "一料理・一材料変更の隔離演習",
+          "priceYen": 700,
+          "category": "架空の丼",
+          "ingredients": "【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り",
+          "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+          "imageUrl": null,
+          "imageFrame": "wide",
+          "imageFit": "contain",
+          "imagePosition": "center",
+          "imageZoom": 100,
+          "imagePositionX": 50,
+          "imagePositionY": 50,
+          "isPublished": false,
+          "allergenStatusBySlug": {
+            "shrimp": "FREE",
+            "crab": "FREE",
+            "walnut": "FREE",
+            "wheat": "CONTAINS",
+            "buckwheat": "FREE",
+            "egg": "FREE",
+            "milk": "UNKNOWN",
+            "peanut": "FREE",
+            "almond": "FREE",
+            "abalone": "FREE",
+            "squid": "FREE",
+            "salmon_roe": "FREE",
+            "orange": "FREE",
+            "cashew": "FREE",
+            "kiwifruit": "FREE",
+            "beef": "FREE",
+            "sesame": "CONTAINS",
+            "salmon": "FREE",
+            "mackerel": "FREE",
+            "soybean": "CONTAINS",
+            "chicken": "FREE",
+            "banana": "FREE",
+            "pork": "FREE",
+            "macadamia_nut": "FREE",
+            "peach": "FREE",
+            "apple": "FREE",
+            "yam": "FREE",
+            "gelatin": "FREE",
+            "pistachio": "FREE"
+          }
+        }
+      ],
+      "response": {
+        "status": 200,
+        "body": {
+          "menu": {
+            "id": "trial-dish-one",
+            "version": 6,
+            "foodVersion": 2,
+            "reviewedFoodVersion": null,
+            "isPublished": false,
+            "imageUrl": null,
+            "foodReviews": [
+              {
+                "id": "synthetic-1-5",
+                "foodVersion": 1,
+                "evidenceRefs": "架空資料 A-1 / R1（実食品の確認ではない）",
+                "scope": "架空の小丼の全構成・マスター全品目。工程の交差接触は未確認",
+                "checkedAt": "2026-10-15T15:24:06.253Z",
+                "recordedAt": "2026-10-15T15:24:06.253Z",
+                "unresolvedIssues": null,
+                "contentSnapshot": {
+                  "name": "架空・きのこの小丼",
+                  "description": "一料理・一材料変更の隔離演習",
+                  "category": "架空の丼",
+                  "ingredients": "【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り",
+                  "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+                  "imageUrl": null,
+                  "allergens": [
+                    {
+                      "slug": "abalone",
+                      "nameJa": "あわび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "almond",
+                      "nameJa": "アーモンド",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "apple",
+                      "nameJa": "りんご",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "banana",
+                      "nameJa": "バナナ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "beef",
+                      "nameJa": "牛肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "buckwheat",
+                      "nameJa": "そば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "cashew",
+                      "nameJa": "カシューナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "chicken",
+                      "nameJa": "鶏肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "crab",
+                      "nameJa": "かに",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "egg",
+                      "nameJa": "卵",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "gelatin",
+                      "nameJa": "ゼラチン",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "kiwifruit",
+                      "nameJa": "キウイフルーツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "macadamia_nut",
+                      "nameJa": "マカダミアナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "mackerel",
+                      "nameJa": "さば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "milk",
+                      "nameJa": "乳",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "orange",
+                      "nameJa": "オレンジ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peach",
+                      "nameJa": "もも",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peanut",
+                      "nameJa": "落花生（ピーナッツ）",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pistachio",
+                      "nameJa": "ピスタチオ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pork",
+                      "nameJa": "豚肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon",
+                      "nameJa": "さけ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon_roe",
+                      "nameJa": "いくら",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "sesame",
+                      "nameJa": "ごま",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "shrimp",
+                      "nameJa": "えび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "soybean",
+                      "nameJa": "大豆",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "squid",
+                      "nameJa": "いか",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "walnut",
+                      "nameJa": "くるみ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "wheat",
+                      "nameJa": "小麦",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "yam",
+                      "nameJa": "やまいも",
+                      "status": "FREE"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "finalPublicSetting": false,
+      "finalReviewState": "outdated",
+      "finalPublicVisible": false,
+      "mismatch": false,
+      "status": "PASS"
+    },
+    {
+      "id": "C4-cancel",
+      "expectedButton": "保存時は公開停止（再確認が必要）",
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "「架空・きのこの小丼」\n原材料を変更しています。アレルゲン全品目と注意書きを見直してください。\n\n公開する設定で保存します。入力内容を確認しましたか？",
+          "accepted": false
+        }
+      ],
+      "requests": [],
+      "finalPublicSetting": true,
+      "finalReviewState": "current",
+      "finalPublicVisible": true,
+      "mismatch": false,
+      "status": "PASS"
+    },
+    {
+      "id": "C5-price-only",
+      "expectedButton": "保存時に公開する",
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "「架空・きのこの小丼」\n公開する前に、原材料・アレルゲン全品目・注意書きを見直してください。\n\n公開する設定で保存します。入力内容を確認しましたか？",
+          "accepted": true
+        }
+      ],
+      "requests": [
+        {
+          "expectedVersion": 5,
+          "foodChangeReported": false,
+          "name": "架空・きのこの小丼",
+          "description": "一料理・一材料変更の隔離演習",
+          "priceYen": 710,
+          "category": "架空の丼",
+          "ingredients": "【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り",
+          "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+          "imageUrl": null,
+          "imageFrame": "wide",
+          "imageFit": "contain",
+          "imagePosition": "center",
+          "imageZoom": 100,
+          "imagePositionX": 50,
+          "imagePositionY": 50,
+          "isPublished": true,
+          "allergenStatusBySlug": {
+            "shrimp": "FREE",
+            "crab": "FREE",
+            "walnut": "FREE",
+            "wheat": "CONTAINS",
+            "buckwheat": "FREE",
+            "egg": "FREE",
+            "milk": "FREE",
+            "peanut": "FREE",
+            "almond": "FREE",
+            "abalone": "FREE",
+            "squid": "FREE",
+            "salmon_roe": "FREE",
+            "orange": "FREE",
+            "cashew": "FREE",
+            "kiwifruit": "FREE",
+            "beef": "FREE",
+            "sesame": "CONTAINS",
+            "salmon": "FREE",
+            "mackerel": "FREE",
+            "soybean": "CONTAINS",
+            "chicken": "FREE",
+            "banana": "FREE",
+            "pork": "FREE",
+            "macadamia_nut": "FREE",
+            "peach": "FREE",
+            "apple": "FREE",
+            "yam": "FREE",
+            "gelatin": "FREE",
+            "pistachio": "FREE"
+          }
+        }
+      ],
+      "response": {
+        "status": 200,
+        "body": {
+          "menu": {
+            "id": "trial-dish-one",
+            "version": 6,
+            "foodVersion": 1,
+            "reviewedFoodVersion": 1,
+            "isPublished": true,
+            "imageUrl": null,
+            "foodReviews": [
+              {
+                "id": "synthetic-1-5",
+                "foodVersion": 1,
+                "evidenceRefs": "架空資料 A-1 / R1（実食品の確認ではない）",
+                "scope": "架空の小丼の全構成・マスター全品目。工程の交差接触は未確認",
+                "checkedAt": "2026-10-15T15:24:10.662Z",
+                "recordedAt": "2026-10-15T15:24:10.662Z",
+                "unresolvedIssues": null,
+                "contentSnapshot": {
+                  "name": "架空・きのこの小丼",
+                  "description": "一料理・一材料変更の隔離演習",
+                  "category": "架空の丼",
+                  "ingredients": "【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り",
+                  "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+                  "imageUrl": null,
+                  "allergens": [
+                    {
+                      "slug": "abalone",
+                      "nameJa": "あわび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "almond",
+                      "nameJa": "アーモンド",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "apple",
+                      "nameJa": "りんご",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "banana",
+                      "nameJa": "バナナ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "beef",
+                      "nameJa": "牛肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "buckwheat",
+                      "nameJa": "そば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "cashew",
+                      "nameJa": "カシューナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "chicken",
+                      "nameJa": "鶏肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "crab",
+                      "nameJa": "かに",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "egg",
+                      "nameJa": "卵",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "gelatin",
+                      "nameJa": "ゼラチン",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "kiwifruit",
+                      "nameJa": "キウイフルーツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "macadamia_nut",
+                      "nameJa": "マカダミアナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "mackerel",
+                      "nameJa": "さば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "milk",
+                      "nameJa": "乳",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "orange",
+                      "nameJa": "オレンジ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peach",
+                      "nameJa": "もも",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peanut",
+                      "nameJa": "落花生（ピーナッツ）",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pistachio",
+                      "nameJa": "ピスタチオ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pork",
+                      "nameJa": "豚肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon",
+                      "nameJa": "さけ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon_roe",
+                      "nameJa": "いくら",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "sesame",
+                      "nameJa": "ごま",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "shrimp",
+                      "nameJa": "えび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "soybean",
+                      "nameJa": "大豆",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "squid",
+                      "nameJa": "いか",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "walnut",
+                      "nameJa": "くるみ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "wheat",
+                      "nameJa": "小麦",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "yam",
+                      "nameJa": "やまいも",
+                      "status": "FREE"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "finalPublicSetting": true,
+      "finalReviewState": "current",
+      "finalPublicVisible": true,
+      "mismatch": false,
+      "status": "PASS"
+    },
+    {
+      "id": "C6-valid-new-review",
+      "expectedButton": "保存時に公開する",
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "「架空・きのこの小丼」\n原材料を変更しています。アレルゲン全品目と注意書きを見直してください。\n\n公開する設定で保存します。入力内容を確認しましたか？",
+          "accepted": true
+        }
+      ],
+      "requests": [
+        {
+          "expectedVersion": 5,
+          "foodChangeReported": false,
+          "foodReview": {
+            "evidenceRefs": "架空 B-1 / R2",
+            "scope": "架空の小丼全構成・全品目。工程は未確認",
+            "checkedAt": "2026-10-15T15:23:00.000Z",
+            "unresolvedIssues": ""
+          },
+          "name": "架空・きのこの小丼",
+          "description": "一料理・一材料変更の隔離演習",
+          "priceYen": 700,
+          "category": "架空の丼",
+          "ingredients": "【架空 R2】米、きのこ、ソースB、白ごまの飾り",
+          "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+          "imageUrl": null,
+          "imageFrame": "wide",
+          "imageFit": "contain",
+          "imagePosition": "center",
+          "imageZoom": 100,
+          "imagePositionX": 50,
+          "imagePositionY": 50,
+          "isPublished": true,
+          "allergenStatusBySlug": {
+            "shrimp": "FREE",
+            "crab": "FREE",
+            "walnut": "FREE",
+            "wheat": "CONTAINS",
+            "buckwheat": "FREE",
+            "egg": "FREE",
+            "milk": "CONTAINS",
+            "peanut": "FREE",
+            "almond": "FREE",
+            "abalone": "FREE",
+            "squid": "FREE",
+            "salmon_roe": "FREE",
+            "orange": "FREE",
+            "cashew": "FREE",
+            "kiwifruit": "FREE",
+            "beef": "FREE",
+            "sesame": "CONTAINS",
+            "salmon": "FREE",
+            "mackerel": "FREE",
+            "soybean": "CONTAINS",
+            "chicken": "FREE",
+            "banana": "FREE",
+            "pork": "FREE",
+            "macadamia_nut": "FREE",
+            "peach": "FREE",
+            "apple": "FREE",
+            "yam": "FREE",
+            "gelatin": "FREE",
+            "pistachio": "FREE"
+          }
+        }
+      ],
+      "response": {
+        "status": 200,
+        "body": {
+          "menu": {
+            "id": "trial-dish-one",
+            "version": 6,
+            "foodVersion": 2,
+            "reviewedFoodVersion": 2,
+            "isPublished": true,
+            "imageUrl": null,
+            "foodReviews": [
+              {
+                "evidenceRefs": "架空 B-1 / R2",
+                "scope": "架空の小丼全構成・全品目。工程は未確認",
+                "checkedAt": "2026-10-15T15:23:00.000Z",
+                "unresolvedIssues": null,
+                "id": "synthetic-6",
+                "foodVersion": 2,
+                "recordedAt": "2026-10-15T15:24:14.325Z",
+                "contentSnapshot": {
+                  "name": "架空・きのこの小丼",
+                  "description": "一料理・一材料変更の隔離演習",
+                  "category": "架空の丼",
+                  "ingredients": "【架空 R2】米、きのこ、ソースB、白ごまの飾り",
+                  "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+                  "imageUrl": null,
+                  "allergens": [
+                    {
+                      "slug": "abalone",
+                      "nameJa": "あわび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "almond",
+                      "nameJa": "アーモンド",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "apple",
+                      "nameJa": "りんご",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "banana",
+                      "nameJa": "バナナ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "beef",
+                      "nameJa": "牛肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "buckwheat",
+                      "nameJa": "そば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "cashew",
+                      "nameJa": "カシューナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "chicken",
+                      "nameJa": "鶏肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "crab",
+                      "nameJa": "かに",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "egg",
+                      "nameJa": "卵",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "gelatin",
+                      "nameJa": "ゼラチン",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "kiwifruit",
+                      "nameJa": "キウイフルーツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "macadamia_nut",
+                      "nameJa": "マカダミアナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "mackerel",
+                      "nameJa": "さば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "milk",
+                      "nameJa": "乳",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "orange",
+                      "nameJa": "オレンジ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peach",
+                      "nameJa": "もも",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peanut",
+                      "nameJa": "落花生（ピーナッツ）",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pistachio",
+                      "nameJa": "ピスタチオ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pork",
+                      "nameJa": "豚肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon",
+                      "nameJa": "さけ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon_roe",
+                      "nameJa": "いくら",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "sesame",
+                      "nameJa": "ごま",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "shrimp",
+                      "nameJa": "えび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "soybean",
+                      "nameJa": "大豆",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "squid",
+                      "nameJa": "いか",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "walnut",
+                      "nameJa": "くるみ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "wheat",
+                      "nameJa": "小麦",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "yam",
+                      "nameJa": "やまいも",
+                      "status": "FREE"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "synthetic-1-5",
+                "foodVersion": 1,
+                "evidenceRefs": "架空資料 A-1 / R1（実食品の確認ではない）",
+                "scope": "架空の小丼の全構成・マスター全品目。工程の交差接触は未確認",
+                "checkedAt": "2026-10-15T15:24:12.790Z",
+                "recordedAt": "2026-10-15T15:24:12.790Z",
+                "unresolvedIssues": null,
+                "contentSnapshot": {
+                  "name": "架空・きのこの小丼",
+                  "description": "一料理・一材料変更の隔離演習",
+                  "category": "架空の丼",
+                  "ingredients": "【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り",
+                  "precaution": "架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。",
+                  "imageUrl": null,
+                  "allergens": [
+                    {
+                      "slug": "abalone",
+                      "nameJa": "あわび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "almond",
+                      "nameJa": "アーモンド",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "apple",
+                      "nameJa": "りんご",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "banana",
+                      "nameJa": "バナナ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "beef",
+                      "nameJa": "牛肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "buckwheat",
+                      "nameJa": "そば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "cashew",
+                      "nameJa": "カシューナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "chicken",
+                      "nameJa": "鶏肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "crab",
+                      "nameJa": "かに",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "egg",
+                      "nameJa": "卵",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "gelatin",
+                      "nameJa": "ゼラチン",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "kiwifruit",
+                      "nameJa": "キウイフルーツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "macadamia_nut",
+                      "nameJa": "マカダミアナッツ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "mackerel",
+                      "nameJa": "さば",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "milk",
+                      "nameJa": "乳",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "orange",
+                      "nameJa": "オレンジ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peach",
+                      "nameJa": "もも",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "peanut",
+                      "nameJa": "落花生（ピーナッツ）",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pistachio",
+                      "nameJa": "ピスタチオ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "pork",
+                      "nameJa": "豚肉",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon",
+                      "nameJa": "さけ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "salmon_roe",
+                      "nameJa": "いくら",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "sesame",
+                      "nameJa": "ごま",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "shrimp",
+                      "nameJa": "えび",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "soybean",
+                      "nameJa": "大豆",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "squid",
+                      "nameJa": "いか",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "walnut",
+                      "nameJa": "くるみ",
+                      "status": "FREE"
+                    },
+                    {
+                      "slug": "wheat",
+                      "nameJa": "小麦",
+                      "status": "CONTAINS"
+                    },
+                    {
+                      "slug": "yam",
+                      "nameJa": "やまいも",
+                      "status": "FREE"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "finalPublicSetting": true,
+      "finalReviewState": "current",
+      "finalPublicVisible": true,
+      "mismatch": false,
+      "status": "PASS"
+    }
+  ],
+  "blockedExternalRequests": [],
+  "errors": [],
+  "limits": [
+    "No real HTTP application route, PostgreSQL, Clerk, Blob or production",
+    "No participant study or food validation",
+    "Memory adapter is not database transaction/trigger proof",
+    "Prior existing CSS reused; no app build/install/generate"
+  ],
+  "corrections": [
+    "The earlier formula-only UNKNOWN mismatch assumed isPublished=true after choosing UNKNOWN. Actual setOne clears it; evaluate as counterexample."
+  ],
+  "browserVersion": "155.0.8059.40",
+  "status": "PASS",
+  "completedAt": "2026-10-15T15:24:14.768Z"
+}

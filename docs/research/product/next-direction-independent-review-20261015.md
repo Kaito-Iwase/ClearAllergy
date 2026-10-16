@@ -1,0 +1,32 @@
+# 現行main照合・次手資料の独立レビュー
+
+> 配置注記：2026-10-15 17:16 JST時点までに作成した資料の保存版です。元の全文は[原稿コピー](../originals/20261015-main-integration/ca-next-independent-review-20261015.md.txt)に保持し、この版はrepo内の参照先だけを整えています。実店舗接触を次手とする当時の提案は、現在の[調査・検証方針](../product/research-and-friend-testing-policy-20261015.md)で更新されています。
+
+対象：`ca-next-direction-20261015.md`、`ca-current-main-issue-audit-20261015.md`、`ca-one-dish-reconciliation-20261015.md`、`ca-next-verification-plan-20261015.md`。固定main `cd502b2404f518975dc4243ab6c41a702e7aa226`。
+
+適用AGENTS.mdの「独立reviewは、実装履歴を共有しない読取専用subagentへ委任する」に従い、履歴を共有しない `/root/ca_next_direction_independent_review` へ委任した。元の2研究計画の最終レビューとは別に、今回新しく作った技術照合と提案の正確さを対象とした。レビュー担当はコード・Issue/コメント・CI・原稿を読み、アプリ/DB/provider/browserの実行やファイル・Git/GitHubの変更を行っていない。
+
+## Round 1：受領した最終報告
+
+**要修正1件（P2）**です。
+
+- **F条件で、現行の`MAY_CONTAIN`方針への対応が抜けています。** `ca-one-dish-reconciliation-20261015.md:22`は、共用器具の条件を`FREE`・注意書き・`STORE_HANDLED`だけで説明しています。しかし、固定mainの`features/admin/menus/components/MenuAllergenRegistrationGuide.tsx:7`と`docs/guide/rules.md:20`は、共用器具等による混入懸念を把握した場合に`MAY_CONTAIN`を選ぶ現行方針を明記しています。注意書きだけでは状態も変わりません。現状の表では、研究案の「原材料不使用＋工程情報」を`FREE`のまま入力することが、現行契約との対応だと読めます。**既存の`MAY_CONTAIN`と理由記載を追記し、F/F2の入力条件と二段表示案との差を明示してください。** 共用から混入確定を推測する必要はありません。
+
+その他の指定観点に追加must-fixはありません。#73/#74の修復済み、#44/#50の未解決、#78の別base、CI・fixture・人・現場の証拠境界、A〜Gの独立条件と6領域の前提・完了条件・依存は整合しています。
+
+fixtureの3ファイルのハッシュ差はLF/CRLF差だけでした。版不一致の指摘には該当しません。ファイル変更、アプリ・DB・provider・ブラウザ試験、Git/GitHub変更は行っていません。
+
+## 修復と確認
+
+作成担当はF欄と6領域計画の材料変更欄へ、現行MAY_CONTAIN＋理由、情報不足ならUNKNOWN、注意書きだけで状態は変わらないことを明記した。原材料/工程の二軸表示案は未採用と区別し、F/F2を同じ入力/正解にしていない。元の研究原稿は変更していない。
+
+修復後の静的検査：11文書・inlineローカルリンク67・固定commitのコード参照28・Issue27件の網羅に欠損0。既存日本語候補7ファイル、元原稿7件の2保存先は全ハッシュ一致。これはリンク/内容照合であり、アプリ動作の新規試験ではない。独立の修復後判定は次節に保存する。
+
+## Round 2：受領した修復後判定
+
+P2は解消済みです。修正箇所に追加must-fixはありません。
+
+- 一料理表F:22：`MAY_CONTAIN`＋理由、資料不足時の`UNKNOWN`、注意書きだけでは状態不変、F/F2と未採用の二軸表示案の区別が現行方針に整合しています。
+- 検証計画:54：同じ対応が反映され、修正による意味のずれは認めません。
+
+再確認は読取のみ。編集・動作試験・外部操作は行っていません。
