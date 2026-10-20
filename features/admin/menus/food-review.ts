@@ -21,7 +21,10 @@ export { isFoodReviewCurrent } from "@/lib/allergens";
 export type FoodReviewDraft = { evidenceRefs: string; scope: string; checkedAt: string; unresolvedIssues: string };
 export type FoodReviewSummary = Omit<FoodReviewDraft, "unresolvedIssues"> & { unresolvedIssues: string | null; id: string; foodVersion: number; recordedAt: string; contentSnapshot: unknown };
 export const emptyFoodReviewDraft = (): FoodReviewDraft => ({ evidenceRefs: "", scope: "", checkedAt: "", unresolvedIssues: "" });
-export function foodReviewDraftComplete(review: FoodReviewDraft) {
-    const time = Date.parse(review.checkedAt);
-    return Boolean(review.evidenceRefs.trim() && review.scope.trim() && Number.isFinite(time) && !review.unresolvedIssues.trim());
+export function isFoodReviewTimeValid(checkedAt: string, now = Date.now()) {
+    const time = Date.parse(checkedAt);
+    return Number.isFinite(time) && time <= now + 5 * 60_000;
+}
+export function foodReviewDraftComplete(review: FoodReviewDraft, now = Date.now()) {
+    return Boolean(review.evidenceRefs.trim() && review.scope.trim() && isFoodReviewTimeValid(review.checkedAt, now) && !review.unresolvedIssues.trim());
 }

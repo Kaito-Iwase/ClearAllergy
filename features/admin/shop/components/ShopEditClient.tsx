@@ -522,237 +522,7 @@ export default function ShopEditClient({
 
     return (
         <fieldset disabled={saving || uploading} className="min-w-0 space-y-6">
-            <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-                <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
-                    <div className={`relative overflow-hidden bg-white p-5 sm:p-8 md:p-10 ${previewImageUrl ? "min-h-[300px] sm:min-h-[360px]" : ""}`}>
-                        {previewImageUrl ? (
-                            <Image
-                                src={previewImageUrl}
-                                alt=""
-                                fill
-                                sizes="(min-width: 1024px) 60vw, 100vw"
-                                unoptimized={previewImageUrl.startsWith("blob:")}
-                                className="absolute inset-0"
-                                style={coverImageStyle}
-                            />
-                        ) : null}
-
-                        {previewImageUrl ? <div className="absolute inset-0 bg-black/60" /> : null}
-
-                        <div className="relative z-10 flex h-full flex-col justify-between">
-                            <div>
-                                <p className={`text-sm font-semibold ${previewImageUrl ? "text-white/90 drop-shadow" : "text-gray-800"}`}>
-                                    公開プレビュー
-                                </p>
-                                <h2 className={`mt-5 text-3xl font-extrabold tracking-tight sm:mt-6 sm:text-4xl md:text-5xl ${previewImageUrl ? "text-white drop-shadow" : "text-gray-900"}`}>
-                                    {name.trim() || "店舗名未設定"}
-                                </h2>
-                                <p className={`mt-4 max-w-xl text-base font-medium md:text-lg ${previewImageUrl ? "text-white/90" : "text-gray-700"}`}>
-                                    {description.trim() ||
-                                        "店舗説明は未設定です。"}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="border-t border-gray-200 bg-white p-4 sm:p-6 lg:border-l lg:border-t-0">
-                        <h3 className="text-2xl font-extrabold text-gray-900">
-                            店舗情報
-                        </h3>
-
-                        <div className="mt-6 space-y-5 text-sm text-gray-700">
-                            <div className="flex items-start gap-3">
-                                <span className="mt-0.5 text-pink-500">📍</span>
-                                <div>
-                                    <p className="font-bold text-gray-900">
-                                        住所
-                                    </p>
-                                    <p className="mt-1 whitespace-pre-wrap">
-                                        {address.trim() || "未設定"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <span className="mt-0.5 text-gray-500">🕒</span>
-                                <div>
-                                    <p className="font-bold text-gray-900">
-                                        営業時間
-                                    </p>
-                                    <p className="mt-1 whitespace-pre-wrap">
-                                        {businessHoursText || "未設定"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <span className="mt-0.5 text-gray-500">休</span>
-                                <div>
-                                    <p className="font-bold text-gray-900">
-                                        定休日
-                                    </p>
-                                    <p className="mt-1 whitespace-pre-wrap">
-                                        {regularHoliday.trim() || "未設定"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <span className="mt-0.5 text-gray-500">TEL</span>
-                                <div>
-                                    <p className="font-bold text-gray-900">
-                                        電話番号
-                                    </p>
-                                    <p className="mt-1 whitespace-pre-wrap">
-                                        {phoneNumber.trim() || "未設定"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {note.trim() ? (
-                                <div className="flex items-start gap-3">
-                                    <span className="mt-0.5 text-gray-500">
-                                        ※
-                                    </span>
-                                    <div>
-                                        <p className="font-bold text-gray-900">
-                                            備考
-                                        </p>
-                                        <p className="mt-1 whitespace-pre-wrap">
-                                            {note.trim()}
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            <div className="flex items-start gap-3">
-                                <span className="mt-0.5 text-amber-500">
-                                    💴
-                                </span>
-                                <div>
-                                    <p className="font-bold text-gray-900">
-                                        平均予算
-                                    </p>
-                                    <p className="mt-1 whitespace-pre-wrap">
-                                        {averageBudgetLabel}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <span className="mt-0.5 text-blue-500">🪪</span>
-                                <div>
-                                    <p className="font-bold text-gray-900">
-                                        公開メニュー
-                                    </p>
-                                    <p className="mt-1">
-                                        {initialShop.publishedMenuCount}件
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <span className="mt-0.5 text-blue-500">🔄</span>
-                                <div>
-                                    <p className="font-bold text-gray-900">
-                                        更新
-                                    </p>
-                                    <p className="mt-1">{updatedAtText}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-8">
-                            <ShareShopUrlButton shopId={initialShop.id} />
-                        </div>
-
-                        <p className="mt-3 text-xs text-gray-500">
-                            ※ QR表示は下のカードで確認できます
-                        </p>
-                    </div>
-                </div>
-            </section>
-
-            <ShopQrCard
-                shopId={initialShop.id}
-                shopName={name.trim() || initialShop.name}
-            />
-
-            {previewImageUrl ? (
-                <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 className="text-2xl font-extrabold text-gray-900">
-                                店舗画像の見え方調整
-                            </h3>
-                            <p className="mt-1 text-sm leading-6 text-gray-600">
-                                カバー写真の見え方を調整できます。保存は、下の店舗情報フォームの変更も含みます。
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={saveShop}
-                            disabled={readOnly || saving || uploading || needsSaveCheck}
-                            className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d] disabled:opacity-60"
-                        >
-                            {readOnly
-                                ? "保存不可（デモ）"
-                                : uploading
-                                ? "画像アップロード中..."
-                                : saving
-                                  ? "保存中..."
-                                  : "店舗情報と画像設定を保存"}
-                        </button>
-                    </div>
-
-                    <ImageCompositionEditor
-                        imageSrc={previewImageUrl}
-                        imageAlt="店舗カバー画像プレビュー"
-                        subjectName={name}
-                        subjectKind="shop"
-                        surface="plain"
-                        values={{
-                            imageFrame: coverImageFrame,
-                            imageFit: coverImageFit,
-                            imagePosition: coverImagePosition,
-                            imageZoom: coverImageZoom,
-                            imagePositionX: coverImagePositionX,
-                            imagePositionY: coverImagePositionY,
-                        }}
-                        initialValues={{
-                            imageFrame: initialShop.coverImageFrame,
-                            imageFit: initialShop.coverImageFit,
-                            imagePosition: initialShop.coverImagePosition,
-                            imageZoom: initialShop.coverImageZoom,
-                            imagePositionX: initialShop.coverImagePositionX,
-                            imagePositionY: initialShop.coverImagePositionY,
-                        }}
-                        onChange={handleCoverCompositionChange}
-                    />
-
-                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-5">
-                        <p className="text-xs leading-5 text-gray-500">
-                            保存すると、画像設定と編集中の店舗情報がまとめて公開ページに反映されます。
-                        </p>
-                        <button
-                            type="button"
-                            onClick={saveShop}
-                            disabled={readOnly || saving || uploading || needsSaveCheck}
-                            className="inline-flex items-center justify-center rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition hover:bg-black/80 disabled:opacity-60"
-                        >
-                            {readOnly
-                                ? "保存不可（デモ）"
-                                : uploading
-                                ? "画像アップロード中..."
-                                : saving
-                                  ? "保存中..."
-                                  : "変更を保存"}
-                        </button>
-                    </div>
-                </section>
-            ) : null}
-
-            <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <section className="mx-auto w-full max-w-4xl">
                 <form
                     onSubmit={onSubmit}
                     onChangeCapture={() => setSavedMessage("")}
@@ -766,14 +536,14 @@ export default function ShopEditClient({
                                 編集フォーム
                             </h3>
                             <p className="mt-1 text-sm text-gray-600">
-                                公開ページに見える内容をここで更新します。
+                                店舗情報と画像設定をまとめて保存します。
                             </p>
                         </div>
 
                         <button
                             type="submit"
                             disabled={readOnly || saving || uploading || needsSaveCheck}
-                            className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
+                            className="shrink-0 whitespace-nowrap rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-extrabold text-black shadow-sm transition hover:bg-[#0db80d] disabled:opacity-60"
                         >
                             {readOnly
                                 ? "保存不可（デモ）"
@@ -1216,7 +986,256 @@ export default function ShopEditClient({
                     </div>
                     </fieldset>
                 </form>
+            </section>
 
+            <details className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <summary className="min-h-11 cursor-pointer rounded-lg py-2 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">店舗画像の見え方調整</summary>
+                <div className="mt-4">
+            {previewImageUrl ? (
+                <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 className="text-2xl font-extrabold text-gray-900">
+                                店舗画像の見え方調整
+                            </h3>
+                            <p className="mt-1 text-sm leading-6 text-gray-600">
+                                カバー写真の見え方を調整できます。保存は、上の店舗情報フォームの変更も含みます。
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={saveShop}
+                            disabled={readOnly || saving || uploading || needsSaveCheck}
+                            className="rounded-xl bg-[#13ec13] px-5 py-3 text-sm font-bold text-black transition hover:bg-[#0db80d] disabled:opacity-60"
+                        >
+                            {readOnly
+                                ? "保存不可（デモ）"
+                                : uploading
+                                ? "画像アップロード中..."
+                                : saving
+                                  ? "保存中..."
+                                  : "店舗情報と画像設定を保存"}
+                        </button>
+                    </div>
+
+                    <ImageCompositionEditor
+                        imageSrc={previewImageUrl}
+                        imageAlt="店舗カバー画像プレビュー"
+                        subjectName={name}
+                        subjectKind="shop"
+                        surface="plain"
+                        values={{
+                            imageFrame: coverImageFrame,
+                            imageFit: coverImageFit,
+                            imagePosition: coverImagePosition,
+                            imageZoom: coverImageZoom,
+                            imagePositionX: coverImagePositionX,
+                            imagePositionY: coverImagePositionY,
+                        }}
+                        initialValues={{
+                            imageFrame: initialShop.coverImageFrame,
+                            imageFit: initialShop.coverImageFit,
+                            imagePosition: initialShop.coverImagePosition,
+                            imageZoom: initialShop.coverImageZoom,
+                            imagePositionX: initialShop.coverImagePositionX,
+                            imagePositionY: initialShop.coverImagePositionY,
+                        }}
+                        onChange={handleCoverCompositionChange}
+                    />
+
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-5">
+                        <p className="text-xs leading-5 text-gray-500">
+                            保存すると、画像設定と編集中の店舗情報がまとめて公開ページに反映されます。
+                        </p>
+                        <button
+                            type="button"
+                            onClick={saveShop}
+                            disabled={readOnly || saving || uploading || needsSaveCheck}
+                            className="inline-flex items-center justify-center rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition hover:bg-black/80 disabled:opacity-60"
+                        >
+                            {readOnly
+                                ? "保存不可（デモ）"
+                                : uploading
+                                ? "画像アップロード中..."
+                                : saving
+                                  ? "保存中..."
+                                  : "変更を保存"}
+                        </button>
+                    </div>
+                </section>
+            ) : null}
+                </div>
+            </details>
+
+            <details className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <summary className="min-h-11 cursor-pointer rounded-lg py-2 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">公開プレビュー</summary>
+                <div className="mt-4">
+            <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+                <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
+                    <div className={`relative overflow-hidden bg-white p-5 sm:p-8 md:p-10 ${previewImageUrl ? "min-h-[300px] sm:min-h-[360px]" : ""}`}>
+                        {previewImageUrl ? (
+                            <Image
+                                src={previewImageUrl}
+                                alt=""
+                                fill
+                                sizes="(min-width: 1024px) 60vw, 100vw"
+                                unoptimized={previewImageUrl.startsWith("blob:")}
+                                className="absolute inset-0"
+                                style={coverImageStyle}
+                            />
+                        ) : null}
+
+                        {previewImageUrl ? <div className="absolute inset-0 bg-black/60" /> : null}
+
+                        <div className="relative z-10 flex h-full flex-col justify-between">
+                            <div>
+                                <p className={`text-sm font-semibold ${previewImageUrl ? "text-white/90 drop-shadow" : "text-gray-800"}`}>
+                                    公開プレビュー
+                                </p>
+                                <h2 className={`mt-5 text-3xl font-extrabold tracking-tight sm:mt-6 sm:text-4xl md:text-5xl ${previewImageUrl ? "text-white drop-shadow" : "text-gray-900"}`}>
+                                    {name.trim() || "店舗名未設定"}
+                                </h2>
+                                <p className={`mt-4 max-w-xl text-base font-medium md:text-lg ${previewImageUrl ? "text-white/90" : "text-gray-700"}`}>
+                                    {description.trim() ||
+                                        "店舗説明は未設定です。"}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-gray-200 bg-white p-4 sm:p-6 lg:border-l lg:border-t-0">
+                        <h3 className="text-2xl font-extrabold text-gray-900">
+                            店舗情報
+                        </h3>
+
+                        <div className="mt-6 space-y-5 text-sm text-gray-700">
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-pink-500">📍</span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        住所
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {address.trim() || "未設定"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-gray-500">🕒</span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        営業時間
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {businessHoursText || "未設定"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-gray-500">休</span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        定休日
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {regularHoliday.trim() || "未設定"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-gray-500">TEL</span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        電話番号
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {phoneNumber.trim() || "未設定"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {note.trim() ? (
+                                <div className="flex items-start gap-3">
+                                    <span className="mt-0.5 text-gray-500">
+                                        ※
+                                    </span>
+                                    <div>
+                                        <p className="font-bold text-gray-900">
+                                            備考
+                                        </p>
+                                        <p className="mt-1 whitespace-pre-wrap">
+                                            {note.trim()}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-amber-500">
+                                    💴
+                                </span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        平均予算
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {averageBudgetLabel}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-blue-500">🪪</span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        公開メニュー
+                                    </p>
+                                    <p className="mt-1">
+                                        {initialShop.publishedMenuCount}件
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3">
+                                <span className="mt-0.5 text-blue-500">🔄</span>
+                                <div>
+                                    <p className="font-bold text-gray-900">
+                                        更新
+                                    </p>
+                                    <p className="mt-1">{updatedAtText}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-8">
+                            <ShareShopUrlButton shopId={initialShop.id} />
+                        </div>
+
+                        <p className="mt-3 text-xs text-gray-500">
+                            ※ QR表示は下のカードで確認できます
+                        </p>
+                    </div>
+                </div>
+            </section>
+                </div>
+            </details>
+
+            <details className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <summary className="min-h-11 cursor-pointer rounded-lg py-2 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">店舗QRコード印刷</summary>
+                <div className="mt-4">
+            <ShopQrCard
+                shopId={initialShop.id}
+                shopName={name.trim() || initialShop.name}
+            />
+                </div>
+            </details>
+
+            <details className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <summary className="min-h-11 cursor-pointer rounded-lg py-2 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">入力のヒント</summary>
+                <div className="mt-4">
                 <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
                     <h3 className="text-2xl font-extrabold text-gray-900">
                         入力のヒント
@@ -1272,7 +1291,8 @@ export default function ShopEditClient({
                         </div>
                     </div>
                 </section>
-            </section>
+                </div>
+            </details>
         </fieldset>
     );
 }

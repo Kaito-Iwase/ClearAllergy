@@ -6,6 +6,7 @@
 import Link from "next/link";
 import React from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { getPublicShopUrl } from "@/features/admin/shop/public-shop-url";
 
 type ShopQrCardProps = {
     shopId: string;
@@ -27,17 +28,15 @@ function subscribeOrigin() {
 
 export default function ShopQrCard({ shopId, shopName }: ShopQrCardProps) {
     // state（画面の状態）として、公開 URL とコピー結果メッセージを持ちます。
-    const origin = React.useSyncExternalStore(
+    const publicShopUrl = React.useSyncExternalStore(
         subscribeOrigin,
-        () => process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") || window.location.origin,
-        () => "",
+        () => getPublicShopUrl(shopId, window.location.origin, process.env.NEXT_PUBLIC_APP_URL),
+        () => null,
     );
     const [qrSizeMm, setQrSizeMm] = React.useState(60);
 
     const [copiedMessage, setCopiedMessage] = React.useState("");
 
-    // origin が決まってから店舗公開 URL を組み立てます。
-    const publicShopUrl = origin ? `${origin}/shops/${shopId}` : "";
     const qrSizePx = Math.round(qrSizeMm * 3.78);
 
     async function handleCopyUrl() {

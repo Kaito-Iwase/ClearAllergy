@@ -245,7 +245,7 @@ server = createServer(async (req, res) => {
 await new Promise((done, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", done); });
 origin = `http://127.0.0.1:${server.address().port}`;
 const sha256 = value => createHash("sha256").update(value).digest("hex");
-const sourceFiles = ["scripts/ingredient-change-trial.mjs", "features/admin/menus/components/MenuListPageClient.tsx", "features/admin/menus/components/MenuEditClient.tsx", "features/admin/menus/components/MenuFoodReviewFields.tsx", "features/admin/menus/menu-list.ts", "features/admin/menus/server/menu-list-data.ts", "features/admin/menus/food-review.ts", "features/admin/menus/schemas/menu-input.ts", "features/admin/menus/schemas/menu-response.ts", "features/public/shops/components/ShopMenuListClient.tsx", "features/public/shops/components/PublicMenuDetailBodyClient.tsx", "lib/allergens.ts", "lib/constants/allergen-master.ts", "lib/utils/formatters.ts"];
+const sourceFiles = ["scripts/ingredient-change-trial.mjs", "features/admin/menus/components/MenuListPageClient.tsx", "features/admin/menus/components/MenuEditClient.tsx", "features/admin/menus/components/MenuFoodReviewFields.tsx", "features/admin/menus/components/MenuSaveOutcomeNotice.tsx", "features/admin/menus/menu-save-plan.ts", "features/admin/menus/menu-list.ts", "features/admin/menus/server/menu-list-data.ts", "features/admin/menus/food-review.ts", "features/admin/menus/schemas/menu-input.ts", "features/admin/menus/schemas/menu-response.ts", "features/public/shops/components/ShopMenuListClient.tsx", "features/public/shops/components/PublicMenuDetailBodyClient.tsx", "lib/allergens.ts", "lib/constants/allergen-master.ts", "lib/utils/formatters.ts"];
 const manifest = { createdAt: new Date().toISOString(), mode, sourceHead: spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8", windowsHide: true }).stdout.trim(), node: process.version, sourceFiles: Object.fromEntries(sourceFiles.map(name => [name, sha256(readFileSync(join(root, name)))])), assetsRoot, cssFiles: Object.fromEntries(cssFiles.map(name => [name, sha256(readFileSync(join(assetsRoot, name)))])), icons, transport: "127.0.0.1 only; memory sessions; same-origin mutations; startup-only facilitator token; CSP self-only; Next/save adapters", limits: ["No real server/DB/auth/Blob", "No trigger/transaction/concurrency proof", "No participant or timing study", "No food/clinical/safety validation", "No unreported physical-change detection", "No delivery of corrections into existing tabs/paper/images", "No claim that all 25 research tests passed", "Facilitator token separates this fixture's presentation/controls; no OS, shared-PC, browser-history or developer-tools confidentiality guarantee", "Facilitator screenshots and R3 truth-card evidence must not be shown before an unprompted response"] };
 writeFileSync(join(output, "trial-manifest.json"), JSON.stringify(manifest, null, 2) + "\n", "utf8");
 let browser;
@@ -273,6 +273,12 @@ if (mode === "--serve") {
         const current = async () => (await context.request.get(origin + facilitatorPath("/__trial__/state"))).json();
         const go = async path => { await page.goto(origin + path); await page.getByRole("heading", { name: "一料理の材料変更を試す", exact: true }).waitFor(); await page.locator(".trial-screen").waitFor(); };
         const reset = async scenario => { await post("/__trial__/scenario", { scenario }); };
+        const savedStatus = page.getByRole("status").filter({ hasText: /^保存しました。公開状態：/ });
+        const confirmSaved = async (published, reviewCurrent) => {
+            await savedStatus.waitFor();
+            assert.equal((await savedStatus.innerText()).replace(/\s/g, ""),
+                `保存しました。公開状態：${published ? "公開" : "非公開"}。食品確認：${reviewCurrent ? "現行の食品内容に対応する記録あり" : "再確認が必要"}。`);
+        };
         const capture = async name => { await page.screenshot({ path: join(output, name + ".png"), fullPage: true }); screenshots.push(name + ".png"); };
         const regression = async (id, description, check) => {
             try { const details = await check(); reviewRegressions.push({ id, status: "PASS", ...(details ? { details } : {}) }); pass(description); }
@@ -302,13 +308,13 @@ if (mode === "--serve") {
             await reset("A"); await go("/admin/menus/trial-dish-one/edit");
             await page.getByLabel("価格（税込・円）", { exact: true }).fill("710");
             await page.getByRole("button", { name: "保存する", exact: true }).click();
-            await page.getByText("保存しました。", { exact: true }).waitFor();
+            await confirmSaved(true, true);
             assert.equal((await current()).menu.priceYen, 710);
             await go("/shops/trial-shop-f/menus/trial-dish-one");
             assert.equal(await page.getByText("¥710", { exact: true }).count(), 1, "Public detail must use saved 710 yen");
             await capture("06-saved-price-710-detail-390");
             await go("/admin/menus/trial-dish-one/edit"); await page.getByLabel("価格（税込・円）", { exact: true }).fill("");
-            await page.getByRole("button", { name: "保存する", exact: true }).click(); await page.getByText("保存しました。", { exact: true }).waitFor();
+            await page.getByRole("button", { name: "保存する", exact: true }).click(); await confirmSaved(true, true);
             assert.equal((await current()).menu.priceYen, null);
             await go("/shops/trial-shop-f/menus/trial-dish-one"); assert.equal(await page.getByText("価格未設定", { exact: true }).count(), 1);
             return { savedPrices: [710, null], checkedDetailLabels: ["¥710", "価格未設定"] };
@@ -356,7 +362,7 @@ if (mode === "--serve") {
         await page.getByLabel("🧺 原材料名", { exact: true }).fill(policy.recipes.B);
         await page.getByRole("group", { name: "乳", exact: true }).getByRole("button", { name: "含む", exact: true }).click();
         await page.getByRole("button", { name: "保存する", exact: true }).click();
-        await page.getByText("保存しました。", { exact: true }).waitFor();
+        await confirmSaved(false, false);
         let snapshot = await current(); assert.equal(snapshot.menu.statuses.milk, "CONTAINS"); assert.equal(snapshot.menu.isPublished, false); assert.equal(snapshot.listRow.foodReviewState, "outdated");
         await go("/"); await page.getByRole("link", { name: "架空・きのこの小丼：食品確認を見直す", exact: true }).click();
         await page.getByRole("checkbox", { name: "今回の提供内容と原資料を照合した記録を保存する", exact: true }).check();
@@ -366,7 +372,7 @@ if (mode === "--serve") {
         await page.getByLabel("食品根拠を確認した日時", { exact: true }).fill(checkedLocalTime);
         await page.getByRole("button", { name: "保存時に非公開にする", exact: true }).click();
         await page.getByRole("button", { name: "保存する", exact: true }).click();
-        await page.getByText("保存しました。", { exact: true }).waitFor();
+        await confirmSaved(true, true);
         snapshot = await current(); assert.equal(snapshot.menu.isPublished, true); assert.equal(snapshot.listRow.foodReviewState, "current"); assert.equal(snapshot.menu.foodReviews[0].evidenceRefs, "架空 B-1 / R2。実食品の確認ではない");
         await go("/shops/trial-shop-f/menus/trial-dish-one");
         await page.getByRole("heading", { name: "架空・きのこの小丼", exact: true }).waitFor();
@@ -388,12 +394,12 @@ if (mode === "--serve") {
             await reset("A"); await go("/admin/menus/trial-dish-one/edit"); await post("/__trial__/fault", { fault });
             await page.getByLabel("価格（税込・円）", { exact: true }).fill("710");
             await page.getByRole("button", { name: "保存する", exact: true }).click();
-            if (fault === "refresh-pending") { await page.getByText(/保存は完了しましたが、公開表示の更新処理が未完了です/).waitFor(); await page.getByText("保存しました。", { exact: true }).waitFor(); }
-            else { await page.locator("#edit-menu-error").waitFor(); assert.equal(await page.getByText("保存しました。", { exact: true }).count(), 0); assert.equal(await page.getByLabel("価格（税込・円）", { exact: true }).inputValue(), "710"); }
+            if (fault === "refresh-pending") { await page.getByText(/保存は完了しましたが、公開表示の更新処理が未完了です/).waitFor(); await confirmSaved(true, true); }
+            else { await page.locator("#edit-menu-error").waitFor(); assert.equal(await savedStatus.count(), 0); assert.equal(await page.getByLabel("価格（税込・円）", { exact: true }).inputValue(), "710"); }
         }
         pass("Synthetic conflict/invalid-200 retain inputs without success; synthetic post-save refresh pending is a separate notice");
         await reset("unknown"); await go("/admin/menus/trial-dish-one/edit");
-        await page.getByRole("button", { name: "保存時は公開停止（再確認が必要）", exact: true }).click();
+        await page.getByRole("button", { name: "保存時は非公開", exact: true }).click();
         await page.locator("#edit-menu-error").waitFor(); assert.equal((await current()).publicVisible, false);
         await page.getByLabel("注意書き", { exact: true }).focus(); await page.keyboard.press("Shift+Tab");
         assert.equal(await page.evaluate(() => document.activeElement?.id), "edit-menu-field-5");
