@@ -11,7 +11,7 @@
 <a id="environment"></a>
 ## 1. どの環境を使うか決める
 
-作業フォルダは `C:\Users\kaito\Documents\Github\ClearAllergy`。Node.jsは `.node-version` の22.23.1、Dockerfile・CIのグローバルnpmは11.18.0です。npmはアプリ依存へ同梱しません。
+作業フォルダは `C:\Users\kaito\Documents\Github\ClearAllergy`。Node.jsは `.node-version` の22.23.4、Dockerfile・CIのグローバルnpmは11.18.0です。npmはアプリ依存へ同梱しません。
 
 ハーネスとブラウザ導入は `scripts/npm-cli.mjs` でnpmのスクリプト実行時に渡される `npm_execpath` またはNode配布の標準位置を検証し、NodeからCLI（コマンドライン実行用プログラム）を引数配列で呼び出します。ホストの実npm版はハーネス結果の `runtime.actualNpm` へ記録します。npmが見つからない場合は暗黙に導入せず停止するため、Node配布を調べるか `npm.cmd exec -- node scripts/agent-harness.mjs verify --base origin/main` で既存npmから起動してください。
 
