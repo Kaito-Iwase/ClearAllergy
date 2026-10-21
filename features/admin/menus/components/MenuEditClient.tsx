@@ -6,7 +6,9 @@
 import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
 import MenuFoodReviewFields from "./MenuFoodReviewFields";
-import { foodSnapshot, foodContentChanged, isFoodReviewCurrent, emptyFoodReviewDraft, foodReviewDraftComplete, type FoodReviewSummary } from "../food-review";
+import { foodSnapshot, foodContentChanged, isFoodReviewCurrent, emptyFoodReviewDraft, type FoodReviewSummary } from "../food-review";
+import { getMenuSavePlan } from "../menu-save-plan";
+import MenuSaveOutcomeNotice from "./MenuSaveOutcomeNotice";
 import { useRouter } from "next/navigation";
 import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
 import {
@@ -181,7 +183,9 @@ export default function MenuEditClient(props: {
         () => getUnknownAllergenNames({ allergens, statusBySlug }),
         [allergens, statusBySlug],
     );
-    const canPublish = unknownAllergenNames.length === 0 && (recordingReview ? foodReviewDraftComplete(foodReview) : reviewCurrent && !foodChanged);
+    const savePlan = getMenuSavePlan({ name, allergens, statusBySlug, requestedIsPublished: isPublished,
+        foodChanged, reviewCurrent, recordingReview, foodReview });
+    const { canPublish } = savePlan;
     const allergenRows = React.useRef(new Map<string, HTMLDivElement>());
     function findNextUnknown() {
         const next = allergens.find((allergen) => (statusBySlug[allergen.slug] ?? "UNKNOWN") === "UNKNOWN");
@@ -316,12 +320,12 @@ export default function MenuEditClient(props: {
             setError("メニュー名は必須です。");
             return;
         }
-        if (recordingReview && (!foodReview.evidenceRefs.trim() || !foodReview.scope.trim() || !Number.isFinite(Date.parse(foodReview.checkedAt)))) {
-            setError("根拠資料・確認範囲・確認日時を入力してください。"); return;
+        if (savePlan.reviewInputInvalid) {
+            setError("根拠資料・確認範囲・確認日時を確認してください。確認日時は現在より5分を超える未来には指定できません。"); return;
         }
         const reviewMessage = getMenuReviewMessage({
             name,
-            willPublish: isPublished,
+            willPublish: savePlan.willPublish,
             ingredientsChanged: ingredients.trim() !== savedIngredients,
         });
         if (reviewMessage && !window.confirm(reviewMessage)) return;
@@ -352,7 +356,7 @@ export default function MenuEditClient(props: {
                 imageZoom,
                 imagePositionX,
                 imagePositionY,
-                isPublished: canPublish ? isPublished : false,
+                isPublished: savePlan.willPublish,
                 allergenStatusBySlug: statusBySlug,
             };
 
@@ -522,7 +526,7 @@ export default function MenuEditClient(props: {
                                       : "bg-amber-600"
                             }`}
                         >
-                            {canPublish ? isPublished ? "保存時に公開する" : "保存時に非公開にする" : "保存時は公開停止（再確認が必要）"}
+                            {canPublish ? isPublished ? "保存時に公開する" : "保存時に非公開にする" : "保存時は非公開"}
                             {readOnly ? "（デモ）" : ""}
                         </button>
 
@@ -563,9 +567,12 @@ export default function MenuEditClient(props: {
 
                 {saved && !hasUnsavedChanges && (
                     <div role="status" className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-                        保存しました。
+                        保存しました。公開状態：{savedIsPublished ? "公開" : "非公開"}。
+                        食品確認：{reviewCurrent ? "現行の食品内容に対応する記録あり" : "再確認が必要"}。
                     </div>
                 )}
+
+                <MenuSaveOutcomeNotice plan={savePlan} unknownCount={unknownAllergenNames.length} totalCount={allergens.length} />
 
                 <MenuPublishReadinessNotice
                     unknownAllergenNames={unknownAllergenNames}

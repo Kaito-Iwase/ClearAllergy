@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,17 +18,18 @@ mkdirSync(output,{recursive:true});
 function compile(source,fileName) {
     return ts.transpileModule(source,{fileName,compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.ESNext}}).outputText;
 }
-writeFileSync(join(fixture,"Card.js"),compile(readFileSync(join(root,"features/admin/shop/components/ShopQrCard.tsx"),"utf8"),"Card.tsx"),"utf8");
-writeFileSync(join(fixture,"entry.js"),compile("import React from 'react'; import {createRoot} from 'react-dom/client'; import Card from './Card.js'; createRoot(document.getElementById('root')).render(<Card shopId='fictional-qr-shop' shopName='架空店舗・QRサイズ検証'/>);","entry.tsx"),"utf8");
+writeFileSync(join(fixture,"loader.cjs"), "const ts=require("+JSON.stringify(require.resolve("typescript"))+");module.exports=function(source){return ts.transpileModule(source,{fileName:this.resourcePath,compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.ESNext}}).outputText;};", "utf8");
+writeFileSync(join(fixture,"entry.js"),compile("import React from 'react'; import {createRoot} from 'react-dom/client'; import Card from '@/features/admin/shop/components/ShopQrCard'; createRoot(document.getElementById('root')).render(<Card shopId='fictional-qr-shop' shopName='架空店舗・QRサイズ検証'/>);","entry.tsx"),"utf8");
 const compiler = webpack({mode:"production",target:"web",entry:join(fixture,"entry.js"),output:{path:fixture,filename:"bundle.js"},optimization:{minimize:false},
     plugins:[new webpack.DefinePlugin({"process.env":`(${JSON.stringify({NODE_ENV:"production",NEXT_PUBLIC_APP_URL:"https://example.invalid"})})`,"process.env.NEXT_PUBLIC_APP_URL":JSON.stringify("https://example.invalid")})],
-    resolve:{modules:[join(root,"node_modules")]},
+    module:{rules:[{test:/\.tsx?$/,use:join(fixture,"loader.cjs")}]},
+    resolve:{extensions:[".tsx",".ts",".js"],modules:[join(root,"node_modules")],alias:{"@":root}},
 });
 await new Promise((resolveBuild,reject)=>compiler.run((error,stats)=>compiler.close(closeError=>{
     if(error || closeError || stats?.hasErrors()) reject(error || closeError || new Error(stats.toString({all:false,errors:true})));
     else resolveBuild();
 })));
-const css = readdirSync(join(root,".next/static/chunks")).filter(name=>name.endsWith(".css")).map(name=>readFileSync(join(root,".next/static/chunks",name),"utf8")).join("\n");
+const css = [".next/static/chunks", ".next/static/css"].map(path=>join(root,path)).filter(existsSync).flatMap(directory=>readdirSync(directory).filter(name=>name.endsWith(".css")).map(name=>readFileSync(join(directory,name),"utf8"))).join("\n");
 const assets = new Map([
     ["/",["text/html",'<!doctype html><html lang="ja"><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="utf-8"><link rel="stylesheet" href="/style.css"></head><body style="padding:12px"><div id="root"></div><script src="/bundle.js"></script></body></html>']],
     ["/style.css",["text/css",css]],["/bundle.js",["text/javascript",readFileSync(join(fixture,"bundle.js"))]],

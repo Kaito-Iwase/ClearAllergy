@@ -1,10 +1,10 @@
 import type { Prisma } from "@prisma/client";
-import { foodSnapshot } from "../food-review";
+import { foodSnapshot, isFoodReviewTimeValid } from "../food-review";
 import type { z } from "zod";
 import type { foodReviewInputSchema } from "../schemas/menu-input";
 
 export function validFoodReviewTime(review: z.infer<typeof foodReviewInputSchema> | undefined) {
-    return !review || Date.parse(review.checkedAt) <= Date.now() + 5 * 60_000;
+    return !review || isFoodReviewTimeValid(review.checkedAt);
 }
 
 export async function flushMenuPublicationChecks(tx: Prisma.TransactionClient) {

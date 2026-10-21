@@ -190,6 +190,8 @@ node scripts/browser-runner.mjs ui
 
 実DB回帰はClerkやBlobへ外部通信しません。`scripts/admin-menu-database-regression.ts`は実ハンドラを実PostgreSQLへ接続し、ClerkセッションとNext cacheだけをそのスクリプトプロセス内で置き換えます。DBの認可照会・transaction・監査は実行し、当該runの一時ユーザーも削除します。DB制約の成功と実セッションによる別店舗拒否は別の確認です。招待の外部サービス失敗・補償はAPIモックテストでも確認しますが、実Clerkとの通信結果が不明な場合の運用まで実証したことにはなりません。
 
+`node scripts/check-store-review-browser.mjs` は実店舗フォーム・メニュー編集・管理Shellを、同じworktreeのビルド済みCSSと架空データで検査します。上記と同じ隔離Playwright指定を使います。390／768／1536pxでフォームの初期位置、文書全体スクロール、補助情報の開閉、下部ナビとの余白、フォーカスを確認し、公開origin＋古いlocalhost設定のQR、統合A4印刷、食品変更と価格変更の公開予定、成功応答による確定表示、409時の入力保持を検査します。Nextの遷移・画像・ログアウトは代用品、APIはブラウザ内で代替応答にします。実DB・Clerk・Blob・Vercelへ接続しません。Material Symbolsの外部フォントは読み込まないため、画像のアイコン表示は実配備と一致しません。`--serve` は目視用の読み取り専用loopbackサーバーで、GET以外を拒否します。[結果と限界](../verification/store-review-20261019.md)を参照してください。
+
 `node scripts/browser-runner.mjs qr` は実 `ShopQrCard` と実 `qrcode.react` のSVGを、架空URLの隔離loopback fixtureで検査します。`composition` と同じ隔離ブラウザ・ビルド済みCSSが必要で、アプリ・DB・Clerkの起動は不要です。320／390／1024／1440pxで正方形・選択サイズ比率・横はみ出し、プリセット・キーボード、印刷メディアのmm寸法と印刷後の解除を確認します。OSの印刷ダイアログだけを置き換え、A4・倍率100%のPDFを35／45／50／60mmで出力します。JSON寸法とスクリーンショット・PDFを確認してください。紙への印刷、カメラでの読取、実管理ルートでの操作は別確認です。
 
 ### 自動テストで置き換えられない手動確認

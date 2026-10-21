@@ -27,6 +27,22 @@ body {
 }
 
 @media print {
+    /* Collapse the form and navigation, including their layout space. */
+    body.printing-shop-qr *:not(:has(.qr-print-area)):not(.qr-print-area):not(.qr-print-area *) {
+        display: none !important;
+    }
+
+    body.printing-shop-qr *:has(.qr-print-area) {
+        display: block !important;
+        position: static !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        overflow: visible !important;
+    }
+
     body.printing-shop-qr * {
         visibility: hidden !important;
     }

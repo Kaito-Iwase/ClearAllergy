@@ -19,8 +19,8 @@ export default function AdminDashboardShell({
     showAuthControls?: boolean;
 }) {
     return (
-        <div className="relative flex min-h-screen w-full flex-row overflow-hidden bg-background-light text-text-main">
-            <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-gray-100 bg-surface-light lg:sticky lg:top-0 lg:flex">
+        <div className="relative flex min-h-dvh min-w-0 w-full flex-row bg-background-light text-text-main">
+            <aside className="hidden h-dvh w-64 shrink-0 flex-col border-r border-gray-100 bg-surface-light lg:sticky lg:top-0 lg:flex">
                 <div className="p-6">
                     <Link href="/" className="flex items-center">
                         <BrandLogo priority />
@@ -77,7 +77,7 @@ export default function AdminDashboardShell({
             </aside>
 
             {/* メイン領域ではページごとの内容を表示します。 */}
-            <main className="flex h-dvh flex-1 flex-col overflow-y-auto bg-background-light">
+            <main className="flex min-w-0 flex-1 flex-col bg-background-light">
                 {/* スマホではサイドバーを出さず、ヘッダーに最小限の操作だけ置きます。 */}
                 <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-surface-light p-4 lg:hidden">
                     <Link href="/" className="flex items-center">
@@ -99,7 +99,7 @@ export default function AdminDashboardShell({
                     </div>
                 </header>
 
-                <div className="mx-auto flex w-full max-w-6xl flex-1 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:p-8">
+                <div className="mx-auto flex w-full max-w-6xl flex-1 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pt-8 lg:pb-8">
                     <div className="w-full">{children}</div>
                 </div>
             </main>
