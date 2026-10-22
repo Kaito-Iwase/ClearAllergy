@@ -150,6 +150,11 @@ try {
     await page.waitForURL(base + shopHref + "#public-menus");
     assert.equal(new URL(page.url()).pathname, shopHref);
     assert.equal(new URL(page.url()).hash, "#public-menus");
+    await page.getByText("表示 0件 / 検索対象 3件", { exact: true }).waitFor();
+    assert.equal(await page.locator('#public-menus').getByRole("link").count(), 0, "ON also excludes FREE candidates when another public menu contains the selected allergen");
+    await openPreferences();
+    await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).uncheck();
+    await apply();
     await page.getByText("表示 2件 / 検索対象 3件", { exact: true }).waitFor();
     assert.equal(await page.locator('#public-menus').getByRole("link").count(), 2);
     pass("除外後の公開メニュー導線と表示件数が現在の一覧に一致");
