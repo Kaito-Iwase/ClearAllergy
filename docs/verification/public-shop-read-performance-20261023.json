@@ -1,0 +1,932 @@
+{
+  "base": "91d76cf61ebd8db2602d2508b62205ab6345b4da",
+  "integrationBase": "58f149d32d71ce3068995541e34aae1ed938bc52",
+  "measuredImplementationHead": "aaa2a2d",
+  "runtime": {
+    "node": "22.15.1",
+    "npm": "10.9.2",
+    "prisma": "6.19.3"
+  },
+  "comparison": "Three alternating-order pairs per route in READ ONLY RepeatableRead. Compared all selected values after removing candidate master id and sorting unordered links by slug. No SQL, params, row values or connection values logged.",
+  "beforeImplementation": {
+    "at": "2026-10-22T16:55:52.833Z",
+    "boundary": "Laptop to existing production pooled DB. Read-only RepeatableRead. No Vercel or HTTP timing. No SQL, params, row values or connection values recorded.",
+    "mode": "candidate query experiment before application edits",
+    "prismaVersion": "6.19.3",
+    "result": "PASS",
+    "pairs": [
+      {
+        "route": "/shops",
+        "round": 0,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 1087.1,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              230,
+              161,
+              339,
+              161,
+              156
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 410.3,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              78,
+              79,
+              157,
+              78
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 5,
+          "menus": 32,
+          "links": 928,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops",
+        "round": 1,
+        "samples": [
+          {
+            "variant": "candidate",
+            "queryReadMs": 409,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              78,
+              78,
+              160,
+              79
+            ]
+          },
+          {
+            "variant": "baseline",
+            "queryReadMs": 411.4,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              82,
+              79,
+              80,
+              76,
+              79
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 5,
+          "menus": 32,
+          "links": 928,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops",
+        "round": 2,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 417.1,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              78,
+              78,
+              82,
+              76,
+              77
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 328,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              84,
+              79,
+              79,
+              78
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 5,
+          "menus": 32,
+          "links": 928,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 0,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 732.4,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              156,
+              161,
+              162,
+              80,
+              159
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 328.8,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              80,
+              79,
+              79,
+              83
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 6,
+          "links": 174,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 1,
+        "samples": [
+          {
+            "variant": "candidate",
+            "queryReadMs": 316.3,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              77,
+              77,
+              78,
+              78
+            ]
+          },
+          {
+            "variant": "baseline",
+            "queryReadMs": 407.5,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              89,
+              76,
+              79,
+              79,
+              77
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 6,
+          "links": 174,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 2,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 399.6,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              77,
+              78,
+              79,
+              78,
+              77
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 320.1,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              78,
+              79,
+              78,
+              78
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 6,
+          "links": 174,
+          "master": 29
+        }
+      }
+    ],
+    "solo": [
+      {
+        "route": "/shops",
+        "variant": "baseline",
+        "wallMs": 732.3,
+        "queryReadMs": 419.4,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "candidate",
+        "wallMs": 656,
+        "queryReadMs": 335.4,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "candidate",
+        "wallMs": 645.3,
+        "queryReadMs": 328.3,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "baseline",
+        "wallMs": 735.3,
+        "queryReadMs": 421.9,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "baseline",
+        "wallMs": 732.5,
+        "queryReadMs": 415.7,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "candidate",
+        "wallMs": 642.5,
+        "queryReadMs": 323.9,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "candidate",
+        "wallMs": 642.4,
+        "queryReadMs": 326.6,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "baseline",
+        "wallMs": 735.8,
+        "queryReadMs": 419.6,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      }
+    ]
+  },
+  "afterImplementation": {
+    "at": "2026-10-22T17:06:17.029Z",
+    "boundary": "Laptop to existing production pooled DB. Read-only RepeatableRead. No Vercel or HTTP timing. No SQL, params, row values or connection values recorded.",
+    "mode": "actual current selects and resolver compared with base 91d76cf selects; list shop first and detail master first as in the route callbacks",
+    "prismaVersion": "6.19.3",
+    "result": "PASS",
+    "pairs": [
+      {
+        "route": "/shops",
+        "round": 0,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 1010.6,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              163,
+              166,
+              326,
+              160,
+              160
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 412,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              80,
+              81,
+              162,
+              81
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 5,
+          "menus": 32,
+          "links": 928,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops",
+        "round": 1,
+        "samples": [
+          {
+            "variant": "candidate",
+            "queryReadMs": 345,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              91,
+              80,
+              82,
+              80
+            ]
+          },
+          {
+            "variant": "baseline",
+            "queryReadMs": 440.5,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              94,
+              80,
+              87,
+              79,
+              81
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 5,
+          "menus": 32,
+          "links": 928,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops",
+        "round": 2,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 427.5,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              81,
+              83,
+              83,
+              81,
+              80
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 336.3,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              83,
+              81,
+              82,
+              80
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 5,
+          "menus": 32,
+          "links": 928,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 0,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 739.8,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              160,
+              163,
+              165,
+              163,
+              81
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 327.6,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              81,
+              80,
+              81,
+              82
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 6,
+          "links": 174,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 1,
+        "samples": [
+          {
+            "variant": "candidate",
+            "queryReadMs": 329.1,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              81,
+              79,
+              81,
+              81
+            ]
+          },
+          {
+            "variant": "baseline",
+            "queryReadMs": 420.6,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              82,
+              82,
+              83,
+              85,
+              81
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 6,
+          "links": 174,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 2,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 423.8,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              80,
+              82,
+              80,
+              94,
+              80
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 322.3,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              79,
+              80,
+              79,
+              80
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 6,
+          "links": 174,
+          "master": 29
+        }
+      }
+    ],
+    "solo": [
+      {
+        "route": "/shops",
+        "variant": "baseline",
+        "wallMs": 745.2,
+        "queryReadMs": 421.2,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "candidate",
+        "wallMs": 672.4,
+        "queryReadMs": 345.5,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "candidate",
+        "wallMs": 689,
+        "queryReadMs": 354.9,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "baseline",
+        "wallMs": 758.5,
+        "queryReadMs": 434.9,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "baseline",
+        "wallMs": 734.6,
+        "queryReadMs": 413.5,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "candidate",
+        "wallMs": 655.3,
+        "queryReadMs": 331.6,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "candidate",
+        "wallMs": 654.4,
+        "queryReadMs": 331.5,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "baseline",
+        "wallMs": 734.2,
+        "queryReadMs": 411.5,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      }
+    ]
+  },
+  "isolatedFictionalFixtures": {
+    "at": "2026-10-22T17:01:21.851Z",
+    "boundary": "Task-owned loopback disposable CI database; fictional fixtures only",
+    "mode": "actual current selects and resolver compared with base 91d76cf selects",
+    "prismaVersion": "6.19.3",
+    "result": "PASS",
+    "pairs": [
+      {
+        "route": "/shops",
+        "round": 0,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 74.4,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              18,
+              3,
+              8,
+              4,
+              4
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 11.1,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              3,
+              1,
+              1,
+              1
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 3,
+          "links": 87,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops",
+        "round": 1,
+        "samples": [
+          {
+            "variant": "candidate",
+            "queryReadMs": 11.7,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              2,
+              1,
+              1,
+              2
+            ]
+          },
+          {
+            "variant": "baseline",
+            "queryReadMs": 15.6,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              2,
+              1,
+              2,
+              1,
+              2
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 3,
+          "links": 87,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops",
+        "round": 2,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 13.7,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              2,
+              1,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 11.3,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              2,
+              1,
+              2,
+              1
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 3,
+          "links": 87,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 0,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 23.5,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              4,
+              3,
+              2,
+              2,
+              3
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 13.2,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              2,
+              2,
+              1,
+              2
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 3,
+          "links": 87,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 1,
+        "samples": [
+          {
+            "variant": "candidate",
+            "queryReadMs": 12,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              2,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "variant": "baseline",
+            "queryReadMs": 14.6,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              2,
+              1,
+              1,
+              1,
+              1
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 3,
+          "links": 87,
+          "master": 29
+        }
+      },
+      {
+        "route": "/shops/:id",
+        "round": 2,
+        "samples": [
+          {
+            "variant": "baseline",
+            "queryReadMs": 15.5,
+            "selectStatements": 5,
+            "statementDurationsMs": [
+              2,
+              1,
+              2,
+              2,
+              1
+            ]
+          },
+          {
+            "variant": "candidate",
+            "queryReadMs": 14.1,
+            "selectStatements": 4,
+            "statementDurationsMs": [
+              4,
+              2,
+              2,
+              1
+            ]
+          }
+        ],
+        "equivalent": true,
+        "counts": {
+          "shops": 1,
+          "menus": 3,
+          "links": 87,
+          "master": 29
+        }
+      }
+    ],
+    "solo": [
+      {
+        "route": "/shops",
+        "variant": "baseline",
+        "wallMs": 22.8,
+        "queryReadMs": 15,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "candidate",
+        "wallMs": 24.6,
+        "queryReadMs": 14.8,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "candidate",
+        "wallMs": 24.2,
+        "queryReadMs": 13.7,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops",
+        "variant": "baseline",
+        "wallMs": 30.2,
+        "queryReadMs": 21.2,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "baseline",
+        "wallMs": 23.4,
+        "queryReadMs": 15.9,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "candidate",
+        "wallMs": 21.4,
+        "queryReadMs": 13.5,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "candidate",
+        "wallMs": 24.9,
+        "queryReadMs": 15.2,
+        "sqlEvents": 8,
+        "selectStatements": 4,
+        "extraReadOnlyStatement": true
+      },
+      {
+        "route": "/shops/:id",
+        "variant": "baseline",
+        "wallMs": 33.3,
+        "queryReadMs": 22.1,
+        "sqlEvents": 9,
+        "selectStatements": 5,
+        "extraReadOnlyStatement": true
+      }
+    ]
+  },
+  "httpPropagation": {
+    "at": "2026-10-22T17:16:11.337Z",
+    "boundary": "Task-owned loopback CI fixture and local production build only; external browser requests blocked.",
+    "result": "PASS",
+    "checks": {
+      "sourceApiAfterUnresolvedReview": 404,
+      "sourcePageStillContainsUnresolvedSource": false,
+      "sourceApiAfterChange": 404,
+      "sourcePageAfterChange": 200,
+      "sourcePageCache": null,
+      "sourcePageStillContainsStoppedSource": false,
+      "sourcePageShowsNotFound": true,
+      "sourcePageHasNoindex": true,
+      "shopResponseStillContainsStoppedSource": false,
+      "initialListContainsProbeShop": true,
+      "listResponseContainsShopAfterAllStopped": false,
+      "supplementDisappearsAfterSourceStops": true,
+      "alreadyOpenView": "UNVERIFIED - no automatic client refresh asserted",
+      "browserStoppedView": "PASS - fresh navigation renders not-found without stopped food content"
+    },
+    "existingFixtureTablesCompared": 10,
+    "existingFixtureRowsUnchanged": true,
+    "preservationMethod": "READ ONLY snapshots of all 10 CI fixture tables before and after; row counts and SHA-256 hashes match. Row values are not recorded."
+  }
+}
