@@ -520,8 +520,20 @@ export default function ShopEditClient({
             ? "未設定"
             : formatPriceYenLabel(Number(averageBudgetYen));
 
+    const displayDialog = React.useRef<HTMLDialogElement>(null);
+    const [displayPanel, setDisplayPanel] = React.useState<"preview" | "qr" | null>(null);
+    const openDisplayPanel = (panel: "preview" | "qr") => {
+        setDisplayPanel(panel);
+        displayDialog.current?.showModal();
+    };
+
     return (
+        <>
         <fieldset disabled={saving || uploading} className="min-w-0 space-y-6">
+            <div aria-label="公開表示とQRの操作" className="mx-auto flex w-full max-w-4xl flex-wrap justify-end gap-2">
+                <button type="button" aria-haspopup="dialog" aria-controls="shop-display-dialog" onClick={() => openDisplayPanel("preview")} className="min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50">公開プレビュー</button>
+                <button type="button" aria-haspopup="dialog" aria-controls="shop-display-dialog" onClick={() => openDisplayPanel("qr")} className="min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50">店舗QRコード印刷</button>
+            </div>
             <section className="mx-auto w-full max-w-4xl">
                 <form
                     onSubmit={onSubmit}
@@ -1067,9 +1079,77 @@ export default function ShopEditClient({
                 </div>
             </details>
 
+
+
+
+
             <details className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-                <summary className="min-h-11 cursor-pointer rounded-lg py-2 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">公開プレビュー</summary>
+                <summary className="min-h-11 cursor-pointer rounded-lg py-2 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">入力のヒント</summary>
                 <div className="mt-4">
+                <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-2xl font-extrabold text-gray-900">
+                        入力のヒント
+                    </h3>
+
+                    <div className="mt-5 space-y-4 text-sm text-gray-700">
+                        <div className="rounded-2xl bg-gray-50 p-4">
+                            <p className="font-bold text-gray-900">
+                                平均予算
+                            </p>
+                            <p className="mt-1">
+                                ランチ中心のお店なら目安の価格帯を入れておくと、初見の人にも選びやすくなります。
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-gray-50 p-4">
+                            <p className="font-bold text-gray-900">店舗画像</p>
+                            <p className="mt-1">
+                                横長で明るすぎない写真だと、店名の白文字が読みやすくなります。まずはWebPかJPGがおすすめです。
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-gray-50 p-4">
+                            <p className="font-bold text-gray-900">店舗名</p>
+                            <p className="mt-1">
+                                公開ページの一番目立つ位置に表示されます。
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-gray-50 p-4">
+                            <p className="font-bold text-gray-900">
+                                お店の説明
+                            </p>
+                            <p className="mt-1">
+                                お店の特徴や、アレルゲン対応の姿勢が伝わる一文があると良いです。
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-gray-50 p-4">
+                            <p className="font-bold text-gray-900">
+                                住所・営業時間
+                            </p>
+                            <p className="mt-1">
+                                営業時間、定休日、電話番号は別々の欄に分けると、公開ページで読みやすく表示できます。
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 text-yellow-900">
+                            <p className="font-bold">注意</p>
+                            <p className="mt-1">
+                                店舗情報は公開ページにそのまま表示されるため、誤字や古い情報がないか確認してから保存してください。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+                </div>
+            </details>
+        </fieldset>
+        <dialog ref={displayDialog} id="shop-display-dialog" aria-labelledby="shop-display-title" onClose={() => setDisplayPanel(null)} className="m-auto max-w-5xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 text-gray-900 shadow-xl backdrop:bg-black/40 sm:p-6" style={{ width: "calc(100% - 2rem)", maxHeight: "calc(100dvh - 2rem)" }}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 id="shop-display-title" className="text-lg font-bold">{displayPanel === "qr" ? "店舗QRコード印刷" : "公開プレビュー（編集中・未保存）"}</h2>
+                <button type="button" onClick={() => displayDialog.current?.close()} className="min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-bold hover:bg-gray-50">閉じる</button>
+            </div>
+            <div hidden={displayPanel !== "preview"}>
             <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
                 <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr]">
                     <div className={`relative overflow-hidden bg-white p-5 sm:p-8 md:p-10 ${previewImageUrl ? "min-h-[300px] sm:min-h-[360px]" : ""}`}>
@@ -1215,84 +1295,19 @@ export default function ShopEditClient({
                         </div>
 
                         <p className="mt-3 text-xs text-gray-500">
-                            ※ QR表示は下のカードで確認できます
+                            ※ QR表示は「店舗QRコード印刷」から確認できます
                         </p>
                     </div>
                 </div>
             </section>
-                </div>
-            </details>
-
-            <details className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-                <summary className="min-h-11 cursor-pointer rounded-lg py-2 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">店舗QRコード印刷</summary>
-                <div className="mt-4">
+            </div>
+            <div hidden={displayPanel !== "qr"}>
             <ShopQrCard
                 shopId={initialShop.id}
                 shopName={name.trim() || initialShop.name}
             />
-                </div>
-            </details>
-
-            <details className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-                <summary className="min-h-11 cursor-pointer rounded-lg py-2 text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">入力のヒント</summary>
-                <div className="mt-4">
-                <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h3 className="text-2xl font-extrabold text-gray-900">
-                        入力のヒント
-                    </h3>
-
-                    <div className="mt-5 space-y-4 text-sm text-gray-700">
-                        <div className="rounded-2xl bg-gray-50 p-4">
-                            <p className="font-bold text-gray-900">
-                                平均予算
-                            </p>
-                            <p className="mt-1">
-                                ランチ中心のお店なら目安の価格帯を入れておくと、初見の人にも選びやすくなります。
-                            </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-gray-50 p-4">
-                            <p className="font-bold text-gray-900">店舗画像</p>
-                            <p className="mt-1">
-                                横長で明るすぎない写真だと、店名の白文字が読みやすくなります。まずはWebPかJPGがおすすめです。
-                            </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-gray-50 p-4">
-                            <p className="font-bold text-gray-900">店舗名</p>
-                            <p className="mt-1">
-                                公開ページの一番目立つ位置に表示されます。
-                            </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-gray-50 p-4">
-                            <p className="font-bold text-gray-900">
-                                お店の説明
-                            </p>
-                            <p className="mt-1">
-                                お店の特徴や、アレルゲン対応の姿勢が伝わる一文があると良いです。
-                            </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-gray-50 p-4">
-                            <p className="font-bold text-gray-900">
-                                住所・営業時間
-                            </p>
-                            <p className="mt-1">
-                                営業時間、定休日、電話番号は別々の欄に分けると、公開ページで読みやすく表示できます。
-                            </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 text-yellow-900">
-                            <p className="font-bold">注意</p>
-                            <p className="mt-1">
-                                店舗情報は公開ページにそのまま表示されるため、誤字や古い情報がないか確認してから保存してください。
-                            </p>
-                        </div>
-                    </div>
-                </section>
-                </div>
-            </details>
-        </fieldset>
+            </div>
+        </dialog>
+        </>
     );
 }

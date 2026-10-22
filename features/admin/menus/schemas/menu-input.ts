@@ -24,6 +24,8 @@ export const menuInputSchema = z.object({
     operationId: z.string().uuid().optional(),
     foodChangeReported: z.boolean().optional(),
     foodReview: foodReviewInputSchema.optional(),
+    foodIssueResolution: z.object({ foodReviewId: z.string().min(1).max(128), foodVersion: z.number().int().nonnegative().max(2147483647) }).optional(),
+    publicationAction: z.enum(["publish", "unpublish"]).optional(),
     name: z.string().trim().min(1, "メニュー名は必須です。").max(MENU_TEXT_LIMITS.name).optional(),
     description: optionalText(MENU_TEXT_LIMITS.description),
     category: optionalText(MENU_TEXT_LIMITS.category),
@@ -39,4 +41,7 @@ export const menuInputSchema = z.object({
     imagePositionX: z.number().int().min(0).max(100).optional(),
     imagePositionY: z.number().int().min(0).max(100).optional(),
     allergenStatusBySlug: z.record(z.string(), z.enum(ALLERGEN_STATUS_VALUES)).optional(),
-});
+}).refine(body => !body.publicationAction || body.isPublished === undefined ||
+    body.isPublished === (body.publicationAction === "publish"), "公開操作と公開フラグが一致しません。")
+    .refine(body => !body.foodIssueResolution || Object.keys(body).every(key => key === "expectedVersion" || key === "foodIssueResolution"),
+        "未解決事項の解消は、内容保存・公開とは別に操作してください。");

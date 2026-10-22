@@ -248,7 +248,15 @@ API障害はレスポンスの `X-Request-Id` から `request_completed` / `oper
 
 復旧では既知の正常SHAへのアプリの切戻しとDB復元を分けます。アプリを戻しても適用済みmigrationや変更データは戻りません。Neonのバックアップ保持・復元先・復元権限を確認し、復元訓練は許可された隔離DBで実施します。本番リセットや逆向きSQLを即席で実行しません。
 
-### 食品確認記録の移行と検証
+### 二段階公開の移行と検証
+
+新migrationは `20261021000000_two_step_publication` と `20261021010000_food_issue_resolution`。公開操作を旧食品確認から分離するため、schema・trigger・API・公開read・UIを一緒に変更します。旧migrationは書き換えません。既に公開中の有効な実在旧記録だけを保持し、非公開を自動公開しません。切替・rollback・新旧サーバー混在は本番適用前の別確認事項です。未解決解除は別の `20261021010000_food_issue_resolution` で追加します。旧確認記録は保持し、明示解除と別公開を検証します。本番切替は別承認です。
+
+`node --import tsx scripts/check-publication-migration.ts` は `CLEARALLERGY_CI_FIXTURES=true` とloopback・固定CI DB名/利用者/テスト専用パスワード・同一のDATABASE_URL/DIRECT_URLを検査し、**空の使い捨てDB**で旧migration→架空の公開/下書き/未解決fixture→新migration→再適用を確認します。共有DB・既存開発DBでは実行しません。`check-ci-database.ts` は保存・公開・巻戻し・旧記録不変・競合の実DB回帰です。画面は `check-store-review-browser.mjs` / `browser-runner.mjs allergens`、合成演習は `ingredient-change-trial.mjs --check` で別に確認します。実Clerk/Blobは代用のため未検証です。[判断理由](../research/product/two-step-publication-decision-20261021.md)・[今回の結果](../verification/two-step-publication-20261021.md)を参照してください。
+
+## 食品確認記録の移行と検証
+
+以下は旧migrationの個別検証です。現在の公開条件は[二段階公開](#二段階公開の移行と検証)を参照し、旧フォームの運用を再導入しません。
 
 `20261009000000_menu_food_review` は編集版・食品版・確認対応版・作成操作IDを `MenuItem` に追加し、`MenuFoodReview` とDBトリガーを作成します。記録をUIだけに持つ方式では別端末・直接DB更新・再読込に対応できないためDBに保存します。既存レコードは確認済みとして補完せず、公開中も一旦停止します。移行前に許可された環境のバックアップ、停止対象、再確認担当、停止告知と公開キャッシュの更新を準備してください。適用対象ごとに履歴を確認してください。2026-10-10の本番適用・32件の公開停止・架空デモ5店舗32件の承認付き再公開・バックアップと復旧確認は[公開店舗一覧の障害復旧記録](../verification/shops-recovery-20261010.md)を参照してください。
 
@@ -258,7 +266,7 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 
 `node --import tsx scripts/check-public-read-snapshot.ts` はCI専用接続ガード付きDBと架空fixtureを使い、一時loopback TCPプロキシで実Prismaの子SELECTを止め、別接続の食品訂正を確定してから解放します。旧食品＋新FREEが混ざる反例と、本番用 `readPublicSnapshot` のRepeatableReadで旧食品＋旧CONTAINSを維持すること、次の取得で停止を反映することを検査します。SQLの結果や時刻をmockする検査ではありません。プロキシ・Prisma接続を閉じ、今回作った店舗だけを削除します。schema/migrationは変更しません。既存の公開データ取得が複数SQLに分かれても、全4入口と補足を同じtransaction clientへ揃えます。`tests/public-read-snapshot.test.ts` はtransaction完了不能と通常処理エラーの区別、既存取得不能表示への受渡しを代用品で検査します。
 
-`scripts/food-review-database-regression.ts` と `scripts/admin-menu-database-regression.ts` は、競合保存・古い全体フォーム・直接DB更新・記録失敗の巻戻し・マスタ変更・公開停止・キャッシュ例外・作成再送を検査します。確認記録の直接INSERTによる未解決事項の追加、過去／未来版の拒否、DB生成snapshotと日時、訂正ロック待ち後の古い確認拒否も検査します。入口は上記の `check-test-database.ts` / `check-ci-database.ts` です。独立の `check-owned-menu-database.ts` も最終版を送り、所有店舗条件を検査します。実認証の `check-test-browser.mjs` は新規確認欄と版付きcleanupに対応していますが、実Clerk・Blobの書込を伴うので今回未実行です。合成記録と成功した検査は、実食品の正確性や現場運用を実証しません。今回の結果は[食品確認記録の検証](../verification/menu-food-review-20261009.md)に記録します。
+`scripts/food-review-database-regression.ts` と `scripts/admin-menu-database-regression.ts` は、競合保存・古い全体フォーム・直接DB更新・記録失敗の巻戻し・マスタ変更・公開停止・キャッシュ例外・作成再送を検査します。確認記録の直接INSERTによる未解決事項の追加、過去／未来版の拒否、DB生成snapshotと日時、訂正ロック待ち後の古い確認拒否も検査します。入口は上記の `check-test-database.ts` / `check-ci-database.ts` です。独立の `check-owned-menu-database.ts` も最終版を送り、所有店舗条件を検査します。実認証の `check-test-browser.mjs` は非公開保存と別公開・版付きcleanupに対応していますが、実Clerk・Blobの書込を伴うので今回未実行です。合成記録と成功した検査は、実食品の正確性や現場運用を実証しません。今回の結果は[食品確認記録の検証](../verification/menu-food-review-20261009.md)に記録します。
 
 `node --import tsx scripts/check-food-review-migration.ts` は空の使い捨てCI DBだけで、旧migration→架空の旧公開データ→新migration→再適用を検査します。既存DBをリセットせず、空でなければ停止します。接続ガードは `check-ci-database.ts` と同じです。実Clerk・Blobを使わず、実行先には合成データが残るため、専用コンテナ等を作業後に停止してください。
 
@@ -288,3 +296,5 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 手順の根拠は現行設定とスクリプトです。補助的にContext7で[Composeのenv_file](https://docs.docker.com/reference/compose-file/services/#env_file)、[環境変数の優先順位](https://docs.docker.com/compose/how-tos/environment-variables/envvars-precedence/)、[Next.jsのrevalidatePath](https://nextjs.org/docs/app/api-reference/functions/revalidatePath)、PrismaのCLI資料を確認しました。取得したPrisma資料にはv7の例も混在していたため、v7移行手順をこのPrisma 6の環境へ採用していません。
 
 認証境界の変更ではContext7で[Vercelの要求ヘッダー](https://vercel.com/docs/headers/request-headers)、[Next.jsのデータ保護](https://nextjs.org/docs/app/guides/data-security)、Clerkのサーバー認証とセッション有効化の資料を確認しています。資料の説明と、このリポジトリのカスタムAPIで実装した検査、実際の配備設定は分けて確認します。
+
+未解決解除は `node --import tsx scripts/check-publication-database.ts` からも検証します。専用CI接続先のガード後に、その実行が所有する一時店舗で、旧履歴不変・現行版束縛・UNKNOWN維持・別公開・削除失効・並行訂正を確認し、後始末します。

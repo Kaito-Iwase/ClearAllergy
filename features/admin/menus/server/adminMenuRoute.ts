@@ -39,8 +39,9 @@ import {
 } from "@/lib/utils/menu-image-display";
 
 import { menuInputSchema } from "@/features/admin/menus/schemas/menu-input";
-import { foodSnapshot, foodContentChanged, isFoodReviewCurrent } from "../food-review";
-import { saveFoodReview, validFoodReviewTime, foodReviewHistorySelection, flushMenuPublicationChecks } from "./food-review-save";
+import { foodSnapshot, foodContentChanged } from "../food-review";
+import { foodReviewHistorySelection, flushMenuPublicationChecks } from "./food-review-save";
+import { savePublicationConfirmation, saveFoodIssueResolution, MenuPublicationBlockedError } from "./publication-save";
 
 const app = new Hono();
 app.onError(handleUnhandledApiError);
@@ -85,7 +86,7 @@ app.get("/api/admin/menus/:menuId", async (c) => {
                 isPublished: true,
                 version: true,
                 foodVersion: true,
-                reviewedFoodVersion: true,
+                reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                 foodReviews: foodReviewHistorySelection,
                 createdAt: true,
                 updatedAt: true,
@@ -152,6 +153,7 @@ app.get("/api/admin/menus/:menuId", async (c) => {
                 version: menu.version,
                 foodVersion: menu.foodVersion,
                 reviewedFoodVersion: menu.reviewedFoodVersion,
+                publicationConfirmedFoodVersion: menu.publicationConfirmedFoodVersion,
                 foodReviews: menu.foodReviews,
                 createdAt: menu.createdAt,
                 updatedAt: menu.updatedAt,
@@ -223,7 +225,7 @@ app.put("/api/admin/menus/:menuId", async (c) => {
                 isPublished: true,
                 version: true,
                 foodVersion: true,
-                reviewedFoodVersion: true,
+                reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                 allergenLinks: {
                     select: {
                         status: true,
@@ -243,7 +245,7 @@ app.put("/api/admin/menus/:menuId", async (c) => {
 
         if (body.expectedVersion === undefined) return NextResponse.json({ error: "編集版が必要です。再読み込みしてから保存してください。" }, { status: 428 });
         if (body.expectedVersion !== existing.version) return NextResponse.json({ error: "別の変更が保存されています。入力を保持したまま、最新内容を確認してください。" }, { status: 409 });
-        if (!validFoodReviewTime(body.foodReview)) return NextResponse.json({ error: "食品確認日時は現在より5分を超える未来には指定できません。" }, { status: 400 });
+        if (body.foodReview) return NextResponse.json({ error: "食品確認フォームからの保存は終了しました。再読み込みして非公開で保存し、保存済み内容から公開してください。" }, { status: 400 });
 
         const priceResult = parsePriceYen(
             body.priceYen === undefined ? existing.priceYen : body.priceYen,
@@ -389,17 +391,21 @@ app.put("/api/admin/menus/:menuId", async (c) => {
         const snapshot = foodSnapshot({ name: nextName, description: nextDescription, category: nextCategory, ingredients: nextIngredients, precaution: nextPrecaution, imageUrl: imageUrlResult.value }, allergens, nextStatusBySlug);
         const foodChanged = Boolean(body.foodChangeReported) || foodContentChanged(foodSnapshot(existing, allergens, previousStatuses), snapshot);
         const linksChanged = existing.allergenLinks.length !== allergens.length || allergens.some(a => previousStatuses[a.slug] !== nextStatusBySlug[a.slug]);
-        const hasReview = body.foodReview ? !body.foodReview.unresolvedIssues : !foodChanged && isFoodReviewCurrent(existing);
-        if (!hasReview) {
-            if (requestedIsPublished && !foodChanged && !body.foodReview) return NextResponse.json({ error: "公開するには現行の食品内容の確認記録が必要です。" }, { status: 400 });
+        if (foodChanged) {
             nextIsPublished = false;
-            forcedUnpublishReason = "food_review_required";
+            forcedUnpublishReason = "saved_food_requires_separate_publication";
+        } else if (body.publicationAction === "publish") {
+            nextIsPublished = true;
+        } else if (body.publicationAction === "unpublish") {
+            nextIsPublished = false;
+        } else if (requestedIsPublished && !existing.isPublished) {
+            return NextResponse.json({ error: "保存済みの内容から「公開する」を操作してください。" }, { status: 400 });
         }
 
         if (publishErrors.length > 0) {
             const publishErrorMessage = publishErrors.join(" ");
 
-            if (body.isPublished !== undefined && requestedIsPublished) {
+            if (body.publicationAction === "publish" || (body.isPublished !== undefined && requestedIsPublished && !foodChanged)) {
                 auditAction = getMenuMutationAuditAction(
                     existing.isPublished,
                     requestedIsPublished,
@@ -438,14 +444,14 @@ app.put("/api/admin/menus/:menuId", async (c) => {
             await tx.menuItem.update({
                 // Recheck ownership at the write; an earlier read can become stale.
                 where: { id: menuId, shopId: auth.shopId, version: body.expectedVersion },
-                data: {
+                data: body.foodIssueResolution ? { isPublished: false } : {
                     name: nextName,
                     description: nextDescription,
                     priceYen: priceResult.value,
                     category: nextCategory,
                     ingredients: nextIngredients,
                     precaution: nextPrecaution,
-                    isPublished: foodChanged || body.foodReview ? false : nextIsPublished,
+                    isPublished: body.foodIssueResolution || body.publicationAction === "publish" || foodChanged ? false : nextIsPublished,
                     ...(body.foodChangeReported ? { foodVersion: { increment: 1 } } : {}),
                     imageUrl: imageUrlResult.value,
                     imageFrame: nextImageFrame,
@@ -470,11 +476,11 @@ app.put("/api/admin/menus/:menuId", async (c) => {
                     updatedAt: true,
                     version: true,
                     foodVersion: true,
-                    reviewedFoodVersion: true,
+                    reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                 },
             });
 
-            if (linksChanged) {
+            if (linksChanged && !body.foodIssueResolution) {
                 await tx.menuItemAllergen.deleteMany({ where: { menuItemId: menuId } });
                 await tx.menuItemAllergen.createMany({
                     data: allergens.map((allergen) => ({
@@ -484,15 +490,18 @@ app.put("/api/admin/menus/:menuId", async (c) => {
                 });
             }
 
-            if (body.foodReview) await saveFoodReview(tx, { menuId, shopId: auth.shopId, actorUserId: auth.appUser.id, review: body.foodReview, snapshot });
-            if (foodChanged || body.foodReview) {
-                await tx.menuItem.update({ where: { id: menuId, shopId: auth.shopId }, data: { isPublished: nextIsPublished } });
+            if (body.foodIssueResolution) {
+                await saveFoodIssueResolution(tx, { menuId, shopId: auth.shopId, actorUserId: auth.appUser.id, ...body.foodIssueResolution });
+            }
+            if (body.publicationAction === "publish" && !foodChanged) {
+                await savePublicationConfirmation(tx, { menuId, shopId: auth.shopId, actorUserId: auth.appUser.id });
+                await tx.menuItem.update({ where: { id: menuId, shopId: auth.shopId }, data: { isPublished: true } });
             }
             await flushMenuPublicationChecks(tx);
             return tx.menuItem.findFirstOrThrow({ where: { id: menuId, shopId: auth.shopId }, select: {
                     id: true, shopId: true, name: true, isPublished: true, imageUrl: true,
                     imageFrame: true, imageFit: true, imagePosition: true, imageZoom: true, imagePositionX: true, imagePositionY: true,
-                    updatedAt: true, version: true, foodVersion: true, reviewedFoodVersion: true,
+                    updatedAt: true, version: true, foodVersion: true, reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                     foodReviews: foodReviewHistorySelection,
             } });
         });
@@ -523,6 +532,9 @@ app.put("/api/admin/menus/:menuId", async (c) => {
 
         return NextResponse.json({ menu: updatedMenu });
     } catch (e) {
+        if (e instanceof MenuPublicationBlockedError) {
+            return NextResponse.json({ error: e.message }, { status: 400 });
+        }
         const notFound = isMenuWriteNotFound(e);
         if (notFound && auditShopId && menuId) {
             const owned = await prisma.menuItem.findFirst({ where: { id: menuId, shopId: auditShopId }, select: { id: true } });
@@ -658,11 +670,11 @@ app.post("/api/admin/menus/:menuId/stop", async (c) => {
         if (!auth.ok) return auth.res;
         const access = await requirePortfolioMutationAccessApi();
         if (!access.ok) return access.res;
-        const menu = await prisma.menuItem.update({ where: { id: c.req.param("menuId"), shopId: auth.shopId }, data: { isPublished: false }, select: { id: true } });
+        const menu = await prisma.menuItem.update({ where: { id: c.req.param("menuId"), shopId: auth.shopId }, data: { isPublished: false }, select: { id: true, isPublished: true, version: true } });
         await writeAdminAuditLog({ req, actorUserId: auth.appUser.id, actorShopId: auth.shopId, action: "menu_unpublish", targetType: "menu", targetId: menu.id, success: true });
         try { revalidatePublicMenuPaths(auth.shopId, menu.id); }
-        catch (error) { logOperationalError(error, { operation: "public_menu_stop_refresh_after_commit" }); return NextResponse.json({ ok: true, publicRefreshPending: true }); }
-        return NextResponse.json({ ok: true });
+        catch (error) { logOperationalError(error, { operation: "public_menu_stop_refresh_after_commit" }); return NextResponse.json({ ok: true, menu, publicRefreshPending: true }); }
+        return NextResponse.json({ ok: true, menu });
     } catch (error) {
         if (isMenuWriteNotFound(error)) return NextResponse.json({ error: "menu not found" }, { status: 404 });
         return internalError(error);

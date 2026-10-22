@@ -10,7 +10,7 @@ export function validFoodReviewTime(review: z.infer<typeof foodReviewInputSchema
 export async function flushMenuPublicationChecks(tx: Prisma.TransactionClient) {
     // Keep the existing deferred checks during link replacement, then resolve
     // them under the transaction's locks before constructing the response.
-    await tx.$executeRaw`SET CONSTRAINTS "MenuItem_reconcile_publication", "MenuItemAllergen_reconcile_publication", "Allergen_reconcile_menu_publication", "ca_require_food_review" IMMEDIATE`;
+    await tx.$executeRaw`SET CONSTRAINTS "MenuItem_reconcile_publication", "MenuItemAllergen_reconcile_publication", "Allergen_reconcile_menu_publication", "ca_require_menu_publication" IMMEDIATE`;
 }
 
 export async function saveFoodReview(tx: Prisma.TransactionClient, args: {
@@ -30,5 +30,7 @@ export async function saveFoodReview(tx: Prisma.TransactionClient, args: {
 }
 export const foodReviewHistorySelection = {
     orderBy: { reviewSequence: "desc" as const }, take: 5,
-    select: { id: true, foodVersion: true, contentSnapshot: true, evidenceRefs: true, scope: true, checkedAt: true, recordedAt: true, unresolvedIssues: true },
+    select: { id: true, foodVersion: true, contentSnapshot: true, evidenceRefs: true, scope: true, checkedAt: true, recordedAt: true, unresolvedIssues: true,
+        issueResolutions: { orderBy: { foodVersion: "desc" as const }, take: 1, select: { foodVersion: true, resolvedAt: true } },
+    },
 };

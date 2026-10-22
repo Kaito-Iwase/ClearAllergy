@@ -118,6 +118,8 @@ model MenuItem {
   version        Int                @default(0)
   foodVersion    Int                @default(0)
   reviewedFoodVersion Int?
+  publicationConfirmedFoodVersion Int?
+  legacyPublicationFoodReviewId String?
   creationOperationId String?
   creationRequestHash String?
   createdAt      DateTime           @default(now())
@@ -125,9 +127,22 @@ model MenuItem {
   shop           Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
   allergenLinks  MenuItemAllergen[]
   foodReviews    MenuFoodReview[]
+  publicationConfirmations MenuPublicationConfirmation[]
+  foodIssueResolutions MenuFoodIssueResolution[]
 
   @@index([shopId])
   @@unique([shopId, creationOperationId])
+}
+
+model MenuPublicationConfirmation {
+  id          String   @id @default(cuid())
+  menuItemId  String
+  foodVersion Int
+  actorUserId String
+  confirmedAt DateTime @default(now())
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([menuItemId, foodVersion])
 }
 
 model MenuFoodReview {
@@ -143,9 +158,25 @@ model MenuFoodReview {
   actorUserId      String
   unresolvedIssues String?
   menuItem         MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  issueResolutions MenuFoodIssueResolution[]
 
   @@index([menuItemId, foodVersion])
   @@unique([menuItemId, reviewSequence])
+}
+
+model MenuFoodIssueResolution {
+  id            String @id @default(cuid())
+  menuItemId    String
+  foodReviewId  String
+  foodVersion   Int
+  issueSnapshot String
+  actorUserId   String
+  resolvedAt    DateTime @default(now())
+  menuItem      MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  foodReview    MenuFoodReview @relation(fields: [foodReviewId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, foodReviewId, foodVersion])
+  @@index([foodReviewId, foodVersion])
 }
 
 model Allergen {

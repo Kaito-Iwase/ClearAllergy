@@ -110,7 +110,10 @@ export async function runFoodReviewDatabaseRegression(db: PrismaClient, shopId: 
     assert.equal(snapshot.allergens.length, master.length);
     assert.equal(snapshot.allergens.find(a => a.slug === master[0].slug)?.status, "MAY_CONTAIN");
     await db.menuItem.update({ where: { id: menu.id }, data: { isPublished: true } });
-    assert.equal((await read(menu.id)).isPublished, true, "A new resolved review can explicitly restore publication");
+    assert.equal((await read(menu.id)).isPublished, false, "A food review alone no longer authorizes publication");
+    await db.menuPublicationConfirmation.create({ data: { menuItemId: menu.id, foodVersion: bound.foodVersion, actorUserId: "synthetic-fixture" } });
+    await db.menuItem.update({ where: { id: menu.id }, data: { isPublished: true } });
+    assert.equal((await read(menu.id)).isPublished, true, "A separate current-version publication action can restore publication");
     console.log("PASS: past/future review versions are rejected; snapshot and record time come from locked persisted content");
 
     const raceBefore = await read(menu.id);
@@ -147,7 +150,7 @@ export async function runFoodReviewDatabaseRegression(db: PrismaClient, shopId: 
     const beforeTruncate = await read(menu.id);
     const beforeTruncateCount = await db.menuFoodReview.count();
     await assert.rejects(db.$transaction(async tx => {
-        await tx.$executeRaw`TRUNCATE "MenuFoodReview"`;
+        await tx.$executeRaw`TRUNCATE "MenuFoodReview" CASCADE`;
         assert.equal(await tx.menuFoodReview.count(), 0);
         const stopped = await tx.menuItem.findUniqueOrThrow({ where: { id: menu.id } });
         assert.equal(stopped.isPublished, false);

@@ -20,7 +20,7 @@ import {
     createStatusBySlug,
     getStoreContainsAllergenSlugs,
     isMenuPublishable,
-    isFoodReviewCurrent,
+    isMenuPublicationCurrent,
 } from "@/lib/allergens";
 import {
     parseMenuImageFit,
@@ -107,7 +107,7 @@ export default async function PublicShopDetailPage({
                                 precaution: true,
                                 updatedAt: true,
                                 foodVersion: true,
-                                reviewedFoodVersion: true,
+                                reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                                 allergenLinks: {
                                     select: {
                                         status: true,
@@ -153,7 +153,7 @@ export default async function PublicShopDetailPage({
 
     // 公開フラグだけでなく、現行マスタの全品目が確定済みかを公開時にも再確認します。
     const publishableMenus = shop.menus.filter((menu) =>
-        isFoodReviewCurrent(menu) && isMenuPublishable({
+        isMenuPublicationCurrent(menu) && isMenuPublishable({
             name: menu.name,
             allergens: allergenMaster,
             statusBySlug: createStatusBySlug(

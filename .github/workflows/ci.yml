@@ -81,12 +81,16 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Check two-step publication upgrade on an empty disposable database
+        run: node --import tsx scripts/check-publication-migration.ts
+
       - name: Prepare isolated fictional data
         run: node --import tsx scripts/setup-ci-env.ts
 
       - name: Check PostgreSQL constraints and rollback
         run: |
           node --import tsx scripts/check-ci-database.ts
+          node --import tsx scripts/check-publication-database.ts
           node --import tsx scripts/check-admin-menu-list-database.ts
 
       - name: Check owned menu writes in isolated PostgreSQL

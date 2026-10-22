@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { readPublicSnapshot } from "./public-read-snapshot";
 import { readPublicDataOrFallback } from "@/lib/public-db";
 import PublicShopListClient from "@/features/public/shops/components/PublicShopListClient";
-import { createStatusBySlug, isMenuPublishable, isFoodReviewCurrent } from "@/lib/allergens";
+import { createStatusBySlug, isMenuPublishable, isMenuPublicationCurrent } from "@/lib/allergens";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ export default async function PublicShopListPage() {
                                     name: true,
                                     priceYen: true,
                                     foodVersion: true,
-                                    reviewedFoodVersion: true,
+                                    reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                                     allergenLinks: {
                                         select: {
                                             status: true,
@@ -91,7 +91,7 @@ export default async function PublicShopListPage() {
     // 現行マスタに対するリンク欠損も createStatusBySlug が UNKNOWN として扱います。
     const shopsWithPublishableMenus = shops.flatMap((shop) => {
         const publishableMenus = shop.menus.filter((menu) =>
-            isFoodReviewCurrent(menu) && isMenuPublishable({
+            isMenuPublicationCurrent(menu) && isMenuPublishable({
                 name: menu.name,
                 allergens: allergenMaster,
                 statusBySlug: createStatusBySlug(

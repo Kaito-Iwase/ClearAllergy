@@ -89,11 +89,6 @@ try {
     const free = a.page.getByRole('button', { name: '原材料に含まない登録', exact: true });
     for (let i = 0; i < await free.count(); i++) await free.nth(i).click();
     await a.page.getByRole('group', { name: '卵', exact: true }).getByRole('button', { name: '含む可能性あり・要確認', exact: true }).click();
-    await a.page.getByRole('checkbox', { name: '今回の提供内容と原資料を照合した記録を保存する', exact: true }).check();
-    await a.page.getByLabel('根拠資料・製品識別・資料の版', { exact: true }).fill('架空試験資料 test-v1（実食品の証拠ではない）');
-    await a.page.getByLabel('確認した提供内容・バリエーション・構成品・対象アレルゲンの範囲', { exact: true }).fill('架空の全構成品・全品目');
-    const checkedLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-    await a.page.getByLabel('食品根拠を確認した日時', { exact: true }).fill(checkedLocal);
     // 小さなPNGを今回の店舗IDのパスへだけアップロードする。
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=', 'base64');
     await a.page.locator('input[type=file]').setInputFiles({ name: 'test-fixture.png', mimeType: 'image/png', buffer: png });
@@ -105,7 +100,6 @@ try {
             writeFileSync('.clerk/clearallergy-test-created-images.json', JSON.stringify(createdImages), { mode: 0o600 });
         }
     });
-    await a.page.getByRole('button', { name: '非公開の下書きとして登録する', exact: true }).click();
     let posts = 0;
     a.page.on('request', r => { if (r.url() === base + '/api/admin/menus' && r.method() === 'POST') posts++; });
     a.page.once('dialog', d => d.dismiss());
@@ -115,11 +109,14 @@ try {
     await a.page.getByRole('button', { name: 'この内容で登録する', exact: true }).click();
     await a.page.waitForURL(/\/admin\/menus\/[^/]+\/edit$/);
     const id = new URL(a.page.url()).pathname.split('/').at(-2); cleanupMenus.push(id);
+    assert.equal((await a.context.request.get(base + '/api/menus/' + id)).status(), 404);
+    await a.page.getByRole('button', { name: '公開する', exact: true }).click();
+    await a.page.getByRole('status').filter({ hasText: '保存しました。公開状態：公開' }).waitFor();
     const pub = await a.context.request.get(base + '/api/menus/' + id);
     assert.equal(pub.status(), 200); assert.equal(createdImages.length, 1);
     const publicData = await pub.json();
     assert.ok(publicData.menu.imageUrl);
-    console.log('PASS: confirmation cancellation sends nothing; reviewed MAY_CONTAIN menu and real Blob image publish successfully');
+    console.log('PASS: cancellation sends nothing; draft saves first, then separate publication exposes MAY_CONTAIN and real Blob image');
     for (const method of ['get', 'put', 'delete']) {
         const response = await b.context.request[method](base + '/api/admin/menus/' + id, { headers: { Origin: base }, ...(method === 'put' ? { data: { name: 'unauthorized', shopId: accounts[1].shopId } } : {}) });
         assert.equal(response.status(), 404);

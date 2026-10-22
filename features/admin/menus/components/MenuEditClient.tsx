@@ -5,8 +5,9 @@
 
 import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
-import MenuFoodReviewFields from "./MenuFoodReviewFields";
-import { foodSnapshot, foodContentChanged, isFoodReviewCurrent, emptyFoodReviewDraft, type FoodReviewSummary } from "../food-review";
+import MenuFoodReviewHistory from "./MenuFoodReviewHistory";
+import { isMenuPublicationCurrent } from "@/lib/allergens";
+import { foodSnapshot, foodContentChanged, hasUnresolvedFoodIssue,  type FoodReviewSummary } from "../food-review";
 import { getMenuSavePlan } from "../menu-save-plan";
 import MenuSaveOutcomeNotice from "./MenuSaveOutcomeNotice";
 import { useRouter } from "next/navigation";
@@ -65,6 +66,7 @@ export default function MenuEditClient(props: {
     initialVersion?: number;
     initialFoodVersion?: number;
     initialReviewedFoodVersion?: number | null;
+    initialPublicationConfirmedFoodVersion?: number | null;
     initialFoodReviews?: FoodReviewSummary[];
     initialName: string;
     initialDescription: string | null;
@@ -171,10 +173,9 @@ export default function MenuEditClient(props: {
     const uploadedFile = React.useRef<{ file: File; url: string } | null>(null);
     const creationOperation = React.useRef<string | null>(null);
     const [version, setVersion] = React.useState(props.initialVersion ?? 0);
-    const [reviewCurrent, setReviewCurrent] = React.useState(isFoodReviewCurrent({ foodVersion: props.initialFoodVersion ?? 0, reviewedFoodVersion: props.initialReviewedFoodVersion }));
+    const [savedFoodVersion, setSavedFoodVersion] = React.useState(props.initialFoodVersion ?? 0);
+    const [publicationCurrent, setPublicationCurrent] = React.useState(isMenuPublicationCurrent({ foodVersion: props.initialFoodVersion ?? 0, publicationConfirmedFoodVersion: props.initialPublicationConfirmedFoodVersion }));
     const [reviewHistory, setReviewHistory] = React.useState(props.initialFoodReviews ?? []);
-    const [foodReview, setFoodReview] = React.useState(emptyFoodReviewDraft);
-    const [recordingReview, setRecordingReview] = React.useState(false);
     const [foodChangeReported, setFoodChangeReported] = React.useState(false);
     const [savedFoodSnapshot, setSavedFoodSnapshot] = React.useState(() => foodSnapshot({ name: initialName, description: initialDescription, category: initialCategory, ingredients: initialIngredients, precaution: initialPrecaution, imageUrl: initialImageUrl }, allergens, initialStatusBySlug));
     const currentFoodSnapshot = foodSnapshot({ name, description, category, ingredients, precaution, imageUrl }, allergens, statusBySlug);
@@ -183,8 +184,9 @@ export default function MenuEditClient(props: {
         () => getUnknownAllergenNames({ allergens, statusBySlug }),
         [allergens, statusBySlug],
     );
+    const unresolvedIssue = hasUnresolvedFoodIssue(savedFoodVersion, reviewHistory[0]);
     const savePlan = getMenuSavePlan({ name, allergens, statusBySlug, requestedIsPublished: isPublished,
-        foodChanged, reviewCurrent, recordingReview, foodReview });
+        foodChanged, publicationCurrent, unresolved: unresolvedIssue });
     const { canPublish } = savePlan;
     const allergenRows = React.useRef(new Map<string, HTMLDivElement>());
     function findNextUnknown() {
@@ -197,7 +199,7 @@ export default function MenuEditClient(props: {
     }
     const draftValues = { name, description, priceYenInput, category, ingredients, precaution,
         imageUrl, imageFrame, imageFit, imagePosition, imageZoom, imagePositionX, imagePositionY,
-        isPublished, statusBySlug, foodReview, recordingReview, foodChangeReported };
+        isPublished, statusBySlug, foodChangeReported };
     const currentDraft = JSON.stringify(draftValues);
     const [savedDraft, setSavedDraft] = React.useState(currentDraft);
     const [savedIsPublished, setSavedIsPublished] = React.useState(initialIsPublished);
@@ -221,20 +223,6 @@ export default function MenuEditClient(props: {
         if (status === "UNKNOWN") {
             setIsPublished(false);
         }
-    }
-
-    function togglePublished() {
-        setError(null);
-        setSaved(false);
-        if (!isPublished && !canPublish) {
-            setIsPublished(false);
-            setError(
-                unknownAllergenNames.length ? `公開するにはアレルゲン${allergens.length}品目を確定してください。未設定: ${unknownAllergenNames.length}件` : "公開するには、現行の食品内容を照合した確認記録と未解決事項の解消が必要です。",
-            );
-            return;
-        }
-
-        setIsPublished((prev) => !prev);
     }
 
     function onSelectImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -300,6 +288,34 @@ export default function MenuEditClient(props: {
         }
     }
 
+    async function saveMenuAction(action: "publish" | "resolve") {
+        if (saving || uploading || creating || readOnly || conflict) return;
+        if (hasUnsavedChanges) { setError("変更を保存してから公開してください。"); return; }
+        setError(null); setNotice(null); setSaved(false); setSaving(true);
+        try {
+            const response = await fetch(`/api/admin/menus/${menuId}`, {
+                method: "PUT", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(action === "resolve" ? { expectedVersion: version,
+                    foodIssueResolution: { foodReviewId: reviewHistory[0]?.id, foodVersion: savedFoodVersion } }
+                    : { expectedVersion: version, publicationAction: "publish" }),
+            });
+            if (!response.ok) { setConflict(response.status === 409); throw new Error(await getApiErrorMessage(response, SAVE_ERROR_MESSAGE)); }
+            const result = menuSaveResponseSchema.safeParse(await response.json().catch(() => null));
+            if (!result.success || result.data.menu.id !== menuId || result.data.menu.version <= version) {
+                throw new Error("保存結果を確認できませんでした。再読み込みして保存状態を確認してください。");
+            }
+            const data = result.data;
+            setSavedFoodVersion(data.menu.foodVersion); setVersion(data.menu.version); setIsPublished(data.menu.isPublished); setSavedIsPublished(data.menu.isPublished);
+            setPublicationCurrent(isMenuPublicationCurrent(data.menu)); setReviewHistory(data.menu.foodReviews); setConflict(false);
+            setSavedDraft(previous => JSON.stringify({ ...JSON.parse(previous), isPublished: data.menu.isPublished }));
+            setSaved(true);
+            if (action === "resolve") setNotice("未解決事項の解消を記録しました。保存済み内容を見直して、別に公開してください。");
+            if (data.publicRefreshPending) setNotice("保存は完了しましたが、公開表示の更新処理が未完了です。再保存せず、公開表示を確認してください。");
+            router.refresh();
+        } catch (error) { setError(getThrownErrorMessage(error, SAVE_ERROR_MESSAGE)); }
+        finally { setSaving(false); }
+    }
+
     async function onSave() {
         if (saving || uploading || creating) return;
         setError(null);
@@ -320,9 +336,6 @@ export default function MenuEditClient(props: {
             setError("メニュー名は必須です。");
             return;
         }
-        if (savePlan.reviewInputInvalid) {
-            setError("根拠資料・確認範囲・確認日時を確認してください。確認日時は現在より5分を超える未来には指定できません。"); return;
-        }
         const reviewMessage = getMenuReviewMessage({
             name,
             willPublish: savePlan.willPublish,
@@ -342,7 +355,6 @@ export default function MenuEditClient(props: {
             const body = {
                 expectedVersion: version,
                 foodChangeReported,
-                ...(recordingReview ? { foodReview: { ...foodReview, checkedAt: new Date(foodReview.checkedAt).toISOString() } } : {}),
                 name: trimmedName,
                 description: normalizeOptionalMenuText(description),
                 priceYen,
@@ -382,16 +394,15 @@ export default function MenuEditClient(props: {
             setIsPublished(data.menu.isPublished);
             setConflict(false);
             setVersion(data.menu.version);
-            setReviewCurrent(isFoodReviewCurrent(data.menu));
+            setPublicationCurrent(isMenuPublicationCurrent(data.menu));
             setReviewHistory(data.menu.foodReviews);
+            setSavedFoodVersion(data.menu.foodVersion);
             setSavedFoodSnapshot({ ...currentFoodSnapshot, imageUrl: data.menu.imageUrl ?? null });
-            setRecordingReview(false);
             setFoodChangeReported(false);
-            setFoodReview(emptyFoodReviewDraft());
             setSavedIsPublished(data.menu.isPublished);
             setSavedIngredients(ingredients.trim());
             setSavedDraft(JSON.stringify({ ...draftValues, isPublished: data.menu.isPublished,
-                recordingReview: false, foodChangeReported: false, foodReview: emptyFoodReviewDraft(),
+                foodChangeReported: false,
                 imageUrl: typeof data.menu.imageUrl === "string" ? data.menu.imageUrl : "" }));
             if (typeof data.menu.imageUrl === "string" || data.menu.imageUrl === null) {
                 setImageUrl(data.menu.imageUrl ?? "");
@@ -508,28 +519,13 @@ export default function MenuEditClient(props: {
                                   : "＋ 新しいメニューを作る"}
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={togglePublished}
-                            aria-pressed={isPublished && canPublish}
-                            disabled={
-                                (readOnly && !readOnlyPreview) ||
-                                creating ||
-                                saving ||
-                                uploading
-                            }
-                            className={`min-h-11 w-full rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto ${
-                                isPublished && canPublish
-                                    ? "bg-green-600"
-                                    : canPublish
-                                      ? "bg-gray-900"
-                                      : "bg-amber-600"
-                            }`}
-                        >
-                            {canPublish ? isPublished ? "保存時に公開する" : "保存時に非公開にする" : "保存時は非公開"}
-                            {readOnly ? "（デモ）" : ""}
-                        </button>
 
+
+                        {!savedIsPublished && <button type="button" onClick={() => void saveMenuAction("publish")}
+                            disabled={readOnly || saving || uploading || creating || conflict || hasUnsavedChanges || !canPublish}
+                            className="min-h-11 w-full rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto">
+                            公開する{readOnly ? "（デモ）" : ""}
+                        </button>}
                         <button
                             type="button"
                             onClick={onSave}
@@ -568,7 +564,7 @@ export default function MenuEditClient(props: {
                 {saved && !hasUnsavedChanges && (
                     <div role="status" className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
                         保存しました。公開状態：{savedIsPublished ? "公開" : "非公開"}。
-                        食品確認：{reviewCurrent ? "現行の食品内容に対応する記録あり" : "再確認が必要"}。
+                        公開操作：{publicationCurrent ? "保存済みの食品内容に対応" : "保存済み内容から別に公開が必要"}。
                     </div>
                 )}
 
@@ -769,8 +765,21 @@ export default function MenuEditClient(props: {
                     totalAllergenCount={allergens.length}
                     onFindUnknown={findNextUnknown}
                 />
-                    <MenuFoodReviewFields value={foodReview} onChange={setFoodReview} recording={recordingReview} onRecordingChange={setRecordingReview}
-                        current={reviewCurrent && !foodChanged} history={reviewHistory} foodChangeReported={foodChangeReported} onFoodChangeReported={setFoodChangeReported} />
+                    <label className="mt-3 flex items-start gap-2 text-sm">
+                        <input type="checkbox" checked={foodChangeReported} onChange={event => setFoodChangeReported(event.target.checked)} />
+                        入力文字が同じでも、仕入れ仕様・代替使用・調理工程などの食品変更があった
+                    </label>
+                    {hasUnsavedChanges && <p className="mt-2 text-sm">公開する前に、変更を保存してください。</p>}
+                    {unresolvedIssue && <section aria-label="保存済みの未解決事項" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
+                            <p className="font-bold">保存済みの未解決事項</p>
+                            <p className="mt-2 whitespace-pre-wrap break-words">{reviewHistory[0].unresolvedIssues}</p>
+                            <p className="mt-2">実際に確認・対応してから「この内容は解消した」を操作してください。旧記録は保持し、公開は別に操作します。アレルゲンの登録状態は変わりません。</p>
+                            <button type="button" onClick={() => void saveMenuAction("resolve")}
+                                disabled={readOnly || saving || uploading || creating || conflict || hasUnsavedChanges}
+                                className="mt-2 min-h-11 rounded-xl border border-amber-700 px-4 py-2 font-semibold disabled:opacity-60">この内容は解消した</button>
+                            {hasUnsavedChanges && <p className="mt-2">変更を保存してから操作してください。</p>}
+                        </section>}
+                    <MenuFoodReviewHistory history={reviewHistory} />
                     <MenuAllergenRegistrationGuide />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">

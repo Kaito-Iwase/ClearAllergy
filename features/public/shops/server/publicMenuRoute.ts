@@ -12,7 +12,7 @@ import {
     buildAllergenRows,
     createStatusBySlug,
     isMenuPublishable,
-    isFoodReviewCurrent,
+    isMenuPublicationCurrent,
 } from "@/lib/allergens";
 import { validateStoredImageUrl } from "@/lib/storage/image-url-policy";
 import {
@@ -75,7 +75,7 @@ app.get("/api/menus/:menuId", async (c) => {
                     createdAt: true,
                     updatedAt: true,
                     foodVersion: true,
-                    reviewedFoodVersion: true,
+                    reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                     allergenLinks: {
                         select: {
                             status: true,
@@ -108,7 +108,7 @@ app.get("/api/menus/:menuId", async (c) => {
             });
 
             if (
-                !isFoodReviewCurrent(menu) || !isMenuPublishable({
+                !isMenuPublicationCurrent(menu) || !isMenuPublishable({
                     name: menu.name,
                     allergens: allergenMaster,
                     statusBySlug: createStatusBySlug(

@@ -31,13 +31,14 @@ const entry = [
     "const note='乳：仕入れ品に、乳を扱う製造ラインについての注意表示があります。\\n小麦：小麦を使う料理と揚げ油を共用しています。';",
     "const target={id:'target',name:'ミックスプレート',description:null,category:'デザート',priceYen:880,precaution:note,updatedAt:'2026-10-09T00:00:00Z',allergenLinks:links({egg:'CONTAINS',wheat:'MAY_CONTAIN',milk:'MAY_CONTAIN',soybean:'CONTAINS'})};",
     "const source={...target,id:'source',name:'くるみを使う別メニュー',precaution:null,allergenLinks:links({walnut:'CONTAINS'})};",
-    "const listBase={category:'架空検証',priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:new Date('2026-10-15T00:00:00Z'),foodVersion:2,reviewedFoodVersion:null,allergenLinks:links({}),foodReviews:[]}; const listRows=[{id:'unknown',name:'架空・品目未設定',allergenLinks:links({milk:'UNKNOWN'})},{id:'current',name:'架空・現行確認で公開中',isPublished:true,reviewedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]},{id:'old',name:'架空・材料更新で旧確認',foodReviews:[{foodVersion:1,unresolvedIssues:null}]},{id:'unresolved',name:'架空・最新記録が未解決',foodReviews:[{foodVersion:2,unresolvedIssues:'非公開の架空仕入れメモ'}]},{id:'missing',name:'架空・確認記録なし'},{id:'stopped',name:'架空・通常の公開停止',reviewedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]}].map(row=>toAdminMenuListRow({...listBase,...row},master));",
+    "const listBase={category:'架空検証',priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:new Date('2026-10-15T00:00:00Z'),foodVersion:2,reviewedFoodVersion:null,publicationConfirmedFoodVersion:null,allergenLinks:links({}),foodReviews:[]}; const listRows=[{id:'unknown',name:'架空・品目未設定',allergenLinks:links({milk:'UNKNOWN'})},{id:'current',name:'架空・現行確認で公開中',isPublished:true,reviewedFoodVersion:2,publicationConfirmedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]},{id:'old',name:'架空・材料更新で旧確認',foodReviews:[{foodVersion:1,unresolvedIssues:null}]},{id:'unresolved',name:'架空・最新記録が未解決',foodReviews:[{foodVersion:2,unresolvedIssues:'非公開の架空仕入れメモ'}]},{id:'missing',name:'架空・確認記録なし'},{id:'stopped',name:'架空・通常の公開停止',reviewedFoodVersion:2,publicationConfirmedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]}].map(row=>toAdminMenuListRow({...listBase,...row},master));",
     "function prefs(highlightSlugs=[],excludedSlugs=[],includeMayContain=false){saveUserAllergenPreferences({highlightSlugs,excludedSlugs,includeMayContain,selectedSlugs:[]})}",
     "function App(){const [published,setPublished]=React.useState(true);const [unknown,setUnknown]=React.useState(false);const [long,setLong]=React.useState(false);const current={...target,precaution:long?'小麦：'+ '長い注意書き'.repeat(250):note,allergenLinks:unknown?links({egg:'CONTAINS',milk:'UNKNOWN'}):target.allergenLinks};const menus=published?[current,source]:[current];",
     "if(location.pathname.startsWith('/new'))return <NewMenu allergens={master} readOnlyPreview={location.pathname==='/new'}/>;",
     "if(location.pathname==='/list-delete')return <MenuList totalAllergenCount={master.length} initialMenus={[{id:'fixture',name:'架空削除メニュー',category:null,priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:'2026-10-09T00:00:00Z',unknownAllergenNames:[],foodReviewState:'current'}]}/>;",
+    "if(location.pathname==='/list-stop')return <MenuList totalAllergenCount={master.length} initialMenus={[{...listRows[0],id:'fixture',name:'架空停止メニュー',isPublished:true,version:5}]}/>;",
     "if(location.pathname.startsWith('/review-queue'))return <MenuList totalAllergenCount={master.length} initialMenus={location.pathname==='/review-queue-empty'?[]:listRows} readOnly={location.pathname==='/review-queue-demo'} readOnlyEditHrefBase={location.pathname==='/review-queue-demo'?'/admin/demo/menus':undefined}/>;",
-    "if(location.pathname.startsWith('/edit'))return <EditMenu menuId='fixture' initialVersion={5} initialFoodVersion={1} initialReviewedFoodVersion={location.pathname==='/edit-save'?1:null} initialFoodReviews={location.pathname==='/edit-save'?history:[]} initialName='入力ガイド確認用' initialDescription={null} initialPriceYen={null} initialCategory={null} initialIngredients={null} initialPrecaution={null} initialImageUrl={null} initialImageFrame='wide' initialImageFit='contain' initialImagePosition='center' initialImageZoom={100} initialImagePositionX={50} initialImagePositionY={50} initialIsPublished={location.pathname==='/edit-save'} allergens={master} initialStatusBySlug={location.pathname==='/edit-save'?reviewedStatuses:statuses} readOnlyPreview={location.pathname==='/edit'}/>;",
+    "if(location.pathname.startsWith('/edit'))return <EditMenu menuId='fixture' initialVersion={5} initialFoodVersion={1} initialReviewedFoodVersion={location.pathname==='/edit-save'?1:null} initialPublicationConfirmedFoodVersion={location.pathname==='/edit-save'?1:null} initialFoodReviews={location.pathname==='/edit-save'?history:[]} initialName='入力ガイド確認用' initialDescription={null} initialPriceYen={null} initialCategory={null} initialIngredients={null} initialPrecaution={null} initialImageUrl={null} initialImageFrame='wide' initialImageFit='contain' initialImagePosition='center' initialImageZoom={100} initialImagePositionX={50} initialImagePositionY={50} initialIsPublished={location.pathname==='/edit-save'} allergens={master} initialStatusBySlug={location.pathname==='/edit-save'?reviewedStatuses:statuses} readOnlyPreview={location.pathname==='/edit'}/>;",
     "return <><h1>架空データによるカード確認</h1><nav style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}><button onClick={()=>prefs()}>設定を解除</button><button onClick={()=>prefs(['milk','walnut'])}>乳とくるみを注目</button><button onClick={()=>prefs([],['walnut'])}>くるみを除外</button><button onClick={()=>prefs([],['milk'])}>乳の可能性は残す</button><button onClick={()=>prefs([],['milk'],true)}>乳の可能性も除外</button><button onClick={()=>setPublished(v=>!v)}>補足元の公開を切替</button><button onClick={()=>setUnknown(v=>!v)}>未確認の入力を切替</button><button onClick={()=>setLong(v=>!v)}>長い注意書きを切替</button></nav><ShopMenus shopId='fixture' menus={menus} allergenMaster={master} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs(menus,master)]}/></>}",
     "createRoot(document.getElementById('root')).render(<App/>);",
 ].join("\n");
@@ -77,7 +78,7 @@ for (const name of readdirSync(media)) if (name.endsWith(".woff2")) {
 }
 const server = createServer((request, response) => {
     const path = new URL(request.url, "http://localhost").pathname;
-    const asset = assets.get(path) || (["/", "/new", "/new-save", "/edit", "/edit-save", "/list-delete", "/review-queue", "/review-queue-demo", "/review-queue-empty"].includes(path) ? ["text/html", html] : null);
+    const asset = assets.get(path) || (["/", "/new", "/new-save", "/edit", "/edit-save", "/list-delete", "/list-stop", "/review-queue", "/review-queue-demo", "/review-queue-empty"].includes(path) ? ["text/html", html] : null);
     response.writeHead(asset ? 200 : 404, { "Content-Type": asset?.[0] || "text/plain" });
     response.end(asset?.[1] || "Not found");
 });
@@ -106,7 +107,9 @@ try {
     assert.match(await registered.innerText(), /含む可能性あり・要確認\s+小麦・乳\s*（2品目）/);
     assert.match(await card.innerText(), /確認対象：特定原材料（9品目）/);
     assert.match(await card.getByRole("group", { name: "その他のアレルゲン", exact: true }).innerText(), /含む\s+大豆\s*（1品目）/);
-    assert.match(await card.getByRole("group", { name: "他の公開メニューの登録情報", exact: true }).innerText(), /くるみ：この店舗の別の公開メニュー/);
+    assert.equal(await card.getByRole("group", { name: "他の公開メニューの登録情報", exact: true }).count(), 0);
+    assert.match(await page.getByRole("region", { name: "店舗全体の登録情報", exact: true }).innerText(), /くるみ/);
+    assert.equal(await page.getByRole("region", { name: "店舗全体の登録情報", exact: true }).count(), 1);
     assert.doesNotMatch(await registered.innerText(), /くるみ/);
     assert.match(await card.getByRole("group", { name: "店舗の注意書き", exact: true }).innerText(), /乳を扱う製造ライン.*\n小麦：/);
     pass("Names and counts remain scoped; manual uncertainty, automatic supplement and full note are separate");
@@ -126,7 +129,7 @@ try {
     assert.equal(await card.getByRole("group", { name: "その他のアレルゲン", exact: true }).count(), 0);
     await page.getByRole("button", { name: "くるみを除外", exact: true }).click();
     assert.equal(await card.count(), 1);
-    assert.match(await card.innerText(), /別の公開メニューに「含む」登録/);
+    assert.match(await page.getByRole("region", { name: "店舗全体の登録情報", exact: true }).innerText(), /くるみ/);
     await page.getByRole("button", { name: "乳の可能性は残す", exact: true }).click();
     assert.match(await registered.innerText(), /含む可能性あり・要確認\s+乳/);
     await page.getByRole("button", { name: "乳の可能性も除外", exact: true }).click();
@@ -155,22 +158,8 @@ try {
         assert.match(await guide.innerText(), /工場・製造ライン.*共用器具・揚げ油/);
         assert.match(await guide.innerText(), /資料や確認が不足.*未設定/);
         const milk = page.getByRole("group", { name: "乳", exact: true });
-        const review = page.getByRole("region", { name: "食品確認記録", exact: true });
-        assert.match(await review.innerText(), /現行の食品内容の確認記録が必要/);
-        await review.getByRole("checkbox", { name: "今回の提供内容と原資料を照合した記録を保存する", exact: true }).check();
-        const evidence = review.getByLabel("根拠資料・製品識別・資料の版", { exact: true });
-        const scope = review.getByLabel("確認した提供内容・バリエーション・構成品・対象アレルゲンの範囲", { exact: true });
-        const checkedAt = review.getByLabel("食品根拠を確認した日時", { exact: true });
-        for (const field of [evidence, scope, checkedAt]) assert.equal(await field.getAttribute("required"), "");
-        await evidence.fill("架空仕様書 test-v1（実食品ではない）");
-        await scope.fill("架空の別添・代替・全対象品目");
-        await checkedAt.fill("2026-10-08T12:00");
-        await review.getByLabel("未解決事項（残っている場合は公開できません）", { exact: true }).fill("架空の未解決事項");
-        writeFileSync(join(output, path.slice(1) + "-review-diagnostic.html"), await page.content(), "utf8");
-        await page.screenshot({ path: join(output, path.slice(1) + "-review-diagnostic.png"), fullPage: true });
-        await evidence.focus();
-        await page.keyboard.press("Tab");
-        assert.equal(await scope.evaluate(element => element === document.activeElement && element.matches(":focus-visible")), true);
+        assert.equal(await page.getByLabel("根拠資料・製品識別・資料の版", { exact: true }).count(), 0);
+        if (path === "/edit") assert.match(await page.getByRole("region", { name: "保存後の予定", exact: true }).innerText(), /公開操作/);
         const original = path === "/new" ? "未設定" : "原材料に含まない登録";
         const noteField = page.getByLabel("注意書き", { exact: true });
         const helpId = await noteField.getAttribute("aria-describedby");
@@ -187,12 +176,61 @@ try {
         for (const width of [320, 390, 1440]) {
             await page.setViewportSize({ width, height: 900 });
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, path + " at " + width);
-            if (width === 390) await review.screenshot({ path: join(output, path.slice(1) + "-food-review-mobile.png") });
+            if (width === 390) await page.screenshot({ path: join(output, path.slice(1) + "-no-review-form-mobile.png") });
         }
         await guide.screenshot({ path: join(output, path.slice(1) + "-allergen-guide.png") });
-        await review.screenshot({ path: join(output, path.slice(1) + "-food-review.png") });
+        await page.screenshot({ path: join(output, path.slice(1) + "-no-review-form.png") });
     }
     assert.deepEqual(writes, []);
+    const stopCalls = [];
+    let stopResponse = "pending";
+    let releaseStop;
+    const pendingStop = new Promise(resolve => { releaseStop = resolve; });
+    await page.route("**/api/admin/menus/fixture/stop", async route => {
+        stopCalls.push(route.request().method());
+        if (stopResponse === "pending") await pendingStop;
+        if (stopResponse === "network") return route.abort("failed");
+        const status = stopResponse === "conflict" ? 409 : stopResponse === "denied" ? 403 : 200;
+        const body = status !== 200 ? { error: "最新状態と操作権限を確認してください。" } : stopResponse === "malformed" ? { ok: true, menu: { id: "fixture", isPublished: true, version: 6 } } : { ok: true, menu: { id: "fixture", isPublished: false, version: 6 }, publicRefreshPending: true };
+        return route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    await page.goto(base + "/list-stop");
+    const stopButton = page.getByRole("button", { name: "架空停止メニューの公開を停止", exact: true });
+    for (const width of [320, 390, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        await stopButton.waitFor();
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await page.screenshot({ path: join(output, `menu-list-stop-${width}.png`), fullPage: true });
+    }
+    await stopButton.focus(); await page.keyboard.press("Enter");
+    await stopButton.filter({ hasText: "停止中…" }).waitFor();
+    assert.equal(await stopButton.isDisabled(), true);
+    assert.match(await page.locator("article").innerText(), /公開中/);
+    assert.equal(stopCalls.length, 1);
+    stopResponse = "ok"; releaseStop();
+    await page.getByRole("status").filter({ hasText: "非公開にしました" }).waitFor();
+    assert.match(await page.locator("article").innerText(), /非公開/);
+    assert.equal(await stopButton.count(), 0);
+    await page.getByRole("alert").filter({ hasText: "反映は未確認" }).waitFor();
+    let deleteVersion;
+    await page.route("**/api/admin/menus/fixture", route => {
+        deleteVersion = route.request().postDataJSON().expectedVersion;
+        return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: "最新の内容を確認してから削除してください。" }) });
+    });
+    await page.getByRole("button", { name: "架空停止メニューを削除", exact: true }).click();
+    await page.getByRole("alert").filter({ hasText: "最新の内容" }).waitFor();
+    assert.equal(deleteVersion, 5, "A stop acknowledgement cannot rebase stale content for deletion");
+    await page.unroute("**/api/admin/menus/fixture");
+    for (const failure of ["network", "conflict", "denied", "malformed"]) {
+        stopResponse = failure;
+        await page.goto(base + "/list-stop");
+        await stopButton.click(); await page.getByRole("alert").waitFor();
+        assert.match(await page.locator("article").innerText(), /公開中/);
+        assert.equal(await page.getByRole("status").filter({ hasText: "非公開にしました" }).count(), 0);
+    }
+    await page.unroute("**/api/admin/menus/fixture/stop");
+    pass("List emergency stop preserves published state until acknowledgement, blocks duplicate sends, and handles failures without false success");
+
     let conflict = true;
     let disconnectSave = false;
     const saves = [];
@@ -201,14 +239,14 @@ try {
         saves.push(route.request().postDataJSON());
         if (disconnectSave) return route.abort("failed");
         await route.fulfill({ status: conflict ? 409 : 200, contentType: "application/json", body: JSON.stringify(conflict ? { error: "別の変更が保存されています。" } : {
-            menu: { id: "fixture", version: 6, foodVersion: 1, reviewedFoodVersion: 1, imageUrl: null, isPublished: true, foodReviews: [] }, publicRefreshPending: true,
+            menu: { id: "fixture", version: 6, foodVersion: 1, reviewedFoodVersion: 1, publicationConfirmedFoodVersion: 1, imageUrl: null, isPublished: true, foodReviews: [] }, publicRefreshPending: true,
         }) });
     });
     await page.goto(base + "/edit-save");
     await page.getByText("保存済みの確認記録（直近5件）", { exact: true }).click();
     await page.getByText("この記録に対応する食品内容", { exact: true }).click();
     assert.equal(await page.getByText("卵：含む", { exact: true }).count(), 1);
-    assert.match(await page.getByRole("region", { name: "食品確認記録", exact: true }).innerText(), /架空資料 test-v1/);
+    assert.match(await page.getByRole("region", { name: "以前の食品確認記録", exact: true }).innerText(), /架空資料 test-v1/);
     const price = page.getByLabel("価格（税込・円）", { exact: true });
     await price.fill("1234");
     await page.getByRole("button", { name: "保存する", exact: true }).click();
@@ -233,11 +271,11 @@ try {
     await page.unroute("**/api/admin/menus/fixture");
     const malformedSaves = [
         { foodReviews: [null] }, { foodReviews: [{ foodVersion: 1 }] }, { foodVersion: null },
-        { reviewedFoodVersion: 99 }, { version: -1 }, { imageUrl: {} },
+        { publicationConfirmedFoodVersion: 99 }, { version: -1 }, { imageUrl: {} },
     ];
     for (const broken of malformedSaves) {
         await page.route("**/api/admin/menus/fixture", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-            menu: { id: "fixture", version: 6, foodVersion: 1, reviewedFoodVersion: 1, imageUrl: null, isPublished: true, foodReviews: [], ...broken },
+            menu: { id: "fixture", version: 6, foodVersion: 1, reviewedFoodVersion: 1, publicationConfirmedFoodVersion: 1, imageUrl: null, isPublished: true, foodReviews: [], ...broken },
         }) }));
         await page.goto(base + "/edit-save");
         await page.getByLabel("価格（税込・円）", { exact: true }).fill("1260");
@@ -320,10 +358,10 @@ try {
     }
     assert.equal(await page.locator("article").count(), 6);
     assert.match(await page.getByRole("status").innerText(), /表示中 6 件/);
-    assert.match(await page.locator("article").filter({ hasText: "通常の公開停止" }).innerText(), /非公開.*現行の食品確認記録あり/s);
+    assert.match(await page.locator("article").filter({ hasText: "通常の公開停止" }).innerText(), /非公開.*食品内容の版対応あり/s);
     assert.ok(!(await page.locator("body").innerText()).includes("非公開の架空仕入れメモ"));
     assert.doesNotMatch(await page.locator("body").innerText(), /設定すると公開準備が完了/);
-    const reviewFilter = page.getByRole("button", { name: /^食品確認の再確認待ち/ });
+    const reviewFilter = page.getByRole("button", { name: /^公開前の確認待ち/ });
     assert.match(await reviewFilter.innerText(), /4/);
     await reviewFilter.focus();
     await page.keyboard.press("Enter");
@@ -331,10 +369,10 @@ try {
     assert.equal(await reviewFilter.evaluate(el => el.matches(":focus-visible") && getComputedStyle(el).outlineStyle !== "none"), true);
     assert.equal(await page.locator("article").count(), 4);
     assert.equal(await page.locator("article").filter({ hasText: "通常の公開停止" }).count(), 0);
-    assert.match(await page.locator("body").innerText(), /現在の食品内容に対応する確認記録がありません/);
-    assert.match(await page.locator("body").innerText(), /最新の食品確認記録に未解決事項があります/);
-    assert.match(await page.locator("body").innerText(), /食品確認記録がありません/);
-    const reviewLink = page.getByRole("link", { name: "架空・材料更新で旧確認：食品確認を見直す", exact: true });
+    assert.match(await page.locator("body").innerText(), /公開前：保存済み内容の確認待ち/);
+    assert.match(await page.locator("body").innerText(), /未解決事項あり/);
+    assert.doesNotMatch(await page.locator("body").innerText(), /長文の食品確認フォームは不要です/);
+    const reviewLink = page.getByRole("link", { name: "架空・材料更新で旧確認：保存済み内容を見直す", exact: true });
     assert.equal(await reviewLink.getAttribute("href"), "/admin/menus/old/edit");
     await reviewLink.focus();
     assert.equal(await reviewLink.evaluate(el => el.matches(":focus-visible") && getComputedStyle(el).outlineStyle !== "none"), true);
@@ -345,7 +383,7 @@ try {
         if (existsSync(join(output, "material-symbols.woff2"))) {
             assert.equal(await reviewLink.evaluate(element => {
                 const box = element.getBoundingClientRect();
-                const text = [...element.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.includes("食品確認を見直す"));
+                const text = [...element.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.includes("保存済み内容を見直す"));
                 if (!text) return false;
                 const range = document.createRange(); range.selectNodeContents(text);
                 return [...range.getClientRects()].every(rect => rect.width > 0 && rect.left >= box.left && rect.right <= box.right + 1 && rect.top >= box.top && rect.bottom <= box.bottom + 1);
@@ -382,15 +420,18 @@ try {
     pass("Review queue supports 320/390/768/1440px, search and each existing filter, zero matches, and simulated versioned deletion with counts/search retained");
     await page.goto(base + "/review-queue-demo");
     await page.locator("article").first().waitFor();
-    assert.equal(await page.getByRole("link", { name: "架空・材料更新で旧確認：食品確認を見直す", exact: true }).getAttribute("href"), "/admin/demo/menus/old/edit");
+    assert.equal(await page.getByRole("link", { name: "架空・材料更新で旧確認：保存済み内容を見直す", exact: true }).getAttribute("href"), "/admin/demo/menus/old/edit");
     for (const button of await page.getByRole("button", { name: /を削除$/ }).all()) assert.equal(await button.isDisabled(), true);
+    const readOnlyStops = await page.getByRole("button", { name: /の公開を停止$/ }).all();
+    assert.ok(readOnlyStops.length > 0);
+    for (const button of readOnlyStops) assert.equal(await button.isDisabled(), true);
     await page.goto(base + "/review-queue-empty");
     await page.getByText("該当するメニューがありません", { exact: true }).waitFor();
     assert.match(await page.getByRole("status").innerText(), /表示中 0 件 \/ 全 0 件/);
     pass("Read-only demo shares review explanations and demo edit links; deletion stays disabled and empty lists remain usable");
     assert.deepEqual(errors, []);
     pass("Real new/edit forms show the guide and associated help; note text never changes state; cards and note fields support keyboard focus");
-    pass("Food review evidence/scope/time inputs are labelled and required; unresolved issues and keyboard/mobile layout remain visible");
+    pass("Long review inputs are absent; history, allergen guides and keyboard/mobile layout remain available");
     console.log("PASS: " + groups + " allergen UI groups passed. Real components with fictional props; DB/auth/save/Next routing are unverified.");
 } finally {
     if (browser) await browser.close();

@@ -5,8 +5,6 @@
 
 import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
-import MenuFoodReviewFields from "./MenuFoodReviewFields";
-import { emptyFoodReviewDraft, foodReviewDraftComplete } from "../food-review";
 import { menuCreateResponseSchema } from "../schemas/menu-response";
 import { useRouter } from "next/navigation";
 import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
@@ -90,7 +88,6 @@ export default function NewMenuForm({
     const [imagePositionY, setImagePositionY] = React.useState(
         DEFAULT_MENU_IMAGE_POSITION_Y,
     );
-    const [isPublished, setIsPublished] = React.useState(false);
     const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
     const [localPreviewUrl, setLocalPreviewUrl] = React.useState<string | null>(
         null,
@@ -106,15 +103,12 @@ export default function NewMenuForm({
     const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [nameInvalid, setNameInvalid] = React.useState(false);
-    const [foodReview, setFoodReview] = React.useState(emptyFoodReviewDraft);
-    const [recordingReview, setRecordingReview] = React.useState(false);
     const creationOperation = React.useRef<string | null>(null);
     const uploadedFile = React.useRef<{ file: File; url: string } | null>(null);
     const unknownAllergenNames = React.useMemo(
         () => getUnknownAllergenNames({ allergens, statusBySlug }),
         [allergens, statusBySlug],
     );
-    const canPublish = unknownAllergenNames.length === 0 && recordingReview && foodReviewDraftComplete(foodReview);
     const allergenRows = React.useRef(new Map<string, HTMLDivElement>());
     function findNextUnknown() {
         const next = allergens.find((allergen) => (statusBySlug[allergen.slug] ?? "UNKNOWN") === "UNKNOWN");
@@ -126,7 +120,7 @@ export default function NewMenuForm({
     }
     const currentDraft = JSON.stringify({ name, description, priceYenInput, category, ingredients, precaution,
         imageUrl, imageFrame, imageFit, imagePosition, imageZoom, imagePositionX, imagePositionY,
-        isPublished, statusBySlug, foodReview, recordingReview });
+        statusBySlug });
     const [initialDraft] = React.useState(currentDraft);
     const [created, setCreated] = React.useState(false);
     const confirmLeave = useUnsavedMenuChanges(!created && (currentDraft !== initialDraft || selectedFile !== null));
@@ -142,23 +136,8 @@ export default function NewMenuForm({
 
     function setOne(slug: string, status: AllergenStatus) {
         setStatusBySlug((prev) => ({ ...prev, [slug]: status }));
-        if (status === "UNKNOWN") {
-            setIsPublished(false);
-        }
     }
 
-    function togglePublished() {
-        setError(null);
-        if (!isPublished && !canPublish) {
-            setIsPublished(false);
-            setError(
-                unknownAllergenNames.length ? `公開するにはアレルゲン${allergens.length}品目を確定してください。未設定: ${unknownAllergenNames.length}件` : "公開するには、食品確認記録と未解決事項の解消が必要です。",
-            );
-            return;
-        }
-
-        setIsPublished((prev) => !prev);
-    }
 
     function onSelectImage(e: React.ChangeEvent<HTMLInputElement>) {
         // 選んだ画像をアップロード前にローカルプレビューできるようにします。
@@ -243,10 +222,8 @@ export default function NewMenuForm({
             return;
         }
 
-        const reviewMessage = getMenuReviewMessage({ name, willPublish: isPublished, ingredientsChanged: false });
-        if (recordingReview && (!foodReview.evidenceRefs.trim() || !foodReview.scope.trim() || !Number.isFinite(Date.parse(foodReview.checkedAt)))) {
-            setError("根拠資料・確認範囲・確認日時を入力してください。"); return;
-        }
+        const reviewMessage = getMenuReviewMessage({ name, willPublish: false, ingredientsChanged: false });
+
         if (reviewMessage && !window.confirm(reviewMessage)) return;
         setIsSubmitting(true);
 
@@ -256,14 +233,13 @@ export default function NewMenuForm({
 
             const body = {
                 operationId: creationOperation.current ??= crypto.randomUUID(),
-                ...(recordingReview ? { foodReview: { ...foodReview, checkedAt: new Date(foodReview.checkedAt).toISOString() } } : {}),
                 name: trimmed,
                 description: normalizeOptionalMenuText(description),
                 priceYen,
                 category: normalizeOptionalMenuText(category),
                 ingredients: normalizeOptionalMenuText(ingredients),
                 precaution: normalizeOptionalMenuText(precaution),
-                isPublished: canPublish ? isPublished : false,
+                isPublished: false,
                 imageUrl: uploadedImageUrl,
                 imageFrame,
                 imageFit,
@@ -319,26 +295,7 @@ export default function NewMenuForm({
                     <div className="font-bold text-gray-900">基本情報</div>
 
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-                        <button
-                            type="button"
-                            onClick={togglePublished}
-                            aria-pressed={isPublished && canPublish}
-                            disabled={
-                                (readOnly && !readOnlyPreview) ||
-                                isSubmitting ||
-                                uploading
-                            }
-                            className={`min-h-11 w-full rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto ${
-                                isPublished && canPublish
-                                    ? "bg-green-600"
-                                    : canPublish
-                                      ? "bg-gray-900"
-                                      : "bg-amber-600"
-                            }`}
-                        >
-                            {canPublish ? isPublished ? "登録時に公開する" : "非公開の下書きとして登録する" : "登録時は非公開（アレルゲン設定・食品確認が必要）"}
-                            {readOnly ? "（デモ）" : ""}
-                        </button>
+
 
                         <button
                             type="submit"
@@ -566,7 +523,7 @@ export default function NewMenuForm({
                     totalAllergenCount={allergens.length}
                     onFindUnknown={findNextUnknown}
                 />
-                <MenuFoodReviewFields value={foodReview} onChange={setFoodReview} recording={recordingReview} onRecordingChange={setRecordingReview} current={false} />
+                <p className="mt-3 text-sm">非公開で保存します。保存後に内容を見直して公開できます。</p>
                 <MenuAllergenRegistrationGuide />
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">

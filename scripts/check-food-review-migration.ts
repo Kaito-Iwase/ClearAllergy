@@ -20,7 +20,7 @@ async function main() {
         mkdirSync(join(fixturePrisma, "migrations"), { recursive: true });
         cpSync(resolve("prisma/schema.prisma"), join(fixturePrisma, "schema.prisma"));
         for (const name of readdirSync(resolve("prisma/migrations"))) {
-            if (name !== "20261009000000_menu_food_review") cpSync(resolve("prisma/migrations", name), join(fixturePrisma, "migrations", name), { recursive: true });
+            if (name === "migration_lock.toml" || name < "20261009000000_menu_food_review") cpSync(resolve("prisma/migrations", name), join(fixturePrisma, "migrations", name), { recursive: true });
         }
         const cli = createRequire(import.meta.url).resolve("prisma/build/index.js");
         const deploy = (schema: string) => {

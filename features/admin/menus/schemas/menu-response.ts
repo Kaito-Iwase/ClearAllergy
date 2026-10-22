@@ -6,6 +6,7 @@ const reviewSummary = z.object({
     evidenceRefs: z.string().min(1).max(4000), scope: z.string().min(1).max(2000),
     checkedAt: z.string().datetime({ offset: true }), recordedAt: z.string().datetime({ offset: true }),
     unresolvedIssues: z.string().max(2000).nullable(), contentSnapshot: z.unknown(),
+    issueResolutions: z.array(z.object({ foodVersion: revision, resolvedAt: z.string().datetime({ offset: true }) })).max(1).optional(),
 });
 
 export const menuCreateResponseSchema = z.object({
@@ -16,8 +17,8 @@ export const menuCreateResponseSchema = z.object({
 export const menuSaveResponseSchema = z.object({
     menu: z.object({
         id: z.string().min(1), version: revision, foodVersion: revision,
-        reviewedFoodVersion: revision.nullable(), isPublished: z.boolean(),
+        reviewedFoodVersion: revision.nullable(), publicationConfirmedFoodVersion: revision.nullable(), isPublished: z.boolean(),
         imageUrl: z.string().max(2048).nullable(), foodReviews: z.array(reviewSummary).max(5),
     }),
     publicRefreshPending: z.boolean().optional(),
-}).refine(({ menu }) => !menu.isPublished || menu.foodVersion === menu.reviewedFoodVersion);
+}).refine(({ menu }) => !menu.isPublished || menu.foodVersion === menu.publicationConfirmedFoodVersion);

@@ -20,6 +20,8 @@
 2026-10-07公開前の依存更新・残存指摘・公開保留の決定は[依存更新記録](../verification/security-release-20261007.md)に記録する。通常CIの成功と依存監査の成功を区別し、監査FAILのまま公開を完了扱いにしない。
 [READMEへ](../../README.md) · [変更対応表](change-map.md) · [保守ルール](maintenance.md)
 
+2026-10-21の[二段階公開の検証記録](../verification/two-step-publication-20261021.md)には長文フォーム廃止・保存後の別公開・移行と、暫定承認された未解決の明示解除の結果を記録します。本番反映済みとは扱いません。理由と承認範囲は[判断ログ](../research/product/two-step-publication-decision-20261021.md)を参照してください。
+
 ## 2026-09-30 Issue #37 / #38 追検証
 
 HEAD `f1f209c`、開始時差分なしの正規Windows作業先で既存実装をレビューし、[I01結果](../research/implementation/i01-result.md)・[I02結果](../research/implementation/i02-result.md)へ今回結果を記録した。未知・空・null・undefined・欠損の表示/404回帰を補強し、全テスト133/133、lint・typecheck・build・diff確認が成功。
@@ -111,3 +113,5 @@ Dockerは通常起動で復旧し、今回専用PostgreSQL17へ既存16 migratio
 ## 2026-10-19 店舗側レビュー①〜③
 
 QRのURL解決、メニュー保存予定と確定結果の区別、店舗フォームの順序とスクロールは[実装・検証記録](../verification/store-review-20261019.md)を参照してください。既存画面の読み取り監査と架空fixtureの回帰検査を、実店舗の利用実証から区別します。
+
+2026-10-22の[店舗管理・公開カードの整理と検証](../verification/store-management-20261022.md)は、直接操作・一覧の公開停止・店舗共通補足、本番レスポンスの注意書きの由来、元の白余白の再現限界を記録します。実装と本番適用を区別します。
