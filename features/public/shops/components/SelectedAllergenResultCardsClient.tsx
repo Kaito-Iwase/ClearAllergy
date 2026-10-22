@@ -6,6 +6,7 @@ import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
 // このコンポーネントは、選択中アレルゲンとメニューの登録上の判定結果だけを表示します。
 
 import React from "react";
+import AllergenPreferenceMatchNotice from "./AllergenPreferenceMatchNotice";
 import {
     classifySelectedAllergenStatuses,
     type AllergenStatus,
@@ -86,7 +87,7 @@ export default function SelectedAllergenResultCardsClient({
     statusBySlug: Record<string, AllergenStatus>;
     storeHandledAllergenSlugs?: string[];
 }) {
-    const { preferences: { highlightSlugs, excludedSlugs }, loaded } = useUserAllergenPreferences();
+    const { preferences: { highlightSlugs, excludedSlugs, includeMayContain }, loaded } = useUserAllergenPreferences();
 
 
 
@@ -131,6 +132,9 @@ export default function SelectedAllergenResultCardsClient({
 
     return (
         <div className="space-y-3">
+            <AllergenPreferenceMatchNotice allergens={allergens} statusBySlug={statusBySlug}
+                storeHandledAllergenSlugs={storeHandledAllergenSlugs}
+                preferences={{ highlightSlugs, excludedSlugs, includeMayContain }} showExcluded />
             <h2 className="text-base font-bold text-gray-900">店舗が登録した内容</h2>
             <p className="text-sm font-semibold text-gray-700">
                 確認対象 {selectedAllergens.length}件：{selectedAllergens.map((allergen) => allergen.nameJa).join("・")}
@@ -166,9 +170,9 @@ export default function SelectedAllergenResultCardsClient({
             ) : null}
 
             {storeHandledAllergens.length > 0 ? (
-                <AllergenInfoCard title="この店舗の別の公開メニューに「含む」登録があります" description={STORE_ALLERGEN_NOTE}
+                <AllergenInfoCard title="別メニューに含む" description={`同じ店舗の別の公開メニューに、この品目を含む登録があります。${STORE_ALLERGEN_NOTE}`}
                     className="border-amber-200 bg-amber-50" titleClassName="text-amber-900">
-                    <AllergenChips allergens={storeHandledAllergens} label="別メニューに含む登録" className="border-amber-200 bg-white text-amber-900" />
+                    <AllergenChips allergens={storeHandledAllergens} label="別メニューに含む" className="border-amber-200 bg-white text-amber-900" />
                 </AllergenInfoCard>
             ) : null}
             {hasUnknownResults ? (
@@ -199,7 +203,7 @@ export default function SelectedAllergenResultCardsClient({
                     <ul className="mt-3 space-y-2">
                         {freeAllergens.map((allergen) => <li key={allergen.slug}>
                             <span className="font-semibold">{allergen.nameJa}</span>：原材料に含まない
-                            {storeHandledAllergenSlugs.includes(allergen.slug) && <span className="block text-sm leading-6 text-amber-900">この店舗の別の公開メニューに「含む」登録があります</span>}
+                            {storeHandledAllergenSlugs.includes(allergen.slug) && <span className="block text-sm leading-6 text-amber-900"><strong>別メニューに含む</strong>：同じ店舗の別の公開メニューに、この品目を含む登録があります。</span>}
                         </li>)}
                     </ul>
                 </div>

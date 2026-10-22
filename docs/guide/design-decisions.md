@@ -316,7 +316,7 @@ READMEに「店舗側が更新し、利用者側が事前に確認」と明記�
 
 ### 詳細
 
-強調と除外の両方が確認対象。`includeMayContain` は除外検索の挙動で、`MAY_CONTAIN` の登録状態や詳細の注意分類を変えない。
+強調と除外の両方が確認対象。`includeMayContain` は[2026-10-23の判断](../research/product/allergen-preference-scope-decision-20261023.md)により、登録MAY_CONTAINと別の公開メニュー由来の情報への強調・除外適用を切り替える。OFFでも登録MAY_CONTAINの注意表示を消さず、DBの登録状態や厨房の確認状況を変えない。
 
 ### 他の選択肢
 

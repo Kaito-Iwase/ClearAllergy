@@ -184,7 +184,7 @@ export function buildSelectedAllergenSummary(args: {
     unknownCount: number;
     storeHandledCount: number;
 } {
-    // includeMayContain は除外検索の設定であり、登録済みの状態自体は変えません。
+    // includeMayContain は利用者の除外・強調設定であり、登録済みの状態自体は変えません。
     // この引数の値にかかわらず MAY_CONTAIN は常に注意側へ分類します。
     const groups = classifySelectedAllergenStatuses({
         statusBySlug: args.statusBySlug,

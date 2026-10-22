@@ -1,5 +1,6 @@
 import type { AllergenStatus } from "@/lib/allergens";
 import { PREFECTURES } from "@/lib/constants/prefectures";
+import { getAllergenPreferenceMatches } from "@/lib/public-allergen-preference-match";
 
 export type CurrentLocation = { latitude: number; longitude: number };
 
@@ -76,6 +77,7 @@ function isMenuExcludedByPreference(
     menu: PublicShopListShop["menus"][number],
     excludedSlugs: string[],
     includeMayContain: boolean,
+    storeHandledAllergenSlugs: string[],
 ): boolean {
     if (excludedSlugs.length === 0) {
         return false;
@@ -87,13 +89,10 @@ function isMenuExcludedByPreference(
             .map((link) => [link.allergen.slug, link.status]),
     );
 
-    return excludedSlugs.some((slug) => {
-        const status = statusByExcludedSlug.get(slug);
-        return (
-            status === "CONTAINS" ||
-            (includeMayContain && status === "MAY_CONTAIN")
-        );
-    });
+    return getAllergenPreferenceMatches({
+        statusBySlug: Object.fromEntries(statusByExcludedSlug), slugs: excludedSlugs,
+        includeMayContain, storeHandledAllergenSlugs,
+    }).length > 0;
 }
 
 function isShopExcludedByPreference(args: {
@@ -107,6 +106,8 @@ function isShopExcludedByPreference(args: {
     }
 
     // 選べるメニューが1件でも残る店舗を、店舗単位で誤って非表示にしないためです。
+    const storeHandledAllergenSlugs = [...new Set(args.shop.menus.flatMap(menu =>
+        menu.allergenLinks.filter(link => link.status === "CONTAINS").map(link => link.allergen.slug)))];
     return (
         args.shop.menus.length > 0 &&
         args.shop.menus.every((menu) =>
@@ -114,6 +115,7 @@ function isShopExcludedByPreference(args: {
                 menu,
                 args.excludedSlugs,
                 args.includeMayContain,
+                storeHandledAllergenSlugs,
             ),
         )
     );

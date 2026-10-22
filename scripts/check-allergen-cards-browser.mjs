@@ -25,6 +25,7 @@ const entry = [
     "import ShopMenus from '@/features/public/shops/components/ShopMenuListClient'; import NewMenu from '@/features/admin/menus/components/NewMenuForm'; import EditMenu from '@/features/admin/menus/components/MenuEditClient'; import MenuList from '@/features/admin/menus/components/MenuListPageClient';",
     "import {ALLERGEN_MASTER} from '@/lib/constants/allergen-master'; import {getStoreContainsAllergenSlugs} from '@/lib/allergens'; import {saveUserAllergenPreferences} from '@/lib/public-allergen-preferences';",
     "import {toAdminMenuListRow} from '@/features/admin/menus/server/menu-list-data';",
+    "import Detail from '@/features/public/shops/components/PublicMenuDetailBodyClient'; import Prefs from '@/features/public/shops/components/UserAllergenPreferenceClient'; import {buildAllergenRows,buildAllergenDisplayItems} from '@/lib/allergens';",
     "const master=ALLERGEN_MASTER.map((a,i)=>({...a,sortOrder:i+1})); const statuses=Object.fromEntries(master.map(a=>[a.slug,'FREE']));",
     "const reviewedStatuses={...statuses,egg:'CONTAINS'}; const history=[{id:'fictional-review',foodVersion:1,evidenceRefs:'架空資料 test-v1（実食品ではない）',scope:'架空の全対象品目',checkedAt:'2026-10-08T00:00:00Z',recordedAt:'2026-10-09T00:00:00Z',unresolvedIssues:'',contentSnapshot:{name:'入力ガイド確認用',description:null,category:null,ingredients:null,precaution:null,imageUrl:null,allergens:master.map(a=>({slug:a.slug,nameJa:a.nameJa,status:reviewedStatuses[a.slug]}))}}];",
     "const links=overrides=>master.map(a=>({allergen:{slug:a.slug},status:overrides[a.slug]||'FREE'}));",
@@ -34,12 +35,13 @@ const entry = [
     "const listBase={category:'架空検証',priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:new Date('2026-10-15T00:00:00Z'),foodVersion:2,reviewedFoodVersion:null,publicationConfirmedFoodVersion:null,allergenLinks:links({}),foodReviews:[]}; const listRows=[{id:'unknown',name:'架空・品目未設定',allergenLinks:links({milk:'UNKNOWN'})},{id:'current',name:'架空・現行確認で公開中',isPublished:true,reviewedFoodVersion:2,publicationConfirmedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]},{id:'old',name:'架空・材料更新で旧確認',foodReviews:[{foodVersion:1,unresolvedIssues:null}]},{id:'unresolved',name:'架空・最新記録が未解決',foodReviews:[{foodVersion:2,unresolvedIssues:'非公開の架空仕入れメモ'}]},{id:'missing',name:'架空・確認記録なし'},{id:'stopped',name:'架空・通常の公開停止',reviewedFoodVersion:2,publicationConfirmedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]}].map(row=>toAdminMenuListRow({...listBase,...row},master));",
     "function prefs(highlightSlugs=[],excludedSlugs=[],includeMayContain=false){saveUserAllergenPreferences({highlightSlugs,excludedSlugs,includeMayContain,selectedSlugs:[]})}",
     "function App(){const [published,setPublished]=React.useState(true);const [unknown,setUnknown]=React.useState(false);const [long,setLong]=React.useState(false);const current={...target,precaution:long?'小麦：'+ '長い注意書き'.repeat(250):note,allergenLinks:unknown?links({egg:'CONTAINS',milk:'UNKNOWN'}):target.allergenLinks};const menus=published?[current,source]:[current];",
+    "if(location.pathname==='/shops/fixture/menus/target')return <Detail shopId='fixture' shopName='架空検証店' menuName={current.name} description={null} category={current.category} priceText='880円' updatedAtText='架空検証時刻' safeImageUrl={null} imageFrame='wide' imageFit='contain' imagePosition='center' imageZoom={100} imagePositionX={50} imagePositionY={50} ingredients='架空の原材料' precaution={note} allergensForClient={master} statusBySlugForClient={Object.fromEntries(current.allergenLinks.map(link=>[link.allergen.slug,link.status]))} rows={buildAllergenDisplayItems(buildAllergenRows(master,current.allergenLinks),getStoreContainsAllergenSlugs(menus,master))} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs(menus,master)]}/>;",
     "if(location.pathname.startsWith('/new'))return <NewMenu allergens={master} readOnlyPreview={location.pathname==='/new'}/>;",
     "if(location.pathname==='/list-delete')return <MenuList totalAllergenCount={master.length} initialMenus={[{id:'fixture',name:'架空削除メニュー',category:null,priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:'2026-10-09T00:00:00Z',unknownAllergenNames:[],foodReviewState:'current'}]}/>;",
     "if(location.pathname==='/list-stop')return <MenuList totalAllergenCount={master.length} initialMenus={[{...listRows[0],id:'fixture',name:'架空停止メニュー',isPublished:true,version:5}]}/>;",
     "if(location.pathname.startsWith('/review-queue'))return <MenuList totalAllergenCount={master.length} initialMenus={location.pathname==='/review-queue-empty'?[]:listRows} readOnly={location.pathname==='/review-queue-demo'} readOnlyEditHrefBase={location.pathname==='/review-queue-demo'?'/admin/demo/menus':undefined}/>;",
     "if(location.pathname.startsWith('/edit'))return <EditMenu menuId='fixture' initialVersion={5} initialFoodVersion={1} initialReviewedFoodVersion={location.pathname==='/edit-save'?1:null} initialPublicationConfirmedFoodVersion={location.pathname==='/edit-save'?1:null} initialFoodReviews={location.pathname==='/edit-save'?history:[]} initialName='入力ガイド確認用' initialDescription={null} initialPriceYen={null} initialCategory={null} initialIngredients={null} initialPrecaution={null} initialImageUrl={null} initialImageFrame='wide' initialImageFit='contain' initialImagePosition='center' initialImageZoom={100} initialImagePositionX={50} initialImagePositionY={50} initialIsPublished={location.pathname==='/edit-save'} allergens={master} initialStatusBySlug={location.pathname==='/edit-save'?reviewedStatuses:statuses} readOnlyPreview={location.pathname==='/edit'}/>;",
-    "return <><h1>架空データによるカード確認</h1><nav style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}><button onClick={()=>prefs()}>設定を解除</button><button onClick={()=>prefs(['milk','walnut'])}>乳とくるみを注目</button><button onClick={()=>prefs([],['walnut'])}>くるみを除外</button><button onClick={()=>prefs([],['milk'])}>乳の可能性は残す</button><button onClick={()=>prefs([],['milk'],true)}>乳の可能性も除外</button><button onClick={()=>setPublished(v=>!v)}>補足元の公開を切替</button><button onClick={()=>setUnknown(v=>!v)}>未確認の入力を切替</button><button onClick={()=>setLong(v=>!v)}>長い注意書きを切替</button></nav><ShopMenus shopId='fixture' menus={menus} allergenMaster={master} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs(menus,master)]}/></>}",
+    "return <><h1>架空データによるカード確認</h1><nav style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}><button onClick={()=>prefs()}>設定を解除</button><button onClick={()=>prefs(['milk','walnut'])}>乳とくるみを注目</button><button onClick={()=>prefs([],['walnut'])}>くるみを除外</button><button onClick={()=>prefs([],['milk'])}>乳の可能性は残す</button><button onClick={()=>prefs([],['milk'],true)}>乳の可能性も除外</button><button onClick={()=>setPublished(v=>!v)}>補足元の公開を切替</button><button onClick={()=>setUnknown(v=>!v)}>未確認の入力を切替</button><button onClick={()=>setLong(v=>!v)}>長い注意書きを切替</button></nav><Prefs allergens={master}/><ShopMenus shopId='fixture' menus={menus} allergenMaster={master} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs(menus,master)]}/></>}",
     "createRoot(document.getElementById('root')).render(<App/>);",
 ].join("\n");
 writeFileSync(join(fixture, "entry.tsx"), entry, "utf8");
@@ -78,7 +80,7 @@ for (const name of readdirSync(media)) if (name.endsWith(".woff2")) {
 }
 const server = createServer((request, response) => {
     const path = new URL(request.url, "http://localhost").pathname;
-    const asset = assets.get(path) || (["/", "/new", "/new-save", "/edit", "/edit-save", "/list-delete", "/list-stop", "/review-queue", "/review-queue-demo", "/review-queue-empty"].includes(path) ? ["text/html", html] : null);
+    const asset = assets.get(path) || (["/", "/shops/fixture/menus/target", "/new", "/new-save", "/edit", "/edit-save", "/list-delete", "/list-stop", "/review-queue", "/review-queue-demo", "/review-queue-empty"].includes(path) ? ["text/html", html] : null);
     response.writeHead(asset ? 200 : 404, { "Content-Type": asset?.[0] || "text/plain" });
     response.end(asset?.[1] || "Not found");
 });
@@ -136,6 +138,57 @@ try {
     assert.equal(await card.count(), 0);
     await page.getByRole("button", { name: "設定を解除", exact: true }).click();
     pass("Preferences preserve selected scope and MAY exclusion; hiding a source card does not remove its supplement");
+    const panel = page.getByRole("region", { name: "あなた向けのアレルゲン設定", exact: true });
+    await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
+    await panel.getByLabel("くるみの表示設定", { exact: true }).selectOption("highlight");
+    await panel.getByLabel("乳の表示設定", { exact: true }).selectOption("highlight");
+    const possibility = panel.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ });
+    assert.equal(await possibility.isChecked(), false);
+    await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
+    assert.equal(await card.getByRole("region", { name: "注目設定に一致", exact: true }).count(), 0);
+    assert.match(await registered.innerText(), /含む可能性あり・要確認\s+乳/);
+    await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
+    await possibility.focus(); await page.keyboard.press("Space");
+    assert.equal(await possibility.isChecked(), true);
+    assert.equal(await card.getByRole("region", { name: "注目設定に一致", exact: true }).count(), 0, "Draft toggle must not change the list before Apply");
+    await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
+    const highlight = card.getByRole("region", { name: "注目設定に一致", exact: true });
+    assert.match(await highlight.innerText(), /くるみ（別メニューに含む）/);
+    assert.match(await highlight.innerText(), /乳（含む可能性あり・要確認）/);
+    assert.match(await registered.innerText(), /含む可能性あり・要確認\s+乳\s*（1品目）/);
+    assert.match(await card.getByRole("group", { name: "他の公開メニューの登録情報", exact: true }).innerText(), /別メニューに含む/);
+    for (const width of [390, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await card.screenshot({ path: join(output, `possibility-highlight-${width}.png`) });
+    }
+    await page.reload(); await card.waitFor();
+    assert.match(await highlight.innerText(), /くるみ（別メニューに含む）/);
+    pass("Unified toggle applies independent highlights only after Apply, persists on reload, and leaves registered MAY visible OFF");
+    await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
+    await panel.getByLabel("くるみの表示設定", { exact: true }).selectOption("exclude");
+    await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
+    assert.equal(await card.count(), 0);
+    await page.getByRole("button", { name: "補足元の公開を切替", exact: true }).click();
+    await card.waitFor();
+    assert.doesNotMatch(await page.getByRole("region", { name: "店舗全体の登録情報", exact: true }).innerText(), /くるみ/);
+    assert.doesNotMatch(await card.innerText(), /別メニューに含む/);
+    pass("Other-public-menu exclusion uses the source before filters and disappears when that source is no longer public");
+    await page.goto(base + "/shops/fixture/menus/target");
+    await page.getByRole("heading", { name: "ミックスプレート", exact: true }).waitFor();
+    assert.match(await page.getByRole("region", { name: "一覧の除外設定に一致", exact: true }).innerText(), /くるみ（別メニューに含む）/);
+    assert.match(await page.getByRole("region", { name: "注目設定に一致", exact: true }).innerText(), /乳（含む可能性あり・要確認）/);
+    assert.equal(await page.getByRole("heading", { name: "含む可能性あり・要確認", exact: true }).count(), 1);
+    assert.match(await page.locator("body").innerText(), /くるみ：原材料に含まない/);
+    assert.equal(await page.getByRole("heading", { name: "別メニューに含む", exact: true }).count(), 1);
+    for (const width of [390, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await page.screenshot({ path: join(output, `possibility-direct-detail-${width}.png`) });
+    }
+    await page.goto(base); await card.count();
+    await page.getByRole("button", { name: "設定を解除", exact: true }).click(); await card.waitFor();
+    pass("Direct menu URLs explain exclusion while retaining raw FREE, registered MAY and separate public-menu facts");
     await page.getByRole("button", { name: "未確認の入力を切替", exact: true }).click();
     assert.match(await registered.innerText(), /未入力・未確認\s+乳\s*（1品目）/);
     await page.getByRole("button", { name: "長い注意書きを切替", exact: true }).click();
@@ -144,6 +197,8 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     pass("Mixed UNKNOWN remains named and a long note is not truncated or converted into a status");
     await page.getByRole("button", { name: "長い注意書きを切替", exact: true }).focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).evaluate(element => element === document.activeElement), true);
     await page.keyboard.press("Tab");
     assert.equal(await card.evaluate(element => element === document.activeElement), true);
     assert.equal(await card.evaluate(element => element.matches(":focus-visible")), true);

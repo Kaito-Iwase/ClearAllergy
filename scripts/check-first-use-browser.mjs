@@ -83,7 +83,7 @@ try {
     await openPreferences();
     await setMode("乳", "highlight");
     await setMode("えび", "exclude");
-    await visible(page.getByRole("checkbox", { name: /「含む可能性あり」も除外する/ })).check();
+    await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).check();
     assert.deepEqual((await preferences()).highlightSlugs, ["egg"]);
     assert.equal((await preferences()).includeMayContain, false);
     assert.equal(await page.getByText("変更を適用しました。", { exact: true }).count(), 0);

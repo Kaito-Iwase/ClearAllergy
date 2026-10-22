@@ -32,10 +32,10 @@ export default function MenuAllergenSummary({ summary }: { summary: Summary }) {
             </div>
             {summary.storeHandledNames.length > 0 ? (
                 <div role="group" aria-label="他の公開メニューの登録情報" className="rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-3 py-2">
-                    <h4 className="text-xs font-bold leading-5 text-amber-900">他の公開メニューの登録情報</h4>
+                    <h4 className="text-xs font-bold leading-5 text-amber-900">別メニューに含む</h4>
                     <p className="mt-1 break-words text-sm leading-6 text-amber-900">
                         <span className="font-bold">{summary.storeHandledNames.join("・")}</span>
-                        ：この店舗の別の公開メニューに「含む」登録があります。
+                        ：同じ店舗の別の公開メニューに、この品目を含む登録があります。
                     </p>
                 </div>
             ) : null}

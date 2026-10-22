@@ -20,6 +20,8 @@ import {
 import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import { useUserAllergenPreferences } from "@/features/public/shops/components/UserAllergenPreferenceClient";
 import MenuAllergenSummary from "./MenuAllergenSummary";
+import AllergenPreferenceMatchNotice from "./AllergenPreferenceMatchNotice";
+import { getAllergenPreferenceMatches } from "@/lib/public-allergen-preference-match";
 
 type AllergenMasterItem = {
     slug: string;
@@ -86,14 +88,9 @@ export default function ShopMenuListClient({
     const selectedSlugs = getSelectedAllergenSlugs({ highlightSlugs, excludedSlugs });
 
     const isExcludedByPreference = React.useCallback((statusBySlug: Record<string, AllergenStatus>) => {
-        return excludedSlugs.some((slug) => {
-            const status = statusBySlug[slug] ?? "UNKNOWN";
-            return (
-                status === "CONTAINS" ||
-                (includeMayContain && status === "MAY_CONTAIN")
-            );
-        });
-    }, [excludedSlugs, includeMayContain]);
+        return getAllergenPreferenceMatches({ statusBySlug, slugs: excludedSlugs,
+            includeMayContain, storeHandledAllergenSlugs }).length > 0;
+    }, [excludedSlugs, includeMayContain, storeHandledAllergenSlugs]);
 
     const searchedMenus = React.useMemo(() => {
         if (q === "") {
@@ -201,6 +198,9 @@ export default function ShopMenuListClient({
                             includeMayContain,
                             nameJaBySlug,
                             rankBySlug,
+                            storeHandledAllergenSlugs: includeMayContain
+                                ? new Set(storeHandledAllergenSlugs.filter(slug => highlightSlugs.includes(slug)))
+                                : undefined,
                         });
 
                         const activeSummary = hasPreference
@@ -235,6 +235,9 @@ export default function ShopMenuListClient({
                                     </span>
                                 </div>
 
+                                {hasPreference && <AllergenPreferenceMatchNotice allergens={allergenMaster}
+                                    statusBySlug={statusBySlug} storeHandledAllergenSlugs={storeHandledAllergenSlugs}
+                                    preferences={{ highlightSlugs, excludedSlugs, includeMayContain }} />}
                                 <MenuAllergenSummary summary={activeSummary} />
 
                                 {!hasPreference && defaultSummaries.otherCount > 0 && otherSummary.badge !== "safe" ? (
@@ -266,8 +269,8 @@ export default function ShopMenuListClient({
                 <p className="mt-4 text-xs font-medium text-gray-500">
                     除外設定に一致するメニューは一覧から非表示になります
                     {includeMayContain
-                        ? "（含む可能性ありも対象）"
-                        : "（含む可能性ありは対象外）"}
+                        ? "（店舗登録の可能性あり・別メニューでの使用も対象）"
+                        : "（含む登録のみ対象。店舗登録の注意情報は表示します）"}
                     。{excludedMenuCount > 0 ? `${excludedMenuCount}件を非表示にしています。` : ""}
                 </p>
             ) : null}

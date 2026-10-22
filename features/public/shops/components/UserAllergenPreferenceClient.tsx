@@ -141,8 +141,8 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                 </div>
                 <label className="mt-4 flex items-start gap-3 rounded-xl bg-gray-50 p-3 text-sm">
                     <input type="checkbox" checked={draft.includeMayContain} onChange={state.onToggleIncludeMayContain} className="mt-1 h-5 w-5 shrink-0" />
-                    <span><span className="font-bold">「含む可能性あり」も除外する</span>
-                        <span className="mt-1 block text-xs leading-5 text-gray-600">除外に設定した項目に適用します。オフでも注意表示は残ります。</span></span>
+                    <span><span className="font-bold">含む可能性があるものを除外・強調</span>
+                        <span className="mt-1 block text-xs leading-5 text-gray-600">※店舗登録の「含む可能性あり・要確認」と、同じ店舗の別メニューでの使用情報にも設定を適用します。店舗登録の注意情報はOFFでも表示します。</span></span>
                 </label>
                 {conflict && <div role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
                     <p>別の画面で設定が変更されました。編集中の内容はまだ保存されていません。</p>
