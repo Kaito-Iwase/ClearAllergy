@@ -5,8 +5,7 @@
 import { Hono } from "hono";
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { foodSnapshot } from "../food-review";
-import { saveFoodReview, validFoodReviewTime, flushMenuPublicationChecks } from "./food-review-save";
+import { flushMenuPublicationChecks } from "./food-review-save";
 import { handleUnhandledApiError, logOperationalError } from "@/lib/observability";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -14,13 +13,11 @@ import { internalError, readJson, requireShopId } from "@/lib/auth/admin-api-uti
 import { enforceSameOriginAdminMutation } from "@/lib/auth/admin-api-security";
 import {
     parsePriceYen,
-    toBooleanOrDefault,
     toRequiredTrimmedString,
     toTrimmedNullableString,
 } from "@/lib/validators/admin-input";
 import {
     createStatusBySlug,
-    getMenuPublishValidationErrors,
     validateAllergenStatusMap,
 } from "@/lib/allergens";
 import { writeAdminAuditLog } from "@/lib/audit-log";
@@ -137,7 +134,9 @@ app.post("/api/admin/menus", async (c) => {
         const body = parsedBody.data;
         operationId = body.operationId;
         requestHash = createHash("sha256").update(JSON.stringify({ ...body, operationId: undefined })).digest("hex");
-        if (!validFoodReviewTime(body.foodReview)) return NextResponse.json({ error: "食品確認日時は現在より5分を超える未来には指定できません。" }, { status: 400 });
+        if (body.foodIssueResolution || body.foodReview || body.isPublished === true || body.publicationAction === "publish") {
+            return NextResponse.json({ error: "新規メニューは非公開で保存し、保存済み内容から「公開する」を操作してください。" }, { status: 400 });
+        }
 
         if (operationId) {
             const replay = await prisma.menuItem.findFirst({ where: { shopId: auth.shopId, creationOperationId: operationId }, select: { id: true, creationRequestHash: true } });
@@ -193,7 +192,6 @@ app.post("/api/admin/menus", async (c) => {
             );
         }
         // 新規作成直後は誤公開を防ぐため、既定は非公開です。
-        const isPublished = toBooleanOrDefault(body?.isPublished, false);
         const allergenMapResult = validateAllergenStatusMap(
             body?.allergenStatusBySlug,
         );
@@ -226,34 +224,6 @@ app.post("/api/admin/menus", async (c) => {
             const incomingStatus = allergenMap[allergen.slug];
             if (incomingStatus) {
                 completeAllergenMap[allergen.slug] = incomingStatus;
-            }
-        }
-
-        if (isPublished) {
-            if (!body.foodReview || body.foodReview.unresolvedIssues) return NextResponse.json({ error: "公開するには未解決事項のない食品確認記録が必要です。" }, { status: 400 });
-            // 公開時だけは、サーバー側で必須条件を必ず再確認します。
-            // UI が壊れても API 直打ちでも、この壁を越えない限り公開できません。
-            const publishErrors = getMenuPublishValidationErrors({
-                name,
-                allergens,
-                statusBySlug: completeAllergenMap,
-            });
-
-            if (publishErrors.length > 0) {
-                await writeAdminAuditLog({
-                    req,
-                    actorUserId: auditActorUserId,
-                    actorShopId: auditShopId,
-                    action: "menu_create",
-                    targetType: "menu",
-                    targetId: null,
-                    success: false,
-                    metadata: { reason: publishErrors.join(" "), isPublished },
-                });
-                return NextResponse.json(
-                    { error: publishErrors.join(" ") },
-                    { status: 400 },
-                );
             }
         }
 
@@ -294,9 +264,6 @@ app.post("/api/admin/menus", async (c) => {
                 })),
             });
 
-            if (body.foodReview) await saveFoodReview(tx, { menuId: menu.id, shopId: auth.shopId, actorUserId: auth.appUser.id,
-                review: body.foodReview, snapshot: foodSnapshot({ name, description, category, ingredients, precaution, imageUrl: imageUrlResult.value }, allergens, completeAllergenMap) });
-            if (isPublished) await tx.menuItem.update({ where: { id: menu.id, shopId: auth.shopId }, data: { isPublished: true } });
             await flushMenuPublicationChecks(tx);
 
             return tx.menuItem.findFirstOrThrow({ where: { id: menu.id, shopId: auth.shopId }, select: { id: true, isPublished: true } });

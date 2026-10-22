@@ -1,4 +1,5 @@
-import { isFoodReviewCurrent } from "@/lib/allergens";
+import { hasUnresolvedFoodIssue } from "./food-review";
+import { isMenuPublicationCurrent } from "@/lib/allergens";
 
 export type MenuFoodReviewState = "current" | "unresolved" | "outdated" | "missing";
 
@@ -15,24 +16,24 @@ export type AdminMenuListRow = {
     foodReviewState: MenuFoodReviewState;
 };
 
-// 公開判定は変更せず、DBが維持する確認対応と最新記録を一覧向けに説明する。
+// DBが維持する公開の版対応と、保持した食品確認履歴の未解決状態を一覧向けに説明する。
 // 停止フラグや経過日数から失効理由を推測しない。
 export function getMenuFoodReviewState(menu: {
     foodVersion: number;
     reviewedFoodVersion: number | null;
-    foodReviews: ReadonlyArray<{ foodVersion: number; unresolvedIssues: string | null }>;
+    publicationConfirmedFoodVersion?: number | null;
+    foodReviews: ReadonlyArray<{ foodVersion: number; unresolvedIssues: string | null; issueResolutions?: ReadonlyArray<{ foodVersion: number }> }>;
 }): MenuFoodReviewState {
     const latest = menu.foodReviews[0];
+    if (hasUnresolvedFoodIssue(menu.foodVersion, latest)) return "unresolved";
+    if (isMenuPublicationCurrent(menu)) return "current";
     if (!latest) return "missing";
-    if (latest.foodVersion !== menu.foodVersion) return "outdated";
-    if (latest.unresolvedIssues?.trim()) return "unresolved";
-    if (isFoodReviewCurrent(menu)) return "current";
     return "outdated";
 }
 
 export const menuFoodReviewText: Record<MenuFoodReviewState, { label: string; reason: string }> = {
-    current: { label: "現行の食品確認記録あり", reason: "現在の食品内容に対応する確認記録があります。公開状態・品目設定とは別に表示しています。" },
-    unresolved: { label: "食品確認：再確認待ち", reason: "最新の食品確認記録に未解決事項があります。編集画面で内容を確認してください。" },
-    outdated: { label: "食品確認：再確認待ち", reason: "現在の食品内容に対応する確認記録がありません。以前の記録は編集画面で確認してください。" },
-    missing: { label: "食品確認：再確認待ち", reason: "食品確認記録がありません。編集画面で根拠・範囲・確認日時を記録してください。" },
+    current: { label: "食品内容の版対応あり", reason: "保存済みの食品内容と公開の版が対応しています。食品安全の保証ではありません。" },
+    unresolved: { label: "未解決事項あり", reason: "最新の食品確認記録に未解決事項があります。編集画面で内容を確認し、実際に対応してから別の「この内容は解消した」を操作してください。" },
+    outdated: { label: "公開前：保存済み内容の確認待ち", reason: "以前の記録は流用しません。保存済み内容を見直して「公開する」を操作してください。" },
+    missing: { label: "公開前：保存済み内容の確認待ち", reason: "保存済み内容を見直して「公開する」を操作してください。長文の食品確認フォームは不要です。" },
 };

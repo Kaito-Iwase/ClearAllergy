@@ -50,9 +50,9 @@ writeFileSync(join(fixture, "navigation.ts"), "const r={push:p=>location.assign(
 // Shared pure functions define display/food gates; real transactions are tested elsewhere.
 const policyEntry = String.raw`
 import {ALLERGEN_MASTER} from '@/lib/constants/allergen-master';
-import {foodSnapshot,foodContentChanged} from '@/features/admin/menus/food-review';
+import {foodSnapshot,foodContentChanged,hasUnresolvedFoodIssue} from '@/features/admin/menus/food-review';
 import {menuInputSchema} from '@/features/admin/menus/schemas/menu-input';
-import {isMenuPublishable,isFoodReviewCurrent} from '@/lib/allergens';
+import {isMenuPublishable,isMenuPublicationCurrent} from '@/lib/allergens';
 import {toAdminMenuListRow} from '@/features/admin/menus/server/menu-list-data';
 export const master=ALLERGEN_MASTER.map((a,i)=>({...a,sortOrder:i+1}));
 export const recipes={A:'【架空 R1】米、きのこ、ソースA（架空 A-1：小麦・大豆使用）、白ごまの飾り',B:'【架空 R2】米、きのこ、ソースB（架空 B-1：小麦・大豆・乳使用）、白ごまの飾り'};
@@ -60,20 +60,20 @@ const now=()=>new Date().toISOString();
 const status=(milk='FREE')=>Object.fromEntries(master.map(a=>[a.slug,['wheat','soybean','sesame'].includes(a.slug)?'CONTAINS':a.slug==='milk'?milk:'FREE']));
 function record(menu,unresolvedIssues=null,evidenceRefs=null){return {id:'synthetic-'+menu.foodVersion+'-'+menu.version,foodVersion:menu.foodVersion,evidenceRefs:evidenceRefs||'架空資料 '+(menu.ingredients===recipes.A?'A-1 / R1':'B-1 / R2')+'（実食品の確認ではない）',scope:'架空の小丼の全構成・マスター全品目。工程の交差接触は未確認',checkedAt:now(),recordedAt:now(),unresolvedIssues,contentSnapshot:foodSnapshot(menu,master,menu.statuses)}}
 export function make(scenario='A'){
- const menu={id:'trial-dish-one',shopId:'trial-shop-f',name:'架空・きのこの小丼',description:'一料理・一材料変更の隔離演習',category:'架空の丼',priceYen:700,imageUrl:null,imageFrame:'wide',imageFit:'contain',imagePosition:'center',imageZoom:100,imagePositionX:50,imagePositionY:50,ingredients:recipes.A,precaution:'架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。',version:5,foodVersion:1,reviewedFoodVersion:1,isPublished:true,updatedAt:now(),statuses:status(),foodReviews:[]};
+ const menu={id:'trial-dish-one',shopId:'trial-shop-f',name:'架空・きのこの小丼',description:'一料理・一材料変更の隔離演習',category:'架空の丼',priceYen:700,imageUrl:null,imageFrame:'wide',imageFit:'contain',imagePosition:'center',imageZoom:100,imagePositionX:50,imagePositionY:50,ingredients:recipes.A,precaution:'架空の資料です。工程・共用器具・交差接触はこの資料では確認していません。',version:5,foodVersion:1,reviewedFoodVersion:1,publicationConfirmedFoodVersion:1,isPublished:true,updatedAt:now(),statuses:status(),foodReviews:[]};
  menu.foodReviews=[record(menu)];
  const state={scenario,generation:0,fault:'normal',physical:'A',inventory:'Aのみ。旧新在庫の併存はないという架空条件',providedBatch:'F-01: ソースAを使用（現物相当カード）',menu};
- if(['stale','unknown','B','unresolved'].includes(scenario)) {menu.ingredients=recipes.B;menu.statuses=status('CONTAINS');menu.version=6;menu.foodVersion=2;menu.reviewedFoodVersion=null;menu.isPublished=false;state.physical='B';state.inventory='Bのみ。旧Aは残っていないという架空条件';state.providedBatch='F-02: ソースBを使用（現物相当カード）'}
- if(scenario==='B'){menu.reviewedFoodVersion=2;menu.isPublished=true;menu.foodReviews.unshift(record(menu))}
+ if(['stale','unknown','B','unresolved'].includes(scenario)) {menu.ingredients=recipes.B;menu.statuses=status('CONTAINS');menu.version=6;menu.foodVersion=2;menu.reviewedFoodVersion=null;menu.publicationConfirmedFoodVersion=null;menu.isPublished=false;state.physical='B';state.inventory='Bのみ。旧Aは残っていないという架空条件';state.providedBatch='F-02: ソースBを使用（現物相当カード）'}
+ if(scenario==='B'){menu.publicationConfirmedFoodVersion=2;menu.reviewedFoodVersion=2;menu.isPublished=true;menu.foodReviews.unshift(record(menu))}
  if(scenario==='unknown'){menu.ingredients='【架空 B-?】米、きのこ、ソースB（複合材料の内訳・資料版を確認できない）、白ごま';menu.statuses.milk='UNKNOWN';menu.foodReviews.unshift(record(menu,'Bの複合材料内訳・適用する提供分を確認できない','架空 B-?受領メモのみ。製品仕様の内訳・資料版は未取得'))}
  if(scenario==='unresolved'){state.physical='A/B（提供分の使用ソース不明）';state.inventory='旧A・新Bが併存する架空条件';state.providedBatch='F-03: 旧A/新Bとの対応は不明';menu.foodReviews.unshift(record(menu,'旧新在庫と提供分の対応が確認できない'))}
  if(scenario==='stop')menu.isPublished=false;
  if(scenario==='unreported'){state.physical='B';state.inventory='Bのみ。旧Aは残っていない（進行役の現物相当台帳）';state.providedBatch='F-02: ソースBを使用（現物相当カード）'}
- if(scenario==='missing'){menu.foodReviews=[];menu.reviewedFoodVersion=null;menu.isPublished=false}
+ if(scenario==='missing'){menu.foodReviews=[];menu.publicationConfirmedFoodVersion=null;menu.reviewedFoodVersion=null;menu.isPublished=false}
  return state;
 }
 const links=menu=>master.map(a=>({allergen:{slug:a.slug},status:menu.statuses[a.slug]??'UNKNOWN'}));
-export function publicVisible(menu){const latest=menu.foodReviews[0];return menu.isPublished&&isFoodReviewCurrent(menu)&&isMenuPublishable({name:menu.name,allergens:master,statusBySlug:menu.statuses})&&!!latest&&latest.foodVersion===menu.foodVersion&&!latest.unresolvedIssues?.trim()}
+export function publicVisible(menu){const latest=menu.foodReviews[0];return menu.isPublished&&isMenuPublicationCurrent(menu)&&isMenuPublishable({name:menu.name,allergens:master,statusBySlug:menu.statuses})&&!hasUnresolvedFoodIssue(menu.foodVersion,latest)}
 export function project(state,facilitator=false){
  const menu=state.menu;
  const a={id:'A-1',title:'A-1 / R1',body:recipes.A+'。この架空資料では乳を原材料として使わないと明示。工程はこの資料の対象外。'};
@@ -94,18 +94,26 @@ export function update(state,raw){
  if(fault==='conflict'){menu.version++;return {status:409,body:{error:'他の更新があります。入力を保持し、最新内容を確認してください（架空競合）'}}}
  if(fault==='invalid200')return {status:200,body:{}};
  if(input.imageUrl||input.allergenStatusBySlug&&Object.keys(input.allergenStatusBySlug).some(k=>!master.some(a=>a.slug===k)))return {status:400,body:{error:'この演習では画像追加や対象外の品目登録は扱いません'}};
- if(input.foodReview&&Date.parse(input.foodReview.checkedAt)>Date.now()+300000)return {status:400,body:{error:'確認日時を確認してください'}};
+ if(input.foodReview)return {status:400,body:{error:'旧確認フォームの保存には対応していません'}};
  const next={...menu,statuses:{...menu.statuses,...input.allergenStatusBySlug},foodReviews:[...menu.foodReviews]};
  for(const k of ['name','description','category','ingredients','precaution','imageUrl','imageFrame','imageFit','imagePosition','imageZoom','imagePositionX','imagePositionY'])if(input[k]!==undefined)next[k]=input[k];
  if(input.priceYen!==undefined){const price=input.priceYen===null||input.priceYen===''?null:Number(input.priceYen);if(price!==null&&(!Number.isSafeInteger(price)||price<0))return {status:400,body:{error:'価格を確認してください'}};next.priceYen=price}
  const changed=!!input.foodChangeReported||foodContentChanged(foodSnapshot(menu,master,menu.statuses),foodSnapshot(next,master,next.statuses));
- if(changed){next.foodVersion++;next.reviewedFoodVersion=null}
+ if(changed){next.foodVersion++;next.reviewedFoodVersion=null;next.publicationConfirmedFoodVersion=null;next.isPublished=false}
  next.version++;next.updatedAt=now();
- if(input.foodReview){const r={...input.foodReview,id:'synthetic-'+next.version,foodVersion:next.foodVersion,recordedAt:now(),unresolvedIssues:input.foodReview.unresolvedIssues?.trim()||null,contentSnapshot:foodSnapshot(next,master,next.statuses)};next.foodReviews=[r,...next.foodReviews].slice(0,5);next.reviewedFoodVersion=r.unresolvedIssues?null:next.foodVersion}
- next.isPublished=input.isPublished??menu.isPublished;
- if(!isFoodReviewCurrent(next)||!isMenuPublishable({name:next.name,allergens:master,statusBySlug:next.statuses}))next.isPublished=false;
+ if(input.foodIssueResolution){
+  const target=input.foodIssueResolution,latest=next.foodReviews[0];
+  if(target.foodVersion!==next.foodVersion||target.foodReviewId!==latest?.id||!hasUnresolvedFoodIssue(next.foodVersion,latest))return {status:400,body:{error:'表示した未解決と保存食品版を確認してください'}};
+  next.foodReviews=[{...latest,issueResolutions:[{foodVersion:next.foodVersion,resolvedAt:now()}]},...next.foodReviews.slice(1)];
+  next.isPublished=false;next.publicationConfirmedFoodVersion=null;
+ }else if(input.publicationAction==='publish'){
+  if(changed||!isMenuPublishable({name:next.name,allergens:master,statusBySlug:next.statuses})||hasUnresolvedFoodIssue(next.foodVersion,next.foodReviews[0]))return {status:400,body:{error:'保存済みの内容・未設定・未解決事項を確認してください'}};
+  next.publicationConfirmedFoodVersion=next.foodVersion;next.isPublished=true;
+ }else if(input.publicationAction==='unpublish'||input.isPublished===false)next.isPublished=false;
+ else if(input.isPublished===true&&!menu.isPublished)return {status:400,body:{error:'別に公開操作が必要です'}};
+ if(!isMenuPublicationCurrent(next)||!isMenuPublishable({name:next.name,allergens:master,statusBySlug:next.statuses}))next.isPublished=false;
  state.menu=next;
- return {status:200,body:{menu:{id:next.id,version:next.version,foodVersion:next.foodVersion,reviewedFoodVersion:next.reviewedFoodVersion,isPublished:next.isPublished,imageUrl:null,foodReviews:next.foodReviews},...(fault==='refresh-pending'?{publicRefreshPending:true}:{})}};
+ return {status:200,body:{menu:{id:next.id,version:next.version,foodVersion:next.foodVersion,reviewedFoodVersion:next.reviewedFoodVersion,publicationConfirmedFoodVersion:next.publicationConfirmedFoodVersion,isPublished:next.isPublished,imageUrl:null,foodReviews:next.foodReviews},...(fault==='refresh-pending'?{publicRefreshPending:true}:{})}};
 }
 `;
 writeFileSync(join(fixture, "policy.ts"), policyEntry, "utf8");
@@ -132,8 +140,8 @@ function App(){const facilitatorKey=new URLSearchParams(location.search).get('fa
  {facilitator&&<section className='trial-panel' aria-label='進行役の現物と申告の照合'><h2>現物相当の台帳とアプリ申告を分ける</h2><p>対象提供分: {data.providedBatch}</p><p>アプリ申告: {data.applicationDeclaration}</p><p>{data.answerNotes}</p></section>}
  <section aria-label='演習の操作画面' className='trial-screen'>
  {path==='/'&&<MenuList key={data.generation+':'+m.version} initialMenus={[data.listRow]} totalAllergenCount={master.length} readOnly readOnlyEditHrefBase='/admin/menus'/>}
- {path===dish&&<Edit key={data.generation} menuId={m.id} initialVersion={m.version} initialFoodVersion={m.foodVersion} initialReviewedFoodVersion={m.reviewedFoodVersion} initialFoodReviews={m.foodReviews} initialName={m.name} initialDescription={m.description} initialPriceYen={m.priceYen} initialCategory={m.category} initialIngredients={m.ingredients} initialPrecaution={m.precaution} initialImageUrl={null} initialImageFrame='wide' initialImageFit='contain' initialImagePosition='center' initialImageZoom={100} initialImagePositionX={50} initialImagePositionY={50} initialIsPublished={m.isPublished} allergens={master} initialStatusBySlug={m.statuses}/>}
- {(path===pub||path===detail)&&!data.publicVisible&&<div role='status' data-trial-public='excluded'><h2>この演習では公開対象外です</h2><p>保存済みの公開フラグ・全品目・現行食品確認の条件で表示から外しています。これはfixtureの説明で、実アプリの訂正案内やHTTP not-foundを再現するものではありません。</p><p>既に開いたタブ・紙・画像へ訂正が届く保証はありません。通常の停止だけでは何が訂正されたか分からない場合があります。</p></div>}
+ {path===dish&&<Edit key={data.generation} menuId={m.id} initialVersion={m.version} initialFoodVersion={m.foodVersion} initialReviewedFoodVersion={m.reviewedFoodVersion} initialPublicationConfirmedFoodVersion={m.publicationConfirmedFoodVersion} initialFoodReviews={m.foodReviews} initialName={m.name} initialDescription={m.description} initialPriceYen={m.priceYen} initialCategory={m.category} initialIngredients={m.ingredients} initialPrecaution={m.precaution} initialImageUrl={null} initialImageFrame='wide' initialImageFit='contain' initialImagePosition='center' initialImageZoom={100} initialImagePositionX={50} initialImagePositionY={50} initialIsPublished={m.isPublished} allergens={master} initialStatusBySlug={m.statuses}/>}
+ {(path===pub||path===detail)&&!data.publicVisible&&<div role='status' data-trial-public='excluded'><h2>この演習では公開対象外です</h2><p>保存済みの公開フラグ・全品目・公開の版対応・未解決事項の条件で表示から外しています。これはfixtureの説明で、実アプリの訂正案内やHTTP not-foundを再現するものではありません。</p><p>既に開いたタブ・紙・画像へ訂正が届く保証はありません。通常の停止だけでは何が訂正されたか分からない場合があります。</p></div>}
  {path===pub&&data.publicVisible&&<PublicList shopId={m.shopId} menus={[card]} allergenMaster={master} storeHandledAllergenSlugs={[]}/>}
  {path===detail&&data.publicVisible&&<PublicDetail shopId={m.shopId} shopName='演習店 F' menuName={m.name} description={m.description} category={m.category} priceText={formatPriceYen(m.priceYen)} updatedAtText={new Date(m.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})} safeImageUrl={null} imageFrame='wide' imageFit='contain' imagePosition='center' imageZoom={100} imagePositionX={50} imagePositionY={50} ingredients={m.ingredients} precaution={m.precaution} allergensForClient={master} statusBySlugForClient={m.statuses} rows={buildAllergenDisplayItems(buildAllergenRows(master,links),new Set())} storeHandledAllergenSlugs={[]}/>}
  {path==='/materials'&&<div><h2>{facilitator?'進行役の全資料・期待結果（操作者へ先に見せない）':'今回割当てられた架空資料'}</h2>{(facilitator?data.allMaterials:data.materials).map(card=><section key={card.id} className='trial-panel' data-trial-material={card.id}><h3>{card.title}</h3><p>{card.body}</p></section>)}</div>}
@@ -237,7 +245,7 @@ server = createServer(async (req, res) => {
         }
         if (path === "/api/admin/menus/trial-dish-one/stop" && req.method === "POST") {
             state.menu.isPublished = false; state.menu.version++; state.menu.updatedAt = new Date().toISOString();
-            return send(res, 200, { ok: true });
+            return send(res, 200, { ok: true, menu: { id: state.menu.id, isPublished: false, version: state.menu.version } });
         }
         return send(res, 404, { error: "unsupported_in_isolated_trial" });
     } catch { return send(res, 400, { error: "invalid_trial_request" }); }
@@ -245,7 +253,7 @@ server = createServer(async (req, res) => {
 await new Promise((done, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", done); });
 origin = `http://127.0.0.1:${server.address().port}`;
 const sha256 = value => createHash("sha256").update(value).digest("hex");
-const sourceFiles = ["scripts/ingredient-change-trial.mjs", "features/admin/menus/components/MenuListPageClient.tsx", "features/admin/menus/components/MenuEditClient.tsx", "features/admin/menus/components/MenuFoodReviewFields.tsx", "features/admin/menus/components/MenuSaveOutcomeNotice.tsx", "features/admin/menus/menu-save-plan.ts", "features/admin/menus/menu-list.ts", "features/admin/menus/server/menu-list-data.ts", "features/admin/menus/food-review.ts", "features/admin/menus/schemas/menu-input.ts", "features/admin/menus/schemas/menu-response.ts", "features/public/shops/components/ShopMenuListClient.tsx", "features/public/shops/components/PublicMenuDetailBodyClient.tsx", "lib/allergens.ts", "lib/constants/allergen-master.ts", "lib/utils/formatters.ts"];
+const sourceFiles = ["scripts/ingredient-change-trial.mjs", "features/admin/menus/components/MenuListPageClient.tsx", "features/admin/menus/components/MenuEditClient.tsx", "features/admin/menus/components/MenuFoodReviewHistory.tsx", "features/admin/menus/components/MenuSaveOutcomeNotice.tsx", "features/admin/menus/menu-save-plan.ts", "features/admin/menus/menu-list.ts", "features/admin/menus/server/menu-list-data.ts", "features/admin/menus/food-review.ts", "features/admin/menus/schemas/menu-input.ts", "features/admin/menus/schemas/menu-response.ts", "features/public/shops/components/ShopMenuListClient.tsx", "features/public/shops/components/PublicMenuDetailBodyClient.tsx", "lib/allergens.ts", "lib/constants/allergen-master.ts", "lib/utils/formatters.ts"];
 const manifest = { createdAt: new Date().toISOString(), mode, sourceHead: spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8", windowsHide: true }).stdout.trim(), node: process.version, sourceFiles: Object.fromEntries(sourceFiles.map(name => [name, sha256(readFileSync(join(root, name)))])), assetsRoot, cssFiles: Object.fromEntries(cssFiles.map(name => [name, sha256(readFileSync(join(assetsRoot, name)))])), icons, transport: "127.0.0.1 only; memory sessions; same-origin mutations; startup-only facilitator token; CSP self-only; Next/save adapters", limits: ["No real server/DB/auth/Blob", "No trigger/transaction/concurrency proof", "No participant or timing study", "No food/clinical/safety validation", "No unreported physical-change detection", "No delivery of corrections into existing tabs/paper/images", "No claim that all 25 research tests passed", "Facilitator token separates this fixture's presentation/controls; no OS, shared-PC, browser-history or developer-tools confidentiality guarantee", "Facilitator screenshots and R3 truth-card evidence must not be shown before an unprompted response"] };
 writeFileSync(join(output, "trial-manifest.json"), JSON.stringify(manifest, null, 2) + "\n", "utf8");
 let browser;
@@ -277,7 +285,7 @@ if (mode === "--serve") {
         const confirmSaved = async (published, reviewCurrent) => {
             await savedStatus.waitFor();
             assert.equal((await savedStatus.innerText()).replace(/\s/g, ""),
-                `保存しました。公開状態：${published ? "公開" : "非公開"}。食品確認：${reviewCurrent ? "現行の食品内容に対応する記録あり" : "再確認が必要"}。`);
+                `保存しました。公開状態：${published ? "公開" : "非公開"}。公開操作：${reviewCurrent ? "保存済みの食品内容に対応" : "保存済み内容から別に公開が必要"}。`);
         };
         const capture = async name => { await page.screenshot({ path: join(output, name + ".png"), fullPage: true }); screenshots.push(name + ".png"); };
         const regression = async (id, description, check) => {
@@ -337,21 +345,32 @@ if (mode === "--serve") {
         await go(facilitatorPath("/"));
         await page.getByLabel("進行条件", { exact: true }).selectOption("stale");
         await page.getByRole("button", { name: "この条件にリセット", exact: true }).click();
-        await page.getByText("現在の食品内容に対応する確認記録がありません。以前の記録は編集画面で確認してください。", { exact: true }).waitFor();
+        await page.getByText("公開前：保存済み内容の確認待ち", { exact: true }).waitFor();
         assert.equal((await current()).listRow.foodReviewState, "outdated");
         pass("Facilitator controls reset the one dish; real list exposes the outdated-food review queue");
         await capture("01-review-queue-390");
         for (const scenario of ["unknown", "unresolved", "missing"]) {
             await reset(scenario); await go("/");
-            await page.getByRole("button", { name: /^食品確認の再確認待ち/ }).click();
+            await page.getByRole("button", { name: /^公開前の確認待ち/ }).click();
             assert.equal(await page.locator("article").count(), 1);
             await go("/shops/trial-shop-f"); await page.locator('[data-trial-public="excluded"]').waitFor();
             assert.equal(await page.getByRole("link", { name: /架空・きのこの小丼/ }).count(), 0);
         }
         pass("Unknown, unresolved and missing-review states remain discoverable in admin and excluded from public props");
+        await reset("unresolved"); await go("/admin/menus/trial-dish-one/edit");
+        const oldIssue=(await current()).menu.foodReviews[0];
+        assert.equal(await page.getByRole("button", { name: "公開する", exact: true }).isDisabled(), true);
+        await page.getByRole("button", { name: "この内容は解消した", exact: true }).click();
+        await page.getByText("未解決事項の解消を記録しました。保存済み内容を見直して、別に公開してください。", { exact: true }).waitFor();
+        assert.equal((await current()).publicVisible,false);
+        assert.equal((await current()).menu.foodReviews[0].unresolvedIssues,oldIssue.unresolvedIssues);
+        assert.equal((await current()).menu.foodReviews[0].checkedAt,oldIssue.checkedAt);
+        await page.getByRole("button", { name: "公開する", exact: true }).click(); await confirmSaved(true,true);
+        assert.equal((await current()).publicVisible,true);
+        pass("Explicit issue resolution preserves the old issue and date, stays unpublished, then separate publication works");
         await reset("stop"); await go("/");
-        await page.getByText("現行の食品確認記録あり", { exact: true }).waitFor();
-        await page.getByRole("button", { name: /^食品確認の再確認待ち/ }).click();
+        await page.getByText("食品内容の版対応あり", { exact: true }).waitFor();
+        await page.getByRole("button", { name: /^公開前の確認待ち/ }).click();
         assert.equal(await page.locator("article").count(), 0);
         pass("Normal STOP keeps its food review current and is not a stale-review item");
         await reset("unreported"); await go(facilitatorPath("/"));
@@ -364,21 +383,18 @@ if (mode === "--serve") {
         await page.getByRole("button", { name: "保存する", exact: true }).click();
         await confirmSaved(false, false);
         let snapshot = await current(); assert.equal(snapshot.menu.statuses.milk, "CONTAINS"); assert.equal(snapshot.menu.isPublished, false); assert.equal(snapshot.listRow.foodReviewState, "outdated");
-        await go("/"); await page.getByRole("link", { name: "架空・きのこの小丼：食品確認を見直す", exact: true }).click();
-        await page.getByRole("checkbox", { name: "今回の提供内容と原資料を照合した記録を保存する", exact: true }).check();
-        await page.getByLabel("根拠資料・製品識別・資料の版", { exact: true }).fill("架空 B-1 / R2。実食品の確認ではない");
-        await page.getByLabel("確認した提供内容・バリエーション・構成品・対象アレルゲンの範囲", { exact: true }).fill("架空の小丼の全構成・全マスター品目。工程は未確認");
-        const checkedLocalTime = await page.evaluate(() => new Date(Date.now() - 60000).toLocaleString("sv-SE").replace(" ", "T").slice(0, 16));
-        await page.getByLabel("食品根拠を確認した日時", { exact: true }).fill(checkedLocalTime);
-        await page.getByRole("button", { name: "保存時に非公開にする", exact: true }).click();
-        await page.getByRole("button", { name: "保存する", exact: true }).click();
+        await go("/"); await page.getByRole("link", { name: "架空・きのこの小丼：保存済み内容を見直す", exact: true }).click();
+        assert.equal(await page.getByLabel("根拠資料・製品識別・資料の版", { exact: true }).count(), 0);
+        const priorReviews=(await current()).menu.foodReviews;
+        await page.getByRole("button", { name: "公開する", exact: true }).click();
         await confirmSaved(true, true);
-        snapshot = await current(); assert.equal(snapshot.menu.isPublished, true); assert.equal(snapshot.listRow.foodReviewState, "current"); assert.equal(snapshot.menu.foodReviews[0].evidenceRefs, "架空 B-1 / R2。実食品の確認ではない");
+        snapshot = await current(); assert.equal(snapshot.menu.isPublished, true); assert.equal(snapshot.listRow.foodReviewState, "current");
+        assert.deepEqual(snapshot.menu.foodReviews, priorReviews, "Publication must not fabricate food evidence");
         await go("/shops/trial-shop-f/menus/trial-dish-one");
         await page.getByRole("heading", { name: "架空・きのこの小丼", exact: true }).waitFor();
         assert.match(await page.locator("body").innerText(), /乳使用/);
         await capture("02-reviewed-B-detail-390");
-        pass("Actual edit inputs save fictional B, invalidate old review, record evidence/scope/time, then publish the reviewed milk-CONTAINS dish");
+        pass("Actual edit inputs save fictional B, invalidate old review, then separately publish the saved milk-CONTAINS dish without new food evidence");
         const oldTab = await context.newPage(); await oldTab.goto(origin + "/shops/trial-shop-f/menus/trial-dish-one");
         await oldTab.getByRole("heading", { name: "架空・きのこの小丼", exact: true }).waitFor();
         await go("/admin/menus/trial-dish-one/edit");
@@ -399,8 +415,7 @@ if (mode === "--serve") {
         }
         pass("Synthetic conflict/invalid-200 retain inputs without success; synthetic post-save refresh pending is a separate notice");
         await reset("unknown"); await go("/admin/menus/trial-dish-one/edit");
-        await page.getByRole("button", { name: "保存時は非公開", exact: true }).click();
-        await page.locator("#edit-menu-error").waitFor(); assert.equal((await current()).publicVisible, false);
+        assert.equal(await page.getByRole("button", { name: "公開する", exact: true }).isDisabled(), true); assert.equal((await current()).publicVisible, false);
         await page.getByLabel("注意書き", { exact: true }).focus(); await page.keyboard.press("Shift+Tab");
         assert.equal(await page.evaluate(() => document.activeElement?.id), "edit-menu-field-5");
         assert.equal(await page.evaluate(() => document.activeElement.matches(":focus-visible") && getComputedStyle(document.activeElement).outlineStyle !== "none"), true);
@@ -412,7 +427,7 @@ if (mode === "--serve") {
             await page.evaluate(async () => { await document.fonts.ready; });
             if (options.has("--icons-root")) {
                 assert.equal(await page.evaluate(() => [...document.fonts].some(font => font.family.includes("Material Symbols") && font.status === "loaded")), true);
-                const link = page.getByRole("link", { name: "架空・きのこの小丼：食品確認を見直す", exact: true });
+                const link = page.getByRole("link", { name: "架空・きのこの小丼：保存済み内容を見直す", exact: true });
                 assert.equal(await link.evaluate(element => {
                     const box = element.getBoundingClientRect(), text = [...element.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
                     if (!text) return false;

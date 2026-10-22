@@ -1,69 +1,46 @@
-import assert from "node:assert/strict";
 import test from "node:test";
-import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
-import { foodSnapshot, foodContentChanged, emptyFoodReviewDraft, isFoodReviewTimeValid } from "../features/admin/menus/food-review";
+import assert from "node:assert/strict";
 import { getMenuSavePlan } from "../features/admin/menus/menu-save-plan";
-import type { AllergenStatus } from "../lib/allergens";
+import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
+import { isMenuPublicationCurrent, type AllergenStatus } from "../lib/allergens";
 
-const now = Date.parse("2026-10-19T00:00:00Z");
-const statuses = Object.fromEntries(ALLERGEN_MASTER.map(a => [a.slug, "FREE" as AllergenStatus]));
-const content = { name: "架空料理", description: null, category: null, ingredients: "架空材料", precaution: null, imageUrl: null, priceYen: 1000 };
-const initial = foodSnapshot(content, ALLERGEN_MASTER, statuses);
-const defaults = { name: content.name, allergens: ALLERGEN_MASTER, statusBySlug: statuses, requestedIsPublished: true,
-    foodChanged: false, reviewCurrent: true, recordingReview: false, foodReview: emptyFoodReviewDraft() };
-const review = { evidenceRefs: "架空資料の版1", scope: "架空の提供内容と全品目", checkedAt: new Date(now).toISOString(), unresolvedIssues: "" };
+const allergens = ALLERGEN_MASTER.map(a => ({ slug: a.slug, nameJa: a.nameJa }));
+const defaults = { name: "架空の料理", allergens,
+    statusBySlug: Object.fromEntries(allergens.map(a => [a.slug, "FREE"])) as Record<string, AllergenStatus>,
+    requestedIsPublished: true, foodChanged: false, publicationCurrent: true, unresolved: false };
 
-test("price-only changes preserve the current food review and publication intent", () => {
-    const changed = foodContentChanged(initial, foodSnapshot({ ...content, priceYen: 1200 }, ALLERGEN_MASTER, statuses));
-    const plan = getMenuSavePlan({ ...defaults, foodChanged: changed }, now);
-    assert.equal(changed, false);
-    assert.equal(plan.willPublish, true);
-    assert.equal(plan.foodReviewState, "current");
+test("価格・構図だけの保存は既存公開を維持し、新しい公開操作を推測しない", () => {
+    assert.equal(getMenuSavePlan(defaults).willPublish, true);
+    assert.equal(getMenuSavePlan({ ...defaults, requestedIsPublished: false }).willPublish, false);
 });
-test("food edits and explicit supply/process changes require a new review", () => {
-    const changed = foodContentChanged(initial, foodSnapshot({ ...content, ingredients: "変更した架空材料" }, ALLERGEN_MASTER, statuses));
-    assert.equal(changed, true);
-    const plan = getMenuSavePlan({ ...defaults, foodChanged: changed }, now);
-    assert.equal(plan.willPublish, false);
-    assert.equal(plan.foodReviewState, "changed");
+test("食品内容変更・文字が同じ変更申告は、公開希望でも非公開保存になる", () => {
+    const result = getMenuSavePlan({ ...defaults, foodChanged: true });
+    assert.equal(result.willPublish, false);
+    assert.equal(result.canPublish, false);
+    assert.equal(result.publicationState, "changed");
 });
-test("a complete new review can accompany food changes and publication", () => {
-    const plan = getMenuSavePlan({ ...defaults, foodChanged: true, recordingReview: true, foodReview: review }, now);
-    assert.equal(plan.willPublish, true);
-    assert.equal(plan.foodReviewState, "recording");
-    assert.equal(plan.reviewInputInvalid, false);
+test("未公開の保存と別の公開操作を分け、旧食品確認だけでは公開予定にしない", () => {
+    const result = getMenuSavePlan({ ...defaults, publicationCurrent: false });
+    assert.equal(result.canPublish, true);
+    assert.equal(result.willPublish, false);
+    assert.equal(result.publicationState, "required");
 });
-test("unresolved issues save a record without making it publishable", () => {
-    const plan = getMenuSavePlan({ ...defaults, recordingReview: true, foodReview: { ...review, unresolvedIssues: "資料が一部不足" } }, now);
-    assert.equal(plan.willPublish, false);
-    assert.equal(plan.foodReviewState, "unresolved");
-    assert.equal(plan.reviewInputInvalid, false);
+test("UNKNOWN・不完全マスタ・名前不足は公開不可", () => {
+    const bad = [{ ...defaults, statusBySlug: { ...defaults.statusBySlug, [allergens[0].slug]: "UNKNOWN" as const } },
+        { ...defaults, allergens: allergens.slice(1) }, { ...defaults, name: " " }];
+    for (const input of bad) assert.equal(getMenuSavePlan(input).canPublish, false);
 });
-test("unknown items, an invalid master and a missing name cannot be advertised as publishable", () => {
-    for (const overrides of [
-        { statusBySlug: { ...statuses, egg: "UNKNOWN" as const } },
-        { allergens: ALLERGEN_MASTER.slice(1) }, { name: " " },
-    ]) {
-        const plan = getMenuSavePlan({ ...defaults, ...overrides }, now);
-        assert.equal(plan.willPublish, false);
-        assert.ok(plan.publishErrors.length > 0);
+test("未解決事項を通常の公開や食品変更で解除しない", () => {
+    for (const foodChanged of [true, false]) {
+        const result = getMenuSavePlan({ ...defaults, foodChanged, unresolved: true });
+        assert.equal(result.canPublish, false); assert.equal(result.willPublish, false);
+        assert.equal(result.publicationState, "unresolved");
     }
 });
-test("publication choice and food-review validity remain independent", () => {
-    const draft = getMenuSavePlan({ ...defaults, requestedIsPublished: false }, now);
-    assert.equal(draft.willPublish, false);
-    assert.equal(draft.canPublish, true);
-    assert.equal(draft.foodReviewState, "current");
-    const missing = getMenuSavePlan({ ...defaults, reviewCurrent: false }, now);
-    assert.equal(missing.willPublish, false);
-    assert.equal(missing.foodReviewState, "required");
-});
-test("incomplete and future review times use the same five-minute server boundary", () => {
-    assert.equal(isFoodReviewTimeValid(new Date(now + 300_000).toISOString(), now), true);
-    assert.equal(isFoodReviewTimeValid(new Date(now + 300_001).toISOString(), now), false);
-    for (const foodReview of [emptyFoodReviewDraft(), { ...review, checkedAt: new Date(now + 300_001).toISOString() }]) {
-        const plan = getMenuSavePlan({ ...defaults, recordingReview: true, foodReview }, now);
-        assert.equal(plan.willPublish, false);
-        assert.equal(plan.reviewInputInvalid, true);
+test("公開版判定は食品確認の版を借用せず、欠損・旧版・不正値を拒否する", () => {
+    for (const publicationConfirmedFoodVersion of [null, undefined, 0, -1, NaN]) {
+        assert.equal(isMenuPublicationCurrent({ foodVersion: 1, publicationConfirmedFoodVersion }), false);
     }
+    assert.equal(isMenuPublicationCurrent({ foodVersion: 1, publicationConfirmedFoodVersion: 1 }), true);
+    assert.equal(isMenuPublicationCurrent({ foodVersion: -1, publicationConfirmedFoodVersion: -1 }), false);
 });

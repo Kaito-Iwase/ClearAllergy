@@ -8,6 +8,8 @@
 
 [主な機能](#features) · [設計上の工夫](#design) · [システム構成](#architecture) · [デモ・起動](#demo) · [開発ドキュメント](#reading-order)
 
+二段階公開への変更を独立作業ブランチで実装・検証しました。新規・食品変更は非公開で保存し、保存済み内容を見直して別に公開します。以前の未解決がある場合は、表示された内容に対応して「この内容は解消した」を操作した後、別に公開します。[判断理由と承認範囲](docs/research/product/two-step-publication-decision-20261021.md)と[検証記録](docs/verification/two-step-publication-20261021.md)を参照してください。本番未適用です。
+
 ## 制作背景
 
 自分自身に食物アレルギーの経験があり、外食時にアレルゲン情報を探す手間や、店員さんに確認する心理的な負担を感じていました。
@@ -37,11 +39,11 @@
 | 情報の不足が「含まない」に見えることを防ぐ | 保存状態を4状態で扱い、未入力・欠損を `UNKNOWN` に正規化。公開条件をUI・API・DBトリガーで確認し、登録状態と店舗内の取扱いに関する補足を分離 | [共通ルール](docs/guide/rules.md#allergens)、[公開条件](docs/guide/rules.md#publication)、[lib/allergens.ts](lib/allergens.ts) |
 | ログインした担当者が他店舗のデータを操作することを防ぐ | Clerkで本人を確認した後、サーバー側で所有店舗を解決。メニューの取得・更新・削除をリソースIDと店舗IDで限定 | [権限の境界](docs/guide/rules.md#ownership)、[adminMenuRoute.ts](features/admin/menus/server/adminMenuRoute.ts) |
 | メニューと品目別情報の保存が途中で食い違うことを防ぐ | 関連レコードをトランザクションで更新。招待受諾では行ロックと一意制約を利用。画像ストレージとの整合性は別の課題として扱う | [保存処理](docs/guide/architecture.md#mutation)、[招待処理](docs/guide/architecture.md#invitations)、[DB定義](prisma/schema.prisma) |
-| 古い入力や以前の確認が食品変更後も使われることを防ぐ | 版付き保存で競合を拒否。根拠・範囲・日時と当時の食品内容を記録し、食品変更後は再確認まで停止。記録の存在は実食品の正確性を証明しない | [食品確認と公開条件](docs/guide/rules.md#publication)、[移行と検証](docs/guide/development.md#食品確認記録の移行と検証) |
+| 古い入力や以前の確認が食品変更後も使われることを防ぐ | 版付き保存で競合を拒否。食品変更を非公開保存し、保存済み最新版へ別に公開操作を行う。旧確認履歴は保持するが新しい公開根拠へ変換しない。公開は食品安全を保証しない | [二段階公開と理由](docs/research/product/two-step-publication-decision-20261021.md)、[公開条件](docs/guide/rules.md#publication) |
 | 閲覧と入力で必要な処理を分ける | 公開ページはServer Componentでデータを取得し、検索・端末設定・入力などをClient Componentで処理。管理操作はAPIで検証して保存 | [内部処理](docs/guide/architecture.md)、[PublicMenuDetailPage.tsx](features/public/shops/server/PublicMenuDetailPage.tsx) |
 | 障害の原因を追いながら、内部情報の露出を抑える | APIに要求IDを付け、処理時間と固定したエラー分類を記録。業務監査と運用ログを分け、利用者には一般的なエラーと再試行を表示 | [要求と障害の追跡](docs/guide/architecture.md#observability)、[lib/observability.ts](lib/observability.ts) |
 
-これらは現行実装の説明です。食品の安全性、実環境での完全な防御、利用者への効果が検証済みであることを示すものではありません。設計の理由やトレードオフを説明する練習には[面接用Q&A](docs/interview/design-decisions.md)を用意しています。
+これらは現行実装の説明です。食品の安全性、実環境での完全な防御、利用者への効果が検証済みであることを示すものではありません。設計理由・代替案・適用限界の過去の調査は[設計判断と根拠](docs/guide/design-decisions.md)を参照してください。現行仕様とは対象時点を区別します。
 
 <a id="architecture"></a>
 ## システム構成

@@ -113,7 +113,7 @@
         <mxCell id="admin-api-line-0" value="Clerkセッション・店舗所有権・更新権限を確認" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="500" y="680" width="490" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="admin-api-line-1" value="入力・版・食品確認・公開条件" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="admin-api-line-1" value="入力・版・明示解除・別公開" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="500" y="704" width="490" height="25" as="geometry" />
         </mxCell>
         <mxCell id="admin-api-line-2" value="店舗・メニュー・招待・画像の処理" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=18;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
@@ -161,10 +161,10 @@
         <mxCell id="postgres-title" value="PostgreSQL / Neonを想定" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=24;fontColor=#5b21b6;fontStyle=1;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="1210" y="799" width="300" height="28" as="geometry" />
         </mxCell>
-        <mxCell id="postgres-line-0" value="店舗・メニュー・品目・確認記録" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="postgres-line-0" value="店舗・メニュー・品目・公開記録" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="1210" y="830" width="300" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="postgres-line-1" value="招待・監査・公開制約・版管理" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="postgres-line-1" value="招待・監査・明示解除・公開制約" style="text;html=0;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#334155;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="1210" y="854" width="300" height="25" as="geometry" />
         </mxCell>
         <mxCell id="public-request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=0;strokeWidth=2;strokeColor=#2563eb;endArrow=block;endFill=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="public-ui" target="public-server">
@@ -234,7 +234,7 @@
         <mxCell id="management-rules-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
           <mxGeometry x="769" y="568" width="133" height="27" as="geometry" />
         </mxCell>
-        <mxCell id="management-rules-label" value="公開前確認" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#0f766e;fontStyle=0;spacing=0;" vertex="1" parent="1">
+        <mxCell id="management-rules-label" value="別公開操作" style="text;html=0;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Yu Gothic UI;fontSize=16;fontColor=#0f766e;fontStyle=0;spacing=0;" vertex="1" parent="1">
           <mxGeometry x="773" y="568" width="125" height="27" as="geometry" />
         </mxCell>
         <mxCell id="read-database-label-back" value="" style="rounded=1;arcSize=8;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">

@@ -19,7 +19,7 @@ export function foodContentChanged(before: ReturnType<typeof foodSnapshot>, afte
 export { isFoodReviewCurrent } from "@/lib/allergens";
 
 export type FoodReviewDraft = { evidenceRefs: string; scope: string; checkedAt: string; unresolvedIssues: string };
-export type FoodReviewSummary = Omit<FoodReviewDraft, "unresolvedIssues"> & { unresolvedIssues: string | null; id: string; foodVersion: number; recordedAt: string; contentSnapshot: unknown };
+export type FoodReviewSummary = Omit<FoodReviewDraft, "unresolvedIssues"> & { unresolvedIssues: string | null; id: string; foodVersion: number; recordedAt: string; contentSnapshot: unknown; issueResolutions?: Array<{ foodVersion: number; resolvedAt: string }> };
 export const emptyFoodReviewDraft = (): FoodReviewDraft => ({ evidenceRefs: "", scope: "", checkedAt: "", unresolvedIssues: "" });
 export function isFoodReviewTimeValid(checkedAt: string, now = Date.now()) {
     const time = Date.parse(checkedAt);
@@ -27,4 +27,12 @@ export function isFoodReviewTimeValid(checkedAt: string, now = Date.now()) {
 }
 export function foodReviewDraftComplete(review: FoodReviewDraft, now = Date.now()) {
     return Boolean(review.evidenceRefs.trim() && review.scope.trim() && isFoodReviewTimeValid(review.checkedAt, now) && !review.unresolvedIssues.trim());
+}
+
+// Resolution is specific to both this review and the saved food version.
+export function hasUnresolvedFoodIssue(foodVersion: number, latest: {
+    unresolvedIssues: string | null;
+    issueResolutions?: ReadonlyArray<{ foodVersion: number }>;
+} | undefined) {
+    return Boolean(latest?.unresolvedIssues?.trim()) && !latest?.issueResolutions?.some(resolution => resolution.foodVersion === foodVersion);
 }

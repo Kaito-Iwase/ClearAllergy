@@ -5,11 +5,11 @@ import { getMenuFoodReviewState, type AdminMenuListRow } from "../menu-list";
 export const adminMenuListSelect = {
     id: true, name: true, category: true, priceYen: true, imageUrl: true,
     isPublished: true, version: true, updatedAt: true,
-    foodVersion: true, reviewedFoodVersion: true,
+    foodVersion: true, reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
     allergenLinks: { select: { status: true, allergen: { select: { slug: true } } } },
     foodReviews: {
         orderBy: { reviewSequence: "desc" }, take: 1,
-        select: { foodVersion: true, unresolvedIssues: true },
+        select: { foodVersion: true, unresolvedIssues: true, issueResolutions: { orderBy: { foodVersion: "desc" }, take: 1, select: { foodVersion: true } } },
     },
 } satisfies Prisma.MenuItemSelect;
 

@@ -500,6 +500,13 @@ export function isFoodReviewCurrent(menu: { foodVersion?: number; reviewedFoodVe
         menu.reviewedFoodVersion !== null && menu.reviewedFoodVersion !== undefined && menu.reviewedFoodVersion === menu.foodVersion;
 }
 
+// 公開操作の版対応。食品資料を照合したことや安全性を表す値ではない。
+export function isMenuPublicationCurrent(menu: { foodVersion?: number; publicationConfirmedFoodVersion?: number | null }) {
+    return typeof menu.foodVersion === "number" && Number.isSafeInteger(menu.foodVersion) && menu.foodVersion >= 0 &&
+        menu.publicationConfirmedFoodVersion !== null && menu.publicationConfirmedFoodVersion !== undefined &&
+        menu.publicationConfirmedFoodVersion === menu.foodVersion;
+}
+
 export type AllergenClassificationNotice = {
     kind: "danger" | "caution" | "unknown" | "safe";
     title: string;

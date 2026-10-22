@@ -13,7 +13,7 @@ import {
     buildAllergenDisplayItems,
     createStatusBySlug,
     isMenuPublishable,
-    isFoodReviewCurrent,
+    isMenuPublicationCurrent,
 } from "@/lib/allergens";
 import { formatDateTimeJa, formatPriceYen } from "@/lib/utils/formatters";
 import { sanitizeStoredImageUrl } from "@/lib/storage/image-url-policy";
@@ -77,7 +77,7 @@ export default async function PublicMenuDetailPage({
                             select: { id: true, name: true },
                         },
                         foodVersion: true,
-                        reviewedFoodVersion: true,
+                        reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                         allergenLinks: {
                             select: {
                                 status: true,
@@ -121,7 +121,7 @@ export default async function PublicMenuDetailPage({
         menu.allergenLinks,
     );
     if (
-        !isFoodReviewCurrent(menu) || !isMenuPublishable({
+        !isMenuPublicationCurrent(menu) || !isMenuPublishable({
             name: menu.name,
             allergens: allergenMaster,
             statusBySlug,

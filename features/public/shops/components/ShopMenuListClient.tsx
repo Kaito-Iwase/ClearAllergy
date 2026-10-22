@@ -21,8 +21,6 @@ import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import { useUserAllergenPreferences } from "@/features/public/shops/components/UserAllergenPreferenceClient";
 import MenuAllergenSummary from "./MenuAllergenSummary";
 
-type BadgeKind = "danger" | "caution" | "safe" | "unknown";
-
 type AllergenMasterItem = {
     slug: string;
     nameJa: string;
@@ -49,26 +47,6 @@ type MenuItemWithStatus = {
     menu: MenuItemCard;
     statusBySlug: Record<string, AllergenStatus>;
 };
-
-function badgeClass(kind: BadgeKind): string {
-    if (kind === "danger") {
-        return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200";
-    }
-    if (kind === "caution") {
-        return "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-200";
-    }
-    if (kind === "unknown") {
-        return "bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200";
-    }
-    return "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-300";
-}
-
-function badgeLabel(kind: BadgeKind): string {
-    if (kind === "danger") return "含む";
-    if (kind === "caution") return "要確認の情報あり";
-    if (kind === "unknown") return "未入力・未確認あり";
-    return "原材料に含まない";
-}
 
 export default function ShopMenuListClient({
     shopId,
@@ -176,6 +154,15 @@ export default function ShopMenuListClient({
 
             <p className="mb-4 text-sm leading-6 text-gray-700">店舗が登録した内容</p>
 
+            {storeHandledAllergenSlugs.length > 0 && (
+                <section aria-label="店舗全体の登録情報" className="mb-5 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                    <h3 className="text-sm font-bold text-amber-950">店舗の公開メニュー全体の登録情報</h3>
+                    <p className="mt-2 text-sm leading-6 text-amber-950">「含む」登録のある品目：{allergenMaster.filter(item => storeHandledAllergenSlugs.includes(item.slug)).map(item => item.nameJa).join("・")}</p>
+                    {hasPreference && <p className="mt-1 text-sm leading-6 text-amber-950">このうち、あなたの確認対象：{allergenMaster.filter(item => storeHandledAllergenSlugs.includes(item.slug) && selectedSlugs.includes(item.slug)).map(item => item.nameJa).join("・") || "該当なし"}</p>}
+                    <p className="mt-2 text-xs leading-5 text-amber-900">個々のメニューの原材料登録とは別の情報です。{STORE_ALLERGEN_NOTE}</p>
+                </section>
+            )}
+
             {searchedMenus.length === 0 ? (
                 <div role="status" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
                     <p className="text-sm text-gray-700">
@@ -203,14 +190,12 @@ export default function ShopMenuListClient({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {visibleMenuItems.map(({ menu, statusBySlug }) => {
                         const defaultSummaries = buildDefaultAllergenSummaries({
-                            storeHandledAllergenSlugs: new Set(storeHandledAllergenSlugs),
                             statusBySlug,
                             nameJaBySlug,
                             rankBySlug,
                         });
 
                         const personalizedSummary = buildSelectedAllergenSummary({
-                            storeHandledAllergenSlugs: new Set(storeHandledAllergenSlugs),
                             statusBySlug,
                             selectedSlugs,
                             includeMayContain,
@@ -250,17 +235,6 @@ export default function ShopMenuListClient({
                                     </span>
                                 </div>
 
-                                <div className="mt-3 flex flex-col items-start gap-2">
-                                    <span
-                                        className={`max-w-full rounded-lg px-3 py-1.5 text-sm font-bold leading-6 ${badgeClass(
-                                            activeSummary.badge,
-                                        )}`}
-                                    >
-                                        {hasPreference ? badgeLabel(activeSummary.badge) : `特定原材料：${badgeLabel(activeSummary.badge)}`}
-                                    </span>
-
-                                </div>
-
                                 <MenuAllergenSummary summary={activeSummary} />
 
                                 {!hasPreference && defaultSummaries.otherCount > 0 && otherSummary.badge !== "safe" ? (
@@ -268,9 +242,6 @@ export default function ShopMenuListClient({
                                         <h4 className="text-sm font-bold text-gray-900">その他のアレルゲン（{defaultSummaries.otherCount}品目）</h4>
                                         <MenuAllergenSummary summary={otherSummary} />
                                     </div>
-                                ) : null}
-                                {activeSummary.storeHandledCount > 0 || (!hasPreference && otherSummary.storeHandledCount > 0) ? (
-                                    <p className="mt-2 text-xs leading-5 text-amber-900">{STORE_ALLERGEN_NOTE}</p>
                                 ) : null}
                                 {menu.precaution?.trim() ? (
                                     <div role="group" aria-label="店舗の注意書き" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">

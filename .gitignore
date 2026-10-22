@@ -47,7 +47,7 @@ next-env.d.ts
 # clerk configuration (can include secrets)
 /.clerk/
 
-# Track maintained guides and interview notes; keep local historical audits and assets ignored.
+# Track maintained guides; keep local historical audits and assets ignored.
 docs/*
 !docs/guide/
 docs/guide/*
@@ -56,9 +56,6 @@ docs/guide/*
 docs/guide/diagrams/*
 !docs/guide/diagrams/clearallergy-architecture.drawio
 !docs/guide/diagrams/clearallergy-architecture.svg
-!docs/interview/
-docs/interview/*
-!docs/interview/design-decisions.md
 !docs/research/
 !docs/research/**
 !docs/agentic-development.md

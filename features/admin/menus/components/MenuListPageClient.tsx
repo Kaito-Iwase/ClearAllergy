@@ -1,7 +1,6 @@
 "use client";
 
-// Server Component から受け取った initialMenus をもとに、検索と削除だけを画面上で扱います。
-// Client Component なのは、入力 state と削除ボタンのイベント処理が必要だからです。
+// Server Componentから受け取った一覧を検索し、公開停止と削除の確定応答を反映します。
 
 import Link from "next/link";
 import Image from "next/image";
@@ -65,6 +64,8 @@ export default function MenuListPageClient({
     const [q, setQ] = useState("");
     const [filter, setFilter] = useState<FilterKey>("all");
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    const [stoppingMenuId, setStoppingMenuId] = useState<string | null>(null);
     const [deletingMenuId, setDeletingMenuId] = useState<string | null>(null);
     const deleting = useRef(false);
 
@@ -113,6 +114,7 @@ export default function MenuListPageClient({
     const onDelete = async (menuId: string, menuName: string, version?: number) => {
         if (deleting.current) return;
         setError(null);
+        setNotice(null);
 
         if (readOnly) {
             setError(
@@ -153,6 +155,36 @@ export default function MenuListPageClient({
         }
     };
 
+    const onStop = async (menuId: string, menuName: string) => {
+        if (readOnly || deleting.current) return;
+        deleting.current = true;
+        setStoppingMenuId(menuId);
+        setError(null);
+        setNotice(null);
+        const unknownResult = "公開停止の結果を確認できません。一覧を再読み込みして確認してください。";
+        try {
+            const res = await fetch(`/api/admin/menus/${menuId}/stop`, { method: "POST" });
+            if (!res.ok) {
+                setError(await getApiErrorMessage(res, unknownResult));
+                return;
+            }
+            const result = await res.json().catch(() => null);
+            if (result?.ok !== true || result.menu?.id !== menuId || result.menu?.isPublished !== false || !Number.isSafeInteger(result.menu?.version) || result.menu.version < 0) {
+                setError(unknownResult);
+                return;
+            }
+            // STOP acknowledges only publication. Do not promote stale content's DELETE version.
+            setMenus(prev => prev.map(menu => menu.id === menuId ? { ...menu, isPublished: false } : menu));
+            setNotice(`「${menuName}」を非公開にしました。最新の内容は一覧を再読み込みして確認してください。`);
+            if (result.publicRefreshPending) setError("非公開化は保存されましたが、公開ページへの反映は未確認です。公開ページを再読み込みして確認してください。");
+        } catch {
+            setError(unknownResult);
+        } finally {
+            deleting.current = false;
+            setStoppingMenuId(null);
+        }
+    };
+
     const filterItems: Array<{
         key: FilterKey;
         label: string;
@@ -166,11 +198,12 @@ export default function MenuListPageClient({
             label: "未設定あり",
             count: stats.needsAllergen,
         },
-        { key: "needsFoodReview", label: "食品確認の再確認待ち", count: stats.needsFoodReview },
+        { key: "needsFoodReview", label: "公開前の確認待ち", count: stats.needsFoodReview },
     ];
 
     return (
         <div className="space-y-5">
+            {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
             {error && (
                 <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                     {error}
@@ -188,7 +221,7 @@ export default function MenuListPageClient({
                                 アレルゲン未設定のメニューが {stats.needsAllergen} 件あります
                             </p>
                             <p className="mt-1 leading-6 text-amber-900">
-                                未設定が残っているメニューは、カード内に注意表示します。公開にはアレルゲン{totalAllergenCount}品目の設定に加え、現行の食品内容に対応する未解決事項のない確認記録が必要です。
+                                未設定が残っているメニューは、カード内に注意表示します。公開にはアレルゲン{totalAllergenCount}品目の設定と、保存済み内容への別の公開操作が必要です。保存済みの未解決事項がある場合は公開できません。
                             </p>
                         </div>
                     </div>
@@ -197,8 +230,8 @@ export default function MenuListPageClient({
 
             {stats.needsFoodReview > 0 && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                    <p className="font-bold">食品確認の再確認待ちが {stats.needsFoodReview} 件あります</p>
-                    <p className="mt-1 leading-6">記録なし・現在の食品内容との未対応・最新記録の未解決事項を含みます。「食品確認の再確認待ち」で絞り込み、各メニューの編集画面で確認してください。</p>
+                    <p className="font-bold">公開前の確認待ちが {stats.needsFoodReview} 件あります</p>
+                    <p className="mt-1 leading-6">保存済み内容への公開操作待ちと、保持した記録の未解決事項を含みます。「公開前の確認待ち」で絞り込み、各メニューの編集画面で確認してください。</p>
                 </div>
             )}
 
@@ -248,7 +281,7 @@ export default function MenuListPageClient({
                     })}
                 </div>
 
-                <p className="text-xs leading-5 text-gray-600">公開状態と食品確認は別です。公開停止だけでは食品確認記録は失効しません。</p>
+                <p className="text-xs leading-5 text-gray-600">公開状態と食品版の対応は別です。公開停止だけでは食品版の対応は失効しません。</p>
                 <div role="status" aria-live="polite" className="text-xs font-medium text-gray-500">
                     表示中 {filtered.length} 件 / 全 {stats.total} 件
                 </div>
@@ -365,15 +398,12 @@ export default function MenuListPageClient({
                                             <p className="mt-1 leading-6">
                                                 {menu.isPublished
                                                     ? "公開中ですが未設定があります。利用者に正確に伝えるため設定を完了してください。"
-                                                    : `公開にはアレルゲン${totalAllergenCount}品目の設定と、現行の食品確認記録が必要です。`}
+                                                : `公開にはアレルゲン${totalAllergenCount}品目の設定と、保存済み内容への別の公開操作が必要です。`}
                                             </p>
                                         </div>
                                     )}
 
-                                    <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${needsFoodReview ? "border-amber-200 bg-amber-50 text-amber-950" : "border-gray-200 bg-gray-50 text-gray-700"}`}>
-                                        <p className="font-bold">{foodReview.label}</p>
-                                        <p className="mt-1 leading-6">{foodReview.reason}</p>
-                                    </div>
+                                    <p className={`mt-2 text-xs font-medium ${needsFoodReview ? "text-amber-900" : "text-gray-600"}`}>{foodReview.label}</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap sm:justify-end">
@@ -390,7 +420,7 @@ export default function MenuListPageClient({
                                     ) : (
                                         <Link
                                             href={editHref}
-                                            aria-label={`${menu.name}：${needsFoodReview ? "食品確認を見直す" : hasUnknown ? "アレルゲン設定" : "編集"}`}
+                                            aria-label={`${menu.name}：${needsFoodReview ? "保存済み内容を見直す" : hasUnknown ? "アレルゲン設定" : "編集"}`}
                                             className={`inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f4c2f] sm:w-auto ${
                                                 needsAttention
                                                     ? "bg-amber-600 text-white hover:bg-amber-700"
@@ -402,16 +432,27 @@ export default function MenuListPageClient({
                                                     ? "notification_important"
                                                     : "edit"}
                                             </span>
-                                            {needsFoodReview ? "食品確認を見直す" : hasUnknown ? "アレルゲン設定" : "編集"}
+                                            {needsFoodReview ? "保存済み内容を見直す" : hasUnknown ? "アレルゲン設定" : "編集"}
                                         </Link>
                                     )}
+
+                                    {menu.isPublished && <button
+                                        type="button"
+                                        onClick={() => onStop(menu.id, menu.name)}
+                                        disabled={readOnly || deletingMenuId !== null || stoppingMenuId !== null}
+                                        aria-label={`${menu.name}の公開を停止`}
+                                        className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 text-sm font-bold text-amber-950 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">visibility_off</span>
+                                        {stoppingMenuId === menu.id ? "停止中…" : "公開停止"}
+                                    </button>}
 
                                     <button
                                         type="button"
                                         onClick={() =>
                                             onDelete(menu.id, menu.name, menu.version)
                                         }
-                                        disabled={readOnly || deletingMenuId !== null}
+                                        disabled={readOnly || deletingMenuId !== null || stoppingMenuId !== null}
                                         className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                                         aria-label={`${menu.name}を削除`}
                                     >

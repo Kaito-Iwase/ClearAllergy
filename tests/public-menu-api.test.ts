@@ -31,7 +31,7 @@ function makeMenu(overrides: Record<string, unknown> = {}) {
         imagePositionY: null,
         isPublished: true,
         foodVersion: 1,
-        reviewedFoodVersion: 1,
+        reviewedFoodVersion: 1, publicationConfirmedFoodVersion: 1,
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
         updatedAt: new Date("2026-01-01T00:00:00.000Z"),
         allergenLinks: allergenRows.map((allergen) => ({
@@ -95,10 +95,10 @@ async function requestMenu() {
 }
 
 test("公開APIは記録なし・旧版の確認では公開せず、私的な根拠記録を返さない", async (t) => {
-    let reviewedFoodVersion: number | null = null;
-    stubPrisma(t, { findMenu: async () => makeMenu({ reviewedFoodVersion, foodReviews: [{ evidenceRefs: "private evidence" }] }) });
-    for (const value of [null, 0]) { reviewedFoodVersion = value; assert.equal((await requestMenu()).status, 404); }
-    reviewedFoodVersion = 1;
+    let publicationConfirmedFoodVersion: number | null = null;
+    stubPrisma(t, { findMenu: async () => makeMenu({ publicationConfirmedFoodVersion, foodReviews: [{ evidenceRefs: "private evidence" }] }) });
+    for (const value of [null, 0]) { publicationConfirmedFoodVersion = value; assert.equal((await requestMenu()).status, 404); }
+    publicationConfirmedFoodVersion = 1;
     const response = await requestMenu();
     assert.equal(response.status, 200);
     const body = await response.json();

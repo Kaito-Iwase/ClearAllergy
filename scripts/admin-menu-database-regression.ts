@@ -175,19 +175,18 @@ export async function runAdminMenuDatabaseRegression(
         } finally { prisma.menuItem.findFirst = originalFindFirst; }
         console.log("PASS: two real PUT handlers reading the same version produce one 200 and one 409");
 
-        const review = { evidenceRefs: "架空製品仕様 test-v1（実食品の証拠ではない）", scope: "架空の構成品と全対象品目", checkedAt: new Date().toISOString(), unresolvedIssues: "" };
         const beforeReviewFailure = await db.menuItem.findUniqueOrThrow({ where: { id: concurrent.id }, include: { allergenLinks: true, foodReviews: true } });
         const originalTransaction = prisma.$transaction;
         prisma.$transaction = (async (work: (tx: Prisma.TransactionClient) => Promise<unknown>) => originalTransaction.call(prisma, async (tx: Prisma.TransactionClient) => {
-            tx.menuFoodReview.create = (async () => { throw new Error("intentional review insert failure"); }) as unknown as typeof tx.menuFoodReview.create;
+            tx.menuPublicationConfirmation.create = (async () => { throw new Error("intentional publication insert failure"); }) as unknown as typeof tx.menuPublicationConfirmation.create;
             return work(tx);
         })) as typeof originalTransaction;
         try {
-            const failed = await route.PUT(put(concurrent.id, { expectedVersion: beforeReviewFailure.version, ingredients: "変更要求", foodReview: review, isPublished: true }));
+            const failed = await route.PUT(put(concurrent.id, { expectedVersion: beforeReviewFailure.version, publicationAction: "publish" }));
             assert.equal(failed.status, 500);
             assert.deepEqual(await db.menuItem.findUniqueOrThrow({ where: { id: concurrent.id }, include: { allergenLinks: true, foodReviews: true } }), beforeReviewFailure);
         } finally { prisma.$transaction = originalTransaction; }
-        console.log("PASS: a real route review insertion failure rolls back menu, links, publication and evidence");
+        console.log("PASS: a real route publication insertion failure rolls back menu, links, publication and evidence");
 
         failCache = true;
         const pending = await route.PUT(put(concurrent.id, { expectedVersion: beforeReviewFailure.version, priceYen: 303 }));
@@ -195,7 +194,7 @@ export async function runAdminMenuDatabaseRegression(
         assert.equal((await pending.json()).publicRefreshPending, true);
         assert.equal((await db.menuItem.findUniqueOrThrow({ where: { id: concurrent.id } })).priceYen, 303);
         const operationId = randomUUID();
-        const postData = { operationId, name: "【架空】再送", isPublished: true, allergenStatusBySlug: Object.fromEntries(master.map(a => [a.slug, "FREE"])), foodReview: review };
+        const postData = { operationId, name: "【架空】再送", isPublished: false, allergenStatusBySlug: Object.fromEntries(master.map(a => [a.slug, "FREE"])) };
         const post = (data: object) => collectionRoute.POST(new Request("http://localhost/api/admin/menus", { method: "POST", headers: { Origin: "http://localhost", "Content-Type": "application/json" }, body: JSON.stringify(data) }));
         const created = await post(postData);
         assert.equal(created.status, 201);
@@ -210,16 +209,67 @@ export async function runAdminMenuDatabaseRegression(
         assert.deepEqual(await (await post(postData)).json(), { id: createdBody.id });
         console.log("PASS: cache failure returns saved success/pending; identical POST replay reuses one menu, changed payload is 409");
 
+        const draft = await db.menuItem.findUniqueOrThrow({ where: { id: createdBody.id } });
+        assert.equal((await route.PUT(put(draft.id, { expectedVersion: draft.version, publicationAction: "publish" }))).status, 200);
         const stopBefore = await db.menuItem.findUniqueOrThrow({ where: { id: createdBody.id }, include: { allergenLinks: true, foodReviews: true } });
+        assert.equal(stopBefore.isPublished, true);
         const stopped = await route.STOP(new Request(`http://localhost/api/admin/menus/${createdBody.id}/stop`, { method: "POST", headers: { Origin: "http://localhost" } }));
         assert.equal(stopped.status, 200);
+        const stoppedBody = await stopped.json();
         const stopAfter = await db.menuItem.findUniqueOrThrow({ where: { id: createdBody.id }, include: { allergenLinks: true, foodReviews: true } });
         assert.equal(stopAfter.isPublished, false);
+        assert.deepEqual(stoppedBody.menu, { id: stopAfter.id, isPublished: false, version: stopAfter.version });
+        assert.ok(stopAfter.version > stopBefore.version);
+        const stopPublicRoute = createRequire(import.meta.url)("../features/public/shops/server/publicMenuRoute.ts");
+        assert.equal((await stopPublicRoute.GET(new Request(`http://localhost/api/menus/${createdBody.id}`))).status, 404);
         assert.equal(stopAfter.ingredients, stopBefore.ingredients);
         assert.equal(stopAfter.foodVersion, stopBefore.foodVersion);
         assert.deepEqual(stopAfter.allergenLinks, stopBefore.allergenLinks);
         assert.deepEqual(stopAfter.foodReviews, stopBefore.foodReviews);
         console.log("PASS: dedicated STOP works without form/review input and preserves saved food content and evidence");
+
+        const issueMenu = await createMenu("【架空】実APIの明示解除と公開");
+        const oldIssue = await db.menuFoodReview.create({ data: { menuItemId: issueMenu.id, foodVersion: issueMenu.foodVersion,
+            contentSnapshot: {}, evidenceRefs: "保持する架空の旧資料", scope: "架空全品目", checkedAt: new Date(),
+            actorUserId: "fictional-issue-author", unresolvedIssues: "表示して解消する架空の問題" } });
+        const beforeResolution = await db.menuItem.findUniqueOrThrow({ where: { id: issueMenu.id }, include: { allergenLinks: true } });
+        const issueBody = { foodReviewId: oldIssue.id, foodVersion: beforeResolution.foodVersion };
+        assert.equal((await route.PUT(put(issueMenu.id, { expectedVersion: beforeResolution.version, publicationAction: "publish" }))).status, 400);
+        const resolvedResponse = await route.PUT(put(issueMenu.id, { expectedVersion: beforeResolution.version, foodIssueResolution: issueBody }));
+        assert.equal(resolvedResponse.status, 200);
+        const resolvedBody = await resolvedResponse.json();
+        const { menuSaveResponseSchema } = createRequire(import.meta.url)("../features/admin/menus/schemas/menu-response.ts");
+        assert.equal(menuSaveResponseSchema.safeParse(resolvedBody).success, true);
+        assert.equal(resolvedBody.menu.isPublished, false);
+        assert.equal(resolvedBody.menu.foodVersion, beforeResolution.foodVersion);
+        assert.equal(resolvedBody.menu.foodReviews[0].issueResolutions[0].foodVersion, beforeResolution.foodVersion);
+        const savedResolution = await db.menuFoodIssueResolution.findFirstOrThrow({ where: { menuItemId: issueMenu.id } });
+        assert.equal(savedResolution.actorUserId, user.id);
+        assert.equal(savedResolution.issueSnapshot, oldIssue.unresolvedIssues);
+        assert.deepEqual(await db.menuFoodReview.findUniqueOrThrow({ where: { id: oldIssue.id } }), oldIssue);
+        assert.deepEqual((await db.menuItemAllergen.findMany({ where: { menuItemId: issueMenu.id } })).sort((a, b) => a.allergenId.localeCompare(b.allergenId)),
+            [...beforeResolution.allergenLinks].sort((a, b) => a.allergenId.localeCompare(b.allergenId)));
+        assert.equal((await route.PUT(put(issueMenu.id, { expectedVersion: beforeResolution.version, foodIssueResolution: issueBody }))).status, 409);
+        const publicRoute = createRequire(import.meta.url)("../features/public/shops/server/publicMenuRoute.ts");
+        const publicGet = () => publicRoute.GET(new Request(`http://localhost/api/menus/${issueMenu.id}`));
+        assert.equal((await publicGet()).status, 404);
+        const publication = await route.PUT(put(issueMenu.id, { expectedVersion: resolvedBody.menu.version, publicationAction: "publish" }));
+        assert.equal(publication.status, 200);
+        const publicationBody = await publication.json();
+        assert.equal(menuSaveResponseSchema.safeParse(publicationBody).success, true);
+        assert.equal(publicationBody.menu.isPublished, true);
+        assert.equal((await publicGet()).status, 200);
+        await db.menuItem.update({ where: { id: issueMenu.id }, data: { ingredients: "次の架空食品版" } });
+        const correctedIssueMenu = await db.menuItem.findUniqueOrThrow({ where: { id: issueMenu.id } });
+        assert.equal((await publicGet()).status, 404);
+        assert.equal((await route.PUT(put(issueMenu.id, { expectedVersion: correctedIssueMenu.version, foodIssueResolution: issueBody }))).status, 400);
+        assert.equal((await route.PUT(put(issueMenu.id, { expectedVersion: correctedIssueMenu.version, publicationAction: "publish" }))).status, 400);
+        process.env.PORTFOLIO_MODE = "true";
+        try {
+            assert.equal((await route.PUT(put(issueMenu.id, { expectedVersion: correctedIssueMenu.version,
+                foodIssueResolution: { ...issueBody, foodVersion: correctedIssueMenu.foodVersion } }))).status, 403);
+        } finally { process.env.PORTFOLIO_MODE = "false"; }
+        console.log("PASS: real resolution PUT retains content/history/actor, stays private, rejects stale/read-only writes, and separate publish aligns response and public GET");
     } finally {
         loader._load = originalLoad;
         prisma.menuItem.findFirst = originalFindFirst;

@@ -64,7 +64,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                 isPublished: true,
                 version: true,
                 foodVersion: true,
-                reviewedFoodVersion: true,
+                reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
                 foodReviews: foodReviewHistorySelection,
                 allergenLinks: {
                     select: {
@@ -110,7 +110,8 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                         initialVersion={menu.version}
                         initialFoodVersion={menu.foodVersion}
                         initialReviewedFoodVersion={menu.reviewedFoodVersion}
-                        initialFoodReviews={menu.foodReviews.map(review => ({ ...review, checkedAt: review.checkedAt.toISOString(), recordedAt: review.recordedAt.toISOString(), unresolvedIssues: review.unresolvedIssues ?? "" }))}
+                        initialPublicationConfirmedFoodVersion={menu.publicationConfirmedFoodVersion}
+                        initialFoodReviews={menu.foodReviews.map(review => ({ ...review, checkedAt: review.checkedAt.toISOString(), recordedAt: review.recordedAt.toISOString(), issueResolutions: review.issueResolutions.map(resolution => ({ ...resolution, resolvedAt: resolution.resolvedAt.toISOString() })), unresolvedIssues: review.unresolvedIssues ?? "" }))}
                         initialName={menu.name}
                         initialDescription={menu.description}
                         initialPriceYen={menu.priceYen}

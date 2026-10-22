@@ -19,7 +19,7 @@ export default function AdminDashboardShell({
     showAuthControls?: boolean;
 }) {
     return (
-        <div className="relative flex min-h-dvh min-w-0 w-full flex-row bg-background-light text-text-main">
+        <div data-admin-dashboard className="relative flex min-h-dvh min-w-0 w-full flex-row bg-background-light text-text-main">
             <aside className="hidden h-dvh w-64 shrink-0 flex-col border-r border-gray-100 bg-surface-light lg:sticky lg:top-0 lg:flex">
                 <div className="p-6">
                     <Link href="/" className="flex items-center">

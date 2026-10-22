@@ -445,11 +445,6 @@
       "match": true
     },
     {
-      "path": "docs/interview/design-decisions.md",
-      "sha256": "c0d3417a121ebe5686c94a6678eedbd9fd638a638773507aa95ad548e34c4bd8",
-      "match": true
-    },
-    {
       "path": "docs/research/00-protocol.md",
       "sha256": "3d843b7fa74d94e177b6f61d3f09871452d9ece322df7ae6c9faacd4b55a4e4c",
       "match": true

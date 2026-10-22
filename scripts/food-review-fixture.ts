@@ -14,5 +14,6 @@ export async function publishReviewedFixture(tx: Prisma.TransactionClient, menuI
         contentSnapshot: foodSnapshot(menu, master, createStatusBySlug(master, menu.allergenLinks)),
         evidenceRefs: "架空テストデータの定義（実食品の確認ではない）", scope: "この架空メニューの全構成・全品目", checkedAt: new Date(), actorUserId: "synthetic-fixture",
     } });
-    return tx.menuItem.update({ where: { id: menu.id }, data: { reviewedFoodVersion: menu.foodVersion, isPublished: true } });
+    await tx.menuPublicationConfirmation.create({ data: { menuItemId: menu.id, foodVersion: menu.foodVersion, actorUserId: "synthetic-fixture" } });
+    return tx.menuItem.update({ where: { id: menu.id }, data: { isPublished: true } });
 }
