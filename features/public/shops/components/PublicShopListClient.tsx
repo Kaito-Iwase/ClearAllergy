@@ -341,8 +341,8 @@ export default function PublicShopListClient({
                     <p className="mt-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm leading-6 text-red-900">
                         除外設定に一致するメニューしかない店舗は非表示になります
                         {includeMayContain
-                            ? "（含む可能性ありも対象）"
-                            : "（含む可能性ありは対象外）"}
+                            ? "（店舗登録の可能性あり・別メニューでの使用も対象）"
+                            : "（含む登録のみ対象。店舗登録の注意情報は表示します）"}
                         。
                         {filtered.excludedCount > 0
                             ? `${filtered.excludedCount}件を非表示にしています。`

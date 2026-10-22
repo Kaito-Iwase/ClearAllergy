@@ -235,13 +235,16 @@ export default function PublicMenuDetailBodyClient(props: {
                                     </span>
                                     <span
                                         className={`max-w-full rounded-lg px-3 py-1.5 text-sm font-bold leading-6 ${statusBadgeClass(
-                                            row.effectiveRisk === "STORE_HANDLED" ? "MAY_CONTAIN" : row.status,
+                                            row.status,
                                         )}`}
                                     >
                                         {statusLabelJa(row.status)}
                                     </span>
                                     {row.effectiveRisk === "STORE_HANDLED" ? (
-                                        <p className="w-full text-sm leading-6 text-amber-900">この店舗の別の公開メニューに「含む」登録があります</p>
+                                        <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm leading-6 text-amber-900">
+                                            <p className="font-bold">別メニューに含む</p>
+                                            <p>同じ店舗の別の公開メニューに、この品目を含む登録があります。</p>
+                                        </div>
                                     ) : null}
                                 </div>
                             ))}

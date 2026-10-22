@@ -158,7 +158,7 @@ try {
     await capture("ui-02-caution-mobile");
     pass("Filtered-out draft rows remain named; draft is unapplied; exclusion option off preserves MAY_CONTAIN caution");
     await open();
-    await visible(page.getByRole("checkbox", { name: /「含む可能性あり」も除外する/ })).check();
+    await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).check();
     await apply();
     assert.equal(await curry.count(), 0, "MAY_CONTAIN exclusion applies only after saving");
     await open();
@@ -180,15 +180,16 @@ try {
     await open();
     await visible(page.getByRole("button", { name: "すべて設定なしにする（未適用）", exact: true })).click();
     await mode("卵", "highlight");
+    await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).check();
     await apply();
     const pancake = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "米粉パンケーキ", exact: true }) });
-    assert.match(await pancake.innerText(), /別の公開メニューに「含む」登録/);
-    assert.match(await pancake.innerText(), /交差接触を確認した結果ではありません/);
+    assert.match(await pancake.innerText(), /別メニューに含む/);
+    assert.match(await menuArea.getByRole("region", { name: "店舗全体の登録情報", exact: true }).innerText(), /交差接触を確認した結果ではありません/);
     await pancake.press("Enter");
     await page.waitForURL(/\/menus\//);
     await page.getByRole("heading", { level: 1 }).waitFor();
     assert.equal(await page.getByRole("heading", { level: 1 }).count(), 1);
-    assert.match(await visible(page.locator("main")).innerText(), /別の公開メニューに「含む」登録/);
+    assert.match(await visible(page.locator("main")).innerText(), /別メニューに含む/);
     await capture("ui-04-store-supplement-desktop");
     pass("FREE with store supplement stays caution across keyboard detail navigation");
 
