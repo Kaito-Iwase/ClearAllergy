@@ -176,10 +176,9 @@ export default function MenuEditClient(props: {
     const [savedFoodVersion, setSavedFoodVersion] = React.useState(props.initialFoodVersion ?? 0);
     const [publicationCurrent, setPublicationCurrent] = React.useState(isMenuPublicationCurrent({ foodVersion: props.initialFoodVersion ?? 0, publicationConfirmedFoodVersion: props.initialPublicationConfirmedFoodVersion }));
     const [reviewHistory, setReviewHistory] = React.useState(props.initialFoodReviews ?? []);
-    const [foodChangeReported, setFoodChangeReported] = React.useState(false);
     const [savedFoodSnapshot, setSavedFoodSnapshot] = React.useState(() => foodSnapshot({ name: initialName, description: initialDescription, category: initialCategory, ingredients: initialIngredients, precaution: initialPrecaution, imageUrl: initialImageUrl }, allergens, initialStatusBySlug));
     const currentFoodSnapshot = foodSnapshot({ name, description, category, ingredients, precaution, imageUrl }, allergens, statusBySlug);
-    const foodChanged = foodChangeReported || selectedFile !== null || foodContentChanged(savedFoodSnapshot, currentFoodSnapshot);
+    const foodChanged = selectedFile !== null || foodContentChanged(savedFoodSnapshot, currentFoodSnapshot);
     const unknownAllergenNames = React.useMemo(
         () => getUnknownAllergenNames({ allergens, statusBySlug }),
         [allergens, statusBySlug],
@@ -199,7 +198,7 @@ export default function MenuEditClient(props: {
     }
     const draftValues = { name, description, priceYenInput, category, ingredients, precaution,
         imageUrl, imageFrame, imageFit, imagePosition, imageZoom, imagePositionX, imagePositionY,
-        isPublished, statusBySlug, foodChangeReported };
+        isPublished, statusBySlug };
     const currentDraft = JSON.stringify(draftValues);
     const [savedDraft, setSavedDraft] = React.useState(currentDraft);
     const [savedIsPublished, setSavedIsPublished] = React.useState(initialIsPublished);
@@ -354,7 +353,6 @@ export default function MenuEditClient(props: {
 
             const body = {
                 expectedVersion: version,
-                foodChangeReported,
                 name: trimmedName,
                 description: normalizeOptionalMenuText(description),
                 priceYen,
@@ -398,11 +396,9 @@ export default function MenuEditClient(props: {
             setReviewHistory(data.menu.foodReviews);
             setSavedFoodVersion(data.menu.foodVersion);
             setSavedFoodSnapshot({ ...currentFoodSnapshot, imageUrl: data.menu.imageUrl ?? null });
-            setFoodChangeReported(false);
             setSavedIsPublished(data.menu.isPublished);
             setSavedIngredients(ingredients.trim());
             setSavedDraft(JSON.stringify({ ...draftValues, isPublished: data.menu.isPublished,
-                foodChangeReported: false,
                 imageUrl: typeof data.menu.imageUrl === "string" ? data.menu.imageUrl : "" }));
             if (typeof data.menu.imageUrl === "string" || data.menu.imageUrl === null) {
                 setImageUrl(data.menu.imageUrl ?? "");
@@ -765,10 +761,6 @@ export default function MenuEditClient(props: {
                     totalAllergenCount={allergens.length}
                     onFindUnknown={findNextUnknown}
                 />
-                    <label className="mt-3 flex items-start gap-2 text-sm">
-                        <input type="checkbox" checked={foodChangeReported} onChange={event => setFoodChangeReported(event.target.checked)} />
-                        入力文字が同じでも、仕入れ仕様・代替使用・調理工程などの食品変更があった
-                    </label>
                     {hasUnsavedChanges && <p className="mt-2 text-sm">公開する前に、変更を保存してください。</p>}
                     {unresolvedIssue && <section aria-label="保存済みの未解決事項" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
                             <p className="font-bold">保存済みの未解決事項</p>

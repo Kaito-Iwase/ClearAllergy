@@ -177,6 +177,7 @@ if (process.argv.includes("--serve")) {
                 await f.page.getByRole("button", { name: "保存する", exact: true }).click();
                 await f.page.getByText(/保存しました。公開状態：非公開/).waitFor();
                 assert.equal(f.writes[0].isPublished, true);
+                assert.equal("foodChangeReported" in f.writes[0], false);
                 assert.match(await f.page.getByText(/保存しました。公開状態/).innerText(), /公開操作：保存済み内容から別に公開が必要/);
                 assert.match(await f.page.getByText(/保存は完了しましたが/).innerText(), /再保存せず/);
                 await f.page.screenshot({ path: join(output, "menu-response-confirmed-desktop.png") });
@@ -188,6 +189,7 @@ if (process.argv.includes("--serve")) {
                 isPublished: body.publicationAction === "publish" }) }));
             try {
                 assert.equal(await f.page.getByLabel("根拠資料・製品識別・資料の版", { exact: true }).count(), 0);
+                assert.equal(await f.page.getByRole("checkbox", { name: /入力文字が同じでも/ }).count(), 0);
                 await f.page.getByLabel("🧺 原材料名", { exact: true }).fill("変更した架空材料");
                 const plan = f.page.getByRole("region", { name: "保存後の予定" });
                 assert.match(await plan.innerText(), /保存後の予定：非公開/);
@@ -196,6 +198,7 @@ if (process.argv.includes("--serve")) {
                 await f.page.getByRole("button", { name: "保存する", exact: true }).click();
                 await f.page.getByText(/保存しました。公開状態：非公開/).waitFor();
                 assert.equal(f.writes[0].isPublished, false);
+                assert.equal("foodChangeReported" in f.writes[0], false);
                 const publish = f.page.getByRole("button", { name: "公開する", exact: true });
                 assert.equal(await publish.isEnabled(), true);
                 await publish.click();
@@ -206,6 +209,29 @@ if (process.argv.includes("--serve")) {
                 assert.equal(await f.page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
                 await f.page.screenshot({ path: join(output, "menu-two-step-published-mobile.png") });
             } finally { await f.context.close(); }
+        });
+        await check("manual food-change control is absent on mobile/desktop; real allergen changes still save unpublished", async () => {
+            for (const width of [390, 1536]) {
+                const f = await open("/menu", width, (body, n) => ({ body: reply(body, n, {
+                    foodVersion: 2, reviewedFoodVersion: null, publicationConfirmedFoodVersion: null, isPublished: false,
+                }) }));
+                try {
+                    assert.equal(await f.page.getByRole("checkbox", { name: /入力文字が同じでも/ }).count(), 0);
+                    assert.equal(await f.page.getByText(/仕入れ仕様・代替使用・調理工程/).count(), 0);
+                    const contains = f.page.getByRole("group", { name: "くるみ", exact: true }).getByRole("button", { name: "含む", exact: true });
+                    await contains.focus(); await f.page.keyboard.press("Enter");
+                    assert.equal(await contains.getAttribute("aria-pressed"), "true");
+                    assert.match(await f.page.getByRole("region", { name: "保存後の予定" }).innerText(), /保存後の予定：非公開/);
+                    assert.equal(await f.page.getByRole("button", { name: "公開する", exact: true }).count(), 0, "An already-public menu must save its edits before a new publication action");
+                    await f.page.getByRole("button", { name: "保存する", exact: true }).click();
+                    await f.page.getByText(/保存しました。公開状態：非公開/).waitFor();
+                    assert.equal(f.writes[0].allergenStatusBySlug.walnut, "CONTAINS");
+                    assert.equal(f.writes[0].isPublished, false);
+                    assert.equal("foodChangeReported" in f.writes[0], false);
+                    assert.equal(await f.page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+                    await f.page.screenshot({ path: join(output, `menu-no-manual-change-${width}.png`) });
+                } finally { await f.context.close(); }
+            }
         });
         await check("shown issue resolves explicitly, preserves history, and publishes separately; food changes expire resolution", async () => {
             const resolvedHistory = [{ ...issueFixture, issueResolutions: [{ foodVersion: 1, resolvedAt: "2026-10-21T00:00:00.000Z" }] }];
