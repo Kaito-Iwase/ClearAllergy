@@ -439,31 +439,6 @@
       "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
     },
     {
-      "path": "docs/interview/design-decisions.md",
-      "classification": "historical",
-      "findings": [
-        {
-          "location": "使い方／Q5・Q6・Q15／Q25",
-          "detail": "全文1422行を読了。基準64163ccの調査と『現行』『今なら』が並び、食品確認未導入・公開静的cache等を現在の仕様と誤読し得た。時点注記と現行guideへの入口を追加し、技術本文は当時の説明として保持する。"
-        },
-        {
-          "location": "表題／用語／Q2・Q21・Q25・Q26／早見表",
-          "detail": "日本語表題、UI/API/DB/CI・enum/ORM/TTL/E2Eの短い説明を追加し、RDBMSの略記を平易化した。本人の動機・CONFIRMED/INFERRED/UNKNOWN・当時の店舗試験案を現在の計画や許可へ昇格しない。"
-        }
-      ],
-      "action": "対象時点と現行入口・用語を補足。過去の技術説明・実行結果を保持。",
-      "unverified": [
-        "本人の動機・当時の比較実績、外部URLの疎通、現在の全コード・配備や実サービス、利用者理解は今回未確認。"
-      ],
-      "full_text_read": true,
-      "read_sha256": "0f2da27c9fc48f19616e919822b61e5405c894fa315fc14d03cfc0a94082af3e",
-      "line_count": 1428,
-      "reviewer": "docs_operations_audit",
-      "audit_recommendation": "可読性・導線・時点の読み方のみ修正。Q1〜Q30の結論、比較案、履歴・SHA・状態/API/DB仕様・実施/未実施を保持する。",
-      "reviewed_final_sha256": "0f2da27c9fc48f19616e919822b61e5405c894fa315fc14d03cfc0a94082af3e",
-      "hash_note": "最終ファイルの照合用。hashだけで全文読了とは扱わない。自身の文書は循環を避けてhashを省略。"
-    },
-    {
       "path": "docs/research/00-protocol.md",
       "full_text_read": true,
       "read_ranges": [

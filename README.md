@@ -41,7 +41,7 @@
 | 閲覧と入力で必要な処理を分ける | 公開ページはServer Componentでデータを取得し、検索・端末設定・入力などをClient Componentで処理。管理操作はAPIで検証して保存 | [内部処理](docs/guide/architecture.md)、[PublicMenuDetailPage.tsx](features/public/shops/server/PublicMenuDetailPage.tsx) |
 | 障害の原因を追いながら、内部情報の露出を抑える | APIに要求IDを付け、処理時間と固定したエラー分類を記録。業務監査と運用ログを分け、利用者には一般的なエラーと再試行を表示 | [要求と障害の追跡](docs/guide/architecture.md#observability)、[lib/observability.ts](lib/observability.ts) |
 
-これらは現行実装の説明です。食品の安全性、実環境での完全な防御、利用者への効果が検証済みであることを示すものではありません。設計の理由やトレードオフを説明する練習には[面接用Q&A](docs/interview/design-decisions.md)を用意しています。
+これらは現行実装の説明です。食品の安全性、実環境での完全な防御、利用者への効果が検証済みであることを示すものではありません。設計理由・代替案・適用限界の過去の調査は[設計判断と根拠](docs/guide/design-decisions.md)を参照してください。現行仕様とは対象時点を区別します。
 
 <a id="architecture"></a>
 ## システム構成

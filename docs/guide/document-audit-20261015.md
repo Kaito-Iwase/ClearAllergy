@@ -64,7 +64,6 @@ Git管理外でcanonicalに残る `docs/audits/` の歴史資料は別枠4件を
 | [docs/guide/rules.md](rules.md) | 現行 | 用語説明・段落・導線を修正。条件・例外・コマンド・過去の結果を保持。 |
 | [docs/guide/ui-ux-review.md](ui-ux-review.md) | 履歴・研究 | 対象時点と現行入口・用語を補足。過去の技術説明・実行結果を保持。 |
 | [docs/guide/verification.md](verification.md) | 現行 | 過去e26bの結果と後続cd502監査を区別する入口を追加。当時の結果は保持。 |
-| [docs/interview/design-decisions.md](../interview/design-decisions.md) | 履歴・研究 | 対象時点と現行入口・用語を補足。過去の技術説明・実行結果を保持。 |
 | [docs/research/00-protocol.md](../research/00-protocol.md) | 履歴・研究 | 原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。 |
 | [docs/research/01-system-boundary.md](../research/01-system-boundary.md) | 履歴・研究 | 原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。 |
 | [docs/research/02-research-questions.md](../research/02-research-questions.md) | 履歴・研究 | 原稿・履歴の本文を保持。時点・用語・注意箇所を索引と読むための案内へ記載。 |
