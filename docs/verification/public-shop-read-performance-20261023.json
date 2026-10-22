@@ -1,5 +1,7 @@
 {
   "base": "91d76cf61ebd8db2602d2508b62205ab6345b4da",
+  "integrationBase": "58f149d32d71ce3068995541e34aae1ed938bc52",
+  "measuredImplementationHead": "aaa2a2d",
   "runtime": {
     "node": "22.15.1",
     "npm": "10.9.2",
@@ -306,9 +308,9 @@
     ]
   },
   "afterImplementation": {
-    "at": "2026-10-22T17:01:21.865Z",
+    "at": "2026-10-22T17:06:17.029Z",
     "boundary": "Laptop to existing production pooled DB. Read-only RepeatableRead. No Vercel or HTTP timing. No SQL, params, row values or connection values recorded.",
-    "mode": "actual current selects and resolver compared with base 91d76cf selects",
+    "mode": "actual current selects and resolver compared with base 91d76cf selects; list shop first and detail master first as in the route callbacks",
     "prismaVersion": "6.19.3",
     "result": "PASS",
     "pairs": [
@@ -318,24 +320,24 @@
         "samples": [
           {
             "variant": "baseline",
-            "queryReadMs": 989.1,
+            "queryReadMs": 1010.6,
             "selectStatements": 5,
             "statementDurationsMs": [
+              163,
+              166,
+              326,
               160,
-              160,
-              325,
-              159,
-              158
+              160
             ]
           },
           {
             "variant": "candidate",
-            "queryReadMs": 445.8,
+            "queryReadMs": 412,
             "selectStatements": 4,
             "statementDurationsMs": [
-              78,
               80,
-              198,
+              81,
+              162,
               81
             ]
           }
@@ -354,25 +356,25 @@
         "samples": [
           {
             "variant": "candidate",
-            "queryReadMs": 341,
+            "queryReadMs": 345,
             "selectStatements": 4,
             "statementDurationsMs": [
+              91,
+              80,
               82,
-              78,
-              81,
-              87
+              80
             ]
           },
           {
             "variant": "baseline",
-            "queryReadMs": 424.2,
+            "queryReadMs": 440.5,
             "selectStatements": 5,
             "statementDurationsMs": [
-              83,
+              94,
               80,
-              81,
-              77,
-              78
+              87,
+              79,
+              81
             ]
           }
         ],
@@ -390,25 +392,25 @@
         "samples": [
           {
             "variant": "baseline",
-            "queryReadMs": 423.3,
+            "queryReadMs": 427.5,
             "selectStatements": 5,
             "statementDurationsMs": [
-              79,
-              77,
-              90,
-              77,
-              81
+              81,
+              83,
+              83,
+              81,
+              80
             ]
           },
           {
             "variant": "candidate",
-            "queryReadMs": 331.5,
+            "queryReadMs": 336.3,
             "selectStatements": 4,
             "statementDurationsMs": [
-              78,
-              78,
-              84,
-              78
+              83,
+              81,
+              82,
+              80
             ]
           }
         ],
@@ -426,25 +428,25 @@
         "samples": [
           {
             "variant": "baseline",
-            "queryReadMs": 722.4,
+            "queryReadMs": 739.8,
             "selectStatements": 5,
             "statementDurationsMs": [
-              155,
-              171,
-              156,
-              77,
-              155
+              160,
+              163,
+              165,
+              163,
+              81
             ]
           },
           {
             "variant": "candidate",
-            "queryReadMs": 325.3,
+            "queryReadMs": 327.6,
             "selectStatements": 4,
             "statementDurationsMs": [
-              76,
+              81,
               80,
-              87,
-              77
+              81,
+              82
             ]
           }
         ],
@@ -462,25 +464,25 @@
         "samples": [
           {
             "variant": "candidate",
-            "queryReadMs": 315.5,
+            "queryReadMs": 329.1,
             "selectStatements": 4,
             "statementDurationsMs": [
+              81,
               79,
-              77,
-              78,
-              77
+              81,
+              81
             ]
           },
           {
             "variant": "baseline",
-            "queryReadMs": 401.7,
+            "queryReadMs": 420.6,
             "selectStatements": 5,
             "statementDurationsMs": [
-              79,
-              78,
-              77,
-              79,
-              80
+              82,
+              82,
+              83,
+              85,
+              81
             ]
           }
         ],
@@ -498,25 +500,25 @@
         "samples": [
           {
             "variant": "baseline",
-            "queryReadMs": 397.6,
+            "queryReadMs": 423.8,
             "selectStatements": 5,
             "statementDurationsMs": [
-              78,
-              78,
-              78,
-              78,
-              79
+              80,
+              82,
+              80,
+              94,
+              80
             ]
           },
           {
             "variant": "candidate",
-            "queryReadMs": 315.7,
+            "queryReadMs": 322.3,
             "selectStatements": 4,
             "statementDurationsMs": [
-              77,
-              77,
-              78,
-              78
+              79,
+              80,
+              79,
+              80
             ]
           }
         ],
@@ -533,8 +535,8 @@
       {
         "route": "/shops",
         "variant": "baseline",
-        "wallMs": 754.2,
-        "queryReadMs": 423.4,
+        "wallMs": 745.2,
+        "queryReadMs": 421.2,
         "sqlEvents": 9,
         "selectStatements": 5,
         "extraReadOnlyStatement": true
@@ -542,8 +544,8 @@
       {
         "route": "/shops",
         "variant": "candidate",
-        "wallMs": 686.9,
-        "queryReadMs": 342.7,
+        "wallMs": 672.4,
+        "queryReadMs": 345.5,
         "sqlEvents": 8,
         "selectStatements": 4,
         "extraReadOnlyStatement": true
@@ -551,8 +553,8 @@
       {
         "route": "/shops",
         "variant": "candidate",
-        "wallMs": 670.5,
-        "queryReadMs": 337.6,
+        "wallMs": 689,
+        "queryReadMs": 354.9,
         "sqlEvents": 8,
         "selectStatements": 4,
         "extraReadOnlyStatement": true
@@ -560,8 +562,8 @@
       {
         "route": "/shops",
         "variant": "baseline",
-        "wallMs": 743.6,
-        "queryReadMs": 423.4,
+        "wallMs": 758.5,
+        "queryReadMs": 434.9,
         "sqlEvents": 9,
         "selectStatements": 5,
         "extraReadOnlyStatement": true
@@ -569,8 +571,8 @@
       {
         "route": "/shops/:id",
         "variant": "baseline",
-        "wallMs": 718.4,
-        "queryReadMs": 403,
+        "wallMs": 734.6,
+        "queryReadMs": 413.5,
         "sqlEvents": 9,
         "selectStatements": 5,
         "extraReadOnlyStatement": true
@@ -578,8 +580,8 @@
       {
         "route": "/shops/:id",
         "variant": "candidate",
-        "wallMs": 629,
-        "queryReadMs": 316.7,
+        "wallMs": 655.3,
+        "queryReadMs": 331.6,
         "sqlEvents": 8,
         "selectStatements": 4,
         "extraReadOnlyStatement": true
@@ -587,8 +589,8 @@
       {
         "route": "/shops/:id",
         "variant": "candidate",
-        "wallMs": 632.5,
-        "queryReadMs": 321.4,
+        "wallMs": 654.4,
+        "queryReadMs": 331.5,
         "sqlEvents": 8,
         "selectStatements": 4,
         "extraReadOnlyStatement": true
@@ -596,8 +598,8 @@
       {
         "route": "/shops/:id",
         "variant": "baseline",
-        "wallMs": 706.4,
-        "queryReadMs": 394.7,
+        "wallMs": 734.2,
+        "queryReadMs": 411.5,
         "sqlEvents": 9,
         "selectStatements": 5,
         "extraReadOnlyStatement": true
@@ -902,5 +904,29 @@
         "extraReadOnlyStatement": true
       }
     ]
+  },
+  "httpPropagation": {
+    "at": "2026-10-22T17:16:11.337Z",
+    "boundary": "Task-owned loopback CI fixture and local production build only; external browser requests blocked.",
+    "result": "PASS",
+    "checks": {
+      "sourceApiAfterUnresolvedReview": 404,
+      "sourcePageStillContainsUnresolvedSource": false,
+      "sourceApiAfterChange": 404,
+      "sourcePageAfterChange": 200,
+      "sourcePageCache": null,
+      "sourcePageStillContainsStoppedSource": false,
+      "sourcePageShowsNotFound": true,
+      "sourcePageHasNoindex": true,
+      "shopResponseStillContainsStoppedSource": false,
+      "initialListContainsProbeShop": true,
+      "listResponseContainsShopAfterAllStopped": false,
+      "supplementDisappearsAfterSourceStops": true,
+      "alreadyOpenView": "UNVERIFIED - no automatic client refresh asserted",
+      "browserStoppedView": "PASS - fresh navigation renders not-found without stopped food content"
+    },
+    "existingFixtureTablesCompared": 10,
+    "existingFixtureRowsUnchanged": true,
+    "preservationMethod": "READ ONLY snapshots of all 10 CI fixture tables before and after; row counts and SHA-256 hashes match. Row values are not recorded."
   }
 }
