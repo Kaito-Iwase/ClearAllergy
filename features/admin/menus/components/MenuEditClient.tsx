@@ -3,8 +3,10 @@
 // Server Component から受け取った初期値を state に展開し、保存と画像アップロードを担当します。
 // menuId を使って「どのメニューを更新するか」を API に伝えます。
 
-import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
+import SavedMenuPublicationPanel from "./SavedMenuPublicationPanel";
+import { loadSavedMenu, type SavedMenuRevision } from "../saved-menu";
+import type { SavedMenu } from "../schemas/menu-response";
 import MenuFoodReviewHistory from "./MenuFoodReviewHistory";
 import { isMenuPublicationCurrent } from "@/lib/allergens";
 import { foodSnapshot, foodContentChanged, hasUnresolvedFoodIssue,  type FoodReviewSummary } from "../food-review";
@@ -87,6 +89,7 @@ export default function MenuEditClient(props: {
     readOnly?: boolean;
     readOnlyPreview?: boolean;
     readOnlyCreateHref?: string;
+    initialConfirmationSnapshot?: SavedMenu;
 }) {
     const router = useRouter();
 
@@ -170,6 +173,14 @@ export default function MenuEditClient(props: {
     const [nameInvalid, setNameInvalid] = React.useState(false);
     const [saved, setSaved] = React.useState(false);
     const [notice, setNotice] = React.useState<string | null>(null);
+    const [confirmation, setConfirmation] = React.useState<SavedMenu | null>(props.initialConfirmationSnapshot ?? null);
+    const [confirmationOpen, setConfirmationOpen] = React.useState(Boolean(props.initialConfirmationSnapshot && !props.initialConfirmationSnapshot.isPublished));
+    const [confirmationLoading, setConfirmationLoading] = React.useState(false);
+    const [confirmationError, setConfirmationError] = React.useState<string | null>(null);
+    const [confirmationSavedNow, setConfirmationSavedNow] = React.useState(Boolean(props.initialConfirmationSnapshot));
+    const confirmationRevision = React.useRef<SavedMenuRevision | undefined>(undefined);
+    const operationPending = React.useRef(false);
+    const formFields = React.useRef<HTMLFieldSetElement>(null);
     const uploadedFile = React.useRef<{ file: File; url: string } | null>(null);
     const creationOperation = React.useRef<string | null>(null);
     const [version, setVersion] = React.useState(props.initialVersion ?? 0);
@@ -202,9 +213,33 @@ export default function MenuEditClient(props: {
     const currentDraft = JSON.stringify(draftValues);
     const [savedDraft, setSavedDraft] = React.useState(currentDraft);
     const [savedIsPublished, setSavedIsPublished] = React.useState(initialIsPublished);
-    const [savedIngredients, setSavedIngredients] = React.useState((initialIngredients ?? "").trim());
     const hasUnsavedChanges = currentDraft !== savedDraft || selectedFile !== null;
     useUnsavedMenuChanges(hasUnsavedChanges);
+
+    function finishConfirmation(unknown = false, edit = false) {
+        setConfirmationOpen(false);
+        setConfirmation(null);
+        // Wait until the fieldset is enabled before returning focus to an input.
+        requestAnimationFrame(() => {
+            if (unknown) findNextUnknown();
+            else formFields.current?.querySelector<HTMLInputElement>(edit ? "#edit-menu-field-1" : "button[data-save-menu]")?.focus();
+        });
+    }
+
+    async function openSavedConfirmation(expected: SavedMenuRevision, savedNow = false) {
+        if (confirmationLoading) return;
+        confirmationRevision.current = expected;
+        setConfirmationSavedNow(savedNow);
+        setConfirmation(null); setConfirmationOpen(true); setConfirmationLoading(true); setConfirmationError(null);
+        try {
+            const menu = await loadSavedMenu(menuId, expected);
+            if (menu.allergens.length !== allergens.length || menu.allergens.some(a => !allergens.some(local => local.slug === a.slug))) {
+                throw new Error("品目マスタが更新されています。最新内容を別タブで確認してから編集してください。");
+            }
+            setConfirmation(menu);
+        } catch (cause) { setConfirmationError(getThrownErrorMessage(cause, "保存済み内容を読み込めませんでした。")); }
+        finally { setConfirmationLoading(false); }
+    }
 
 
     React.useEffect(() => {
@@ -288,8 +323,11 @@ export default function MenuEditClient(props: {
     }
 
     async function saveMenuAction(action: "publish" | "resolve") {
-        if (saving || uploading || creating || readOnly || conflict) return;
+        if (operationPending.current || saving || uploading || creating || readOnly || conflict) return;
         if (hasUnsavedChanges) { setError("変更を保存してから公開してください。"); return; }
+        if (action === "publish" && (!confirmation || confirmation.version !== version || confirmation.foodVersion !== savedFoodVersion)) return;
+        operationPending.current = true;
+        setConfirmationError(null);
         setError(null); setNotice(null); setSaved(false); setSaving(true);
         try {
             const response = await fetch(`/api/admin/menus/${menuId}`, {
@@ -304,19 +342,25 @@ export default function MenuEditClient(props: {
                 throw new Error("保存結果を確認できませんでした。再読み込みして保存状態を確認してください。");
             }
             const data = result.data;
+            if (action === "publish" && !data.menu.isPublished) throw new Error("公開結果を確認できませんでした。保存内容は保持されています。最新状態を確認してください。");
             setSavedFoodVersion(data.menu.foodVersion); setVersion(data.menu.version); setIsPublished(data.menu.isPublished); setSavedIsPublished(data.menu.isPublished);
             setPublicationCurrent(isMenuPublicationCurrent(data.menu)); setReviewHistory(data.menu.foodReviews); setConflict(false);
             setSavedDraft(previous => JSON.stringify({ ...JSON.parse(previous), isPublished: data.menu.isPublished }));
             setSaved(true);
+            if (action === "publish") { setConfirmationOpen(false); setConfirmation(null); setNotice("保存済み内容を公開しました。"); }
             if (action === "resolve") setNotice("未解決事項の解消を記録しました。保存済み内容を見直して、別に公開してください。");
             if (data.publicRefreshPending) setNotice("保存は完了しましたが、公開表示の更新処理が未完了です。再保存せず、公開表示を確認してください。");
             router.refresh();
-        } catch (error) { setError(getThrownErrorMessage(error, SAVE_ERROR_MESSAGE)); }
-        finally { setSaving(false); }
+        } catch (error) {
+            const message = getThrownErrorMessage(error, "公開処理を完了できませんでした。保存済み内容は保持されています。");
+            setError(message);
+            if (action === "publish") setConfirmationError(message);
+        }
+        finally { setSaving(false); operationPending.current = false; }
     }
 
     async function onSave() {
-        if (saving || uploading || creating) return;
+        if (operationPending.current || saving || uploading || creating || confirmationOpen) return;
         setError(null);
         setNameInvalid(false);
         setSaved(false);
@@ -335,12 +379,7 @@ export default function MenuEditClient(props: {
             setError("メニュー名は必須です。");
             return;
         }
-        const reviewMessage = getMenuReviewMessage({
-            name,
-            willPublish: savePlan.willPublish,
-            ingredientsChanged: ingredients.trim() !== savedIngredients,
-        });
-        if (reviewMessage && !window.confirm(reviewMessage)) return;
+        operationPending.current = true;
         setSaving(true);
         try {
             const trimmedName = name.trim();
@@ -397,7 +436,6 @@ export default function MenuEditClient(props: {
             setSavedFoodVersion(data.menu.foodVersion);
             setSavedFoodSnapshot({ ...currentFoodSnapshot, imageUrl: data.menu.imageUrl ?? null });
             setSavedIsPublished(data.menu.isPublished);
-            setSavedIngredients(ingredients.trim());
             setSavedDraft(JSON.stringify({ ...draftValues, isPublished: data.menu.isPublished,
                 imageUrl: typeof data.menu.imageUrl === "string" ? data.menu.imageUrl : "" }));
             if (typeof data.menu.imageUrl === "string" || data.menu.imageUrl === null) {
@@ -407,11 +445,13 @@ export default function MenuEditClient(props: {
             setSaved(true);
             if (data.publicRefreshPending) setNotice("保存は完了しましたが、公開表示の更新処理が未完了です。再保存せず、公開表示を確認してください。");
             setSelectedFile(null);
-            router.refresh();
+            if (!data.menu.isPublished) await openSavedConfirmation(data.menu, true);
+            else router.refresh();
         } catch (e) {
             setError(getThrownErrorMessage(e, SAVE_ERROR_MESSAGE));
         } finally {
             setSaving(false);
+            operationPending.current = false;
         }
     }
 
@@ -485,7 +525,13 @@ export default function MenuEditClient(props: {
     }
 
     return (
-        <fieldset disabled={saving || uploading || creating} className="min-w-0 space-y-6"
+        <div className="min-w-0 space-y-6">
+        {confirmationOpen && <SavedMenuPublicationPanel menu={confirmation} loading={confirmationLoading}
+            error={confirmationError} busy={saving && !confirmationLoading} savedNow={confirmationSavedNow} blocked={conflict}
+            onPublish={() => void saveMenuAction("publish")} onClose={() => finishConfirmation()}
+            onEdit={unknown => finishConfirmation(unknown, true)}
+            onRetry={() => { if (confirmationRevision.current) void openSavedConfirmation(confirmationRevision.current, confirmationSavedNow); }} />}
+        <fieldset ref={formFields} disabled={saving || uploading || creating || confirmationOpen} className="min-w-0 space-y-6"
             onChangeCapture={() => setSaved(false)}>
             <legend className="sr-only">メニュー編集</legend>
             {notice && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}
@@ -517,13 +563,14 @@ export default function MenuEditClient(props: {
 
 
 
-                        {!savedIsPublished && <button type="button" onClick={() => void saveMenuAction("publish")}
+                        {!savedIsPublished && <button type="button" onClick={() => void openSavedConfirmation({ version, foodVersion: savedFoodVersion })}
                             disabled={readOnly || saving || uploading || creating || conflict || hasUnsavedChanges || !canPublish}
                             className="min-h-11 w-full rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto">
                             公開する{readOnly ? "（デモ）" : ""}
                         </button>}
                         <button
                             type="button"
+                            data-save-menu
                             onClick={onSave}
                             disabled={
                                 (readOnly && !readOnlyPreview) ||
@@ -878,5 +925,6 @@ export default function MenuEditClient(props: {
                 </div>
             </div>
         </fieldset>
+        </div>
     );
 }

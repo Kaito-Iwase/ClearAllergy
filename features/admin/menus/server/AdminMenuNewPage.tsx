@@ -37,7 +37,7 @@ export default async function AdminMenuNewPage() {
                     メニュー新規作成
                 </h1>
                 <p className="mt-1 text-gray-600">
-                    編集画面と同じ項目を先に入力して新規作成できます。作成後はそのまま編集画面へ移動します。
+                    編集画面と同じ項目を入力して非公開で保存できます。保存後、このページで内容を確認して公開できます。
                 </p>
 
                 <div className="mt-6">

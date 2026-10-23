@@ -105,6 +105,11 @@ jobs:
       - name: Install isolated browser runner
         run: node scripts/browser-runner.mjs install --with-deps
 
+      - name: Check saved-menu publication flow with fictional intercepted API
+        env:
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/clearallergy-browser-results
+        run: node scripts/browser-runner.mjs publication
+
       - name: Check public prototype in Chromium
         env:
           CLEARALLERGY_BROWSER_BASE_URL: http://localhost:3000

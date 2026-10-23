@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(join(root, "package.json"));
+const { require: requireTS } = require("tsx/cjs/api");
+const { ALLERGEN_MASTER: fixtureMaster } = requireTS("../lib/constants/allergen-master.ts", import.meta.url);
 const { webpack } = require("next/dist/compiled/webpack/webpack");
 const fixture = mkdtempSync(join(tmpdir(), "clearallergy-store-review-"));
 const output = process.env.CLEARALLERGY_BROWSER_OUTPUT || fixture;
@@ -79,13 +81,26 @@ if (process.argv.includes("--serve")) {
     async function open(path, width = 390, respond) {
         const context = await browser.newContext({ viewport: { width, height: 844 } });
         const writes = [];
+        let savedMenu = { id: "fictional-menu", name: "架空メニュー", description: "実食品の確認ではありません。", priceYen: 1000, category: "架空", ingredients: "架空材料", precaution: null,
+            imageUrl: null, imageFrame: "wide", imageFit: "cover", imagePosition: "center", imageZoom: 100, imagePositionX: 50, imagePositionY: 50,
+            version: 1, foodVersion: 1, reviewedFoodVersion: 1, publicationConfirmedFoodVersion: path === "/menu-issue" ? null : 1,
+            isPublished: path !== "/menu-issue", foodReviews: path === "/menu-issue" ? [issueFixture] : [],
+            allergens: [] };
         await context.route("**/*", async route => {
             const req = route.request(), url = new URL(req.url());
             if (url.origin !== origin) { external.push(url.origin); return route.abort(); }
             if (req.method() !== "GET") {
                 writes.push(req.postDataJSON());
                 const reply = respond ? await respond(writes.at(-1), writes.length) : { status: 400, body: { error: "架空の保存先" } };
+                if (reply.body?.menu) {
+                    const input = writes.at(-1);
+                    savedMenu = { ...savedMenu, ...input, ...reply.body.menu,
+                        allergens: (input.allergenStatusBySlug ? Object.entries(input.allergenStatusBySlug).map(([slug, status]) => ({ slug, status })) : savedMenu.allergens) };
+                }
                 return route.fulfill({ status: reply.status || 200, contentType: "application/json", body: JSON.stringify(reply.body) });
+            }
+            if (url.pathname === "/api/admin/menus/fictional-menu") {
+                return route.fulfill({ json: { menu: { ...savedMenu, allergens: fixtureMaster.map(a => ({ ...a, status: savedMenu.allergens.find(s => s.slug === a.slug)?.status ?? "FREE" })) } } });
             }
             const found = asset(url.pathname);
             return route.fulfill({ status: found ? 200 : 404, contentType: found?.[0] || "text/plain", body: found?.[1] || "Not found" });
@@ -199,7 +214,7 @@ if (process.argv.includes("--serve")) {
                 await f.page.getByText(/保存しました。公開状態：非公開/).waitFor();
                 assert.equal(f.writes[0].isPublished, false);
                 assert.equal("foodChangeReported" in f.writes[0], false);
-                const publish = f.page.getByRole("button", { name: "公開する", exact: true });
+                const publish = f.page.getByRole("region", { name: "保存しました", exact: true }).getByRole("button", { name: "この内容で公開", exact: true });
                 assert.equal(await publish.isEnabled(), true);
                 await publish.click();
                 await f.page.getByText(/保存しました。公開状態：公開/).waitFor();
@@ -252,6 +267,7 @@ if (process.argv.includes("--serve")) {
                 assert.equal(await publish.isEnabled(), true);
                 await f.page.screenshot({ path: join(output, "menu-explicit-resolution-mobile.png") });
                 await publish.click();
+                await f.page.getByRole("region", { name: "保存済み内容の確認", exact: true }).getByRole("button", { name: "この内容で公開", exact: true }).click();
                 await f.page.getByText(/保存しました。公開状態：公開/).waitFor();
                 assert.deepEqual(f.writes[1], { expectedVersion: 2, publicationAction: "publish" });
                 assert.equal(resolvedHistory[0].unresolvedIssues, issueFixture.unresolvedIssues);
@@ -259,6 +275,7 @@ if (process.argv.includes("--serve")) {
                 await f.page.getByLabel("🧺 原材料名", { exact: true }).fill("次の架空の食品版");
                 await f.page.getByRole("button", { name: "保存する", exact: true }).click();
                 await f.page.getByText(/保存しました。公開状態：非公開/).waitFor();
+                await f.page.getByRole("region", { name: "保存しました", exact: true }).getByRole("button", { name: "内容を修正", exact: true }).click();
                 assert.equal(await publish.isDisabled(), true);
                 assert.match(await issue.innerText(), /架空の未解決内容を確認する/);
                 assert.equal(await issue.getByRole("button", { name: "この内容は解消した", exact: true }).isEnabled(), true);

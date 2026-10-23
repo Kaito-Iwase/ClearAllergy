@@ -83,6 +83,8 @@ DB、Clerk、サーバー側のユーザープロフィールへの保存はあ�
 
 食品内容の差分は `food-review.ts`、保存予定は `menu-save-plan.ts`、応答の検証は `schemas/menu-response.ts` で扱います。応答の公開trueには `foodVersion === publicationConfirmedFoodVersion` が必要です。UIは成功応答を検証してから保存済み基準を更新し、結果不明・409では入力を保持します。新規・編集の長文フォームは削除し、過去の記録は `MenuFoodReviewHistory` で閲覧します。
 
+非公開保存後の確認欄は `saved-menu.ts` が既存の所有者用GETを読み、`SavedMenuPublicationPanel` に保存済みの実内容を渡します。編集ではID・保存版・食品版が成功応答と一致する場合だけ公開確認に使い、公開PUTはその期待版を送ります。GET失敗は保存失敗と混同せず、読取のみ再試行します。新規作成IDの確定後は同じページで既存IDの編集へ切り替え、追加のPOSTや強制遷移をしません。UNKNOWNの修正は入力へ戻して再保存します。確認終了の「保存」は新しいAPI書込ではありません。API・DB・認可の主要経路は同じため、構成図の接続は変更していません。
+
 新migration `20261021000000_two_step_publication` は親・子・マスタ変更時の既存失効機構を新しい公開対応版にも適用します。新しい公開イベントは現行食品版への対応をDBで検査し、変更不可とし、削除／TRUNCATE時に対応する公開を停止します。旧食品確認の追記・変更禁止や削除時の失効を維持します。旧記録追加で公開はせず、再公開は別操作です。既に公開中の有効な旧記録はID付きの移行根拠として保持し、架空のイベントは追加しません。
 
 管理一覧・一覧GET・デモは `menu-list-data.ts` の共通select/DTOを使い、`isMenuPublicationCurrent` と最新履歴の未解決有無から理由を導出します。既存DTOキー `foodReviewState` は互換のため保持しますが、食品根拠の存在を新規公開の必須条件とはしません。私的な根拠・操作者・snapshot・未解決本文は一覧へ渡しません。未解決に対する別の `foodIssueResolution:{foodReviewId,foodVersion}` 要求は、内容保存・公開要求との混在を拒否します。期待版で所有行を確保し、最新の未解決記録IDと保存済み食品版を再確認し、`MenuFoodIssueResolution` へ追記します。親は非公開のままで、内容と品目リンクを変更しません。記録の本文と操作時刻はDBが保存済みの未解決内容と実時刻から確定します。公開側のDB条件・API・一覧・UIは現行食品版に対応する解除だけを認めます。[判断ログ](../research/product/two-step-publication-decision-20261021.md)に境界を記録しています。
