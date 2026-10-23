@@ -120,8 +120,8 @@ try {
     });
     await check("publish error retains saved snapshot; retry uses same saved version without saving again", async () => {
         let failures = 1;
-        const f = await open({ intercept: ({ body }) => body?.publicationAction && failures-- > 0 ? { status: 500, body: { error: "架空の公開失敗。保存済み内容は保持されています。" } } : null });
-        try { await save(f); await panel(f).getByRole("button", { name: "この内容で公開", exact: true }).click(); await panel(f).getByRole("alert").waitFor(); assert.equal(f.state.isPublished, false);
+        const f = await open({ intercept: ({ body }) => body?.publicationAction && failures-- > 0 ? { status: 500, body: {} } : null });
+        try { await save(f); await panel(f).getByRole("button", { name: "この内容で公開", exact: true }).click(); await panel(f).getByRole("alert").waitFor(); assert.match(await panel(f).getByRole("alert").innerText(), /公開結果を確認できません。保存済み内容は保持されています/); assert.equal(f.state.isPublished, false);
             await panel(f).getByRole("button", { name: "この内容で公開", exact: true }).click(); await f.page.getByText("保存済み内容を公開しました。", { exact: true }).waitFor();
             assert.equal(f.writes.length, 3); assert.deepEqual(f.writes[1].body, f.writes[2].body);
         } finally { await f.context.close(); }

@@ -328,6 +328,9 @@ export default function MenuEditClient(props: {
         if (action === "publish" && (!confirmation || confirmation.version !== version || confirmation.foodVersion !== savedFoodVersion)) return;
         operationPending.current = true;
         setConfirmationError(null);
+        const actionErrorMessage = action === "publish"
+            ? "公開結果を確認できません。保存済み内容は保持されています。"
+            : SAVE_ERROR_MESSAGE;
         setError(null); setNotice(null); setSaved(false); setSaving(true);
         try {
             const response = await fetch(`/api/admin/menus/${menuId}`, {
@@ -336,10 +339,10 @@ export default function MenuEditClient(props: {
                     foodIssueResolution: { foodReviewId: reviewHistory[0]?.id, foodVersion: savedFoodVersion } }
                     : { expectedVersion: version, publicationAction: "publish" }),
             });
-            if (!response.ok) { setConflict(response.status === 409); throw new Error(await getApiErrorMessage(response, SAVE_ERROR_MESSAGE)); }
+            if (!response.ok) { setConflict(response.status === 409); throw new Error(await getApiErrorMessage(response, actionErrorMessage)); }
             const result = menuSaveResponseSchema.safeParse(await response.json().catch(() => null));
             if (!result.success || result.data.menu.id !== menuId || result.data.menu.version <= version) {
-                throw new Error("保存結果を確認できませんでした。再読み込みして保存状態を確認してください。");
+                throw new Error(actionErrorMessage);
             }
             const data = result.data;
             if (action === "publish" && !data.menu.isPublished) throw new Error("公開結果を確認できませんでした。保存内容は保持されています。最新状態を確認してください。");
@@ -352,7 +355,9 @@ export default function MenuEditClient(props: {
             if (data.publicRefreshPending) setNotice("保存は完了しましたが、公開表示の更新処理が未完了です。再保存せず、公開表示を確認してください。");
             router.refresh();
         } catch (error) {
-            const message = getThrownErrorMessage(error, "公開処理を完了できませんでした。保存済み内容は保持されています。");
+            const detail = getThrownErrorMessage(error, actionErrorMessage);
+            const message = action === "publish" && !detail.startsWith(actionErrorMessage)
+                ? `${actionErrorMessage} ${detail}` : detail;
             setError(message);
             if (action === "publish") setConfirmationError(message);
         }
