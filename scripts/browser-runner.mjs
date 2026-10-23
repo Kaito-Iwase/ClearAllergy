@@ -12,7 +12,7 @@ const runner = resolve(process.env.CLEARALLERGY_BROWSER_RUNNER_DIR || join(tmpdi
 const modulePath = join(runner, "node_modules", "playwright");
 const env = { ...process.env, PLAYWRIGHT_MODULE_PATH: modulePath, PLAYWRIGHT_BROWSERS_PATH: join(runner, "browsers") };
 const [command, ...options] = process.argv.slice(2);
-const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | ui | allergens | composition | qr | demo | admin";
+const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | ui | allergens | composition | qr | publication | demo | admin";
 class RunnerError extends Error {}
 
 function runNode(args, childEnv = env) {
@@ -42,11 +42,13 @@ try {
         assertInstalled();
         runNode([join(modulePath, "cli.js"), "install", ...options, "chromium"]);
         console.log(`Playwright ${version} and Chromium are ready. Start the isolated app, then run node scripts/browser-runner.mjs public.`);
-    } else if (["public", "ui", "allergens", "composition", "qr", "demo", "admin"].includes(command) && options.length === 0) {
+    } else if (["public", "ui", "allergens", "composition", "qr", "publication", "demo", "admin"].includes(command) && options.length === 0) {
         assertInstalled();
         if (command === "admin") {
             console.log("Running dedicated admin regression: writes to the test DB, development Clerk and configured Blob store. Test images require the separate cleanup command.");
             runNode(["scripts/check-test-browser.mjs"]);
+        } else if (command === "publication") {
+            runNode(["--import", "tsx", "scripts/check-saved-publication-browser.mjs"]);
         } else if (command === "allergens") {
             runNode(["scripts/check-allergen-cards-browser.mjs"]);
         } else if (command === "composition") {

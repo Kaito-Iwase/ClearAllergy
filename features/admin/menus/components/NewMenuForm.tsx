@@ -3,8 +3,10 @@
 // app/admin/(dashboard)/menus/new/page.tsx からアレルゲンマスタを受け取り、
 // 入力値の state 管理、画像アップロード、作成 API 呼び出しまでを担当します。
 
-import { getMenuReviewMessage } from "../publication-review";
 import React from "react";
+import MenuEditClient from "./MenuEditClient";
+import { loadSavedMenu, savedMenuEditorProps } from "../saved-menu";
+import type { SavedMenu } from "../schemas/menu-response";
 import { menuCreateResponseSchema } from "../schemas/menu-response";
 import { useRouter } from "next/navigation";
 import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
@@ -103,6 +105,10 @@ export default function NewMenuForm({
     const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [nameInvalid, setNameInvalid] = React.useState(false);
+    const [createdMenuId, setCreatedMenuId] = React.useState<string | null>(null);
+    const [createdMenu, setCreatedMenu] = React.useState<SavedMenu | null>(null);
+    const [createdNotice, setCreatedNotice] = React.useState<string | null>(null);
+    const submitPending = React.useRef(false);
     const creationOperation = React.useRef<string | null>(null);
     const uploadedFile = React.useRef<{ file: File; url: string } | null>(null);
     const unknownAllergenNames = React.useMemo(
@@ -204,7 +210,7 @@ export default function NewMenuForm({
 
     const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (isSubmitting || uploading) return;
+        if (submitPending.current || isSubmitting || uploading || createdMenuId) return;
         setError(null);
         setNameInvalid(false);
 
@@ -222,9 +228,7 @@ export default function NewMenuForm({
             return;
         }
 
-        const reviewMessage = getMenuReviewMessage({ name, willPublish: false, ingredientsChanged: false });
-
-        if (reviewMessage && !window.confirm(reviewMessage)) return;
+        submitPending.current = true;
         setIsSubmitting(true);
 
         try {
@@ -269,16 +273,39 @@ export default function NewMenuForm({
             }
             const data = result.data;
 
-            // 作成成功後は、そのメニューの編集画面へそのまま移動します。
             setCreated(true);
-            if (data.publicRefreshPending) window.alert("作成は完了しましたが、公開表示の更新処理が未完了です。再作成せず公開表示を確認してください。");
-            router.push(`/admin/menus/${data.id}/edit`);
+            setCreatedMenuId(data.id);
+            if (data.publicRefreshPending) setCreatedNotice("作成は完了しましたが、公開表示の更新処理が未完了です。再作成せず公開表示を確認してください。");
+            await readCreatedMenu(data.id);
         } catch (err) {
             setError(getThrownErrorMessage(err, CREATE_ERROR_MESSAGE));
         } finally {
             setIsSubmitting(false);
+            submitPending.current = false;
         }
     };
+
+    async function readCreatedMenu(id: string) {
+        setIsSubmitting(true); setError(null);
+        try { setCreatedMenu(await loadSavedMenu(id)); }
+        catch (cause) { setError(getThrownErrorMessage(cause, "保存済み内容を読み込めませんでした。再保存せず再確認してください。")); }
+        finally { setIsSubmitting(false); }
+    }
+
+    if (createdMenu) return <div className="space-y-4">
+        {createdNotice && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{createdNotice}</p>}
+        <a href={`/admin/menus/${createdMenu.id}/edit`} className="text-sm font-semibold text-green-800 underline">この保存済みメニューの編集URL</a>
+        <MenuEditClient {...savedMenuEditorProps(createdMenu)} initialConfirmationSnapshot={createdMenu} />
+    </div>;
+
+    // An acknowledged ID is retried by GET, never by a second creation request.
+    if (createdMenuId) return <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="font-bold text-gray-900">保存しました</h2>
+        <p className="text-sm text-gray-700">公開前に保存済み内容を確認します。</p>
+        {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
+        <button type="button" disabled={isSubmitting} onClick={() => void readCreatedMenu(createdMenuId)} className="min-h-11 rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isSubmitting ? "読み込み中…" : "保存済み内容を再確認する"}</button>
+        <a href={`/admin/menus/${createdMenuId}/edit`} className="ml-3 text-sm font-semibold text-green-800 underline">保存済みメニューを開く</a>
+    </section>;
 
     return (
         <form onSubmit={onSubmit}>
@@ -330,7 +357,7 @@ export default function NewMenuForm({
                 <p className="mt-3 text-xs text-gray-500">
                     {readOnly
                         ? "この画面は操作確認用です。登録ボタンを押しても保存されません。"
-                        : "登録後、このメニューの編集画面へ移動します。"}
+                        : "非公開で保存後、このページで保存済み内容を確認して公開できます。"}
                 </p>
 
                 <p className="mt-3 text-sm text-gray-700">未保存の新規メニューです。登録が成功するまで公開されません。</p>

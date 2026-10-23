@@ -308,9 +308,10 @@ test("保存済み最新版の別公開操作だけが新しい公開記録を�
     assert.deepEqual(confirmed, { menuItemId: "own-menu", foodVersion: 1, actorUserId: "app-owner" });
 });
 
-for (const blocked of ["unresolved", "missing-master"] as const) test(`別公開操作の${blocked}拒否は理由付き400で根拠を作らない`, async (t) => {
+for (const blocked of ["unresolved", "missing-master", "unknown", "missing-link"] as const) test(`別公開操作の${blocked}拒否は理由付き400で根拠を作らない`, async (t) => {
     setup(t);
-    const links = ALLERGEN_MASTER.map(a => ({ allergen: { slug: a.slug }, status: "FREE" }));
+    const links = ALLERGEN_MASTER.map((a, index) => ({ allergen: { slug: a.slug }, status: blocked === "unknown" && index === 0 ? "UNKNOWN" : "FREE" }))
+        .filter((_, index) => blocked !== "missing-link" || index !== 0);
     replace(t, prisma.menuItem, "findFirst", async () => ({ id: "own-menu", name: "架空", isPublished: false,
         foodVersion: 1, publicationConfirmedFoodVersion: null, allergenLinks: links }));
     replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
