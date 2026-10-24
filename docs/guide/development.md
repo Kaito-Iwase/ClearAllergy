@@ -299,3 +299,7 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 認証境界の変更ではContext7で[Vercelの要求ヘッダー](https://vercel.com/docs/headers/request-headers)、[Next.jsのデータ保護](https://nextjs.org/docs/app/guides/data-security)、Clerkのサーバー認証とセッション有効化の資料を確認しています。資料の説明と、このリポジトリのカスタムAPIで実装した検査、実際の配備設定は分けて確認します。
 
 未解決解除は `node --import tsx scripts/check-publication-database.ts` からも検証します。専用CI接続先のガード後に、その実行が所有する一時店舗で、旧履歴不変・現行版束縛・UNKNOWN維持・別公開・削除失効・並行訂正を確認し、後始末します。
+
+### 任意の候補証跡（P0）
+
+`agent-harness.mjs phase` / `summarize` による候補・build同一性の照合と安全な失敗診断は [証拠の契約](../agentic-development.md#phase-evidence) を参照してください。公開画面のphaseは現在buildを専用loopback portで起動し、所有プロセスを終了します。このPRは既存CIの呼出方法や重要回帰の接続を変更しません。snapshot/propagation/別空DB移行jobのCI接続（P1）は別差分で、まだ未公開です。
