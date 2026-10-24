@@ -2,7 +2,7 @@
 const { globSync: tinyGlobSync } = module.require("tinyglobby");
 const { isAbsolute } = module.require("node:path");
 
-// Scoped to @next/eslint-plugin-next@16.3.8: its sole fast-glob consumer
+// Scoped to @next/eslint-plugin-next@16.4.1: its sole fast-glob consumer
 // calls globSync(pattern, { onlyDirectories: true }). This is not a full shim.
 function globSync(patterns, options) {
     if (options?.onlyDirectories !== true) throw new Error("Next root glob requires directory-only matching.");
