@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "fix/issue-triage-20261024": false,
+      "fix/utc-db-timestamps-20261024": false,
+      "chore/harness-evidence-20261024": false,
+      "chore/harness-p0-evidence-20261024": false,
+      "fix/next-security-20261024": false
+    }
+  }
+}
