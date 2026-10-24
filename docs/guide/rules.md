@@ -4,6 +4,15 @@
 
 この文書が共通仕様の説明先です。ページ別の文書はここを参照し、状態表や公開条件を複製しません。根拠は[変更対応表](change-map.md#cross-cutting)から追えます。以下の実装説明を、未承認の仕様変更を正当化する根拠にはしません。
 
+<a id="timestamps"></a>
+## 日時は内部 UTC、表示は日本時間
+
+日時列は瞬間を表し、既存の `TIMESTAMP(3)` には UTC の年月日時分秒を保存します。Prisma の `Date` と JSON の ISO 8601 `Z` 形式を維持し、表示時だけ `formatDateTimeJa` で `Asia/Tokyo` に変換します。DB 接続セッションの `TimeZone`、アプリ実行環境の時差、表示形式を保存値へ加算しません。直接 SQL の書込みも同じ契約に従います。
+
+DB の `createdAt` default とトリガーの更新時刻は `CURRENT_TIMESTAMP AT TIME ZONE 'UTC'`（トランザクション開始時刻）、食品確認の `recordedAt`・未解決解除の `resolvedAt`・公開操作の `confirmedAt` は `clock_timestamp() AT TIME ZONE 'UTC'`（実際の記録時刻）です。これらのイベント時刻は従来どおり DB が生成し、呼出元の値を信用しません。食品確認の `checkedAt` は確認した瞬間を表し、記録時刻から未来 5 分以内という既存 CHECK を維持します。招待の期限比較も UTC 値同士で行います。
+
+この契約への移行は新規書込みに適用し、過去の日時・食品履歴・解除・公開状態を補正しません。過去値の生成元や当時のセッション時差が不明なまま一律に時差を引くことは禁止します。過去値の調査・補正は、根拠と対象を確認した別の作業です。[移行と検証](development.md#utc-timestamps)を参照してください。
+
 <a id="allergens"></a>
 ## 品目、保存状態、表示上の分類は別物
 
