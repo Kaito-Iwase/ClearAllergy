@@ -47,7 +47,7 @@ async function open({ width = 390, menu = {}, path = "/edit", intercept } = {}) 
             if (method === "GET") f.reads++; else f.writes.push({ method, body });
             const overridden = intercept ? await intercept({ method, body, f }) : null;
             if (overridden?.abort) return route.abort();
-            if (overridden) return route.fulfill({ status: overridden.status || 200, contentType: "application/json", body: JSON.stringify(overridden.body) });
+            if (overridden) return route.fulfill({ status: overridden.status || 200, contentType: overridden.contentType || "application/json", body: overridden.rawBody ?? JSON.stringify(overridden.body) });
             if (method === "GET") return route.fulfill({ json: { menu: f.state } });
             if (method === "POST") {
                 f.state = { ...f.state, ...body, allergens: f.state.allergens.map(a => ({ ...a, status: body.allergenStatusBySlug[a.slug] ?? "UNKNOWN" })) };
@@ -80,6 +80,23 @@ const panel = f => f.page.getByRole("region", { name: "保存しました", exac
 const save = f => f.page.getByRole("button", { name: "保存する", exact: true }).click();
 async function check(name, run) { try { await run(); cases.push({ name, passed: true }); console.log("PASS " + name); } catch (e) { cases.push({ name, passed: false, error: e.message }); console.error("FAIL " + name + ": " + e.message); } }
 try {
+    await check("blank names and negative prices never submit; zero and empty prices remain distinct", async () => {
+        for (const price of ["0", ""]) {
+            const f = await open();
+            try {
+                await f.page.getByLabel("メニュー名", { exact: true }).fill(" ");
+                await save(f); await f.page.getByRole("alert").getByText("メニュー名は必須です。", { exact: true }).waitFor();
+                assert.equal(f.writes.length, 0);
+                await f.page.getByLabel("メニュー名", { exact: true }).fill("境界値の架空メニュー");
+                await f.page.getByLabel("価格（税込・円）", { exact: true }).fill("-1");
+                await save(f); await f.page.getByRole("alert").waitFor();
+                assert.equal(f.writes.length, 0);
+                await f.page.getByLabel("価格（税込・円）", { exact: true }).fill(price);
+                await save(f); await panel(f).getByRole("button", { name: "この内容で公開", exact: true }).waitFor();
+                assert.equal(f.writes.length, 1); assert.equal(f.writes[0].body.priceYen, price === "0" ? 0 : null);
+            } finally { await f.context.close(); }
+        }
+    });
     await check("saved snapshot, explicit publish, no native dialog, no forced navigation, duplicate-click protection", async () => {
         const f = await open({ intercept: async ({ method }) => { if (method === "PUT") await new Promise(r => setTimeout(r, 80)); } });
         try {
@@ -117,6 +134,25 @@ try {
         const f = await open({ intercept: ({ method }) => method === "PUT" ? { status: 500, body: { error: "架空の保存失敗" } } : null });
         try { await f.page.getByLabel("メニュー名", { exact: true }).fill("保持する名前"); await save(f); await f.page.getByRole("alert").waitFor(); assert.equal(await panel(f).count(), 0); assert.equal(await f.page.getByLabel("メニュー名", { exact: true }).inputValue(), "保持する名前"); }
         finally { await f.context.close(); }
+    });
+    await check("HTML save/publish failures keep the operation guidance and input, without showing proxy markup", async () => {
+        for (const action of ["save", "publish"]) {
+            const f = await open({ intercept: ({ method, body }) => method === "PUT" && (action === "save" || body?.publicationAction)
+                ? { status: 502, contentType: "text/html; charset=utf-8", rawBody: "<HTML><BODY>proxy-error-marker</BODY></HTML>" } : null });
+            try {
+                await f.page.getByLabel("メニュー名", { exact: true }).fill("障害時に保持する架空入力");
+                await save(f);
+                if (action === "publish") await panel(f).getByRole("button", { name: "この内容で公開", exact: true }).click();
+                const alert = action === "publish" ? panel(f).getByRole("alert") : f.page.getByRole("alert");
+                await alert.waitFor();
+                assert.doesNotMatch(await alert.innerText(), /proxy-error-marker|<HTML>/);
+                assert.match(await alert.innerText(), action === "publish" ? /公開結果を確認できません。保存済み内容は保持されています/ : /保存/);
+                assert.equal(await f.page.getByLabel("メニュー名", { exact: true }).inputValue(), "障害時に保持する架空入力");
+                assert.equal(f.state.isPublished, false);
+                assert.equal(f.writes.length, action === "publish" ? 2 : 1);
+                if (action === "save") assert.equal(await panel(f).count(), 0);
+            } finally { await f.context.close(); }
+        }
     });
     await check("publish error retains saved snapshot; retry uses same saved version without saving again", async () => {
         let failures = 1;
