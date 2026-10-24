@@ -299,3 +299,7 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 認証境界の変更ではContext7で[Vercelの要求ヘッダー](https://vercel.com/docs/headers/request-headers)、[Next.jsのデータ保護](https://nextjs.org/docs/app/guides/data-security)、Clerkのサーバー認証とセッション有効化の資料を確認しています。資料の説明と、このリポジトリのカスタムAPIで実装した検査、実際の配備設定は分けて確認します。
 
 未解決解除は `node --import tsx scripts/check-publication-database.ts` からも検証します。専用CI接続先のガード後に、その実行が所有する一時店舗で、旧履歴不変・現行版束縛・UNKNOWN維持・別公開・削除失効・並行訂正を確認し、後始末します。
+
+### Runtime依存の限定override
+
+`@vercel/cli-config@0.2.0` 配下のZodはroot4.6.6へ合わせます。旧exact pinの公式advisory対策であり、Vercel SDK・認証設定の更新ではありません。上流consumer/Zodを更新するときはoverride削除可否と純粋schemaのparse/encode互換性を `tests/runtime-dependency-compat.test.ts` で再確認してください。[範囲・隔離・残gate](../verification/runtime-dependency-security-20261024.md)を参照してください。
