@@ -12,6 +12,7 @@ const output = process.env.CLEARALLERGY_BROWSER_OUTPUT || join(tmpdir(), "cleara
 mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
 let groups = 0;
+const fontChecks = { normal: [], fallback: [] };
 const pass = name => { groups++; console.log(`PASS: ${name}`); };
 const visible = locator => locator.filter({ visible: true });
 async function readablePreference(locator, hue) {
@@ -83,6 +84,7 @@ try {
     assert.match(await defaultPancake.getByRole("group", { name: "その他のアレルゲン", exact: true }).innerText(), /含む\s+大豆\s*（1品目）/);
     pass("Unselected cards classify specified ingredients separately; other CONTAINS/MAY_CONTAIN facts remain visible");
 
+    const normalText = new Map();
     for (const width of [320, 390, 768, 1024, 1440]) {
         await page.setViewportSize({ width, height: 900 });
         for (const route of ["/", "/shops", shopHref, menuHref, "/terms"]) {
@@ -103,13 +105,18 @@ try {
                 try {
                     // Navigation can retain hidden page DOM. Inspect the visible heading only,
                     // and wait for its glyphs rather than a fonts.ready promise from the previous page.
-                    await visible(page.locator("main h1")).evaluate(async heading => {
+                    const loadedFaces = await visible(page.locator("main h1")).evaluate(async heading => {
                         document.querySelectorAll("[data-ui-font-heading]").forEach(node => node.removeAttribute("data-ui-font-heading"));
                         heading.setAttribute("data-ui-font-heading", "");
-                        await document.fonts.load(getComputedStyle(heading).font, heading.textContent ?? "");
+                        const style = getComputedStyle(heading);
+                        // Load the primary app font, not every optional OS fallback in the CSS stack.
+                        const family = style.fontFamily.split(",")[0].trim();
+                        const faces = await document.fonts.load(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${family}`, heading.textContent ?? "");
                         await document.fonts.ready;
                         await new Promise(requestAnimationFrame);
+                        return faces.map(face => ({ family: face.family.replace(/["']/g, ""), status: face.status }));
                     });
+                    assert.ok(loadedFaces.length > 0 && loadedFaces.every(face => /^Noto[ _]Sans[ _]JP$/i.test(face.family) && face.status === "loaded"), "Primary Japanese web-font faces must load for the actual heading text");
                     const { root } = await fontInspector.send("DOM.getDocument");
                     const { nodeId } = await fontInspector.send("DOM.querySelector", { nodeId: root.nodeId, selector: "[data-ui-font-heading]" });
                     assert.ok(nodeId, "Inspect a real page heading");
@@ -123,6 +130,8 @@ try {
                 }
             }
             assert.ok(renderedFonts.length > 0 && renderedFonts.every(font => font.isCustomFont && /Noto\s*Sans\s*JP/i.test(font.familyName)), "Japanese glyphs must render using the self-hosted Noto font, without falling back to an OS font");
+            fontChecks.normal.push({ width, route, renderedFonts });
+            normalText.set(`${width}:${route}`, await visible(page.locator("main")).textContent());
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${width}px overflow: ${route}`);
             const logo = visible(page.locator('header a[href="/"]')).first();
             assert.equal(await logo.innerText(), "ClearAllergy");
@@ -133,6 +142,70 @@ try {
         }
         pass(`${width}px: home/list/shop/detail/terms, no overflow, full wordmark, one active menu search`);
     }
+
+    // Exercise optional OS fallback separately, without requiring a specific installed font.
+    const normalPage = page;
+    const fallbackContext = await browser.newContext();
+    let blockedFonts = 0;
+    await fallbackContext.route("**/*", route => {
+        if (route.request().resourceType() === "font") { blockedFonts++; return route.abort(); }
+        return new URL(route.request().url()).origin === base.origin ? route.continue() : route.abort();
+    });
+    page = await fallbackContext.newPage();
+    const fallbackErrors = [];
+    page.on("pageerror", error => fallbackErrors.push(error.message));
+    const fallbackInspector = await fallbackContext.newCDPSession(page);
+    await fallbackInspector.send("DOM.enable");
+    await fallbackInspector.send("CSS.enable");
+    for (const width of [390, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const zoom of [1, 2]) {
+            for (const route of ["/", "/shops", shopHref, menuHref, "/terms"]) {
+                await page.goto(new URL(route, base).href);
+                const heading = visible(page.locator("main h1"));
+                await heading.waitFor();
+                await page.evaluate(async scale => {
+                    document.documentElement.style.zoom = String(scale);
+                    await document.fonts.ready;
+                    await new Promise(requestAnimationFrame);
+                }, zoom);
+                assert.equal(await visible(page.locator("main")).count(), 1);
+                assert.equal(await visible(page.locator("main")).textContent(), normalText.get(`${width}:${route}`), "Font failure must retain the full main text");
+                const glyphs = await heading.evaluate(element => {
+                    element.setAttribute("data-ui-fallback-heading", "");
+                    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+                    let japanese = 0;
+                    let visibleGlyphs = true;
+                    while (walker.nextNode()) {
+                        const node = walker.currentNode;
+                        for (let i = 0; i < node.textContent.length; i++) {
+                            if (!/[\u3040-\u30ff\u3400-\u9fff]/.test(node.textContent[i])) continue;
+                            japanese++;
+                            const range = document.createRange();
+                            range.setStart(node, i); range.setEnd(node, i + 1);
+                            const box = range.getBoundingClientRect();
+                            visibleGlyphs &&= box.width > 0 && box.height > 0 && box.left >= -1 && box.right <= innerWidth + 1;
+                        }
+                    }
+                    return { japanese, visibleGlyphs };
+                });
+                assert.ok(glyphs.japanese > 0 && glyphs.visibleGlyphs, "Fallback Japanese characters must have visible in-width glyph boxes");
+                const { root } = await fallbackInspector.send("DOM.getDocument");
+                const { nodeId } = await fallbackInspector.send("DOM.querySelector", { nodeId: root.nodeId, selector: "[data-ui-fallback-heading]" });
+                const { fonts } = await fallbackInspector.send("CSS.getPlatformFontsForNode", { nodeId });
+                assert.ok(fonts.length > 0 && fonts.every(font => !font.isCustomFont && font.glyphCount > 0), "Blocked web fonts must fall back to actual OS glyph rendering");
+                assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${width}px ${zoom}x fallback overflow: ${route}`);
+                assert.equal(await visible(page.locator('header a[href="/"]')).first().innerText(), "ClearAllergy");
+                fontChecks.fallback.push({ width, zoom, route, glyphs, renderedFonts: fonts });
+                if (route === shopHref) await capture(`ui-font-fallback-${width}-${zoom}x`);
+            }
+        }
+    }
+    assert.ok(blockedFonts > 0, "Fallback regression must actually block font requests");
+    assert.deepEqual(fallbackErrors, [], "Font failures must not cause client exceptions");
+    await fallbackContext.close();
+    page = normalPage;
+    pass("Blocked web fonts retain Japanese OS glyphs, complete text and layout at 390/1440px and 1x/2x CSS zoom");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(new URL(shopHref, base).href);
@@ -219,4 +292,7 @@ try {
     console.error(error.stack);
     if (page) await capture("ui-failure").catch(() => {});
     process.exitCode = 1;
-} finally { await browser.close(); }
+} finally {
+    try { writeFileSync(join(output, "font-checks.json"), JSON.stringify(fontChecks, null, 2)); }
+    finally { await browser.close(); }
+}

@@ -164,6 +164,8 @@ node scripts/browser-runner.mjs ui
 
 `node scripts/browser-runner.mjs demo` は公開画面と保存しない管理デモ、`node scripts/browser-runner.mjs admin` は専用環境の管理操作を確認します。後者はDB・開発用Clerk・Blobへの書込を伴い、専用アカウントと保存先の許可が必要です。ランナーの準備だけで認証情報やテストデータが作られるわけではありません。
 
+`ui` は通常表示で先頭のNoto fontだけをロード待ちし、日本語の実描画がcustom Notoであることを確認します。任意のOS fallbackを一括で強制ロードしません。別contextでWeb fontを遮断し、390/1440px・CSS zoom 1/2でOSの日本語font、全文保持、文字の表示領域・横幅も検査します。日本語を描画できるOS fontが必要ですが、Arialなど特定familyの導入は要求しません。結果は出力先の `font-checks.json` と画像に保存します。[実行結果と限界](../verification/public-ui-font-portability-20261025.md)を参照してください。
+
 `node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォーム、管理メニュー一覧を、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。
 
 320／390／768／1440pxの品目名・状態別件数・対象範囲・注意書き全文、個人設定とMAY_CONTAIN除外、補足元の非公開化、混在するUNKNOWN、新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスを確認します。
