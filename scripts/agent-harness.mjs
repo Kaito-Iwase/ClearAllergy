@@ -1,9 +1,10 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveNpmCli } from "./npm-cli.mjs";
+import { buildFingerprint, candidateIdentity, combinePhaseEvidence, failureDiagnostics, PHASES } from "./verification-evidence.mjs";
 
 export const ASSESSMENT_MARKER = "<!-- clearallergy-agent:v1 -->";
 const REPOSITORY = "Kaito-Iwase/ClearAllergy";
@@ -129,6 +130,18 @@ function fingerprint() {
     return sha256(JSON.stringify([...new Set(files)].filter((path) => !path.startsWith(".agent-runs/")).sort().map((path) => [path, existsSync(path) ? sha256(readFileSync(path)) : "deleted"])));
 }
 
+function captureCandidate(baseSha) {
+    return candidateIdentity({ head: git("rev-parse", "HEAD"), baseSha, fingerprint: fingerprint(),
+        harnessSha256: sha256(readFileSync(new URL(import.meta.url))),
+        evidenceSha256: sha256(readFileSync(new URL("./verification-evidence.mjs", import.meta.url))),
+        lockSha256: sha256(readFileSync("package-lock.json")) });
+}
+
+function diagnostics(output, result) {
+    const tests = git("ls-files", "tests").split(/\r?\n/).filter(path => path.endsWith(".test.ts"));
+    return failureDiagnostics(output, result, tests);
+}
+
 export function prepareReportPath(root, output) {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.json$/.test(output)) throw new Error("Output must be a fresh JSON filename inside .agent-runs.");
     const directory = join(root, ".agent-runs");
@@ -176,7 +189,7 @@ export function publishReport(handle, report, candidateUnchanged) {
 }
 
 // No inherited credentials or DB target. Read-only builds use an unreachable local DB.
-function checkEnvironment() {
+function checkEnvironment({ database = false, browser = false } = {}) {
     for (const path of [".env", ".env.local", ".env.production", ".env.production.local", ".env.development", ".env.development.local", ".env.test", ".env.test.local", ".clerk"]) {
         if (existsSync(path)) throw new Error("Use a clean isolated worktree without environment/account files.");
     }
@@ -184,9 +197,81 @@ function checkEnvironment() {
     for (const [key, value] of Object.entries(process.env)) {
         if (/^(PATH|PATHEXT|SYSTEMROOT|WINDIR|COMSPEC|TEMP|TMP|HOME|USERPROFILE|APPDATA|LOCALAPPDATA|NUMBER_OF_PROCESSORS)$/i.test(key)) env[key] = value;
     }
-    return { ...env, CI: "true", NEXT_TELEMETRY_DISABLED: "1", DATABASE_URL: "postgresql://unused:unused@127.0.0.1:1/unused?connect_timeout=1", DIRECT_URL: "postgresql://unused:unused@127.0.0.1:1/unused?connect_timeout=1",
+    const safe = { ...env, CI: "true", NEXT_TELEMETRY_DISABLED: "1", DATABASE_URL: "postgresql://unused:unused@127.0.0.1:1/unused?connect_timeout=1", DIRECT_URL: "postgresql://unused:unused@127.0.0.1:1/unused?connect_timeout=1",
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlYXJhbGxlcmd5LWNpLmNsZXJrLmFjY291bnRzLmRldiQ", CLERK_SECRET_KEY: "sk_test_ci_placeholder_not_a_real_key",
         PORTFOLIO_MODE: "true", ADMIN_REGISTRATION_MODE: "disabled", ENABLE_CLERK_ADMIN_AUTH: "false", NEXT_PUBLIC_APP_URL: "http://localhost:3000" };
+    if (database) {
+        if (process.env.CI !== "true" || process.env.CLEARALLERGY_CI_FIXTURES !== "true" || process.env.DATABASE_URL !== process.env.DIRECT_URL) throw new Error("Phase requires the isolated CI database.");
+        let target;
+        try { target = new URL(process.env.DATABASE_URL); } catch { throw new Error("Phase requires the isolated CI database."); }
+        if (target.protocol !== "postgresql:" || !["127.0.0.1", "localhost", "ci-db"].includes(target.hostname)
+            || target.pathname !== "/clearallergy_ci" || target.username !== "clearallergy_ci" || target.password !== "local_ci_only") throw new Error("Phase requires the isolated CI database.");
+        Object.assign(safe, { DATABASE_URL: process.env.DATABASE_URL, DIRECT_URL: process.env.DIRECT_URL, CLEARALLERGY_CI_FIXTURES: "true" });
+    }
+    if (browser) {
+        let base;
+        try { base = new URL(process.env.CLEARALLERGY_BROWSER_BASE_URL ?? "http://127.0.0.1:3000"); } catch { throw new Error("Phase requires a loopback HTTP app."); }
+        if (base.protocol !== "http:" || !["localhost", "127.0.0.1"].includes(base.hostname) || base.username || base.password) throw new Error("Phase requires a loopback HTTP app.");
+        Object.assign(safe, { CLEARALLERGY_BROWSER_BASE_URL: base.href, CLEARALLERGY_BROWSER_OUTPUT: resolve(".agent-runs/browser"),
+            CLEARALLERGY_BROWSER_PUBLIC_ONLY: "true", CLEARALLERGY_BROWSER_BLOCK_EXTERNAL: "true" });
+        for (const name of ["PLAYWRIGHT_MODULE_PATH", "PLAYWRIGHT_BROWSERS_PATH", "CLEARALLERGY_BROWSER_RUNNER_DIR", "BROWSER_EXECUTABLE"]) if (process.env[name]) safe[name] = process.env[name];
+    }
+    return safe;
+}
+
+export function runPhase({ base, phase, output }) {
+    if (!Object.hasOwn(PHASES, phase)) throw new Error("Unknown verification phase.");
+    const baseSha = resolveBase(base);
+    const browser = phase.startsWith("browser-") || phase === "propagation";
+    const database = phase.startsWith("db-") || phase.endsWith("-upgrade") || ["prepare-fixture", "browser-public", "propagation"].includes(phase);
+    const env = checkEnvironment({ database, browser });
+    const runId = randomUUID();
+    env.CLEARALLERGY_PHASE_RUN_ID = runId;
+    const before = captureCandidate(baseSha);
+    const buildBefore = buildFingerprint(process.cwd());
+    const handle = beginReport(process.cwd(), output ?? `${phase}.json`);
+    try {
+        const spec = PHASES[phase];
+        const args = spec[0] === "npm" ? [resolveNpmCli().path, "run", spec[1]] : spec;
+        const start = Date.now();
+        const result = spawnSync(process.execPath, args, { env, encoding: "utf8", windowsHide: true, timeout: 10 * 60_000, maxBuffer: 16 * 1024 * 1024 });
+        const contents = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+        const after = captureCandidate(baseSha);
+        const buildAfter = buildFingerprint(process.cwd());
+        const buildUnchanged = !browser || (buildBefore !== null && buildBefore === buildAfter);
+        const report = { version: 2, kind: "phase", phase, runId, head: before.head, baseSha, startedAt: new Date(start).toISOString(), finishedAt: new Date().toISOString(),
+            candidateBefore: before, candidateAfter: after, candidateUnchanged: before.id === after.id,
+            exitCode: result.status, elapsedMs: Date.now() - start, outputSha256: sha256(contents), diagnostics: diagnostics(contents, result), buildBefore, buildAfter,
+            completedCheckpoints: contents.split(/\r?\n/).filter(line => line.startsWith("PASS:")).length,
+            serverEvidence: ["browser-public", "propagation"].includes(phase) ? `server-${phase === "browser-public" ? "public" : "propagation"}-${runId}.json` : null,
+            runtime: { node: process.versions.node, platform: process.platform, arch: process.arch, npm: spec[0] === "npm" ? resolveNpmCli().version : null,
+                fixture: database ? "fictional-ci" : "no-database" },
+            ci: { sha: /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA ?? "") ? process.env.GITHUB_SHA : null },
+            status: result.status === 0 && !result.error && buildUnchanged && (phase !== "build" || buildAfter !== null) ? "PASS" : "FAIL" };
+        return publishReport(handle, report, () => captureCandidate(baseSha).id === before.id);
+    } finally { closeSync(handle.fd); }
+}
+
+function resolveBase(base) {
+    if (!nonempty(base) || base.startsWith("-") || !/^[A-Za-z0-9_/.-]+$/.test(base)) throw new Error("Specify an existing base ref explicitly.");
+    return git("rev-parse", "--verify", `${base}^{commit}`);
+}
+
+export function summarizePhases({ base, inputs, required, output }) {
+    const baseSha = resolveBase(base);
+    const before = captureCandidate(baseSha);
+    const receipts = inputs.map(name => {
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.json$/.test(name)) throw new Error("Invalid phase evidence filename.");
+        const path = join(".agent-runs", name);
+        if (!existsSync(path)) return null;
+        const stat = lstatSync(path);
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new Error("Unsafe phase evidence file.");
+        try { return JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error("Invalid phase evidence JSON."); }
+    }).filter(Boolean);
+    const report = { version: 2, kind: "summary", ...combinePhaseEvidence(receipts, required, before), candidateUnchanged: true };
+    const handle = beginReport(process.cwd(), output ?? "phase-summary.json");
+    try { return publishReport(handle, report, () => captureCandidate(baseSha).id === before.id); }
+    finally { closeSync(handle.fd); }
 }
 
 export function verify({ base, output = "verification.json" }) {
@@ -203,29 +288,33 @@ export function verify({ base, output = "verification.json" }) {
     const head = git("rev-parse", "HEAD");
     const baseSha = git("rev-parse", "--verify", `${base}^{commit}`);
     const before = fingerprint();
+    const candidate = captureCandidate(baseSha);
     const harnessBefore = sha256(readFileSync(new URL(import.meta.url)));
     const startedAt = new Date().toISOString();
     const results = [];
     for (const command of commands) {
+        const phaseBefore = captureCandidate(baseSha);
         const start = Date.now();
         const args = command.prisma ? [prisma, command.prisma] : [npm, ...command.args];
         const result = spawnSync(process.execPath, args, { env, encoding: "utf8", windowsHide: true, timeout: 10 * 60_000, maxBuffer: 16 * 1024 * 1024 });
         const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+        const phaseAfter = captureCandidate(baseSha);
         const counts = {};
         for (const key of ["tests", "pass", "fail", "skipped", "cancelled", "todo"]) {
             const match = combined.match(new RegExp(`^# ${key} (\\d+)$`, "m"));
             if (match) counts[key] = Number(match[1]);
         }
-        results.push({ name: command.name, script: command.script ?? `prisma ${command.prisma}`, exitCode: result.status,
-            status: result.status === 0 && !result.error ? "PASS" : "FAIL", elapsedMs: Date.now() - start, counts,
+        results.push({ name: command.name, commandDefinitionSha256: sha256(command.script ?? `prisma ${command.prisma}`), exitCode: result.status,
+            status: result.status === 0 && !result.error && phaseBefore.id === candidate.id && phaseAfter.id === candidate.id ? "PASS" : "FAIL", elapsedMs: Date.now() - start, counts,
+            diagnostics: diagnostics(combined, result), candidateBefore: phaseBefore.id, candidateAfter: phaseAfter.id,
             errorCode: result.error?.code ?? null, outputSha256: sha256(combined) });
         console.error(`${command.name}: ${results.at(-1).status}${Object.keys(counts).length ? ` ${JSON.stringify(counts)}` : ""}`);
-        if (result.status !== 0 || result.error) break;
+        if (results.at(-1).status !== "PASS") break;
     }
     const after = fingerprint();
     const whitespace = spawnSync("git", ["diff", "--check", baseSha], { encoding: "utf8", windowsHide: true });
     const expectedNode = readFileSync(".node-version", "utf8").trim();
-    const report = { version: 1, repository: REPOSITORY, head, baseSha, startedAt, finishedAt: new Date().toISOString(),
+    const report = { version: 2, repository: REPOSITORY, head, baseSha, candidate, startedAt, finishedAt: new Date().toISOString(),
         candidateBefore: before, candidateAfter: after, candidateUnchanged: before === after && head === git("rev-parse", "HEAD") && harnessBefore === sha256(readFileSync(new URL(import.meta.url))),
         harnessSha256: harnessBefore, lockSha256: sha256(readFileSync("package-lock.json")),
         runtime: { actualNode: process.versions.node, expectedNode, matches: process.versions.node === expectedNode, actualNpm: npmCli.version },
@@ -242,14 +331,16 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
         const [command, ...args] = process.argv.slice(2);
         const flags = {};
         for (let i = 0; i < args.length; i += 2) {
-            if (!["--snapshot", "--base", "--output"].includes(args[i]) || !args[i + 1] || flags[args[i]]) throw new Error("Invalid arguments.");
+            if (!["--snapshot", "--base", "--output", "--phase", "--inputs", "--required"].includes(args[i]) || !args[i + 1] || flags[args[i]]) throw new Error("Invalid arguments.");
             flags[args[i]] = args[i + 1];
         }
         const result = command === "queue" && flags["--snapshot"]
             ? assessQueue(JSON.parse(readFileSync(flags["--snapshot"], "utf8").replace(/^\uFEFF/, "")))
-            : command === "verify" ? verify({ base: flags["--base"], output: flags["--output"] }) : null;
+            : command === "verify" ? verify({ base: flags["--base"], output: flags["--output"] })
+                : command === "phase" ? runPhase({ base: flags["--base"], phase: flags["--phase"], output: flags["--output"] })
+                    : command === "summarize" ? summarizePhases({ base: flags["--base"], inputs: (flags["--inputs"] ?? "").split(","), required: (flags["--required"] ?? "").split(","), output: flags["--output"] }) : null;
         if (!result) throw new Error("Use queue --snapshot <file> or verify --base <ref> [--output <name.json>].");
         console.log(JSON.stringify(result, null, 2));
-        if (result.status === "FAIL") process.exitCode = 1;
+        if (["FAIL", "UNVERIFIED"].includes(result.status)) process.exitCode = 1;
     } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

@@ -314,3 +314,7 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 ### Runtime依存の限定override
 
 `@vercel/cli-config@0.2.0` 配下のZodはroot4.6.6へ合わせます。旧exact pinの公式advisory対策であり、Vercel SDK・認証設定の更新ではありません。上流consumer/Zodを更新するときはoverride削除可否と純粋schemaのparse/encode互換性を `tests/runtime-dependency-compat.test.ts` で再確認してください。[範囲・隔離・残gate](../verification/runtime-dependency-security-20261024.md)を参照してください。
+
+### 任意の候補証跡（P0）
+
+`agent-harness.mjs phase` / `summarize` による候補・build同一性の照合と安全な失敗診断は [証拠の契約](../agentic-development.md#phase-evidence) を参照してください。公開画面のphaseは現在buildを専用loopback portで起動し、所有プロセスを終了します。このPRは既存CIの呼出方法や重要回帰の接続を変更しません。snapshot/propagation/別空DB移行jobのCI接続（P1）は別差分で、まだ未公開です。

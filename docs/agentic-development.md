@@ -105,11 +105,22 @@ package.jsonのscriptsとCIを毎回読み、コマンドと副作用を確認�
 node scripts/agent-harness.mjs verify --base origin/main --output verification.json
 ```
 
-runnerは `scripts/npm-cli.mjs` で解決したNode配布またはnpm lifecycleの既存CLIをNodeから呼び、OS必須変数だけ引き継ぐ。npmをアプリ依存に同梱しない。DBは到達不能なlocalhost、ClerkはCIと同じ非実在キーへ限定し、`.env`/account fileがあるworktreeでは停止する。real DB/browser fixtureの初期化、seed、repair、migration、Clerk/Blob writeは実行しない。buildのGoogle Fontsなど既存の公開通信は必要になる。失敗時の生ログはreportに保存せず、コマンド・exit・出力hash・test件数を保存する。詳細調査が必要なら同じ非秘密環境で失敗コマンドを実行し、原因を確認する。
+runnerは `scripts/npm-cli.mjs` で解決したNode配布またはnpm lifecycleの既存CLIをNodeから呼び、OS必須変数だけ引き継ぐ。npmをアプリ依存に同梱しない。`verify` のDBは到達不能なlocalhost、ClerkはCIと同じ非実在キーへ限定し、`.env`/account fileがあるworktreeでは停止する。`verify` 自体はDB/browser fixtureの初期化、seed、repair、migration、Clerk/Blob writeを実行しない。buildのGoogle Fontsなど既存の公開通信は必要になる。失敗時は生ログ・script本文・test名を保存せず、固定phase ID・exit・出力hash・test件数・固定分類と既知testファイルの位置だけを保存する。詳細調査が必要なら同じ非秘密環境で失敗コマンドを実行し、原因を確認する。
 
 既存reportは上書きせず、再検証では`--output verification-next.json`等の新しい名前を指定する。directoryのリンク・既存file/linkを事前拒否し、検証開始前に排他的に新規作成したfile descriptorを保持する。暫定VERIFYINGを書き、candidateとdirectory/file同一性の最終確認が失敗したら保存済みJSONにもFAILを記録する。directoryが途中でリンクへ交換されても保持したdescriptor以外へ書かない。`.agent-runs/verification.json`はhead/base、candidate file hashの前後、lock hash、実Nodeと`.node-version`の差、実npm版、実行結果・件数・未実施領域を含む。PASSはローカルコマンドの成功で、runtime差やGitHub/DB/browserの確認を補わない。内容・HEADが途中で変わればFAIL。commit後にコードを変更したら再実行し、PRは最終HEADのcheckを取得する。doc-onlyなら指示に従い動作gate省略可能だが、ハーネスrunnerのコード変更は通常gate対象。
 
-認可・安全・公開条件・DBを触ったら影響に応じて別店舗/未認証/API回帰、接続guard下の実PostgreSQL制約・rollback、mobile/desktop/keyboard/状態を追加する。mock、build、schema validateは実DBの代用ではない。専用環境の対象と副作用が未許可ならUNVERIFIEDを記録して該当gateで停止する。既存CIは公開browserを実行するが実Clerk/Blobの試験ではない。
+<a id="phase-evidence"></a>
+### 別実行の証拠を同じ候補へ結び付ける
+
+`phase` は固定された既存コマンドだけを実行し、新しいJSONを `.agent-runs/` に排他的に作成します。例：`node scripts/agent-harness.mjs phase --base origin/main --phase test --output unit.json`。DB phaseはCI専用フラグ・両接続URLの一致・固定された架空資格情報/DB名/loopbackを検査し、Clerk/Blob等の継承変数を除去します。`prepare-fixture` と `*-upgrade` は実際に架空データ/migrationを書き込むため、空の使い捨てDBに限定して事前に対象と副作用を承認してください。空DB専用の旧移行試験同士は別DBへ分けます。既存環境のreset機能はありません。
+
+各phaseはHEAD・base・ソースfingerprint・lock・runnerコードhashの前後、OS/Node/npm、fixture種別、実行時間、完了checkpoint数、固定失敗分類を記録します。buildは `.next/BUILD_ID`、server/static成果物のhashを残し、browser/公開反映phaseはその同一性も確認します。実行時に変化する `.next/cache`、`.next/server/route-cache`、`.next/server/prefetch-hints.json` は除外し、配布するserverコード・static・routing manifestは照合します。`browser-public` / `propagation` は現worktreeのbuildを専用loopback portで自分が起動し、所有プロセスの準備完了を待ち、最後に停止します。既に起動済みの別appへ接続して現在buildの証拠と混ぜません。失敗・compile/ブラウザ起動前の停止も子プロセスの終了結果としてJSONへ残ります。接続先等のpreflight拒否はphaseを実行せず、集約では不足扱いです。生ログ・環境値・自由文・絶対パス・未知test位置は診断へ保存しません。失敗位置は既知testソースへの参照で、元のtest名やエラー本文ではありません。
+
+`node scripts/agent-harness.mjs summarize --base origin/main --inputs unit.json --required test --output summary.json` で現在候補と照合します。候補/版/lock/runner違い、偽のidentity ID、失敗/不安全な証跡、build違いはFAIL、未実行はUNVERIFIED、両方とも終了コード1です。browserを含む集約は対応するbuild phaseも要求します。requiredはその集約で要求する範囲を明示するもので、全品質gateの完了を自動認定しません。署名付き証明ではなく、候補取り違えと偶発的な結果流用を防ぐローカル証跡です。独立reviewとremote checkは常に別途確認し、機械的にPASSへ昇格しません。CIがPR merge commitをcheckoutした場合、記録HEADはそのmerge commitです。PR headと同一と誤認しないでください。
+
+この版の制限として、`summarize` はphase receiptの候補・build欄を照合しますが、参照先 `serverEvidence` の実在・run/candidate/build/hashを検証しません。`verify` も変更が実行中に変わらないことを確認するだけで、作業計画に対するscope外・rename・untracked・protected areaや追加必須検証を認定する機能ではありません。queueのsnapshot/assessment検査とverifyは未接続です。環境変数の除去はOS隔離ではなく、子プロセスのファイル読取・通信能力を制限するものではありません。これらを必要とする承認・集約の根拠には単体のPASSを使わず、[今回の検証境界](verification/harness-evidence-main-20261025.md)を確認してください。
+
+認可・安全・公開条件・DBを触ったら影響に応じて別店舗/未認証/API回帰、接続guard下の実PostgreSQL制約・rollback、mobile/desktop/keyboard/状態を追加する。mock、build、schema validateは実DBの代用ではない。専用環境の対象と副作用が未許可ならUNVERIFIEDを記録して該当gateで停止する。CIの公開browserは実Clerk/Blobの試験ではない。
 
 ## Self review → Independent review → Repair
 
