@@ -159,7 +159,7 @@ DBのenum・schema、公開条件、APIレスポンス、除外検索の条件�
 
 共有スタイルの管理画面側への影響を確認するためdemo回帰も試行したが、`proxy.ts` の `/admin/:path*` matcherとClerk middlewareはportfolio設定でも適用され、非実在キーではhandshakeへ転送された。ブラウザの外部通信は遮断済みであり、実認証への接続・認可の迂回・matcherの変更は行っていない。専用の許可済みClerk環境で管理デモを再検証する必要がある。
 
-404復旧時にはReact #419が2件記録された。レスポンス本文には `NEXT_HTTP_ERROR_FALLBACK;404` があり、HTTPは200、画面は404案内を表示して一覧へ復旧できた。通常経路の例外0件と、この描画切替を分けて記録する。#419はサーバーがSuspense境界を完了できずクライアント描画へ切り替えた状態であり（[React公式説明](https://react.dev/errors/419)）、ストリーミング開始後のnotFoundはHTTPステータスを変更できない（[Next.js公式説明](https://nextjs.org/docs/app/api-reference/file-conventions/not-found)）。ハーネスはこの404 digestがある場合の#419だけを別記し、通常経路の#419や他の例外は失敗にする。今回の改修で警告を解消したとは扱わない。
+404復旧時にはReact #419が2件記録された。レスポンス本文には `NEXT_HTTP_ERROR_FALLBACK;404` があり、HTTPは200、画面は404案内を表示して一覧へ復旧できた。通常経路の例外0件と、この描画切替を分けて記録する。#419はサーバーがSuspense境界を完了できずクライアント描画へ切り替えた状態であり（[React公式説明](https://react.dev/errors/419)）、ストリーミング開始後のnotFoundはHTTPステータスを変更できない（[Next.js公式説明](https://nextjs.org/docs/app/api-reference/file-conventions/not-found)）。ハーネスはこの404 digestがある場合の#419だけを別記し、通常経路の#419や他の例外は失敗にする。今回の改修で警告を解消したとは扱わない。 これは2026-10-07時点の判定です。2026-10-25に、上記の当時の検査がcontext終了中の例外を再判定せず成功する欠陥を再現しました。[後続の修正・観測境界](../verification/public-ui-error-observation-20261025.md)では、例外自身のdigest照合と終了後の最終判定を追加しています。過去のPASSを新しい判定条件で再検証済みとは扱いません。
 
 画像証跡は出力先の `ui-01-draft-mobile.png`、`ui-02-caution-mobile.png`、`ui-03-free-desktop.png`、`ui-04-store-supplement-desktop.png`。スクリーンショットを目視し、検索で隠れた編集案の品目、短い状態名、保証の限界、元のFREEと別メニュー補足の両立を確認した。
 

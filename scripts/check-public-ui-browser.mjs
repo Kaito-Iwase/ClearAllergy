@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { observeUIErrors } from "./ui-error-observer.mjs";
 
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
 const base = new URL(process.env.CLEARALLERGY_BROWSER_BASE_URL || "http://localhost:3101");
@@ -13,7 +14,9 @@ mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
 let groups = 0;
 const fontChecks = { normal: [], fallback: [] };
-const pass = name => { groups++; console.log(`PASS: ${name}`); };
+const errorChecks = [];
+let completed = false;
+const pass = name => { groups++; console.log(`CHECK: ${name}`); };
 const visible = locator => locator.filter({ visible: true });
 async function readablePreference(locator, hue) {
     const appearance = await locator.evaluate(element => {
@@ -43,12 +46,12 @@ async function capture(name) {
 try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     await context.route("**/*", route => new URL(route.request().url()).origin === base.origin ? route.continue() : route.abort());
+    const normalErrors = await observeUIErrors(context, { label: "normal" });
+    errorChecks.push(normalErrors.report);
     page = await context.newPage();
     const fontInspector = await context.newCDPSession(page);
     await fontInspector.send("DOM.enable");
     await fontInspector.send("CSS.enable");
-    const errors = [];
-    page.on("pageerror", error => { errors.push(error.message); console.error(`Client exception at ${new URL(page.url()).pathname}: ${error.message}`); });
     page.setDefaultTimeout(20000);
     await page.goto(new URL("/shops", base).href);
     const shopLink = page.locator('a[id^="shop-"]').first();
@@ -151,9 +154,9 @@ try {
         if (route.request().resourceType() === "font") { blockedFonts++; return route.abort(); }
         return new URL(route.request().url()).origin === base.origin ? route.continue() : route.abort();
     });
+    const fallbackErrors = await observeUIErrors(fallbackContext, { label: "font-fallback" });
+    errorChecks.push(fallbackErrors.report);
     page = await fallbackContext.newPage();
-    const fallbackErrors = [];
-    page.on("pageerror", error => fallbackErrors.push(error.message));
     const fallbackInspector = await fallbackContext.newCDPSession(page);
     await fallbackInspector.send("DOM.enable");
     await fallbackInspector.send("CSS.enable");
@@ -202,8 +205,7 @@ try {
         }
     }
     assert.ok(blockedFonts > 0, "Fallback regression must actually block font requests");
-    assert.deepEqual(fallbackErrors, [], "Font failures must not cause client exceptions");
-    await fallbackContext.close();
+    await fallbackErrors.closeAndVerify();
     page = normalPage;
     pass("Blocked web fonts retain Japanese OS glyphs, complete text and layout at 390/1440px and 1x/2x CSS zoom");
 
@@ -272,27 +274,38 @@ try {
     await capture("ui-04-store-supplement-desktop");
     pass("FREE with store supplement stays caution across keyboard detail navigation");
 
-    assert.deepEqual(errors, [], "Normal public routes must have no client exceptions");
-    const notFoundResponse = await page.goto(new URL("/shops/ui-audit-does-not-exist", base).href);
+    await normalErrors.closeAndVerify();
+    // A separate context prevents a 404 allowance from excusing normal-route errors.
+    const notFoundUrl = new URL("/shops/ui-audit-does-not-exist", base).href;
+    const recoveryContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await recoveryContext.route("**/*", route => new URL(route.request().url()).origin === base.origin ? route.continue() : route.abort());
+    const recoveryErrors = await observeUIErrors(recoveryContext, { label: "404-recovery", notFoundUrl });
+    errorChecks.push(recoveryErrors.report);
+    page = await recoveryContext.newPage();
+    page.setDefaultTimeout(20000);
+    const notFoundResponse = await page.goto(notFoundUrl);
     const notFoundHtml = await notFoundResponse.text();
     writeFileSync(join(output, "not-found-response.html"), notFoundHtml, "utf8");
+    recoveryErrors.confirmNotFoundResponse({ page, url: notFoundResponse.url(), status: notFoundResponse.status(), html: notFoundHtml });
     await page.getByRole("heading", { name: "ページが見つかりません", exact: true }).waitFor();
     await page.getByRole("link", { name: "店舗一覧を見る", exact: true }).click();
     await page.waitForURL(new URL("/shops", base).href);
-    // Next's streamed notFound may abort Suspense after HTTP 200 has committed.
-    // Report this separately; never suppress #419 on normal routes or other errors.
-    const notFoundBoundary = notFoundHtml.includes('data-dgst="NEXT_HTTP_ERROR_FALLBACK;404"') || /\$RX\("[^"\n]+","NEXT_HTTP_ERROR_FALLBACK;404"\)/.test(notFoundHtml);
-    assert.ok(notFoundBoundary && notFoundHtml.includes('<meta name="robots" content="noindex"'));
-    assert.ok(errors.every(message => message.startsWith("Minified React error #419;")));
-    if (errors.length > 0) console.log(`LIMITATION: streamed notFound recovery reported React #419 (${errors.length}); HTTP ${notFoundResponse.status()}. Normal routes had zero client exceptions.`);
-    pass("404 renders recovery link; known streamed notFound fallback accounted for separately");
-    await context.close();
-    console.log(`Completed: ${groups} UI groups passed`);
+    await visible(page.getByRole("heading", { name: "エリア・キーワードから店舗を探す", exact: true })).waitFor();
+    await visible(page.locator('a[id^="shop-"]')).first().waitFor();
+    const recovery = await recoveryErrors.closeAndVerify();
+    console.log(`LIMITATION: streamed notFound recovery reported React #419 (${recovery.streamedNotFound419}); HTTP ${notFoundResponse.status()}. Other client exceptions: 0.`);
+    pass("404 renders recovery link; digest-matched streamed notFound fallback accounted for through context closure");
+    completed = true;
 } catch (error) {
     console.error(error.stack);
     if (page) await capture("ui-failure").catch(() => {});
     process.exitCode = 1;
 } finally {
-    try { writeFileSync(join(output, "font-checks.json"), JSON.stringify(fontChecks, null, 2)); }
+    try {
+        writeFileSync(join(output, "font-checks.json"), JSON.stringify(fontChecks, null, 2));
+        writeFileSync(join(output, "client-error-checks.json"), JSON.stringify(errorChecks, null, 2));
+    }
     finally { await browser.close(); }
 }
+
+if (completed) console.log(`Completed: ${groups} UI groups passed; all client error observations closed and verified`);

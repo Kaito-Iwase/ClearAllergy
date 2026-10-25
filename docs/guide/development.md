@@ -164,7 +164,7 @@ node scripts/browser-runner.mjs ui
 
 `node scripts/browser-runner.mjs demo` は公開画面と保存しない管理デモ、`node scripts/browser-runner.mjs admin` は専用環境の管理操作を確認します。後者はDB・開発用Clerk・Blobへの書込を伴い、専用アカウントと保存先の許可が必要です。ランナーの準備だけで認証情報やテストデータが作られるわけではありません。
 
-`ui` は通常表示で先頭のNoto fontだけをロード待ちし、日本語の実描画がcustom Notoであることを確認します。任意のOS fallbackを一括で強制ロードしません。別contextでWeb fontを遮断し、390/1440px・CSS zoom 1/2でOSの日本語font、全文保持、文字の表示領域・横幅も検査します。日本語を描画できるOS fontが必要ですが、Arialなど特定familyの導入は要求しません。結果は出力先の `font-checks.json` と画像に保存します。[実行結果と限界](../verification/public-ui-font-portability-20261025.md)を参照してください。
+`ui` は通常表示で先頭のNoto fontだけをロード待ちし、日本語の実描画がcustom Notoであることを確認します。任意のOS fallbackを一括で強制ロードしません。別contextでWeb fontを遮断し、390/1440px・CSS zoom 1/2でOSの日本語font、全文保持、文字の表示領域・横幅も検査します。日本語を描画できるOS fontが必要ですが、Arialなど特定familyの導入は要求しません。結果は出力先の `font-checks.json` と画像に保存します。 `client-error-checks.json` は通常・font fallback・404復旧を別contextで記録し、各contextの終了中までに受信した例外を判定します。`CHECK` は個別assertionの通過であり、全contextの判定とbrowser終了後の `Completed` が全体成功です。404の例外許容には、同じpageの応答の404 digest/noindexと、例外自身の404 digest・元document・復旧経路の一致が必要です。観測終了後に実行されるはずだったタイマーまで検証したとは扱いません。[遅延例外の修正・観測境界](../verification/public-ui-error-observation-20261025.md)を参照してください。[実行結果と限界](../verification/public-ui-font-portability-20261025.md)を参照してください。
 
 `node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォーム、管理メニュー一覧を、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。
 
