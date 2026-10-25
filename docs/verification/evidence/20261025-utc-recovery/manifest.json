@@ -1,0 +1,87 @@
+{
+  "kind": "preserved-historical-reproduction-materials-not-a-new-test-run",
+  "sourceSubjectHead": "e70d037052242fbc6d0f78860e3a42d2405b681e",
+  "preservationBaseHead": "abffb13d2c987b2482bdfcdfbc8dfca3f17d6534",
+  "script": {
+    "member": "utc-recovery-20261025.py",
+    "originalPathAtPreservation": ".agent-runs/utc-recovery-20261025.py",
+    "bytes": 14313,
+    "sha256BeforeCopy": "d9ea42ea36faeb728137db9e622ec5fac855cf939606c881173903a3655fdaa8",
+    "sha256ExtractedCopy": "d9ea42ea36faeb728137db9e622ec5fac855cf939606c881173903a3655fdaa8",
+    "byteIdentical": true,
+    "executionTimeHashWasRecorded": false,
+    "version": "Surviving final resume version, used for the recorded --restore-only command; byte identity to the earlier first-stage file is not established"
+  },
+  "archive": {
+    "file": "utc-recovery-originals.zip",
+    "bytes": 43081,
+    "sha256": "0f506a1fb0ff99ef49273c3d77f69586f0805a116461e7ea99d882665fcb89a7"
+  },
+  "members": {
+    "utc-recovery-20261025.py": {
+      "bytes": 14313,
+      "sha256": "d9ea42ea36faeb728137db9e622ec5fac855cf939606c881173903a3655fdaa8"
+    },
+    "recorded-outputs/before-rows.json": {
+      "bytes": 5592,
+      "sha256": "d5783de2778f4eff7dcb79dc516f89edf3d7f5c028f18c0a6a965859e90c1a8e"
+    },
+    "recorded-outputs/after-rows.json": {
+      "bytes": 5592,
+      "sha256": "d5783de2778f4eff7dcb79dc516f89edf3d7f5c028f18c0a6a965859e90c1a8e"
+    },
+    "recorded-outputs/before-catalog.json": {
+      "bytes": 82925,
+      "sha256": "081fddcd734a04509d9b55c112d9d6f578ab077fbf64b63240338a088572c0d7"
+    },
+    "recorded-outputs/after-catalog.json": {
+      "bytes": 83399,
+      "sha256": "ca28933acb8f51e0ee395f6dc44e6eda39fd87c88df8c3661639f3742c00c55e"
+    },
+    "recorded-outputs/before.dump": {
+      "bytes": 58760,
+      "sha256": "13160ddea55775af8de3175076fdc95c070e346fa7b85148e89d155e9f60b3a3"
+    },
+    "recorded-outputs/after.dump": {
+      "bytes": 59234,
+      "sha256": "8ab03d9f9e67267498541e0b71e5fc328dfbca78ed0ab3df6c9a3c809aadf03d"
+    },
+    "recorded-outputs/result.json": {
+      "bytes": 1163,
+      "sha256": "de35839041696d90933b415cad467ce41e637336ef7be171398d7386d204a393"
+    },
+    "recorded-outputs/sql-recovery-r2.log": {
+      "bytes": 1591,
+      "sha256": "48282264de92bd5a1719e2fdf7957ae7523509939fc3686362e74c1eacd2dbb3"
+    },
+    "recorded-outputs/backup-restore.log": {
+      "bytes": 299,
+      "sha256": "3fb4176f5c6be65ed857def5563c9640a91cc911bda2fc3d113b15d4e32b0af9"
+    }
+  },
+  "migrationInputsSha256": {
+    "prisma/migrations/20260301144342_init/migration.sql": "2fc5e679c209613a9714732e7aafdce6f7a7df294252054b04cf01be0f480e58",
+    "prisma/migrations/20260308085850_add_shop_cover_image/migration.sql": "be8b030230c2c32d4be1ca6e5a45327cb4104cc0f44e80cc2a75a36913394478",
+    "prisma/migrations/20260404122218_add_clerk_user_id_nullable/migration.sql": "fd94ab740e36f19e5e9aea3fbdeef82197103adae8e9c69947ce8012bcc0a87f",
+    "prisma/migrations/20260404143000_add_shop_average_budget/migration.sql": "e233938e06b54786188704ac559b359f825e55d695fecafafac9b0ed99585c75",
+    "prisma/migrations/20260405000000_add_unknown_allergen_status/migration.sql": "5df2f4efad7b8936fc6a3e67e8417698d280318c0c1e99fa40072a36f9996f07",
+    "prisma/migrations/20260405000100_set_unknown_allergen_default/migration.sql": "0654843912f5115f8ed64c47af2324e7b31a7c8efd6d02c36a354d6136513463",
+    "prisma/migrations/20260405010000_add_audit_log/migration.sql": "c5eddd5bc6ef5d8589ee39bfb34bd1e7e04c69f6efbf04205c4e298fd174b0d0",
+    "prisma/migrations/20260420000000_add_admin_invites/migration.sql": "1271881fd61b1a30469fd99c7551e87e3410d68bb0ccbc433afb49376b16f961",
+    "prisma/migrations/20260420090000_add_menu_image_display_options/migration.sql": "d98d240564a94a05151eaf57b18225bda28f31c34225ffbae1f6d86a0e168f69",
+    "prisma/migrations/20260420100000_add_menu_image_fine_tuning/migration.sql": "febe8eb7a98db00541d1fa727c17758eb06ac41c734c912559401e8d5d6331a8",
+    "prisma/migrations/20260420110000_add_menu_image_frame/migration.sql": "9987e6f392a89f6ea5a2663d654fde0b052f00b70c7e31ee59f61379969a8800",
+    "prisma/migrations/20260420120000_add_shop_cover_image_display_options/migration.sql": "62425aac25dfaf531b6434b7c5a0ea972eb2311210b706d30c794961d68f3118",
+    "prisma/migrations/20260420130000_split_shop_business_fields/migration.sql": "44461e5a455875589b7aba189e677039a06d5e15e3a1f066d90ebedfc7693a1c",
+    "prisma/migrations/20260424070000_add_pistachio_allergen/migration.sql": "cdfb1ff13b682c20c9cb193675b4137db65157511070c93396ceedf6cefbb5ef",
+    "prisma/migrations/20260611000000_add_shop_area_and_google_place/migration.sql": "b2ab04ad1e0152e22f7520e06e2336b57bda3f47d0640a6684050dd83d072f67",
+    "prisma/migrations/20260622000000_auto_unpublish_incomplete_menus/migration.sql": "879175e45833a5ed7e5c709e15ea33d3ef03b3647dd350ef90a200eacb8ab1b0",
+    "prisma/migrations/20261009000000_menu_food_review/migration.sql": "9e5526e53f718dedde70f028ea93efe8c60fa3f3e614f3e3d6bbe7e35d85bcab",
+    "prisma/migrations/20261021000000_two_step_publication/migration.sql": "bf837d5229801d99e77aada1baf6d0f5fd851973f6580eae29b09c330ec7a407",
+    "prisma/migrations/20261021010000_food_issue_resolution/migration.sql": "e3c4ed93b07ba2f1f9f4aadee87970ab8cb10001c29868468aa288f7343489e9",
+    "prisma/migrations/20261024000000_utc_timestamp_contract/migration.sql": "4b4723163165e35b4cd307c3704aded1842c0847142f12683cddbf3230c9e93d"
+  },
+  "fixture": "All fixtures are inline synthetic SQL; archived rows/dumps are from the task-owned disposable cluster. No live DB/auth/Blob data was accessed.",
+  "safety": "Historical reference, not an executable recommended procedure. Labels/assert/empty public schema checks are scoped guards, not proof of arbitrary Docker environment ownership. --restore-only adds five old checkpoints without re-verifying them. See README.",
+  "validation": "AST syntax parse, ZIP CRC and exact byte/hash equality, migration bytes vs e70d037, existing recorded output hashes, fixture identity and connection/token pattern inspection; no DB tests rerun"
+}

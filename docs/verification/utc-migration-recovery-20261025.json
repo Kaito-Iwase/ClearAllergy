@@ -117,5 +117,23 @@
     "ca-utc-restore-20261025-before": "STOPPED: pre-migration backup restored then migration reapplied",
     "ca-utc-restore-20261025-after": "STOPPED: post-migration backup restored"
   },
-  "harness_preflight_sha256": "9551caddd274b080a42418e53608db438e6a918ab35a862b4ba4fd5a697c4de3"
+  "harness_preflight_sha256": "9551caddd274b080a42418e53608db438e6a918ab35a862b4ba4fd5a697c4de3",
+  "preservation": {
+    "kind": "historical-materials-only-no-new-db-run",
+    "readme": "evidence/20261025-utc-recovery/README.md",
+    "manifest": "evidence/20261025-utc-recovery/manifest.json",
+    "archive": "evidence/20261025-utc-recovery/utc-recovery-originals.zip",
+    "scriptSha256BeforeCopy": "d9ea42ea36faeb728137db9e622ec5fac855cf939606c881173903a3655fdaa8",
+    "scriptSha256ExtractedCopy": "d9ea42ea36faeb728137db9e622ec5fac855cf939606c881173903a3655fdaa8",
+    "archiveSha256": "0f506a1fb0ff99ef49273c3d77f69586f0805a116461e7ea99d882665fcb89a7",
+    "executionTimeHashWasRecorded": false,
+    "version": "Surviving final restore-only version; earlier first-stage file byte identity UNVERIFIED",
+    "notRecommendedForDirectExecution": true,
+    "limits": [
+      "assert guards can be disabled by optimized Python",
+      "container labels/names do not attest arbitrary Docker context or connection environment",
+      "restore-only adds five historical checkpoints without re-verifying them"
+    ],
+    "sourceSubjectHead": "e70d037052242fbc6d0f78860e3a42d2405b681e"
+  }
 }

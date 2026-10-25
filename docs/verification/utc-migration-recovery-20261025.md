@@ -50,6 +50,8 @@ snapshotは全10テーブルの `to_jsonb` を固定順で比較。catalogはinf
 
 この試験の実行用一時probe・詳細log・合成backupは作業worktreeの `.agent-runs/utc-recovery-20261025.py`、`.agent-runs/utc-recovery-evidence-r2/` と `/tmp/clearallergy-utc-*.log` に保存した。probeは既存ハーネスへの追加機能ではなく今回の再現用で、通常回帰の代わりにしない。Git管理した本記録と[判定JSON](utc-migration-recovery-20261025.json)が判定の要約で、ローカル一時ファイルは補助証跡である。
 
+後続の成果物保全で、残存スクリプト・内蔵合成fixture・元出力/backup/logを[未変更の原本ZIPとmanifest](evidence/20261025-utc-recovery/README.md)へ保存した。保全前後のscript hashは一致するが、当時の実行時hashは未記録。残存版は復元再開時の最終版で、前半5試験実行時ファイルとのbyte一致は未確認である。assert依存・container所有確認・再開時の旧checkpoint扱いに限界があるため、履歴資料として保存し、そのまま実行できる推奨手順とはしない。新しいDB試験・独立レビュー・migration変更は行っていない。
+
 - `before.dump` SHA-256：`13160ddea55775af8de3175076fdc95c070e346fa7b85148e89d155e9f60b3a3`
 - `after.dump` SHA-256：`8ab03d9f9e67267498541e0b71e5fc328dfbca78ed0ab3df6c9a3c809aadf03d`
 
