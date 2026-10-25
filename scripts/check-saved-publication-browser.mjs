@@ -47,7 +47,7 @@ async function open({ width = 390, menu = {}, path = "/edit", intercept } = {}) 
             if (method === "GET") f.reads++; else f.writes.push({ method, body });
             const overridden = intercept ? await intercept({ method, body, f }) : null;
             if (overridden?.abort) return route.abort();
-            if (overridden) return route.fulfill({ status: overridden.status || 200, contentType: "application/json", body: JSON.stringify(overridden.body) });
+            if (overridden) return route.fulfill({ status: overridden.status || 200, contentType: overridden.contentType || "application/json", body: overridden.rawBody ?? JSON.stringify(overridden.body) });
             if (method === "GET") return route.fulfill({ json: { menu: f.state } });
             if (method === "POST") {
                 f.state = { ...f.state, ...body, allergens: f.state.allergens.map(a => ({ ...a, status: body.allergenStatusBySlug[a.slug] ?? "UNKNOWN" })) };
@@ -117,6 +117,25 @@ try {
         const f = await open({ intercept: ({ method }) => method === "PUT" ? { status: 500, body: { error: "架空の保存失敗" } } : null });
         try { await f.page.getByLabel("メニュー名", { exact: true }).fill("保持する名前"); await save(f); await f.page.getByRole("alert").waitFor(); assert.equal(await panel(f).count(), 0); assert.equal(await f.page.getByLabel("メニュー名", { exact: true }).inputValue(), "保持する名前"); }
         finally { await f.context.close(); }
+    });
+    await check("HTML save/publish failures keep the operation guidance and input, without showing proxy markup", async () => {
+        for (const action of ["save", "publish"]) {
+            const f = await open({ intercept: ({ method, body }) => method === "PUT" && (action === "save" || body?.publicationAction)
+                ? { status: 502, contentType: "text/html; charset=utf-8", rawBody: "<HTML><BODY>proxy-error-marker</BODY></HTML>" } : null });
+            try {
+                await f.page.getByLabel("メニュー名", { exact: true }).fill("障害時に保持する架空入力");
+                await save(f);
+                if (action === "publish") await panel(f).getByRole("button", { name: "この内容で公開", exact: true }).click();
+                const alert = action === "publish" ? panel(f).getByRole("alert") : f.page.getByRole("alert");
+                await alert.waitFor();
+                assert.doesNotMatch(await alert.innerText(), /proxy-error-marker|<HTML>/);
+                assert.match(await alert.innerText(), action === "publish" ? /公開結果を確認できません。保存済み内容は保持されています/ : /保存/);
+                assert.equal(await f.page.getByLabel("メニュー名", { exact: true }).inputValue(), "障害時に保持する架空入力");
+                assert.equal(f.state.isPublished, false);
+                assert.equal(f.writes.length, action === "publish" ? 2 : 1);
+                if (action === "save") assert.equal(await panel(f).count(), 0);
+            } finally { await f.context.close(); }
+        }
     });
     await check("publish error retains saved snapshot; retry uses same saved version without saving again", async () => {
         let failures = 1;
