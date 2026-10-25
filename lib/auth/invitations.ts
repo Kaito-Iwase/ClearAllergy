@@ -192,7 +192,7 @@ export async function acceptPendingInviteForCurrentUser(args: {
             FROM "AdminInvite"
             WHERE "email" = ${email}
               AND "status" = 'pending'::"InviteStatus"
-              AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
+              AND ("expiresAt" IS NULL OR "expiresAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
             ORDER BY "createdAt" ASC
             LIMIT 1
             FOR UPDATE NOWAIT

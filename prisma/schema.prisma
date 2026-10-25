@@ -8,12 +8,14 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// DateTime values represent UTC instants in TIMESTAMP(3); JSON uses ISO Z.
+// Display conversion to Asia/Tokyo belongs to the formatter, never persistence.
 model User {
   id           String   @id @default(cuid())
   email        String?  @unique
   // Clerk 移行時の互換用。現在のランタイム認証は Clerk セッションを正とします。
   passwordHash String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   updatedAt    DateTime @updatedAt
   // Clerk ユーザーとアプリ内 User を結び付ける主キーです。
   clerkUserId  String?  @unique
@@ -41,7 +43,7 @@ model Shop {
   phoneNumber         String?
   note                String?
   isActive            Boolean       @default(false)
-  createdAt           DateTime      @default(now())
+  createdAt           DateTime      @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   updatedAt           DateTime      @updatedAt
   coverImageUrl       String?
   coverImageFrame     String        @default("wide")
@@ -68,7 +70,7 @@ model AdminInvite {
   acceptedByClerkUserId String?
   acceptedAt            DateTime?
   revokedAt             DateTime?
-  createdAt             DateTime     @default(now())
+  createdAt             DateTime     @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   updatedAt             DateTime     @updatedAt
   shop                  Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
@@ -88,7 +90,7 @@ model AuditLog {
   success     Boolean
   ipAddress   String?
   metadata    Json?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   actorUser   User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([actorUserId])
@@ -122,7 +124,7 @@ model MenuItem {
   legacyPublicationFoodReviewId String?
   creationOperationId String?
   creationRequestHash String?
-  createdAt      DateTime           @default(now())
+  createdAt      DateTime           @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   updatedAt      DateTime           @updatedAt
   shop           Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
   allergenLinks  MenuItemAllergen[]
@@ -139,7 +141,7 @@ model MenuPublicationConfirmation {
   menuItemId  String
   foodVersion Int
   actorUserId String
-  confirmedAt DateTime @default(now())
+  confirmedAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 
   @@index([menuItemId, foodVersion])
@@ -154,7 +156,7 @@ model MenuFoodReview {
   evidenceRefs     String
   scope            String
   checkedAt        DateTime
-  recordedAt       DateTime @default(now())
+  recordedAt       DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   actorUserId      String
   unresolvedIssues String?
   menuItem         MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
@@ -171,7 +173,7 @@ model MenuFoodIssueResolution {
   foodVersion   Int
   issueSnapshot String
   actorUserId   String
-  resolvedAt    DateTime @default(now())
+  resolvedAt    DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   menuItem      MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   foodReview    MenuFoodReview @relation(fields: [foodReviewId], references: [id], onDelete: Cascade)
 
@@ -185,7 +187,7 @@ model Allergen {
   nameJa    String
   nameEn    String
   sortOrder Int                @default(0)
-  createdAt DateTime           @default(now())
+  createdAt DateTime           @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   updatedAt DateTime           @updatedAt
   menuLinks MenuItemAllergen[]
 }
@@ -195,7 +197,7 @@ model MenuItemAllergen {
   allergenId String
   // 未確認を安全側に扱うため、初期値は UNKNOWN にしています。
   status     AllergenStatus @default(UNKNOWN)
-  createdAt  DateTime       @default(now())
+  createdAt  DateTime       @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"))
   updatedAt  DateTime       @updatedAt
   allergen   Allergen       @relation(fields: [allergenId], references: [id], onDelete: Cascade)
   menuItem   MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Cascade)

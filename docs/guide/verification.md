@@ -4,6 +4,8 @@
 
 2026-10-25のPR #96の現mainへのローカル適用は、[公開店舗読取の比較と検証限界](../verification/public-shop-read-performance-20261025.md)を参照してください。隔離DBで取得結果の一致とSELECT 5→4を確認しました。実測速度改善や本番HTTP全体の短縮を示す結果ではありません。
 
+2026-10-25のPR #102の現mainへのローカル適用候補は、[UTC日時の移行・回帰結果](../verification/utc-timestamp-contract-20261025.md)を参照してください。PostgreSQL 17の架空DBで既存値不変と3タイムゾーンを検証し、本番適用・過去値補正・実認証は含めません。
+
 2026-10-23の保存後の同じページでの公開確認は、[実装・検証記録](../verification/saved-menu-publication-20261023.md)を参照してください。保存済み版の読取・公開、未設定時の修正、二重送信・競合・失敗時の表示を対象にし、公開条件やDB契約は変更しません。隔離画面・CIと本番の読取確認を区別します。
 
 2026-10-24のZod/Undici/Honoの追加更新は[対象条件・限定override・検証境界](../verification/runtime-dependency-security-20261024.md)を参照してください。Next更新の別差分です。
