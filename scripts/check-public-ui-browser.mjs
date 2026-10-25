@@ -63,7 +63,12 @@ try {
 
     const defaultChicken = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "照り焼きチキンプレート", exact: true }) });
     assert.match(await defaultChicken.innerText(), /確認対象：特定原材料（9品目）/);
-    assert.match(await defaultChicken.innerText(), /特定原材料：含む/);
+    // The redundant top badge was removed; verify the primary registration rows exactly.
+    const chickenPrimaryRows = defaultChicken.getByRole("group", { name: "店舗が登録したアレルゲン", exact: true }).first().locator("dl > div");
+    assert.deepEqual(await chickenPrimaryRows.evaluateAll(rows => rows.map(row => [
+        row.querySelector("dt").textContent,
+        row.querySelector("dd").textContent.replace(/\s+/g, ""),
+    ])), [["含む", "卵（1品目）"], ["含む可能性あり・要確認", "小麦・乳（2品目）"]]);
     const chickenOther = defaultChicken.getByRole("group", { name: "その他のアレルゲン", exact: true });
     const chickenOtherRows = chickenOther.locator("dl > div");
     assert.match(await chickenOtherRows.filter({ has: page.locator("dt", { hasText: /^含む$/ }) }).innerText(), /大豆・鶏肉\s*（2品目）/);
@@ -73,7 +78,8 @@ try {
     assert.match(primaryText, /含む\s+卵\s*（1品目）/);
     assert.match(primaryText, /含む可能性あり・要確認\s+小麦・乳\s*（2品目）/);
     const defaultPancake = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "米粉パンケーキ", exact: true }) });
-    assert.doesNotMatch(await defaultPancake.innerText(), /特定原材料：含む/);
+    assert.equal(await defaultPancake.getByRole("group", { name: "店舗が登録したアレルゲン", exact: true }).first().innerText(),
+        "確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。");
     assert.match(await defaultPancake.getByRole("group", { name: "その他のアレルゲン", exact: true }).innerText(), /含む\s+大豆\s*（1品目）/);
     pass("Unselected cards classify specified ingredients separately; other CONTAINS/MAY_CONTAIN facts remain visible");
 
