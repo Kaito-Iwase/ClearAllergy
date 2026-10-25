@@ -8,6 +8,7 @@ import type { CSSProperties } from "react";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { readPublicSnapshot } from "./public-read-snapshot";
+import { createPublicAllergenLinkResolver } from "./public-allergen-links";
 import ShareShopUrlButton from "@/features/public/shops/components/ShareShopUrlButton";
 import ShopMenuListClient from "@/features/public/shops/components/ShopMenuListClient";
 import UserAllergenPreferenceClient from "@/features/public/shops/components/UserAllergenPreferenceClient";
@@ -51,7 +52,7 @@ export default async function PublicShopDetailPage({
             const [allergenMaster, shop] = await Promise.all([
                 // アレルゲンマスタは一覧カードや設定 UI の両方で使うため、1 回だけ取得します。
                 tx.allergen.findMany({
-                    select: { slug: true, nameJa: true, sortOrder: true },
+                    select: { id: true, slug: true, nameJa: true, sortOrder: true },
                     orderBy: { sortOrder: "asc" },
                 }),
 
@@ -111,7 +112,7 @@ export default async function PublicShopDetailPage({
                                 allergenLinks: {
                                     select: {
                                         status: true,
-                                        allergen: { select: { slug: true } },
+                                        allergenId: true,
                                     },
                                 },
                             },
@@ -120,9 +121,16 @@ export default async function PublicShopDetailPage({
                 }),
             ]);
 
+            const resolveLinks = createPublicAllergenLinkResolver(allergenMaster);
             return {
-                allergenMaster,
-                shop,
+                allergenMaster: allergenMaster.map(({ slug, nameJa, sortOrder }) => ({ slug, nameJa, sortOrder })),
+                shop: shop ? {
+                    ...shop,
+                    menus: shop.menus.map(menu => ({
+                        ...menu,
+                        allergenLinks: resolveLinks(menu.allergenLinks),
+                    })),
+                } : null,
             };
         }),
         {
