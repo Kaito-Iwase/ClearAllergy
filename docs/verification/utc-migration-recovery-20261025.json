@@ -1,0 +1,121 @@
+{
+  "source_head": "e70d037052242fbc6d0f78860e3a42d2405b681e",
+  "checks": [
+    "legacy writer provenance counterexample",
+    "late SQL failure atomic rollback",
+    "tenth ALTER lock timeout atomic rollback",
+    "exact allowed catalog delta and row preservation",
+    "direct SQL replay",
+    "before custom-format backup restores rows/catalog exactly in a fresh LA cluster; migration reapplies successfully",
+    "after custom-format backup restores rows/catalog exactly in a fresh LA cluster"
+  ],
+  "postgres": "PostgreSQL 17.11 (Debian 17.11-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit",
+  "image": "postgres@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27",
+  "backup_sha256": {
+    "before.dump": "13160ddea55775af8de3175076fdc95c070e346fa7b85148e89d155e9f60b3a3",
+    "after.dump": "8ab03d9f9e67267498541e0b71e5fc328dfbca78ed0ab3df6c9a3c809aadf03d"
+  },
+  "unverified": [
+    "Prisma failed migration ledger/resolve/deploy (official engine download CONNECT 403)",
+    "production provenance/data/locks/backup/provider roles and ACL",
+    "crash or disconnect after commit"
+  ],
+  "date": "2026-10-25",
+  "branch": "codex/utc-migration-boundaries-20261025",
+  "base_main": "0b6ed291b2fd853230c7efdeeb1e061815404a81",
+  "kind": "limited-author-reproduction-not-independent-review",
+  "application_changes": false,
+  "migration_changes": false,
+  "prisma_package": "6.19.3",
+  "runtime": {
+    "node": "24.19.0",
+    "npm": "11.9.0",
+    "repositoryNode": "22.23.4",
+    "repositoryNpm": "11.18.0"
+  },
+  "artifacts_sha256": {
+    "before-rows.json": "d5783de2778f4eff7dcb79dc516f89edf3d7f5c028f18c0a6a965859e90c1a8e",
+    "after-rows.json": "d5783de2778f4eff7dcb79dc516f89edf3d7f5c028f18c0a6a965859e90c1a8e",
+    "before-catalog.json": "081fddcd734a04509d9b55c112d9d6f578ab077fbf64b63240338a088572c0d7",
+    "after-catalog.json": "ca28933acb8f51e0ee395f6dc44e6eda39fd87c88df8c3661639f3742c00c55e"
+  },
+  "commands": [
+    {
+      "command": "npm ci --cache /tmp/clearallergy-utc-npm-cache --no-audit --no-fund",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "command": "node node_modules/prisma/build/index.js generate",
+      "status": "BLOCKED",
+      "exit": 1,
+      "reason": "Official engine CONNECT 403, including normally authorized escalated attempt"
+    },
+    {
+      "command": "node --import tsx scripts/check-utc-timestamp-migration.ts",
+      "status": "BLOCKED",
+      "exit": 1,
+      "reason": "Prisma Client not generated; import failed before DB operations"
+    },
+    {
+      "command": "npm test",
+      "status": "FAIL",
+      "exit": 1,
+      "tests": 173,
+      "pass": 164,
+      "fail": 9,
+      "cancelled": 0,
+      "skipped": 0,
+      "reason": "9 test file initializations failed because Prisma Client was not generated"
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "FAIL",
+      "exit": 2,
+      "reason": "Missing generated Prisma Client types"
+    },
+    {
+      "command": "npm run lint",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "command": "node scripts/agent-harness.mjs verify --base origin/main --output utc-boundaries-harness-preflight.json",
+      "status": "UNVERIFIED",
+      "exit": 1,
+      "commandsRun": [],
+      "codeChecksStatus": "NOT_RUN",
+      "reason": "No declared plan/current live snapshot/trusted GitHub-hosted CI identity"
+    },
+    {
+      "command": "python .agent-runs/utc-recovery-20261025.py",
+      "status": "PARTIAL",
+      "exit": 1,
+      "reason": "5 SQL checks passed; restore startup connection raced temporary server shutdown"
+    },
+    {
+      "command": "python .agent-runs/utc-recovery-20261025.py --restore-only",
+      "status": "PASS",
+      "exit": 0,
+      "reason": "Resumed only backup restore after confirming empty schema; 2 restores passed"
+    },
+    {
+      "command": "npm run build",
+      "status": "NOT_RUN",
+      "reason": "Known Prisma prebuild official engine download blocker; no repeat bypass"
+    },
+    {
+      "command": "node scripts/check-context-links.mjs",
+      "status": "PASS",
+      "exit": 0,
+      "checked": 236
+    }
+  ],
+  "containers": {
+    "ca-utc-boundaries-20261025": "STOPPED: initial incomplete fixture preserved",
+    "ca-utc-boundaries-r2-20261025": "STOPPED: SQL checks",
+    "ca-utc-restore-20261025-before": "STOPPED: pre-migration backup restored then migration reapplied",
+    "ca-utc-restore-20261025-after": "STOPPED: post-migration backup restored"
+  },
+  "harness_preflight_sha256": "9551caddd274b080a42418e53608db438e6a918ab35a862b4ba4fd5a697c4de3"
+}

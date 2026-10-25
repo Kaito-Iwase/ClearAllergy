@@ -8,7 +8,8 @@
       "chore/harness-p0-evidence-20261024": false,
       "fix/next-security-20261024": false,
       "fix/runtime-dependency-security-20261024": false,
-      "codex/font-portability-local-20261025": false
+      "codex/font-portability-local-20261025": false,
+      "codex/utc-migration-boundaries-20261025": false
     }
   }
 }
