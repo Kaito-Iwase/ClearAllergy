@@ -100,6 +100,10 @@
 | ブラウザ・専用DB回帰の実行環境 | [開発手順](development.md#browser) | `scripts/browser-runner.mjs`、`scripts/check-first-use-browser.mjs`、`scripts/check-public-ui-browser.mjs`、`scripts/check-allergen-cards-browser.mjs`、`scripts/check-image-composition-browser.mjs`、`scripts/check-shop-qr-browser.mjs`、`scripts/check-test-browser.mjs`、`scripts/check-test-database.ts`、`scripts/database-regression.ts`、`scripts/test-environment.ts` | `tests/browser-runner.test.ts`、`tests/test-environment.test.ts`。Playwright 1.61.0とChromiumはアプリ依存から隔離し明示的に導入。実DB回帰は接続先ガード通過後に架空データを書き込み、自分の作成分を後始末。実認証とBlobを使うadmin回帰はCIのpublic回帰と分離 |
 | テストデータ・運用補正 | [運用](development.md#operations) | `prisma/demo-menus.ts`、`prisma/seed.ts`、`prisma/repair-published-menus.ts`、`scripts/setup-test-env.ts`、`scripts/test-environment.ts`、`scripts/check-allergen-master.ts`、`scripts/backfill-pistachio-allergen.ts`、`scripts/create-test-user.ts`（廃止済み・常に拒否）、`scripts/migrate-users-to-clerk.ts`、`scripts/cleanup-test-images.ts` | `tests/demo-menu-fixtures.test.ts`、`tests/test-environment.test.ts`、`tests/retired-test-user-command.test.ts`。廃止済み以外の運用コマンドは接続先・副作用・許可を確認してから |
 
+## コンテキストと自律開発
+
+ハーネスや作業規則を変える場合は[自律開発](../agentic-development.md)、[仕様の正本](rules.md)、[文書の保守](maintenance.md)を読み、`scripts/agent-harness.mjs`、[範囲・必要検証の方針](../../scripts/harness-policy.mjs)、[phase証跡](../../scripts/verification-evidence.mjs)、[文書参照検査](../../scripts/check-context-links.mjs)を照合する。回帰入口は`tests/agent-harness.test.ts`、`tests/harness-context.test.ts`、`tests/verification-evidence.test.ts`。実Git範囲、重複PR、取得鮮度、候補/build/serverの一致、必要gate不足と承認の境界を対象にし、通常テスト成功を実Clerk/Blobや食品安全の確認へ拡大しない。CI接続変更は別の権限・検証を要する。
+
 <a id="examples"></a>
 ## 代表的な変更依頼での使い方
 

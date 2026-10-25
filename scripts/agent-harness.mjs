@@ -4,7 +4,9 @@ import { closeSync, existsSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, 
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveNpmCli } from "./npm-cli.mjs";
-import { buildFingerprint, candidateIdentity, combinePhaseEvidence, failureDiagnostics, PHASES } from "./verification-evidence.mjs";
+import { buildFingerprint, candidateIdentity, combinePhaseEvidence, failureDiagnostics, serverEvidenceMatches, PHASES } from "./verification-evidence.mjs";
+import { inventoryComplete, readGitChanges, scopePreflight, executionPreflight, verificationOutcome, validScopePath, scopesOverlap, protectedArea } from "./harness-policy.mjs";
+export { validScopePath, scopesOverlap, protectedArea } from "./harness-policy.mjs";
 
 export const ASSESSMENT_MARKER = "<!-- clearallergy-agent:v1 -->";
 const REPOSITORY = "Kaito-Iwase/ClearAllergy";
@@ -14,21 +16,12 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const nonempty = (value) => typeof value === "string" && value.trim().length > 0;
 const stringList = (value) => Array.isArray(value) && value.length > 0 && value.every(nonempty);
 const validNumber = (value) => Number.isSafeInteger(value) && value > 0;
-export function validScopePath(value) {
-    return nonempty(value) && !value.startsWith("/") && !/[\\:\x00-\x1f]/.test(value)
-        && value.replace(/\/$/, "").split("/").every((part) => part !== "" && part !== "." && part !== "..");
-}
-export function scopesOverlap(left, right) {
-    const a = left.replace(/\/$/, "").toLowerCase();
-    const b = right.replace(/\/$/, "").toLowerCase();
-    return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
-}
 
 export function definitionHash(issue) {
     return sha256(JSON.stringify([issue.number, issue.title, issue.body ?? ""]));
 }
 
-// Read only tagged JSON from comments, never instructions in arbitrary issue text.
+// Tagged comments are assessment data, never proof of human authorization.
 export function assessmentFromComments(comments) {
     const latest = [...comments].reverse().find((comment) => comment.body?.includes(ASSESSMENT_MARKER));
     if (!latest) return null;
@@ -38,15 +31,9 @@ export function assessmentFromComments(comments) {
     catch { return null; }
 }
 
-export function protectedArea(paths) {
-    const scopes = ["prisma", "proxy.ts", "lib/auth", "lib/allergens.ts", "lib/db", "lib/db.ts", "features/admin", "app/api"];
-    return paths.some((path) => scopes.some((scope) => scopesOverlap(path, scope))
-        || /allergen|publication|invitation|privacy|terms/i.test(path));
-}
-
 // Advisory selection only. This function grants no GitHub, shell or merge authority.
 export function assessQueue(snapshot, now = Date.now()) {
-    if (snapshot.repository !== REPOSITORY || snapshot.version !== 1 || !nonempty(snapshot.actorLogin)
+    if (!inventoryComplete(snapshot) || snapshot.repository !== REPOSITORY || snapshot.version !== 1 || !nonempty(snapshot.actorLogin)
         || !/^[a-f0-9]{40}$/.test(snapshot.baseSha ?? "") || !Array.isArray(snapshot.issues) || !Array.isArray(snapshot.pullRequests)) {
         throw new Error("Invalid GitHub snapshot; do not select an issue.");
     }
@@ -72,7 +59,7 @@ export function assessQueue(snapshot, now = Date.now()) {
             || /^\s*(?:[-+]\s+)?(?:状態|Status\b)\s*[:：]?\s*(?:HUMAN_DECISION_REQUIRED|BLOCKED)\b/im.test(statusText)) reasons.push("human decision or body blocker");
         if ((issue.labels ?? []).some((label) => ["agent-blocked", "human-review", "duplicate", "invalid", "wontfix"].includes(label))) reasons.push("blocking label");
         if (!(issue.labels ?? []).includes("agent-ready")) reasons.push("not labelled agent-ready");
-        if (!plan || record.author !== snapshot.actorLogin || !nonempty(record.url)) reasons.push("missing trusted assessment comment");
+        if (!plan || record.author !== snapshot.actorLogin || !nonempty(record.url)) reasons.push("missing matching assessment record");
         if (plan) {
             if (plan.state !== "ready") reasons.push(`assessment state ${plan.state}`);
             if (plan.definitionHash !== definitionHash(issue) || plan.baseSha !== snapshot.baseSha) reasons.push("assessment no longer matches definition/base");
@@ -105,14 +92,15 @@ export function assessQueue(snapshot, now = Date.now()) {
         const paths = Array.isArray(plan?.paths) ? plan.paths : [];
         return { number: issue.number, title: issue.title, ready: reasons.length === 0, reasons,
             priority: plan?.priority ?? null, risk: protectedArea(paths) ? "high" : plan?.risk ?? null,
-            manualMergeRequired: true, assessmentUrl: record?.url ?? null };
+            manualMergeRequired: true, implementationAuthority: "UNVERIFIED", assessmentUrl: record?.url ?? null };
     });
     rows.sort((a, b) => Number(b.ready) - Number(a.ready)
         || (PRIORITIES.indexOf(a.priority) < 0 ? 99 : PRIORITIES.indexOf(a.priority)) - (PRIORITIES.indexOf(b.priority) < 0 ? 99 : PRIORITIES.indexOf(b.priority))
         || a.number - b.number);
     return { repository: snapshot.repository, fetchedAt: snapshot.fetchedAt, baseSha: snapshot.baseSha,
         selected: rows.find((row) => row.ready)?.number ?? null, issues: rows,
-        nextAction: rows.some((row) => row.ready) ? "re-fetch selected issue, comments, dependencies and PRs; claim before implementation" : "one bounded repository audit; then record blockers and stop if no ready issue" };
+        implementationAuthority: "UNVERIFIED", commentsAreLocks: false,
+        nextAction: rows.some((row) => row.ready) ? "re-fetch issue/comments/dependencies/PRs; check current user authorization independently; a claim is not a lock" : "one bounded repository audit; then record blockers and stop if no ready issue" };
 }
 
 export function verificationCommands(pkg) {
@@ -140,6 +128,31 @@ function captureCandidate(baseSha) {
 function diagnostics(output, result) {
     const tests = git("ls-files", "tests").split(/\r?\n/).filter(path => path.endsWith(".test.ts"));
     return failureDiagnostics(output, result, tests);
+}
+
+// Only bounded, regular, single-link JSON under the evidence directory. The
+// held descriptor binds the bytes read; this is not an OS sandbox guarantee.
+function readEvidenceJson(name) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.json$/.test(name)) throw new Error("Invalid evidence filename.");
+    const directory = ".agent-runs", path = join(directory, name);
+    const parent = lstatSync(directory, { bigint: true });
+    const initial = lstatSync(path, { bigint: true });
+    if (!parent.isDirectory() || parent.isSymbolicLink() || !initial.isFile() || initial.isSymbolicLink() || initial.nlink !== 1n || initial.size > 1_000_000n) throw new Error("Unsafe evidence file.");
+    const fd = openSync(path, "r");
+    try {
+        const held = fstatSync(fd, { bigint: true });
+        if (held.ino !== initial.ino || (process.platform !== "win32" && held.dev !== initial.dev) || held.nlink !== 1n || held.size !== initial.size) throw new Error("Evidence changed while opening.");
+        const bytes = readFileSync(fd);
+        const after = fstatSync(fd, { bigint: true }), finalParent = lstatSync(directory, { bigint: true });
+        if (bytes.length > 1_000_000 || held.size !== after.size || held.mtimeNs !== after.mtimeNs || parent.ino !== finalParent.ino || finalParent.isSymbolicLink()) throw new Error("Evidence changed while reading.");
+        return { sha256: sha256(bytes), report: JSON.parse(bytes.toString("utf8").replace(/^\uFEFF/, "")) };
+    } finally { closeSync(fd); }
+}
+
+export function readServerEvidence(receipt) {
+    const expected = `server-${receipt.phase === "browser-public" ? "public" : "propagation"}-${receipt.runId}.json`;
+    if (receipt.serverEvidence !== expected || !/^server-(?:public|propagation)-[a-f0-9-]{36}\.json$/.test(expected)) return null;
+    try { return readEvidenceJson(expected); } catch { return null; }
 }
 
 export function prepareReportPath(root, output) {
@@ -180,10 +193,11 @@ export function publishReport(handle, report, candidateUnchanged) {
         writeSync(handle.fd, `${JSON.stringify(value, null, 2)}\n`, 0, "utf8");
     };
     // A crash or failed final check must never leave resumable PASS evidence.
-    write({ ...report, status: "VERIFYING" });
+    write({ ...report, status: "VERIFYING", verificationComplete: false });
     report.publicationSafe = sameReportLocation(handle);
     report.candidateUnchanged = report.candidateUnchanged && candidateUnchanged();
     if (!report.publicationSafe || !report.candidateUnchanged) report.status = "FAIL";
+    if (Object.hasOwn(report, "verificationComplete")) report.verificationComplete = report.status === "PASS";
     write(report); // Held descriptor cannot follow a directory/link swapped during checks.
     return report;
 }
@@ -219,9 +233,33 @@ function checkEnvironment({ database = false, browser = false } = {}) {
     return safe;
 }
 
-export function runPhase({ base, phase, output }) {
-    if (!Object.hasOwn(PHASES, phase)) throw new Error("Unknown verification phase.");
+function prepareVerification(base, plan, snapshot) {
     const baseSha = resolveBase(base);
+    const changes = readGitChanges(baseSha);
+    const scope = scopePreflight(plan, changes, snapshot);
+    if (scope.status === "PASS" && snapshot.baseSha !== baseSha) { scope.status = "UNVERIFIED"; scope.reasons.push("GitHub snapshot base differs from actual diff base"); }
+    return { baseSha, changes, scope, execution: executionPreflight() };
+}
+
+function reportPreflight(preflight, output) {
+    const head = git("rev-parse", "HEAD");
+    const before = sha256(JSON.stringify(preflight.changes));
+    const handle = beginReport(process.cwd(), output);
+    try {
+        return publishReport(handle, { version: 3, kind: "preflight", head, baseSha: preflight.baseSha,
+            status: preflight.scope.status === "FAIL" ? "FAIL" : "UNVERIFIED", scope: preflight.scope, execution: preflight.execution,
+            commands: [], codeChecksStatus: "NOT_RUN", sourceIdentityCaptured: false, candidateUnchanged: true,
+            missingRequiredChecks: preflight.scope.verification.phases, manualChecks: preflight.scope.verification.manual,
+            implementationAuthority: "UNVERIFIED" }, () => head === git("rev-parse", "HEAD") && before === sha256(JSON.stringify(readGitChanges(preflight.baseSha))));
+    } finally { closeSync(handle.fd); }
+}
+
+/** @param {{base: string, phase: string, output?: string, plan?: any, snapshot?: any}} options */
+export function runPhase({ base, phase, output, plan = null, snapshot = null }) {
+    if (!Object.hasOwn(PHASES, phase)) throw new Error("Unknown verification phase.");
+    const preflight = prepareVerification(base, plan, snapshot);
+    if (preflight.scope.status !== "PASS" || !preflight.execution.allowed) return reportPreflight(preflight, output ?? `${phase}.json`);
+    const baseSha = preflight.baseSha;
     const browser = phase.startsWith("browser-") || phase === "propagation";
     const database = phase.startsWith("db-") || phase.endsWith("-upgrade") || ["prepare-fixture", "browser-public", "propagation"].includes(phase);
     const env = checkEnvironment({ database, browser });
@@ -229,6 +267,7 @@ export function runPhase({ base, phase, output }) {
     env.CLEARALLERGY_PHASE_RUN_ID = runId;
     const before = captureCandidate(baseSha);
     const buildBefore = buildFingerprint(process.cwd());
+    env.CLEARALLERGY_PHASE_CANDIDATE_ID = before.id;
     const handle = beginReport(process.cwd(), output ?? `${phase}.json`);
     try {
         const spec = PHASES[phase];
@@ -248,6 +287,11 @@ export function runPhase({ base, phase, output }) {
                 fixture: database ? "fictional-ci" : "no-database" },
             ci: { sha: /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA ?? "") ? process.env.GITHUB_SHA : null },
             status: result.status === 0 && !result.error && buildUnchanged && (phase !== "build" || buildAfter !== null) ? "PASS" : "FAIL" };
+        if (["browser-public", "propagation"].includes(phase)) {
+            const support = readServerEvidence(report);
+            report.serverEvidenceSha256 = support?.sha256 ?? null;
+            if (!serverEvidenceMatches(report, support, before)) report.status = "FAIL";
+        }
         return publishReport(handle, report, () => captureCandidate(baseSha).id === before.id);
     } finally { closeSync(handle.fd); }
 }
@@ -257,27 +301,41 @@ function resolveBase(base) {
     return git("rev-parse", "--verify", `${base}^{commit}`);
 }
 
-export function summarizePhases({ base, inputs, required, output }) {
-    const baseSha = resolveBase(base);
+/** @param {{base: string, inputs: string[], required: string[], output?: string, plan?: any, snapshot?: any}} options */
+export function summarizePhases({ base, inputs, required, output, plan = null, snapshot = null }) {
+    const preflight = prepareVerification(base, plan, snapshot);
+    if (preflight.scope.status !== "PASS") return reportPreflight(preflight, output ?? "phase-summary.json");
+    const baseSha = preflight.baseSha;
     const before = captureCandidate(baseSha);
     const receipts = inputs.map(name => {
         if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.json$/.test(name)) throw new Error("Invalid phase evidence filename.");
-        const path = join(".agent-runs", name);
-        if (!existsSync(path)) return null;
-        const stat = lstatSync(path);
-        if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new Error("Unsafe phase evidence file.");
-        try { return JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error("Invalid phase evidence JSON."); }
+        if (!existsSync(join(".agent-runs", name))) return null;
+        try { return readEvidenceJson(name).report; } catch { throw new Error("Invalid or unsafe phase evidence JSON."); }
     }).filter(Boolean);
-    const report = { version: 2, kind: "summary", ...combinePhaseEvidence(receipts, required, before), candidateUnchanged: true };
+    const supports = {};
+    for (const receipt of receipts) {
+        if (!["browser-public", "propagation"].includes(receipt.phase)) continue;
+        const support = readServerEvidence(receipt);
+        if (support) supports[receipt.serverEvidence] = support;
+    }
+    const needed = [...new Set([...required, ...preflight.scope.verification.phases])];
+    const report = { version: 3, kind: "summary", ...combinePhaseEvidence(receipts, needed, before, supports), scope: preflight.scope, candidateUnchanged: true,
+        manualChecks: preflight.scope.verification.manual.map(check => ({ check, status: "UNVERIFIED" })) };
+    if (report.status === "PASS" && report.manualChecks.length) report.status = "UNVERIFIED";
+    report.verificationComplete = report.status === "PASS";
     const handle = beginReport(process.cwd(), output ?? "phase-summary.json");
     try { return publishReport(handle, report, () => captureCandidate(baseSha).id === before.id); }
     finally { closeSync(handle.fd); }
 }
 
-export function verify({ base, output = "verification.json" }) {
+/** @param {{base: string, output?: string, plan?: any, snapshot?: any}} options */
+export function verify({ base, output = "verification.json", plan = null, snapshot = null }) {
     if (!nonempty(base) || base.startsWith("-") || !/^[A-Za-z0-9_/.-]+$/.test(base)) throw new Error("Specify an existing base ref explicitly.");
+    const preflight = prepareVerification(base, plan, snapshot);
+    if (preflight.scope.status !== "PASS" || !preflight.execution.allowed) return reportPreflight(preflight, output);
     const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-    const commands = verificationCommands(pkg);
+    const commands = verificationCommands(pkg).filter(command => command.prisma ? preflight.scope.verification.phases.includes("build") : preflight.scope.verification.phases.includes(command.name));
+    commands.push({ name: "context-links", args: ["scripts/check-context-links.mjs"], nodeScript: true });
     const env = checkEnvironment();
     const npmCli = resolveNpmCli();
     const npm = npmCli.path;
@@ -295,7 +353,7 @@ export function verify({ base, output = "verification.json" }) {
     for (const command of commands) {
         const phaseBefore = captureCandidate(baseSha);
         const start = Date.now();
-        const args = command.prisma ? [prisma, command.prisma] : [npm, ...command.args];
+        const args = command.prisma ? [prisma, command.prisma] : command.nodeScript ? command.args : [npm, ...command.args];
         const result = spawnSync(process.execPath, args, { env, encoding: "utf8", windowsHide: true, timeout: 10 * 60_000, maxBuffer: 16 * 1024 * 1024 });
         const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
         const phaseAfter = captureCandidate(baseSha);
@@ -304,7 +362,7 @@ export function verify({ base, output = "verification.json" }) {
             const match = combined.match(new RegExp(`^# ${key} (\\d+)$`, "m"));
             if (match) counts[key] = Number(match[1]);
         }
-        results.push({ name: command.name, commandDefinitionSha256: sha256(command.script ?? `prisma ${command.prisma}`), exitCode: result.status,
+        results.push({ name: command.name, commandDefinitionSha256: sha256(command.nodeScript ? "node scripts/check-context-links.mjs" : command.script ?? `prisma ${command.prisma}`), exitCode: result.status,
             status: result.status === 0 && !result.error && phaseBefore.id === candidate.id && phaseAfter.id === candidate.id ? "PASS" : "FAIL", elapsedMs: Date.now() - start, counts,
             diagnostics: diagnostics(combined, result), candidateBefore: phaseBefore.id, candidateAfter: phaseAfter.id,
             errorCode: result.error?.code ?? null, outputSha256: sha256(combined) });
@@ -319,8 +377,9 @@ export function verify({ base, output = "verification.json" }) {
         harnessSha256: harnessBefore, lockSha256: sha256(readFileSync("package-lock.json")),
         runtime: { actualNode: process.versions.node, expectedNode, matches: process.versions.node === expectedNode, actualNpm: npmCli.version },
         commands: results, diffCheck: whitespace.status === 0 ? "PASS" : "FAIL",
-        unverified: ["real PostgreSQL constraints/races", "browser and accessibility", "real Clerk/Blob", "GitHub checks", "deployment and user comprehension"] };
-    report.status = results.length === commands.length && results.every((result) => result.status === "PASS") && report.candidateUnchanged && report.diffCheck === "PASS" ? "PASS" : "FAIL";
+        scope: preflight.scope, execution: preflight.execution, implementationAuthority: "UNVERIFIED",
+        unverified: ["real Clerk/Blob", "GitHub checks", "deployment and user comprehension"] };
+    Object.assign(report, verificationOutcome(preflight.scope.verification, results, results.length === commands.length, report.candidateUnchanged, report.diffCheck === "PASS"));
     return publishReport(handle, report, () => after === fingerprint() && head === git("rev-parse", "HEAD")
         && harnessBefore === sha256(readFileSync(new URL(import.meta.url))));
     } finally { closeSync(handle.fd); }
@@ -331,16 +390,21 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
         const [command, ...args] = process.argv.slice(2);
         const flags = {};
         for (let i = 0; i < args.length; i += 2) {
-            if (!["--snapshot", "--base", "--output", "--phase", "--inputs", "--required"].includes(args[i]) || !args[i + 1] || flags[args[i]]) throw new Error("Invalid arguments.");
+            if (!["--snapshot", "--plan", "--base", "--output", "--phase", "--inputs", "--required"].includes(args[i]) || !args[i + 1] || flags[args[i]]) throw new Error("Invalid arguments.");
             flags[args[i]] = args[i + 1];
         }
-        const result = command === "queue" && flags["--snapshot"]
-            ? assessQueue(JSON.parse(readFileSync(flags["--snapshot"], "utf8").replace(/^\uFEFF/, "")))
-            : command === "verify" ? verify({ base: flags["--base"], output: flags["--output"] })
-                : command === "phase" ? runPhase({ base: flags["--base"], phase: flags["--phase"], output: flags["--output"] })
-                    : command === "summarize" ? summarizePhases({ base: flags["--base"], inputs: (flags["--inputs"] ?? "").split(","), required: (flags["--required"] ?? "").split(","), output: flags["--output"] }) : null;
+        const data = value => {
+            if (!value) return null;
+            const name = value.replaceAll("\\", "/").replace(/^\.agent-runs\//, "");
+            return readEvidenceJson(name).report;
+        };
+        const plan = data(flags["--plan"]), snapshot = data(flags["--snapshot"]);
+        const result = command === "queue" && snapshot ? assessQueue(snapshot)
+            : command === "verify" ? verify({ base: flags["--base"], output: flags["--output"], plan, snapshot })
+                : command === "phase" ? runPhase({ base: flags["--base"], phase: flags["--phase"], output: flags["--output"], plan, snapshot })
+                    : command === "summarize" ? summarizePhases({ base: flags["--base"], inputs: (flags["--inputs"] ?? "").split(","), required: (flags["--required"] ?? "").split(","), output: flags["--output"], plan, snapshot }) : null;
         if (!result) throw new Error("Use queue --snapshot <file> or verify --base <ref> [--output <name.json>].");
         console.log(JSON.stringify(result, null, 2));
         if (["FAIL", "UNVERIFIED"].includes(result.status)) process.exitCode = 1;
-    } catch (error) { console.error(error.message); process.exitCode = 1; }
+    } catch { console.error("Harness refused invalid/unsafe input or an unavailable precondition; raw errors were not printed."); process.exitCode = 1; }
 }

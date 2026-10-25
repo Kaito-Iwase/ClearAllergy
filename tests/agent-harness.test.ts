@@ -17,13 +17,14 @@ function ready(number = 1, priority = "correctness") {
     return issue;
 }
 function snapshot(issues = [ready()]) {
-    return { version: 1, repository: "Kaito-Iwase/ClearAllergy", actorLogin: "Kaito-Iwase", baseSha, fetchedAt: new Date(now).toISOString(), issues, pullRequests: [] as { number: number; state: string; linkedIssues: number[]; changedFiles: string[] }[] };
+    return { collectionComplete: { issues: true, pullRequests: true, comments: true, dependencies: true, pullRequestFiles: true }, version: 1, repository: "Kaito-Iwase/ClearAllergy", actorLogin: "Kaito-Iwase", baseSha, fetchedAt: new Date(now).toISOString(), issues, pullRequests: [] as { number: number; state: string; linkedIssues: number[]; changedFiles: string[] }[] };
 }
 
 test("a current complete assessment enables a proposal, never merge authority", () => {
     const result = assessQueue(snapshot(), now);
     assert.equal(result.selected, 1);
     assert.equal(result.issues[0].manualMergeRequired, true);
+    assert.equal(result.implementationAuthority, "UNVERIFIED");
 });
 test("labels alone and untrusted assessments cannot make an issue ready", () => {
     const issue = ready();
@@ -103,10 +104,11 @@ test("a changed candidate persists FAIL evidence instead of a stale PASS", () =>
     const root = mkdtempSync(join(tmpdir(), "clearallergy-report-change-"));
     const handle = beginReport(root, "report.json");
     try {
-        const result = publishReport(handle, { status: "PASS", candidateUnchanged: true }, () => false);
+        const result = publishReport(handle, { status: "PASS", candidateUnchanged: true, verificationComplete: true }, () => false);
         assert.equal(result.status, "FAIL");
         const stored = JSON.parse(readFileSync(handle.path, "utf8"));
         assert.equal(stored.status, "FAIL"); assert.equal(stored.candidateUnchanged, false);
+        assert.equal(stored.verificationComplete, false);
     } finally { closeSync(handle.fd); assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep)); rmSync(root, { recursive: true, force: true }); }
 });
 test("swapping the report directory cannot write through a new junction", () => {

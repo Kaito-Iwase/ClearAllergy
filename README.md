@@ -8,7 +8,7 @@
 
 [主な機能](#features) · [設計上の工夫](#design) · [システム構成](#architecture) · [デモ・起動](#demo) · [開発ドキュメント](#reading-order)
 
-二段階公開への変更を独立作業ブランチで実装・検証しました。新規・食品変更は非公開で保存し、保存済み内容を見直して別に公開します。以前の未解決がある場合は、表示された内容に対応して「この内容は解消した」を操作した後、別に公開します。[判断理由と承認範囲](docs/research/product/two-step-publication-decision-20261021.md)と[検証記録](docs/verification/two-step-publication-20261021.md)を参照してください。本番未適用です。
+二段階公開はmainに実装されています。新規・食品変更は非公開で保存し、保存済み内容を見直して別に公開します。以前の未解決がある場合は、表示された内容に対応して「この内容は解消した」を操作した後、別に公開します。[判断理由と承認範囲](docs/research/product/two-step-publication-decision-20261021.md)、[検証記録](docs/verification/two-step-publication-20261021.md)、保存後公開パネルの[PR #97](https://github.com/Kaito-Iwase/ClearAllergy/pull/97)を参照してください。現在の本番データ・動作や配備状態は別途確認が必要です。この実装の説明は、食品安全の保証を意味しません。
 
 ## 制作背景
 

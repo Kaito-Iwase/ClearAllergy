@@ -19,7 +19,8 @@
 - Problem → Evidence → Cause → Candidate solutions → Decision → VerificationをIssue commentへ記録する。labelだけではReadyにしない。
 - GitHub本文のHUMAN_DECISION_REQUIRED、依存、owner、対象環境、既存PRを再確認し、不明ならblockする。claim後も再取得する。既定の実装並列度は1。
 - canonical checkoutを入口に、許可された独立worktreeで1 Issue / 1 branch / 1 worktree / 1 PR。既存未commit変更・他の作業領域を保持する。
-- `node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json`は候補の提案、`node scripts/agent-harness.mjs verify --base origin/main`は既存scriptsのローカル検証。GitHubと実DB/browserの確認は別。snapshot/出力に秘密値を含めない。
+- `node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json`は候補の提案。`verify` / `phase` / `summarize`は明示base、`--plan .agent-runs/plan.json`、完全で新しい`--snapshot .agent-runs/queue.json`を要求し、宣言範囲とrename元/先・未追跡を含むGit差分を照合する。逸脱時は停止し、既存PRの継続は番号・Issue・取得headを明示する。コメントやAI評価は人間承認にも排他ロックにもならない。
+- lint/type/test/buildの成功と、変更に必要な実DB・競合・公開browser・手動確認の完了を分ける。不足はUNVERIFIED。snapshot/診断に秘密値を含めない。候補実行は信頼できる一時CI等へ隔離する。env除去・CI環境変数の一致はOS隔離の証明ではなく、実資格情報のあるホストで未信頼のコード/npm scriptsを実行しない。[実行境界と証拠](docs/agentic-development.md#execution-boundary)を確認する。
 - DB/browser等を別実行する場合は `phase --base <同じref> --phase <固定ID>` で候補・build hash付き証跡を作り、`summarize --base <ref> --inputs <JSON名のカンマ区切り> --required <phase IDのカンマ区切り>` で照合する。[証拠の契約](docs/agentic-development.md#phase-evidence)に従い、候補/成果物違い・不足・失敗をPASSへ統合しない。独立review・remote CIは別確認。
 - 検証用npmはアプリ依存に同梱せず、Node配布またはnpm lifecycleの既存CLIを `scripts/npm-cli.mjs` で解決する。CLIが見つからない場合は導入せず停止する。[開発手順](docs/guide/development.md#environment)とreportの実Node/npm版を確認する。Next lintの限定glob互換層はplugin更新時に利用API・rootDir・内部リンク検知・clean install/auditを再確認する。
 - 独立reviewは、実装履歴を共有しない読取専用subagentへ委任する。Issue、base/head、diff、Invariantと検証結果を渡し、self reviewと区別する。委任できなければDraftで未実施を明記。fix→verify→reviewは最大3 rounds、同じ重大指摘の再発2回で停止。
@@ -29,11 +30,11 @@
 
 ## 作業環境と開始時の確認
 
-開発環境はWSLからWindowsへ移行済みです。今後の作業先は必ず次のフォルダを使用してください。
+開発環境はWSLからWindowsへ移行済みです。現在の正規checkoutを確認する入口は次のフォルダです。
 
 `C:\Users\kaito\Documents\Github\ClearAllergy`
 
-- PowerShellを前提とし、コマンドは上記フォルダで実行する。
+- PowerShellを前提とする。許可された独立worktreeを使う場合は、その実際のルートでコマンドを実行する。正規checkoutの未コミット変更を移動・破棄せず、`git worktree list`と各HEADを確認する。正規パスを理由に別worktreeの変更を混ぜない。
 - WSL側の元フォルダや、次のバックアップは作業先にしない。明示的な依頼なしに変更・削除しない。
   - `C:\Users\kaito\Documents\Github\ClearAllergy-before-wsl-return-20260920`
   - `C:\Users\kaito\Documents\Github\ClearAllergy-wsl-import-20260920`

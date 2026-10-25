@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildFingerprint, candidateIdentity, combinePhaseEvidence, failureDiagnostics } from "../scripts/verification-evidence.mjs";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -97,50 +97,33 @@ test("launch, timeout and uncategorized failures remain explicit without arbitra
     assert.equal(JSON.stringify(failureDiagnostics("", { status: 1, error: { code: "private-value" } })).includes("private-value"), false);
 });
 
-test("real phase CLI strips secrets, persists failures, and rejects old receipts after a source edit", () => {
-    const root = mkdtempSync(join(tmpdir(), "ca-phase-evidence-"));
+test("phase CLI refuses host execution and never runs a repository script without its preconditions", () => {
+    const root = mkdtempSync(join(tmpdir(), "ca-phase-preflight-"));
     const env: NodeJS.ProcessEnv = { NODE_ENV: "test" };
     for (const [key, value] of Object.entries(process.env)) if (/^(PATH|PATHEXT|SYSTEMROOT|WINDIR|COMSPEC|TEMP|TMP|HOME|USERPROFILE|APPDATA|LOCALAPPDATA)$/i.test(key)) env[key] = value;
-    env.BLOB_READ_WRITE_TOKEN = "private-provider-token";
+    env.BLOB_READ_WRITE_TOKEN = "private-provider-fixture";
     const git = (...args: string[]) => {
         const result = spawnSync("git", args, { cwd: root, env, encoding: "utf8", windowsHide: true });
         assert.equal(result.status, 0, result.stderr);
     };
     try {
-        mkdirSync(join(root, "scripts")); mkdirSync(join(root, "tests"));
-        for (const name of ["agent-harness.mjs", "verification-evidence.mjs", "npm-cli.mjs"])
+        mkdirSync(join(root, "scripts"));
+        for (const name of ["agent-harness.mjs", "verification-evidence.mjs", "npm-cli.mjs", "harness-policy.mjs"])
             cpSync(fileURLToPath(new URL("../scripts/" + name, import.meta.url)), join(root, "scripts", name));
         writeFileSync(join(root, ".gitignore"), "node_modules/\n.agent-runs/\n");
         writeFileSync(join(root, "package.json"), "{}"); writeFileSync(join(root, "package-lock.json"), "{}");
-        writeFileSync(join(root, "tests", "example.test.ts"), "// fixture source\n");
         git("init", "--quiet"); git("add", ".");
         git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture");
         mkdirSync(join(root, "node_modules/prisma/build"), { recursive: true });
-        writeFileSync(join(root, "node_modules/prisma/build/index.js"), `
-if (process.env.BLOB_READ_WRITE_TOKEN) throw new Error('inherited provider secret');
-if (process.argv[2] === 'validate') {
- console.log('not ok 1 - private test name');
- console.log("  location: '/private/root/tests/example.test.ts:10:1'");
- console.log('ERR_ASSERTION P1001 token=secret-value personal@example.invalid');
- process.exitCode = 1;
-}
-`);
-        const run = (...args: string[]) => spawnSync(process.execPath, ["scripts/agent-harness.mjs", ...args], { cwd: root, env, encoding: "utf8", windowsHide: true });
-        assert.equal(run("phase", "--base", "HEAD", "--phase", "prisma-generate").status, 0);
-        assert.equal(run("phase", "--base", "HEAD", "--phase", "prisma-validate").status, 1);
-        const failed = readFileSync(join(root, ".agent-runs/prisma-validate.json"), "utf8");
-        const receipt = JSON.parse(failed);
-        assert.equal(receipt.status, "FAIL"); assert.equal(receipt.publicationSafe, true);
-        assert.deepEqual(receipt.diagnostics.failedCases, ["tests/example.test.ts:10:1"]);
-        for (const secret of ["private-provider-token", "private test name", "secret-value", "personal@", "/private/root"]) assert.ok(!failed.includes(secret));
-        assert.equal(run("summarize", "--base", "HEAD", "--inputs", "prisma-generate.json", "--required", "prisma-generate", "--output", "summary-before.json").status, 0);
-        writeFileSync(join(root, "tests/example.test.ts"), "// changed after validation\n");
-        assert.equal(run("summarize", "--base", "HEAD", "--inputs", "prisma-generate.json", "--required", "prisma-generate", "--output", "summary-after.json").status, 1);
-        assert.equal(JSON.parse(readFileSync(join(root, ".agent-runs/summary-after.json"), "utf8")).status, "FAIL");
-        assert.equal(run("phase", "--base", "HEAD", "--phase", "db-snapshot").status, 1, "No inherited production/dedicated DB is accepted without the explicit CI target");
-    } finally {
-        assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep)); rmSync(root, { recursive: true, force: true });
-    }
+        writeFileSync(join(root, "node_modules/prisma/build/index.js"), "require('node:fs').writeFileSync('script-ran.txt','fixture');");
+        const result = spawnSync(process.execPath, ["scripts/agent-harness.mjs", "phase", "--base", "HEAD", "--phase", "prisma-generate"], { cwd: root, env, encoding: "utf8", windowsHide: true });
+        assert.equal(result.status, 1);
+        const saved = readFileSync(join(root, ".agent-runs/prisma-generate.json"), "utf8"), report = JSON.parse(saved);
+        assert.equal(report.kind, "preflight"); assert.equal(report.status, "UNVERIFIED");
+        assert.equal(report.codeChecksStatus, "NOT_RUN"); assert.equal(report.execution.osIsolationProven, false);
+        assert.equal(existsSync(join(root, "script-ran.txt")), false);
+        assert.equal(saved.includes("private-provider-fixture"), false);
+    } finally { assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep)); rmSync(root, { recursive: true, force: true }); }
 });
 
 test("public phase owns its current-build server and ignores a caller's existing app", async () => {
@@ -151,7 +134,7 @@ test("public phase owns its current-build server and ignores a caller's existing
     const address = old.address(); assert.ok(address && typeof address === "object");
     try {
         mkdirSync(join(root, "scripts")); mkdirSync(join(root, "node_modules/next/dist/bin"), { recursive: true });
-        for (const name of ["run-public-phase.mjs", "ci-environment.ts", "ci-log-summary.ts", "agent-harness.mjs", "verification-evidence.mjs", "npm-cli.mjs"])
+        for (const name of ["run-public-phase.mjs", "ci-environment.ts", "ci-log-summary.ts", "agent-harness.mjs", "verification-evidence.mjs", "npm-cli.mjs", "harness-policy.mjs"])
             cpSync(fileURLToPath(new URL("../scripts/" + name, import.meta.url)), join(root, "scripts", name));
         writeFileSync(join(root, "node_modules/next/dist/bin/next"), `
 const http = require('node:http');
@@ -177,6 +160,11 @@ console.log('OWNED_PID '+body.pid);
         assert.equal(summaries.length, 1);
         const summary = readFileSync(join(root, ".agent-runs", summaries[0]), "utf8");
         assert.equal(JSON.parse(summary).categories.databaseUnavailable, 1);
+        assert.equal(JSON.parse(summary).phase, "browser-public");
+        assert.equal(JSON.parse(summary).outcome.status, "PASS");
+        assert.equal(JSON.parse(summary).outcome.exitCode, 0);
+        assert.equal(JSON.parse(summary).outcome.serverStopped, true);
+        assert.equal(JSON.parse(summary).candidateId, null, "Direct fixture execution supplies no candidate attestation");
         for (const secret of ["private-user", "private-secret", "private.invalid", "postgresql:"]) assert.ok(!summary.includes(secret));
         // Simulate the publisher detecting a path replacement after holding its
         // descriptor. The driver must propagate its refusal to the phase exit.

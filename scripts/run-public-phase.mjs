@@ -6,14 +6,18 @@ import { summarizeCiLog } from "./ci-log-summary.ts";
 import { beginReport, publishReport } from "./agent-harness.mjs";
 import { closeSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { buildFingerprint } from "./verification-evidence.mjs";
 
 // Own a fresh app process from this cwd/build. Never reuse a caller's server or
 // port, and never accept another app's HTTP readiness as proof of ownership.
 assertCiDatabaseTarget();
 const [mode, ...extra] = process.argv.slice(2);
 if (!["public", "propagation"].includes(mode) || extra.length || process.env.CI !== "true") throw new Error("Invalid isolated public phase.");
-const runId = /^[a-f0-9-]{36}$/.test(process.env.CLEARALLERGY_PHASE_RUN_ID ?? "") ? process.env.CLEARALLERGY_PHASE_RUN_ID : randomUUID();
+const runId = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(process.env.CLEARALLERGY_PHASE_RUN_ID ?? "") ? process.env.CLEARALLERGY_PHASE_RUN_ID : randomUUID();
 const evidence = beginReport(process.cwd(), `server-${mode}-${runId}.json`);
+const buildBefore = buildFingerprint(process.cwd());
+const candidateId = /^[a-f0-9]{64}$/.test(process.env.CLEARALLERGY_PHASE_CANDIDATE_ID ?? "") ? process.env.CLEARALLERGY_PHASE_CANDIDATE_ID : null;
+let completedExitCode = null;
 let raw = "", truncated = false;
 const collect = chunk => { raw += chunk.toString(); if (raw.length > 1_000_000) { raw = raw.slice(-1_000_000); truncated = true; } };
 const reservation = createServer();
@@ -57,6 +61,7 @@ try {
             exited.then(() => ({ server: true })),
             new Promise(yes => { checkTimer = setTimeout(() => yes({ timeout: true }), 6 * 60_000); }),
         ]);
+        completedExitCode = "check" in outcome ? outcome.check : null;
         if ("server" in outcome || "timeout" in outcome || server.exitCode !== null || outcome.check !== 0) throw new Error("Owned public verification failed.");
     } finally {
         clearTimeout(checkTimer);
@@ -72,6 +77,8 @@ try {
     finally {
         try {
             const summary = publishReport(evidence, { kind: "server-log-summary", runId, status: "COLLECTED", candidateUnchanged: true,
+                phase: mode === "public" ? "browser-public" : "propagation", candidateId, buildBefore, buildAfter: buildFingerprint(process.cwd()),
+                outcome: { status: completedExitCode === 0 && !process.exitCode && server.exitCode !== null ? "PASS" : "FAIL", exitCode: completedExitCode, serverStopped: server.exitCode !== null },
                 ...summarizeCiLog(raw), truncated }, () => true);
             if (summary.status === "FAIL" || summary.publicationSafe !== true) process.exitCode = 1;
         }

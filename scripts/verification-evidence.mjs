@@ -19,6 +19,7 @@ export const PHASES = {
     "db-shop": ["--import", "tsx", "scripts/check-shop-database.ts"],
     "db-snapshot": ["--import", "tsx", "scripts/check-public-read-snapshot.ts"],
     "browser-publication": ["scripts/browser-runner.mjs", "publication"],
+    "context-links": ["scripts/check-context-links.mjs"],
     "browser-public": ["--import", "tsx", "scripts/run-public-phase.mjs", "public"],
     propagation: ["--import", "tsx", "scripts/run-public-phase.mjs", "propagation"],
 };
@@ -80,7 +81,19 @@ export function failureDiagnostics(contents, result = {}, knownTests = []) {
     return { categories, failedCases: [...new Set(failedCases)].slice(0, 100), testCounts, rawLogIncluded: false };
 }
 
-export function combinePhaseEvidence(receipts, required, current) {
+const runIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+export function serverEvidenceMatches(receipt, support, candidate) {
+    if (!["browser-public", "propagation"].includes(receipt.phase)) return true;
+    const name = `server-${receipt.phase === "browser-public" ? "public" : "propagation"}-${receipt.runId}.json`;
+    const log = support?.report;
+    return runIdPattern.test(receipt.runId ?? "") && receipt.serverEvidence === name && hex.test(receipt.serverEvidenceSha256 ?? "")
+        && support?.sha256 === receipt.serverEvidenceSha256 && log?.kind === "server-log-summary" && log.runId === receipt.runId
+        && log.phase === receipt.phase && log.candidateId === candidate.id && log.buildBefore === receipt.buildBefore && log.buildAfter === receipt.buildAfter
+        && log.status === "COLLECTED" && log.publicationSafe === true && log.candidateUnchanged === true && log.rawLogIncluded === false
+        && log.outcome?.status === "PASS" && log.outcome.exitCode === 0 && log.outcome.serverStopped === true;
+}
+
+export function combinePhaseEvidence(receipts, required, current, supports = {}) {
     const candidate = candidateIdentity(current);
     if (!Array.isArray(required) || !required.length || new Set(required).size !== required.length || required.some(name => !Object.hasOwn(PHASES, name))) throw new Error("Invalid required phases.");
     required = [...required];
@@ -94,8 +107,9 @@ export function combinePhaseEvidence(receipts, required, current) {
         const matches = before.id === candidate.id && after.id === candidate.id && receipt.candidateBefore.id === before.id && receipt.candidateAfter.id === after.id;
         const needsBuild = receipt.phase.startsWith("browser-") || receipt.phase === "propagation";
         const buildMatches = !needsBuild || (hex.test(receipt.buildBefore) && receipt.buildBefore === receipt.buildAfter && receipt.buildAfter === build?.buildAfter);
-        phases.push({ phase: receipt.phase, status: matches && buildMatches && receipt.status === "PASS" && receipt.exitCode === 0
-            && receipt.candidateUnchanged === true && receipt.publicationSafe === true ? "PASS" : "FAIL", candidateMatches: matches, buildMatches });
+        const supportMatches = serverEvidenceMatches(receipt, supports[receipt.serverEvidence], candidate);
+        phases.push({ phase: receipt.phase, status: matches && buildMatches && supportMatches && receipt.status === "PASS" && receipt.exitCode === 0
+            && receipt.candidateUnchanged === true && receipt.publicationSafe === true ? "PASS" : "FAIL", candidateMatches: matches, buildMatches, serverEvidenceMatches: supportMatches });
     }
     const missing = required.filter(name => !phases.some(row => row.phase === name));
     return { candidate, required, phases, missing, status: phases.some(row => row.status === "FAIL") ? "FAIL" : missing.length ? "UNVERIFIED" : "PASS",

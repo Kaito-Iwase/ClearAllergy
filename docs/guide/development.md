@@ -11,9 +11,9 @@
 <a id="environment"></a>
 ## 1. どの環境を使うか決める
 
-作業フォルダは `C:\Users\kaito\Documents\Github\ClearAllergy`。Node.jsは `.node-version` の22.23.4、Dockerfile・CIのグローバルnpmは11.18.0です。npmはアプリ依存へ同梱しません。
+正規checkoutの確認入口は `C:\Users\kaito\Documents\Github\ClearAllergy`。許可された独立worktreeではその実ルートを作業フォルダとし、各HEAD・dirty状態を確認して既存編集を保持します。Node.jsは `.node-version` の22.23.4、Dockerfile・CIのグローバルnpmは11.18.0です。npmはアプリ依存へ同梱しません。
 
-ハーネスとブラウザ導入は `scripts/npm-cli.mjs` でnpmのスクリプト実行時に渡される `npm_execpath` またはNode配布の標準位置を検証し、NodeからCLI（コマンドライン実行用プログラム）を引数配列で呼び出します。ホストの実npm版はハーネス結果の `runtime.actualNpm` へ記録します。npmが見つからない場合は暗黙に導入せず停止するため、Node配布を調べるか `npm.cmd exec -- node scripts/agent-harness.mjs verify --base origin/main` で既存npmから起動してください。
+ハーネスとブラウザ導入は `scripts/npm-cli.mjs` でnpmのスクリプト実行時に渡される `npm_execpath` またはNode配布の標準位置を検証し、NodeからCLI（コマンドライン実行用プログラム）を引数配列で呼び出します。実npm版はハーネス結果の `runtime.actualNpm` へ記録します。npmが見つからない場合は暗黙に導入せず停止し、許可済みNode配布を確認してください。候補コードの実行は[ハーネスの実行境界](../agentic-development.md#execution-boundary)を満たす環境に限り、`--plan` / `--snapshot`も指定します。資格情報のあるホストでフラグを偽装して起動しません。
 
 Windowsでは `npm.cmd` / `npx.cmd` を使います。既に準備済みの環境は、最初に再インストールせず状態を確認します。
 
@@ -317,4 +317,6 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 
 ### 任意の候補証跡（P0）
 
-`agent-harness.mjs phase` / `summarize` による候補・build同一性の照合と安全な失敗診断は [証拠の契約](../agentic-development.md#phase-evidence) を参照してください。公開画面のphaseは現在buildを専用loopback portで起動し、所有プロセスを終了します。このPRは既存CIの呼出方法や重要回帰の接続を変更しません。snapshot/propagation/別空DB移行jobのCI接続（P1）は別差分で、まだ未公開です。
+`agent-harness.mjs phase` / `summarize` による候補・build同一性の照合と安全な失敗診断は [証拠の契約](../agentic-development.md#phase-evidence) を参照してください。公開画面のphaseは現在buildを専用loopback portで起動し、所有プロセスを終了します。server証跡の欠落・run ID/候補/build/hash/終了結果の不一致を集約成功へ含めません。実Git範囲から必要なgateを選び、通常4検査の成功と検証完了を区別します。CIの呼出方法は変更していません。snapshot/propagation/別空DB移行jobのCI接続（P1）は別差分で、取得時点では未公開です。
+
+文書の入口7ファイルは `node scripts/check-context-links.mjs` で相対リンク・Markdownアンカー・コードファイル存在と対応する`#L番号`の範囲を確認できます。外部リンク、コードの意味、仕様承認、研究の正しさは検査しません。[変更対応表](change-map.md)から対象の仕様・呼出元・テストを読む確認は引き続き必要です。

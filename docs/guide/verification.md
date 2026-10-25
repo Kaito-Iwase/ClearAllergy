@@ -6,7 +6,7 @@
 
 2026-10-25のPR #102の現mainへのローカル適用候補は、[UTC日時の移行・回帰結果](../verification/utc-timestamp-contract-20261025.md)を参照してください。PostgreSQL 17の架空DBで既存値不変と3タイムゾーンを検証し、本番適用・過去値補正・実認証は含めません。
 
-2026-10-25のPR #105のローカル適用は、[phase証跡の機械検証と未取得成果](../verification/harness-evidence-main-20261025.md)を参照してください。追加harness成果は未取得・未適用で、単体のPASSをscope認定やserverEvidence検証の代用にしません。独立レビュー上限に達しており、最終的な人間レビューが必要です。
+2026-10-25のPR #105追加harnessのローカル適用は、[追加差分の出典・機械検証・実行条件](../verification/harness-context-main-20261025.md)を参照してください。[本体のみの先行記録](../verification/harness-evidence-main-20261025.md)とは対象を分けます。追加独立レビューは実施せず、最終的な人間レビューが必要です。
 
 2026-10-23の保存後の同じページでの公開確認は、[実装・検証記録](../verification/saved-menu-publication-20261023.md)を参照してください。保存済み版の読取・公開、未設定時の修正、二重送信・競合・失敗時の表示を対象にし、公開条件やDB契約は変更しません。隔離画面・CIと本番の読取確認を区別します。
 
