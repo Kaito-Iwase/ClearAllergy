@@ -76,9 +76,10 @@ try {
     try { if (server.exitCode === null) await stopOwned(server, exited); }
     finally {
         try {
+            const serverStopped = server.exitCode !== null || server.signalCode !== null;
             const summary = publishReport(evidence, { kind: "server-log-summary", runId, status: "COLLECTED", candidateUnchanged: true,
                 phase: mode === "public" ? "browser-public" : "propagation", candidateId, buildBefore, buildAfter: buildFingerprint(process.cwd()),
-                outcome: { status: completedExitCode === 0 && !process.exitCode && server.exitCode !== null ? "PASS" : "FAIL", exitCode: completedExitCode, serverStopped: server.exitCode !== null },
+                outcome: { status: completedExitCode === 0 && !process.exitCode && serverStopped ? "PASS" : "FAIL", exitCode: completedExitCode, serverStopped },
                 ...summarizeCiLog(raw), truncated }, () => true);
             if (summary.status === "FAIL" || summary.publicationSafe !== true) process.exitCode = 1;
         }

@@ -12,13 +12,15 @@
 
 宣言scopeと実Git差分（rename元/先・untrackedを含む）の照合、公開食品取得/表示のprotected分類、実変更から必要な検証の選択、完了フラグ、最新snapshotの完全性、serverEvidenceの実読込・hash/run/phase/candidate/build/終了結果の照合、入口文書の相対参照検査が対象です。CIメタデータのガードを維持し、環境変数の一致をOS隔離の証明とは扱いません。
 
-実装・テスト8ファイルは再構成した追加成果と一致することを確認します。文書は現mainへ差分で適用し、agentic-developmentは三treeで統合。READMEは現mainで確認できる実装とPR参照を記載し、追加成果の古いProduction配備成功の申告を現在の確認結果へ転記しません。
+初回適用時は実装・テスト8ファイルが再構成した追加成果と一致しました。後述のLinux停止判定だけを追加修正し、残り7ファイルは一致を維持します。文書は現mainへ差分で適用し、agentic-developmentは三treeで統合。READMEは現mainで確認できる実装とPR参照を記載し、追加成果の古いProduction配備成功の申告を現在の確認結果へ転記しません。
 
 mainのsecurity依存・lock、vercel.json・配備抑止文書、schema・過去migration、食品仕様・公開契約・認可・workflowは変更しません。未公開P1 workflowを混ぜず、#95/#96/#101/#102の候補も別に保持します。製品仕様の正本であるrules/productは更新不要です。
 
 ## RED/GREENと実行境界
 
 本体のみの候補で、公開snapshotのprotected分類、serverEvidence欠落、最終保存時の完了フラグ、実Git範囲逸脱の4反例を再現しました。いずれも新しい期待結果に対して失敗（0成功/4失敗）。Git fixtureのnpmコマンドは固定no-opで、アプリ検証とは別です。追加適用後に同じ反例と既存関連テスト、full unit・lint・typecheck・build・文書参照を検査し、実結果と失敗をタスク成果へ残します。
+
+初回のfull unitは270成功/1失敗でした。LinuxのSIGTERM終了では子プロセスの`exitCode`がnull、`signalCode`がSIGTERMになるため、停止済みでも追加版のserver証跡がFAILになることを既存テストと小さな子プロセスで再現しました。`run-public-phase.mjs`の最終停止判定を、終了コードまたは終了シグナルのいずれかがある場合へ修正。既存の所有server・終了結果・秘密marker・保存拒否を含む関連37件が成功しました。実CIガードを弱める変更ではありません。修正後の固定commitで通常gateを再実行します。Context7は利用可能なツール一覧になく、Nodeの実プロセスと配置済み型定義で終了状態を確認しました。
 
 追加版のphase/verifyは、完全な最新GitHub snapshotとGitHub-hosted CIメタデータを要求します。現クラウド環境の通常アプリ検証と、このrunnerの実行条件を混同しません。実CIの値や収集完了を偽装せず、ガードが拒否するphase pipelineは未実行として残します。固定fixtureを使ったserver所有/停止・秘密marker除外は、実アプリのphase→server→summary全経路の成功ではありません。
 
