@@ -6,6 +6,7 @@ on:
     paths:
       - package.json
       - package-lock.json
+      - scripts/next-root-glob/package.json
       - .github/workflows/dependency-audit.yml
   schedule:
     - cron: "27 3 * * 1"

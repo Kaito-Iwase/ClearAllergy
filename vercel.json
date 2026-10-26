@@ -9,7 +9,8 @@
       "fix/next-security-20261024": false,
       "fix/runtime-dependency-security-20261024": false,
       "dependabot/**": false,
-      "chore/ca-dependabot-deploy-guard-20261026": false
+      "chore/ca-dependabot-deploy-guard-20261026": false,
+      "chore/ca-dependabot-config-prep-20261026": false
     }
   }
 }

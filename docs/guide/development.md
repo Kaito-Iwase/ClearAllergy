@@ -227,7 +227,7 @@ CI定義は `.github/workflows/ci.yml`。main/develop向けPR、両ブランチ�
 
 ブラウザ用Playwrightはジョブの一時ディレクトリに用意します。失敗時は `scripts/collect-ci-diagnostics.ts` がCI用の接続設定と実行フラグを確認し、生のサーバーログから固定した分類・件数だけの要約を作ります。生ログ・認証情報・入力本文を成果物へ掲載する方式ではありません。スクリーンショットと存在する診断要約をSHA（コミットの識別値）付きで7日間保存します。
 
-依存検査は別の `.github/workflows/dependency-audit.yml` が担当します。main/develop向けの依存ファイル・当該workflow変更PR、毎週月曜03:27 UTC（12:27 JST）、手動実行が入口です。`npm audit --ignore-scripts --audit-level=high` で既知の高・重大の問題を検出すると失敗します。自動修正やパッケージ更新はしません。通信障害の失敗と検出された脆弱性を区別して調べます。対象はdevを含むアプリlockfileで、Node配布のnpm CLI・OS・隔離Playwrightの脆弱性まで修正した証拠ではありません。
+依存検査は別の `.github/workflows/dependency-audit.yml` が担当します。main/develop向けのroot package/lock、`scripts/next-root-glob/package.json`、当該workflow変更PR、毎週月曜03:27 UTC（12:27 JST）、手動実行が入口です。`npm audit --ignore-scripts --audit-level=high` で既知の高・重大の問題を検出すると失敗します。自動修正やパッケージ更新はしません。通信障害の失敗と検出された脆弱性を区別して調べます。対象はdevを含むアプリlockfileで、Node配布のnpm CLI・OS・隔離Playwrightの脆弱性まで修正した証拠ではありません。
 
 Next.jsのlint設定は全ルールを維持します。`@next/eslint-plugin-next@16.4.1` のルートディレクトリ検索だけ、`scripts/next-root-glob` のローカル互換層へoverrideします。既存tinyglobby 0.2.17を使い、ディレクトリの自動展開を無効にして絶対パス・末尾区切りを正規化します。パターンは65,536文字・入れ子128段までとし、超過と未対応の範囲brace（波括弧による範囲指定。`app{1..12}` 等）は検査失敗です。範囲は明示した配列か選択braceへ置き換えてください。`.npmrc` の `install-links=true` をinstall/ciで共有し、Dockerはローカルpackageをnpm ciの前にCOPYします。一般のfast-glob代替として使わず、Next plugin更新時には利用API・rootDir検索・内部リンク検知とclean install/auditを再確認してください。保守対象はこのリポジトリです。検証は `tests/next-root-glob.test.ts` と `tests/npm-cli.test.ts` から追えます。
 
@@ -241,9 +241,17 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 
 ### Dependabot導入前の自動デプロイ抑止
 
-`vercel.json` の `git.deploymentEnabled` は既存の6ブランチの `false` を保持し、`dependabot/**` と導入準備ブランチ `chore/ca-dependabot-deploy-guard-20261026` だけを追加で `false` にします。[Vercel公式仕様](https://vercel.com/docs/project-configuration/git-configuration)はminimatch構文を使い、未指定ブランチは `true`、複数一致時は `true` が優先です。main/developや通常の作業ブランチの自動デプロイ条件は変更しません。これはGit連携の自動デプロイ抑止であり、手動deployの禁止ではありません。
+`vercel.json` の `git.deploymentEnabled` は既存の6ブランチの `false` を保持し、`dependabot/**` と導入準備ブランチ `chore/ca-dependabot-deploy-guard-20261026`、`chore/ca-dependabot-config-prep-20261026` だけを追加で `false` にします。[Vercel公式仕様](https://vercel.com/docs/project-configuration/git-configuration)はminimatch構文を使い、未指定ブランチは `true`、複数一致時は `true` が優先です。main/developや通常の作業ブランチの自動デプロイ条件は変更しません。これはGit連携の自動デプロイ抑止であり、手動deployの禁止ではありません。
 
 導入順は、別承認によるこの抑止設定のmain反映 → 対象ブランチでの実際の抑止確認 → Dependabot security updatesの有効化とversion updates設定の反映です。この準備変更ではGitHub設定の有効化、merge、auto-merge、deployは行いません。パターンのローカル検査は実Vercelでの抑止観測と区別し、実際の抑止は未確認です。
+
+### Dependabot設定の準備と初回更新の確認
+
+`.github/dependabot.yml` は準備ブランチ上の設定です。main未反映のためversion updatesはこの変更では有効化されません。抑止確認前にはmainへ反映せず、BのPR作成はAの反映・確認後まで保留します。設定は[GitHub公式リファレンス](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)に基づき、npmの `/` と `/scripts/next-root-glob`、GitHub Actionsの `/` を毎週月曜03:00 UTCに検査する構成です。version updatesのPR上限はnpm 3、Actions 1。minor/patchはNext・React群、Prisma群、その他群（順に一致判定）、Actions群にまとめ、majorは個別PRにします。初期のsecurity updates用グループは定義しません。security PRには上記の設定上限が効かず、GitHub側の別の固定上限10があります。Docker・Node・npmの固定版は初期の自動更新対象に含めません。
+
+rootは `fast-glob: file:scripts/next-root-glob` と `install-links=true` を使い、lockfile v3の `node_modules/fast-glob.dependencies.tinyglobby` と `node_modules/tinyglobby` にnested manifestのexact版0.2.17を記録しています。nested側に独立したlockfileはありません。manifestだけの更新でもauditは起動しますが、auditはroot lockを読むため、新しいmanifestの依存解決を保証しません。初回nested更新PRではroot lockとの同期、clean `npm ci`、audit、`tests/next-root-glob.test.ts` と通常CIを確認します。Dependabot resolverがこのfile依存とroot lockをどう更新するかは未実行・未確認です。
+
+初回の各更新PRは、CI・audit・manifest/lock差分・Vercel Preview抑止を人が照合します。Next本体・`@next/env`・`eslint-config-next` の16.4.1同期、Prismaのlock版6.19.3と `@next/eslint-plugin-next@16.4.1` / `@prisma/config@6.19.3` / `@vercel/cli-config@0.2.0` の版限定overrideの適用・削除可否も確認し、自動mergeしません。CI権限・実行条件はpaths追加以外変更せず、本番キーをDependabotへコピーしません。
 
 ### 公開前と障害時の確認
 

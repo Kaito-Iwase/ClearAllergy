@@ -1,0 +1,49 @@
+# mainへの反映前に、Vercel抑止設定のmain反映と実際の抑止確認が必要。
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+      - "/scripts/next-root-glob"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Etc/UTC"
+    # version updatesの上限。security updatesには別の固定上限がある。
+    open-pull-requests-limit: 3
+    groups:
+      next-react-nonmajor:
+        applies-to: "version-updates"
+        patterns:
+          - "next"
+          - "@next/*"
+          - "eslint-config-next"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+        update-types: ["minor", "patch"]
+      prisma-nonmajor:
+        applies-to: "version-updates"
+        patterns: ["prisma", "@prisma/*"]
+        update-types: ["minor", "patch"]
+      # 上の群に一致する依存は先の群を優先。majorは個別PR。
+      other-nonmajor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 1
+    groups:
+      actions-nonmajor:
+        applies-to: "version-updates"
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
