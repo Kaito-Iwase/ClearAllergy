@@ -5,3 +5,5 @@ The exact nonproduction branches listed in root vercel.json have git.deploymentE
 Official specification checked before push: https://vercel.com/docs/project-configuration/git-configuration . The property controls automatic Git deployments; no ignored-build command, skip-ci commit convention or post-start cancellation is relied upon. Preview DB/Clerk/Blob separation remains unverified, so no preview is requested. GitHub Actions remains enabled and uses disposable PostgreSQL and placeholder auth credentials; the workflows contain no deploy step or production secret reference.
 
 Keep the branch entries while reviewing these changes. Do not enable a deployment or merge as part of this task. Any later removal or preview must separately confirm nonproduction connections.
+
+The local preparation branch `test/isolated-preview-fixtures-20261026` also has an exact `false` entry. This preparation does not add an enable entry for `test/staging`, change other entries, or authorize push/deployment. Its fixed test-resource initialization remains held before connecting until both Clerk owners and the manual execution scope are approved.

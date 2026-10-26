@@ -42,6 +42,7 @@ DBデータ・コンテナ内依存・`.next`（Next.jsの生成物）はそれ�
 | `ENABLE_CLERK_ADMIN_AUTH` | Google / Clerk SSO（外部アカウントによるログイン）導線の表示判定に使う。全認証の無効化スイッチではない |
 | `NEXT_PUBLIC_APP_URL` | 公開URL・QR等の基準URL |
 | `BLOB_READ_WRITE_TOKEN` / `ALLOWED_IMAGE_URL_PREFIXES` | アップロードと許可する画像ストア。未設定なら画像機能を無理に試さない |
+| `CLEARALLERGY_TEST_PREVIEW` / `TEST_BLOB_READ_WRITE_TOKEN` / `EXPECTED_TEST_BLOB_STORE_ID` | `test/staging` の専用PreviewでのBlob書込固定。[専用PreviewのBlob設定](#test-preview-blob)を参照。実値は対象branchのVercel Preview設定だけへ保存 |
 | `GOOGLE_MAPS_SERVER_API_KEY` | 管理画面のGoogle店舗候補検索用 |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` / `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | 旧地図用設定。現在の公開画面は動く地図を提供しない |
 | `ADMIN_REGISTRATION_MODE` / `ADMIN_REGISTRATION_INVITE_TOKEN` | 旧登録方式の設定。現行の自己登録停止を解除しない |
@@ -110,6 +111,73 @@ docker compose -f compose.test.yaml ps
 初期化はデータ更新を伴います。既存の同名メニューは作り直しませんが、ユーザー・店舗・品目マスタのupsert（存在すれば更新、なければ追加）はあります。「再実行しても一切変更なし」ではありません。接続ガードを外して他DBに実行しないでください。
 
 認証情報は `.clerk/clearallergy-test-accounts.json` に保存されます。店舗A/Bのログインに使いますが、中身を共有・ログ出力しません。このディレクトリはGitとDockerイメージの対象外です。管理デモは保存しないため、保存確認には専用管理者で `/admin/login` から入ります。
+
+### 既存の空テスト店舗へ下書きだけを追加する
+
+`scripts/initialize-test-shop.ts` は、アカウント・店舗・品目マスタが別途準備済みの専用DBで、指定した空店舗へ既存の架空3メニューを追加するための入口です。通常seedや `setup-test-env.ts` の代わりにアカウントを作るものではありません。接続先は既存のCI一時DBまたは専用Composeのガードだけを許可します。DB・マスタ・既存データを変更する初期設定やreset、Clerk・Blobへの通信、公開・食品確認記録の合成は行いません。
+
+対象DBへの書込が許可されている場合に限り、専用Compose内から次の書式で実行します。`SHOP_ID` と `user_OWNER_ID` は、担当者が確認した既存の店舗ID・Clerk所有者IDへ置き換えます。IDは認証用秘密鍵ではありませんが、ログ等へ不要に共有しません。
+
+```powershell
+docker compose -f compose.test.yaml exec app node --import tsx scripts/initialize-test-shop.ts --shop-id SHOP_ID --owner-clerk-user-id user_OWNER_ID --apply
+```
+
+対象店舗名は `【架空・テスト専用】` で始まり、店舗所有者と関連UserのClerk IDが指定値と一致し、メニューが0件である必要があります。品目マスタの全定義も現行コードと照合します。不一致・再実行時は追加・上書き・削除せず停止します。`--apply` の省略や未知の引数も拒否します。成功時は作成した非公開メニュー件数だけを表示します。競合・通信断等の失敗は自動再試行しません。結果不明の場合は、担当者が対象店舗の保存済み内容を確認してください。
+
+追加する下書きは `prisma/demo-menus.ts` の全品目・注意書きをそのまま使い、省略をFREEに補いません。公開は保存後に通常管理画面で別に操作します。既存メニュー・食品確認・公開履歴・未解決事項には触れません。純粋fixture生成とDBモックの検査は `node --import tsx --test tests/test-shop-fixtures.test.ts` で実行でき、Prismaエンジン・Chromium・実認証情報を必要としません。モックの成功は実DBの制約・競合・rollbackや実認証の成功を示しません。
+
+**持続的な専用Previewは未配備です。** この入口はリモートDBを拒否します。Previewへ接続する前に、既存Vercel projectの対象branch専用設定、独立DBの通常・直接接続先、開発用Clerkの識別と所有アカウント、独立Blob、公開範囲と対象branchのデプロイガードを別途確認・承認します。既存CI/ComposeのURLを書き換えたり、ガードを外して代用しません。共有の本番・デモ接続を引き継がず、初期化コマンドをbuildやdeployへ組み込みません。実リソースの設定・資格情報・アカウント作成はこのローカル準備に含みません。
+
+<a id="test-preview-blob"></a>
+### 専用PreviewのBlob設定
+
+`lib/storage/upload-images.ts` は専用モードのときだけ、test tokenをSDKの `put` の `token` 引数へ明示して保存先を固定します。対象branchは `test/staging` 固定です。実リソースと公開範囲を確認した担当者が、次の設定を**そのbranchのVercel Preview設定だけ**へ保存します。実キーをrepo、ローカル環境ファイル、ログ、チャットへコピーしません。
+
+| 変数 | 必要な値・確認 |
+| --- | --- |
+| `CLEARALLERGY_TEST_PREVIEW` | 厳密に `true` |
+| `VERCEL` / `VERCEL_ENV` / `VERCEL_GIT_COMMIT_REF` | Vercelが設定した `1` / `preview` / `test/staging`。手動で偽装しない |
+| `TEST_BLOB_READ_WRITE_TOKEN` | 新しい専用Public Blobのread-write token。既存共有tokenを流用しない |
+| `EXPECTED_TEST_BLOB_STORE_ID` | 担当者が別途確認した専用store ID。dashboardの `store_` prefix付き・なしを許可し、除去後はtokenのstore segmentと大文字小文字も一致させる |
+| `ALLOWED_IMAGE_URL_PREFIXES` | 専用storeだけの `https://<store segmentを小文字化>.public.blob.vercel-storage.com`。画像URL検査とNext画像origin設定のためbuild前に指定。既存共有originを含めず、変更後は新buildが必要 |
+
+mode・配備環境・branch・token・期待storeが不正なら、SDKを呼ぶ前に停止します。`test/staging` ではflag省略・falseでも停止します。他branchではflagなし・空・falseの従来経路を保ちます。エラーにはtoken・接続先を含めず、共有 `BLOB_READ_WRITE_TOKEN` やOIDCへfallbackしません。token形式とstoreの照合は認証の代わりではなく、実tokenの権限はSDK・Blob側が検証します。
+
+既存のtoken形式解析を再利用しています。固定版 [@vercel/blob 2.5.0公式実装](https://github.com/vercel/storage/blob/%40vercel%2Fblob%402.5.0/packages/blob/src/helpers.ts)では明示 `token` がOIDC＋store ID、環境変数tokenより優先され、store IDの大文字小文字を保持します。`tests/test-preview-blob.test.ts` はSDK通信を置き換え、明示binding・欠損/不一致時の停止・従来optionsを検査します。実upload・Blobの権限・配備設定の成功を示すものではありません。Blob bindingはDB初期化を行いません。
+
+<a id="test-preview-init"></a>
+### 新規NeonテストDBの手動INIT（実行保留）
+
+`scripts/initialize-test-preview.ts` は次の固定リソース一組専用です。CI/Composeの接続ガードを変更せず、通常seed・SQLでのschema再構築・reset・deleteを使いません。package scripts・CI・build・deployには接続していません。
+
+| 対象 | 確認済みの非秘密識別子 |
+| --- | --- |
+| Neon project / branch | `patient-heart-55595249` / `br-flat-wildflower-aoeragrs` |
+| direct host | `ep-silent-bonus-aofdajar.c-2.ap-southeast-1.aws.neon.tech` |
+| pooler host | `ep-silent-bonus-aofdajar-pooler.c-2.ap-southeast-1.aws.neon.tech` |
+| database / role | `neondb` / `neondb_owner` |
+| Clerk app / Development instance | `app_3LDk2uLf3DRxrxfMhuSUMFQ71A9` / `ins_3LDk2su6C7R2NXWTzjgi8ttubj2` |
+| 専用Public Blob | `store_wTqdbKlMg3bBQK4s`（SIN1。DB INITからはアクセスしない） |
+
+**現時点ではCLIはDBへ接続する前に停止します。** テストClerkユーザーは未作成で、`scripts/test-preview-initialization.ts` の `APPROVED_TEST_PREVIEW_OWNER_IDS` は空です。入力された `user_...` の形式だけでは本人確認・instance所属の根拠になりません。担当者が上記Development instanceの承認済みtrusted metadataから実ユーザー2名の存在・所属・IDを確認し、親がその証拠と有限の書込範囲を確認した後だけ、対象2 IDをコードのallowlistへ設定します。任意JSON・環境変数・CLIフラグでこの確認を代替する入口はありません。INITはClerkへ接続せず、アカウント作成・パスワード設定・メール送信もしません。
+
+実行場所とDB書込対象の承認も必要です。資格情報を新たにこのworkspaceへ転送したり、実キーをローカル環境ファイル・repo・ログへ保存しません。対象Preview branchの秘密を既に安全に利用できる、担当者が承認した手動実行場所が決まるまでは保留します。そこでPrisma Client・必要な公式engineが利用可能であることを別途確認します。既知の403を反復したり、TLS/checksum検証を回避しません。
+
+次は承認・owner確認後だけ使う書式です。現状で実行して初期化できるという意味ではありません。
+
+```powershell
+node --import tsx scripts/initialize-test-preview.ts --owner-a user_APPROVED_A --owner-b user_APPROVED_B --apply
+```
+
+`CLEARALLERGY_TEST_PREVIEW=true` と既に安全に提供された `DATABASE_URL`（固定pooler）・`DIRECT_URL`（固定direct）を検査します。URLは `postgresql:`、上記host/database/role、同一の非空password、port省略または5432に限定します。`sslmode=require` が必須で、追加で許可するqueryは `channel_binding=require`、`schema=public`、pooler側だけの `pgbouncer=true` です。重複query・別host/schemaへの迂回・fragmentは拒否します。project/branch ID文字列だけをDB認証の証明にせず、担当者がdashboard上のendpoint対応を確認した上で、このhost一組を固定しています。
+
+CLIの処理順は、明示引数・固定URL・承認済みowner → 実接続のdatabase/roleと空schema確認 → このcheckoutの既存20 migrationを通常の `prisma migrate deploy` で適用 → migration名・checksum・完了状態の照合 → Serializable transactionでfixture作成です。Prisma子processへはDB接続と必要なOS変数だけを渡し、出力はログへ転載しません。migration子processは120秒、fixture transactionは30秒を上限とし、超過・通信断は自動再試行しません。
+
+transactionでは業務データ0件を再確認し、既存マスタが現行定義の一部である場合だけ不足分を追加します。migration由来のpistachio等は上書きしません。Clerk IDに対応するUser 2件（email・passwordを合成しない）と所有者が一致する架空店舗A/B、既存3メニューずつの計6下書きを作ります。全品目と注意書きを保ち、版はDB default/triggerに任せます。食品確認・公開確認・未解決解除の履歴は作りません。公開は保存済み内容に対する後の本人UI操作です。必要な編集許可は、作成されたUser IDを読み取り確認して対象Previewだけの `PORTFOLIO_EDITOR_APP_USER_IDS` へ設定します。
+
+再実行は、20 migrationが正しく完了済みで業務データが空の場合だけfixture段階を再開できます。業務データ・未知schema・失敗/不一致migrationがあれば変更せず停止します。fixture失敗はtransactionへ伝えますが、既に適用済みのmigrationは巻き戻しません。通信断等で結果不明なら、自動再試行せず対象DBを読み取り確認します。成功確認はマスタ全件の一致、User 2・Shop 2・MenuItem 6、各メニュー全品目、全件非公開、確認/公開/解除履歴0件、所有関係の一致です。
+
+`node --import tsx --test tests/test-preview-initialization.test.ts` は固定URL・引数・承認前停止・既存データ拒否・migration失敗・master不一致・transactionへの失敗伝播をモックで検査します。rollbackのモック検査は実PostgreSQLでの制約・rollback・同時実行の証明ではありません。実初期化・実認証・Preview配備は未検証です。準備branch `test/isolated-preview-fixtures-20261026` はroot `vercel.json` の完全一致falseで自動配備を抑止します。`test/staging` の配備許可はこの変更に含めません。
 
 <a id="checks"></a>
 ## 4. 検証方法を選ぶ

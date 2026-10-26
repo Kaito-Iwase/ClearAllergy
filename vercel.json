@@ -12,7 +12,8 @@
       "codex/ui-error-observation-20261025": false,
       "codex/ci-evidence-paths-20261025": false,
       "codex/utc-migration-boundaries-20261025": false,
-      "codex/combined-validation-20261026": false
+      "codex/combined-validation-20261026": false,
+      "test/isolated-preview-fixtures-20261026": false
     }
   }
 }
