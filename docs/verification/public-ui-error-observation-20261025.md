@@ -2,7 +2,7 @@
 
 [確認範囲](../guide/verification.md) · [実行手順](../guide/development.md#browser) · [変更対応表](../guide/change-map.md)
 
-## 2026-10-26の単一候補による再検証
+## 2026-10-26の単一候補による再検証（push前の記録）
 
 以下の2026-10-25の実行結果は過去の証拠であり、新しい候補の結果ではない。集約の基点は `e70d037052242fbc6d0f78860e3a42d2405b681e`、候補枝は `codex/combined-validation-20261026`。その後、deploy抑止と実効設定を確認できた場合に限り、同候補と必要な非秘密証跡の通常push・既存CIの同枝指定による手動実行が承認された。以下の確認時点ではpush・CI起動とも保留中。全変更の正式採用、PR作成・更新、merge、deploy、本番・共有DBやサービス設定の変更は含まない。
 
@@ -45,6 +45,56 @@ push前のリポジトリ検査では、`git.deploymentEnabled`は11個の完全
 既存CIはunit/lint/type/build、公開版移行・DB制約・所有権・店舗保存、架空保存公開component、公開prototype browserを実行する。一方、追加UI observer、専用UTC境界検査、全P0 phase/summarizeを完走させる構成ではない。CI成功とそれらの未達を分けて扱う。Vercel実効設定の読取はPingu側の別証拠であり、この文書はpush後のdeployment不発生の実観測ではない。
 
 実CI、最新inventoryに基づくphase/summarize、人間確認は別gate。GitHub-hosted情報を偽装せず、通常の直接実行をphase receiptへ読み替えない。#101/#102/#105は各3回、旧P1は引継ぎ上2回のレビュー上限を保持し、この集約では独立レビューを追加しない。旧P1の未取得差分を再構成せず、旧hash不一致も解消済みとしない。
+
+## 同一候補の実CIと別環境UI検証（2026-10-26追記）
+
+検証した候補は `cda3fef880ddc96f632dc06d7bdf9005f8f4bab0`、tree `34464851551c9232ace9949404a7b9591c302ce7`。これは上記2a3b4eaに結果報告だけを追加したコミットで、04:26 UTCに同名リモートへの通常pushとHEAD一致を確認した。この追記を保存する後続コミットも文書変更だけであり、以下の成功・失敗を後続HEADの実行結果へ読み替えない。
+
+### 本人が起動したGitHub Actions
+
+この実装担当の `gh workflow run ci.yml --repo Kaito-Iwase/ClearAllergy --ref codex/combined-validation-20261026` は、事前の `GET /repos/Kaito-Iwase/ClearAllergy/actions/workflows/ci.yml` が `Forbidden`、exit 1となり、dispatch POSTに到達しなかった。再試行や別資格情報による迂回はしていない。これだけでworkflow書込み権限の不足とは断定しない。その後、本人が起動した実行をPinguがGitHub metadata・jobs・全job logから独立に確認し、次の結果を提供した。この担当が再実行・再取得した結果ではない。
+
+- [CI run 40270068119](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40270068119)、attempt 1、event `workflow_dispatch`、actor `Kaito-Iwase`。
+- 作成 `2026-10-26T04:37:59Z`、完了 `04:40:54Z`、conclusion `success`。job `121400755718` は `Test, lint, typecheck, and build`。
+- checkout後の`git log`で上記cda3fefを確認。PR用merge SHAではない。
+
+| 既存workflowの検証 | Pinguが確認した結果 |
+| --- | --- |
+| `npx prisma generate` / `npx prisma validate` | PASS |
+| `npm test` | 287件PASS、失敗0 |
+| `npm run lint` / `npm run typecheck` | PASS |
+| 空の使い捨てDBでの二段階公開upgrade | PASS |
+| PostgreSQL制約・rollback・公開版・所有者のメニュー書込み・店舗保存 | PASS |
+| `npm run build` | Next 16.4.1の新規build PASS。既存build cacheの流用なし |
+| `node scripts/browser-runner.mjs publication` | 架空API応答へ差し替えた保存・公開component検査PASS |
+| `node scripts/browser-runner.mjs public` | 公開prototypeのChromium検査PASS |
+| 失敗時summary / artifact upload | 失敗時summaryは条件によりskip、artifact upload成功 |
+
+artifact IDは `12628370679`、名前は `prototype-browser-cda3fef880ddc96f632dc06d7bdf9005f8f4bab0`、サイズは4,521,128 bytes、GitHub metadataのdigestは `sha256:55f0d2cf18c65f68767055e9a8df51a02b96cfc73d3a39126d13106cdbfe27c0`、期限は `2026-11-02T04:40:47Z`。ZIP内容は再取得・展開しておらず、このdigestは独自再計算値ではない。CIのBUILD_ID／build fingerprint receiptも未取得で、raw artifactをこのリポジトリへ保存したとは扱わない。既存通常CIの成功であり、追加UIモードや全P0 phase/summarizeの成功ではない。
+
+### 別の隔離環境で行った追加UI検証の試行
+
+別タスク `01a17679-e260-7688-8be8-4e2f951fa033` の完了報告をPinguから受領した。対象は同じcda3fef/treeで、520追跡ファイルの前後一致・cleanを確認したという報告である。この担当自身の実行や、上記CIと同じ環境の結果として記載しない。
+
+| 実行・確認 | 別タスクから提供された結果 |
+| --- | --- |
+| Node / npm | 22.23.4 / 11.18.0 |
+| clean install / lint / 文書リンク | PASS / PASS / 239件PASS |
+| unit | 173件PASS、生成済みPrisma Client不足で9ファイル失敗。観測器の9ケースはPASS。全unit成功ではない |
+| typecheck | FAIL：Prismaの生成型不足 |
+| Prisma engine checksum取得 | 公式`binaries.prisma.sh`でHTTP 403、exit 1 |
+| Chromium取得 | HTTP 403 |
+| 新build・BUILD_ID・fingerprint、DB回帰、`browser-runner.mjs ui` | NOT_RUN |
+
+通信拒否の迂回・再試行は行わず終了。利用可能ディスクは開始時約30GB、終了時約12GB。runtimeはloopbackのみ、実資格情報・home・Docker socketを持ち込まず、使い捨てDBは0テーブル、作成したcontainerは全停止という報告である。証跡は別途本人へ提供済みだが、非公開保存先のリンクや内容はこのリポジトリへ転載していない。GitHub CIの成功によって、この別環境の403や追加UI未実行が解消したとは扱わない。
+
+### deploy観測と残条件
+
+PinguによるVercelの読取では、04:32:29 UTC時点でcda3fefのSHA検索は`No Results`、候補ブランチ検索も該当なし。04:32:46 UTC時点のProduction deployment `AAyye7c49YsNypAkqpZaA6VMWaa7` はmain `0b6ed291b2fd853230c7efdeeb1e061815404a81` のReadyのまま変更なしだった。これは特定時点の観測で、抑止理由のreceiptはなく、将来やこの追記の後続HEADまでdeploymentがないという保証ではない。候補の11個の完全一致falseは変更しない。
+
+残る追加UI検証には、容量のある許可済み隔離環境で公式Prisma engine/checksum・Chromiumを取得できる条件、生成済みPrisma Clientと使い捨て合成DBが必要。正規の環境条件が整ってから対象SHA/treeと新buildの対応を保存し、既存の未知例外観測を含むUIモードを実行する。取得拒否を無視したbuild、旧buildの代用、検査緩和は行わない。この文書追記を理由とするCIの再起動やテストの反復は行わない。
+
+人間の最終確認、UTC migrationの正式採用・本番適用判断、未取得の旧P1 source、P0の残条件、旧hash不一致は引き続き未解決。独立レビューは追加せず、既存回数上限を保持する。#108は別扱いのままで、元PR・main/develop・サービス設定・製品コードを変更しない。
 
 ## 対象と判断
 
