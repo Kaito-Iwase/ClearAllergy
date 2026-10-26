@@ -153,7 +153,7 @@ runnerは `scripts/npm-cli.mjs` で解決したNode配布またはnpm lifecycle�
 
 `node scripts/agent-harness.mjs summarize --base origin/main --plan .agent-runs/plan.json --snapshot .agent-runs/queue.json --inputs unit.json --required test --output summary.json` で現在候補と照合します。候補/版/lock/runner違い、偽のidentity ID、失敗/不安全な証跡、build違いはFAIL、未実行はUNVERIFIED、両方とも終了コード1です。browserを含む集約は対応するbuild phaseも要求します。requiredはその集約で要求する範囲を明示するもので、全品質gateの完了を自動認定しません。署名付き証明ではなく、候補取り違えと偶発的な結果流用を防ぐローカル証跡です。独立reviewとremote checkは常に別途確認し、機械的にPASSへ昇格しません。CIがPR merge commitをcheckoutした場合、記録HEADはそのmerge commitです。PR headと同一と誤認しないでください。
 
-この版の制限として、`summarize` はphase receiptの候補・build欄を照合しますが、参照先 `serverEvidence` の実在・run/candidate/build/hashを検証しません。`verify` も変更が実行中に変わらないことを確認するだけで、作業計画に対するscope外・rename・untracked・protected areaや追加必須検証を認定する機能ではありません。queueのsnapshot/assessment検査とverifyは未接続です。環境変数の除去はOS隔離ではなく、子プロセスのファイル読取・通信能力を制限するものではありません。これらを必要とする承認・集約の根拠には単体のPASSを使わず、[今回の検証境界](verification/harness-evidence-main-20261025.md)を確認してください。
+現行版は上記のscope・完全な最新snapshot・server補助JSONを照合します。ただしGitHubのinventory収集、実CIの起動・結果取得、証跡の署名、独立レビュー、人間の判断を自動で行うものではありません。既存Actionsは通常検査を直接呼び、`phase` / `summarize` と `.agent-runs/` の保存は未接続です。環境変数の除去はOS隔離ではなく、子プロセスのファイル読取・通信能力を制限するものではありません。[現在の実行経路と再開条件](verification/ci-evidence-paths-20261025.md)を確認し、過去の[本体のみの検証](verification/harness-evidence-main-20261025.md)と[追加版の検証](verification/harness-context-main-20261025.md)は対象時点を分けて読んでください。
 
 認可・安全・公開条件・DBを触ったら影響に応じて別店舗/未認証/API回帰、接続guard下の実PostgreSQL制約・rollback、mobile/desktop/keyboard/状態を追加する。mock、build、schema validateは実DBの代用ではない。専用環境の対象と副作用が未許可ならUNVERIFIEDを記録して該当gateで停止する。CIの公開browserは実Clerk/Blobの試験ではない。
 

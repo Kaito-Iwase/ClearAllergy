@@ -1,0 +1,101 @@
+{
+  "date": "2026-10-25",
+  "kind": "existing-execution-paths-and-author-documentation-fix",
+  "subjectSourceHead": "e70d037052242fbc6d0f78860e3a42d2405b681e",
+  "mainBase": "0b6ed291b2fd853230c7efdeeb1e061815404a81",
+  "branch": "codex/ci-evidence-paths-20261025",
+  "runtime": {
+    "node": "24.19.0",
+    "npm": "11.9.0",
+    "repositoryNode": "22.23.4",
+    "repositoryNpm": "11.18.0"
+  },
+  "commands": [
+    {
+      "command": "node --import tsx --test --test-reporter=tap tests/agent-harness.test.ts tests/harness-context.test.ts tests/verification-evidence.test.ts tests/ci-log-summary.test.ts",
+      "status": "PASS",
+      "exit": 0,
+      "counts": {
+        "tests": 39,
+        "pass": 39,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "scope": "local fixed fixtures and pure-function/owned-process tests; not remote CI evidence",
+      "outputSha256": "1afcf58b5507e64faa58da3724d137b0c3b5120911be59c0e65c00f4d8b909a3"
+    },
+    {
+      "command": "node scripts/check-context-links.mjs",
+      "status": "PASS",
+      "exit": 0,
+      "checked": 237,
+      "outputSha256": "b13df32d4c47c29a73d9763f97b2a9e4abf04fbf5a6b705fb3554754315dff56"
+    },
+    {
+      "command": "git diff --check",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "command": "JSON/branch guard/new report relative reference validation",
+      "status": "PASS"
+    }
+  ],
+  "sourceSha256": {
+    "scripts/agent-harness.mjs": "a004bc7ac17fe41969ba647dc891c0bcb8947097cccb5c73b4bb3bca24655ec0",
+    "scripts/harness-policy.mjs": "e5432708c95e1630949f1e090bf39f4c4b583f47f590d6aa47c6855ffd315239",
+    "scripts/run-public-phase.mjs": "bdb3aecd96bc9304edf8e37f110e449f1499ec6cecd0f97ec43c8f735dc9292f",
+    "scripts/verification-evidence.mjs": "f6c4384cf153b0fa8d1ba24e42bbd4a16ace36418076e432c799efcba0b6f563",
+    "scripts/ci-log-summary.ts": "44cb8446cdbddc1f90c9ad1c21e642ba9458421a193819810ba327aa79bd3b22",
+    "scripts/collect-ci-diagnostics.ts": "0d6e56bce9768dcd0df5d56bf56c90a902e712e644435147f9ed1c10d99f4789",
+    ".github/workflows/ci.yml": "a8bc8b823c09396428be5b515498f0d98d6db996179715fa518e26b60ea1ae86",
+    ".github/workflows/dependency-audit.yml": "f1991935aca3585c0d409a4f5350518eaf32a375dfd6f7c7f921387985dc23e8"
+  },
+  "documentationDefect": "Stale phase-evidence paragraph denied serverEvidence/scope/snapshot checks present in current code; corrected only that paragraph. Existing tests verify those checks.",
+  "githubRemoteCi": "UNVERIFIED: prior API/GraphQL Forbidden not retried; no workflow dispatch, artifact download or PR creation attempted",
+  "p0Pipeline": "UNVERIFIED: no complete fresh live inventory or genuine CI identity; Actions do not invoke phase/summarize or upload .agent-runs",
+  "prisma": "UNVERIFIED: previous official engine CONNECT 403 not retried",
+  "applicationChanges": false,
+  "executableChanges": false,
+  "workflowChanges": false,
+  "credentialsOrEnvironmentSettingsChanged": false,
+  "review": "No fourth independent review; #105 final human review pending",
+  "previousUtcSummary": {
+    "sourceBranch": "codex/utc-migration-boundaries-20261025",
+    "head": "abffb13d2c987b2482bdfcdfbc8dfca3f17d6534",
+    "reexecuted": false,
+    "fixtureAndBackup": "synthetic only",
+    "checks": [
+      {
+        "name": "legacy timestamp writer provenance",
+        "status": "PASS"
+      },
+      {
+        "name": "late error full rollback",
+        "status": "PASS"
+      },
+      {
+        "name": "tenth ALTER lock timeout",
+        "status": "PASS"
+      },
+      {
+        "name": "successful row/schema contract",
+        "status": "PASS"
+      },
+      {
+        "name": "direct SQL replay",
+        "status": "PASS"
+      },
+      {
+        "name": "pre-migration backup restore/reapply",
+        "status": "PASS"
+      },
+      {
+        "name": "post-migration backup restore",
+        "status": "PASS"
+      }
+    ],
+    "failureEvidence": "Official engine CONNECT 403; ungenerated .prisma/client/default.js throws before DB operations during lib/db module initialization; 9 test-file initializations failed, no product-code regression established"
+  }
+}
