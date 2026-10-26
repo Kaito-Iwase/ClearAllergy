@@ -4,7 +4,7 @@
 
 ## 2026-10-26の単一候補による再検証
 
-以下の2026-10-25の実行結果は過去の証拠であり、新しい候補の結果ではない。本人が承認した今回の範囲は、`e70d037052242fbc6d0f78860e3a42d2405b681e` を基点とする独立ローカル枝 `codex/combined-validation-20261026` への集約と検証まで。全変更の正式採用、push、PR更新、merge、deploy、本番・共有DBやサービス設定の変更は含まない。
+以下の2026-10-25の実行結果は過去の証拠であり、新しい候補の結果ではない。集約の基点は `e70d037052242fbc6d0f78860e3a42d2405b681e`、候補枝は `codex/combined-validation-20261026`。その後、deploy抑止と実効設定を確認できた場合に限り、同候補と必要な非秘密証跡の通常push・既存CIの同枝指定による手動実行が承認された。以下の確認時点ではpush・CI起動とも保留中。全変更の正式採用、PR作成・更新、merge、deploy、本番・共有DBやサービス設定の変更は含まない。
 
 | 集約元 | 採り込む差分 |
 | --- | --- |
@@ -25,7 +25,24 @@
 
 #95の文書は `940d2ae` と `b237c8f` で既に適応済み。#108（確認HEAD `0d8b3944385c163c640c6351eac849cc65e8001e`）は別扱いとし、その文書・Dependabot関連設定を取り込まない。共有パスは `docs/guide/change-map.md`、`docs/guide/development.md`、`vercel.json`。#108の枝・PRとそのdeploy guardは変更しない。後に#108と統合する場合は、双方の文書とguardを明示的に照合する必要がある。
 
-新しい検証は確定した候補HEAD/treeを記録し、`npm test`、`npm run lint`、`npm run typecheck`、`npm run build`、既存の `browser-runner.mjs ui` と影響する使い捨てDBの確認を対象とする。古いBUILD_IDを再利用して新ビルド成功にしない。検証実施前に書いたこの節は成功証明ではなく、実際のコマンド・終了コード・候補と新buildの対応は別の実行記録で示す。Prisma/Fonts・隔離環境の不足があれば失敗または未実行として残す。
+検証対象は `2a3b4ea66b221e6f6add3bd69d93ff9d4ecb4487`、tree `1a4f50cab2dc6099d7733b53e557a0f53f4277b9`。以下はこのSHAの直接実行結果であり、この報告だけを追加する後続コミットや将来のCIの成功証明ではない。
+
+| コマンド／検証 | 2026-10-26 UTCの結果 |
+| --- | --- |
+| `npm run build` | PASS、exit 0、03:42:50–03:43:13。実行前に`.next`なし。Prisma Client 6.19.3、Next 16.4.1 |
+| `npm run lint` | PASS、exit 0、03:43:37–03:43:50 |
+| `npm test` / `npm run typecheck` | UNVERIFIED。初回の出力・receiptがENOSPCで空になり、結果を復元できない。再試行はDocker起動時exit 125で検査開始前に停止。成功件数は不明 |
+| 使い捨てDB・公開版・UTC回帰 | NOT_RUN。新規PostgreSQLのinitdbが`pg_wal`作成時ENOSPCで停止。fixture/schema作成前 |
+| `node scripts/browser-runner.mjs ui` | NOT_RUN。新buildのUI検証に必要な合成DBを開始できなかった |
+| 実GitHub Actions / phase・summarize | 未実行／未検証。直接実行を同一SHAの実CIやphase receiptに読み替えない |
+
+新BUILD_IDは `hTNoqSRE_vA6HZE8w1Ct9`、保存済みbuild fingerprintは `2b930ed49bd168c32678d1adb6060da858a9ec638f1051f4d15875dfee38ef84`。520追跡ファイルの前後一致を確認したsource manifest SHA-256は `6599abfe22a2bbcb7ce08dbb91c544d2003cf0c94bb864024278ce07f753c93f`。build log SHA-256は `97aa299bc61568c8d4327d35054478207fb868fd72b4dd314fa6e667fa044748`。原本のbuild/lint receiptとlogは作業環境内に保持し、資格情報やraw logはこの文書へ転記しない。
+
+Node 22.23.4 / npm 11.18.0、既存同一lockfile依存を使い、Dockerのread-only root・UID 1000・capabilityなし・home/資格情報/socketのmountなしで実行。buildのみ通常bridge、lintはnetwork none。Fonts通信は通常経路で成功したが、依存のclean installやPrisma配布先403の解消を証明しない。以前の通信可否が変わった主体も不明。root/workspace/Docker側の利用可能容量0が継続し、別volumeの`/tmp`の空きだけではDockerを起動できない。容量のある許可済み隔離環境で未完了検査を再開する必要がある。古いUI結果・test件数はこの候補の結果に加えない。
+
+push前のリポジトリ検査では、`git.deploymentEnabled`は11個の完全一致`false`のみで、候補名に一致するのは候補自身の1項目。競合する`true`やwildcardはない。CI workflowはe70と同一で、push対象はmain/developのみ。既存2 workflowにdeploy処理、reusable workflow呼出、`repository_dispatch`・`deployment_status`・`workflow_run`の連鎖はない。既存CIの手動実行は使い捨てPostgreSQLサービスと固定架空認証を使い、実Secrets参照・実Clerk/Blob操作はない。公開ページはClerk middleware対象外、公開browserは外部通信を遮断し、公開操作のcomponent検査は全APIを架空応答へ差し替える。npm/Prisma/Chromium/Fonts取得の外部通信は必要であり、ジョブ全体のnetwork denyを意味しない。
+
+既存CIはunit/lint/type/build、公開版移行・DB制約・所有権・店舗保存、架空保存公開component、公開prototype browserを実行する。一方、追加UI observer、専用UTC境界検査、全P0 phase/summarizeを完走させる構成ではない。CI成功とそれらの未達を分けて扱う。Vercel実効設定の読取はPingu側の別証拠であり、この文書はpush後のdeployment不発生の実観測ではない。
 
 実CI、最新inventoryに基づくphase/summarize、人間確認は別gate。GitHub-hosted情報を偽装せず、通常の直接実行をphase receiptへ読み替えない。#101/#102/#105は各3回、旧P1は引継ぎ上2回のレビュー上限を保持し、この集約では独立レビューを追加しない。旧P1の未取得差分を再構成せず、旧hash不一致も解消済みとしない。
 
