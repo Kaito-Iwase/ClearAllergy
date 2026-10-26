@@ -239,6 +239,12 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 
 このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
 
+### Dependabot導入前の自動デプロイ抑止
+
+`vercel.json` の `git.deploymentEnabled` は既存の6ブランチの `false` を保持し、`dependabot/**` と導入準備ブランチ `chore/ca-dependabot-deploy-guard-20261026` だけを追加で `false` にします。[Vercel公式仕様](https://vercel.com/docs/project-configuration/git-configuration)はminimatch構文を使い、未指定ブランチは `true`、複数一致時は `true` が優先です。main/developや通常の作業ブランチの自動デプロイ条件は変更しません。これはGit連携の自動デプロイ抑止であり、手動deployの禁止ではありません。
+
+導入順は、別承認によるこの抑止設定のmain反映 → 対象ブランチでの実際の抑止確認 → Dependabot security updatesの有効化とversion updates設定の反映です。この準備変更ではGitHub設定の有効化、merge、auto-merge、deployは行いません。パターンのローカル検査は実Vercelでの抑止観測と区別し、実際の抑止は未確認です。
+
 ### 公開前と障害時の確認
 
 公開前には、対象SHAのCI結果、PreviewとProductionのDB・Clerk・Blobの分離、適用済みmigration、正規HTTPSでのOrigin検査、画像アップロード上限、ログ保管期間・閲覧権限・通知先を確認します。配備設定の名前や画面が存在するだけで、動作確認済みとはしません。秘密値は記録せず、確認した対象・日時・結果を残します。
