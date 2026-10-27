@@ -173,6 +173,8 @@ node --import tsx scripts/initialize-test-preview.ts --owner-a user_3LFy4E2hco0V
 
 CLIの処理順は、明示引数・固定URL・承認済みowner → 実接続のdatabase/roleと空schema確認 → このcheckoutの既存20 migrationを通常の `prisma migrate deploy` で適用 → migration名・checksum・完了状態の照合 → Serializable transactionでfixture作成です。Prisma子processへはDB接続と必要なOS変数だけを渡し、出力はログへ転載しません。migration子processは120秒、fixture transactionは30秒を上限とし、超過・通信断は自動再試行しません。
 
+INIT診断はstderrへ1行ずつASCII JSONで出し、固定event `INIT_PHASE` / `INIT_ERROR` / `MIGRATION_RESULT` / `CLI_STOP` / `CLI_DONE` と固定phaseだけを記録します。`CLI_STOP` はcleanupに入る前の最初の失敗phaseを保持し、errorは許可リストのstructured `code` / `errorCode`、providerの `meta.code` だけを採用します。未知値は `UNCLASSIFIED` / `UNKNOWN_PHASE` / `UNKNOWN_SIGNAL` またはnullにします。migrationはexit code・許可したsignal・`ETIMEDOUT` によるtimeout判定を記録します。例外message/stack、stdout/stderr、生URL、資格情報、未検証の自由文字列は出しません。診断はretry・reset・追加DB操作を行わず、失敗原因の確定や解消を示すものではありません。`tests/test-preview-initialization.test.ts` の診断検査は合成エラーとDBモックだけを使います。
+
 transactionでは業務データ0件を再確認し、既存マスタが現行定義の一部である場合だけ不足分を追加します。migration由来のpistachio等は上書きしません。Clerk IDに対応するUser 2件（email・passwordを合成しない）と所有者が一致する架空店舗A/B、既存3メニューずつの計6下書きを作ります。全品目と注意書きを保ち、版はDB default/triggerに任せます。食品確認・公開確認・未解決解除の履歴は作りません。公開は保存済み内容に対する後の本人UI操作です。必要な編集許可は、作成されたUser IDを読み取り確認して対象Previewだけの `PORTFOLIO_EDITOR_APP_USER_IDS` へ設定します。
 
 再実行は、20 migrationが正しく完了済みで業務データが空の場合だけfixture段階を再開できます。業務データ・未知schema・失敗/不一致migrationがあれば変更せず停止します。fixture失敗はtransactionへ伝えますが、既に適用済みのmigrationは巻き戻しません。通信断等で結果不明なら、自動再試行せず対象DBを読み取り確認します。成功確認はマスタ全件の一致、User 2・Shop 2・MenuItem 6、各メニュー全品目、全件非公開、確認/公開/解除履歴0件、所有関係の一致です。

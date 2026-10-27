@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
+import { createTestPreviewDiagnostics } from "../scripts/initialize-test-preview";
 import { assertApprovedTestPreviewOwners, assertTestPreviewDatabaseTarget, initializeTestPreviewDatabase,
     parseTestPreviewInitializationArgs, readTestPreviewMigrations, TEST_PREVIEW_TARGET, validatePartialTestPreviewMaster } from "../scripts/test-preview-initialization";
 
@@ -199,4 +200,96 @@ test("部分masterの未知品目・重複・定義変更を拒否し、現行20
     }
     assert.equal(migrations.length, 20);
     for (const migration of migrations) assert.match(migration.checksum, /^[a-f0-9]{64}$/);
+});
+
+test("診断は実行phaseを区別し、cleanup後も最初の失敗phaseをCLI_STOPへ残す", async t => {
+    setup(t);
+    for (const [options, expected] of [
+        [{ migrated: true, nonempty: true }, "DB_PREFLIGHT"], [{ failMigration: true }, "MIGRATE"],
+        [{ invalidLedger: true }, "MIGRATION_VERIFY"], [{ failMenu: true }, "FIXTURES"],
+    ] as const) {
+        const lines: string[] = [];
+        const diagnostics = createTestPreviewDiagnostics(line => lines.push(line));
+        const { dependencies } = mockDatabase(options);
+        await assert.rejects(async () => {
+            try {
+                await initializeTestPreviewDatabase(approvedOwners, { ...dependencies,
+                    onDiagnostic: event => event.type === "PHASE" ? diagnostics.phase(event.phase) : diagnostics.failure(event.phase, event.error),
+                });
+            } catch (error) { diagnostics.stop(error); throw error; }
+        });
+        const records = lines.map(line => JSON.parse(line));
+        assert.ok(records.some(record => record.event === "INIT_PHASE" && record.phase === "DB_DISCONNECT"));
+        assert.equal(records.at(-1).event, "CLI_STOP");
+        assert.equal(records.at(-1).phase, expected);
+        assert.equal(records.at(-1).error_code, "UNCLASSIFIED");
+        assert.ok(lines.every(line => /^[\x20-\x7e]+$/.test(line)));
+        assert.doesNotMatch(lines.join(""), /mock migration failure|mock menu insert failure|Existing business data/);
+    }
+});
+
+test("structured Prisma/provider codeだけを採用しmessage・stack・秘密らしい文字列を出さない", () => {
+    const secret = "postgresql://private:synthetic-secret@private.invalid/neondb sk_test_synthetic_secret https://private.invalid";
+    const error = Object.assign(new Error(secret), { code: "P2010", meta: { code: "42P01", message: secret }, stdout: secret, stderr: secret });
+    const lines: string[] = [];
+    const diagnostics = createTestPreviewDiagnostics(line => lines.push(line));
+    diagnostics.phase("DB_PREFLIGHT"); diagnostics.failure("DB_PREFLIGHT", error);
+    diagnostics.phase("DB_DISCONNECT"); diagnostics.failure("DB_DISCONNECT", { errorCode: "P1001", message: secret });
+    diagnostics.stop(error);
+    const records = lines.map(line => JSON.parse(line));
+    assert.deepEqual(records[1], { event: "INIT_ERROR", phase: "DB_PREFLIGHT", error_code: "P2010", provider_code: "42P01" });
+    assert.equal(records[3].error_code, "P1001");
+    assert.deepEqual(records.at(-1), { event: "CLI_STOP", phase: "DB_PREFLIGHT", error_code: "P2010", provider_code: "42P01" });
+    assert.doesNotMatch(lines.join(""), /synthetic-secret|private|sk_test|message|stack|stdout|stderr/);
+});
+
+test("migration診断はexit・allowlisted signal・timeoutだけを記録しraw出力を読まない", () => {
+    for (const [result, expected] of [
+        [{ status: 1, signal: null }, { exit_code: 1, signal: null, timed_out: false, error_code: null }],
+        [{ status: null, signal: "SIGTERM", error: { code: "ETIMEDOUT", message: "synthetic-secret" } },
+            { exit_code: null, signal: "SIGTERM", timed_out: true, error_code: "ETIMEDOUT" }],
+        [{ status: null, signal: "SIGKILL", error: { code: "EACCES", stack: "synthetic-secret" } },
+            { exit_code: null, signal: "SIGKILL", timed_out: false, error_code: "EACCES" }],
+        [{ status: 0, signal: null }, { exit_code: 0, signal: null, timed_out: false, error_code: null }],
+    ] as const) {
+        const guarded = Object.defineProperties({ ...result }, {
+            stdout: { get: () => assert.fail("stdout must not be read") },
+            stderr: { get: () => assert.fail("stderr must not be read") },
+        });
+        const lines: string[] = [];
+        const diagnostics = createTestPreviewDiagnostics(line => lines.push(line));
+        diagnostics.migrationResult(guarded); diagnostics.stop(new Error("synthetic-secret"));
+        const records = lines.map(line => JSON.parse(line));
+        assert.deepEqual(records[0], { event: "MIGRATION_RESULT", phase: "MIGRATE", ...expected });
+        assert.deepEqual(records[1].migration, expected);
+        assert.doesNotMatch(lines.join(""), /synthetic-secret|stdout|stderr|message|stack/);
+    }
+});
+
+test("未知code/phase/signal・getter・coercion・throwing proxyを出力へ渡さない", () => {
+    const lines: string[] = [];
+    const diagnostics = createTestPreviewDiagnostics(line => lines.push(line));
+    const forbidden = () => assert.fail("Untrusted getter or coercion invoked");
+    const error = Object.defineProperties({ toJSON: forbidden, toString: forbidden }, {
+        code: { get: forbidden }, message: { get: forbidden }, stack: { get: forbidden },
+    });
+    diagnostics.phase("synthetic-secret"); diagnostics.failure("synthetic-secret", error);
+    diagnostics.migrationResult({ status: "synthetic-secret", signal: "SIGTERM synthetic-secret", error: { code: "P1001\nsynthetic-secret" } });
+    diagnostics.stop(new Proxy({}, { getOwnPropertyDescriptor: () => { throw new Error("synthetic-secret"); } }));
+    const records = lines.map(line => JSON.parse(line));
+    assert.deepEqual(records[1], { event: "INIT_ERROR", phase: "UNKNOWN_PHASE", error_code: "UNCLASSIFIED", provider_code: null });
+    assert.deepEqual(records[2], { event: "MIGRATION_RESULT", phase: "MIGRATE", exit_code: null, signal: "UNKNOWN_SIGNAL", timed_out: false, error_code: "UNCLASSIFIED" });
+    assert.ok(lines.every(line => /^[\x20-\x7e]+$/.test(line)));
+    assert.doesNotMatch(lines.join(""), /synthetic-secret|message|stack|toJSON|toString/);
+});
+
+test("診断writer/observerの失敗は既存fixture transactionの成否を変えない", async t => {
+    setup(t);
+    const diagnostics = createTestPreviewDiagnostics(() => { throw new Error("synthetic-secret"); });
+    assert.doesNotThrow(() => { diagnostics.phase("ARGS"); diagnostics.stop({ code: "P1001" }); diagnostics.done(); });
+    const { dependencies, calls } = mockDatabase();
+    const shops = await initializeTestPreviewDatabase(approvedOwners, { ...dependencies,
+        onDiagnostic: () => { throw new Error("synthetic-secret"); },
+    });
+    assert.equal(shops.length, 2); assert.equal(calls.commit, 1); assert.equal(calls.rollback, 0);
 });

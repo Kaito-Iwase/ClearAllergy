@@ -113,22 +113,42 @@ export type TestPreviewInitializationDependencies = {
     connect: () => PrismaClient;
     migrate: () => void;
     migrations: Migration[];
+    onDiagnostic?: (event: TestPreviewDiagnosticEvent) => void;
 };
+
+type InitializationPhase = "DB_TARGET" | "OWNER_ARGS" | "MIGRATION_FILES" | "OWNERS" | "DB_CONNECT"
+    | "DB_PREFLIGHT" | "MIGRATE" | "MIGRATION_VERIFY" | "FIXTURES" | "DB_DISCONNECT";
+export type TestPreviewDiagnosticEvent = { phase: InitializationPhase; type: "PHASE" }
+    | { phase: InitializationPhase; type: "ERROR"; error: unknown };
 
 // Injected transports allow pure mock tests. The manual CLI always supplies the
 // fail-closed approved-owner verifier; no CLI flag can bypass that verifier.
 export async function initializeTestPreviewDatabase(owners: TestPreviewOwners, dependencies: TestPreviewInitializationDependencies) {
+    let currentPhase: InitializationPhase = "DB_TARGET";
+    const notify = (event: TestPreviewDiagnosticEvent) => {
+        try { dependencies.onDiagnostic?.(event); } catch { /* Diagnostics cannot change initialization behavior. */ }
+    };
+    const phase = (next: InitializationPhase) => { currentPhase = next; notify({ type: "PHASE", phase: next }); };
+    phase("DB_TARGET");
     assertTestPreviewDatabaseTarget();
+    phase("OWNER_ARGS");
     parseTestPreviewInitializationArgs(["--owner-a", owners[0], "--owner-b", owners[1], "--apply"]);
+    phase("MIGRATION_FILES");
     if (dependencies.migrations.length !== 20 || new Set(dependencies.migrations.map(m => m.name)).size !== 20) {
         throw new Error("The reviewed set of 20 migrations is required.");
     }
+    phase("OWNERS");
     await dependencies.verifyOwners(owners);
+    phase("DB_CONNECT");
     const db = dependencies.connect();
     try {
+        phase("DB_PREFLIGHT");
         await assertDatabaseBeforeMigration(db, dependencies.migrations);
+        phase("MIGRATE");
         dependencies.migrate(); // usual Prisma migrate deploy; never reconstructed SQL
+        phase("MIGRATION_VERIFY");
         await assertMigrationLedger(db, dependencies.migrations);
+        phase("FIXTURES");
         return await db.$transaction(async tx => {
             await assertEmptyBusinessData(tx);
             const master = await tx.allergen.findMany();
@@ -149,5 +169,12 @@ export async function initializeTestPreviewDatabase(owners: TestPreviewOwners, d
             // Defaults/triggers own all versions. No food-review, publication or resolution history is synthesized.
             return shops;
         }, { isolationLevel: "Serializable", timeout: 30_000 });
-    } finally { await db.$disconnect(); }
+    } catch (error) {
+        notify({ type: "ERROR", phase: currentPhase, error });
+        throw error;
+    } finally {
+        phase("DB_DISCONNECT");
+        try { await db.$disconnect(); }
+        catch (error) { notify({ type: "ERROR", phase: "DB_DISCONNECT", error }); throw error; }
+    }
 }
