@@ -20,6 +20,13 @@ type AdminLoginPageClientProps = {
     databaseUnavailableReason?: string | null;
 };
 
+function isExistingSessionError(error: unknown) {
+    return typeof error === "object" && error !== null
+        && "errors" in error && Array.isArray(error.errors)
+        && error.errors.some((item: unknown) => typeof item === "object" && item !== null
+            && "code" in item && item.code === "session_exists");
+}
+
 export default function AdminLoginPageClient({
     showGoogleAuthButton = false,
     pendingSetupEmail,
@@ -35,6 +42,7 @@ export default function AdminLoginPageClient({
     const [requiresEmailCode, setRequiresEmailCode] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [hasExistingSession, setHasExistingSession] = useState(false);
     const [loading, setLoading] = useState(false);
 
     async function reportLoginResult(args: {
@@ -113,6 +121,7 @@ export default function AdminLoginPageClient({
     const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError(null);
+        setHasExistingSession(false);
         setNotice(null);
         setLoading(true);
 
@@ -165,6 +174,14 @@ export default function AdminLoginPageClient({
             });
 
             if (passwordResult.error) {
+                if (isExistingSessionError(passwordResult.error)) {
+                    setHasExistingSession(true);
+                    setError(
+                        "既存のログインセッションが検出されました。この画面ではログイン完了を確認できていません。「管理画面へ進む」から状態を確認してください。再ログインは繰り返さず、管理画面に入れない場合は担当者に状況を伝えてください。",
+                    );
+                    return;
+                }
+
                 await reportLoginResult({
                     email: normalizedEmail,
                     success: false,
@@ -284,6 +301,7 @@ export default function AdminLoginPageClient({
 
     async function resetLoginFlow() {
         setError(null);
+        setHasExistingSession(false);
         setNotice(null);
         setEmailCode("");
         setRequiresEmailCode(false);
@@ -410,6 +428,13 @@ export default function AdminLoginPageClient({
                         {error ? (
                             <div id="login-error" role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                                 {error}
+                                {hasExistingSession ? (
+                                    <p className="mt-3">
+                                        <Link href="/admin" className="font-bold underline underline-offset-4">
+                                            管理画面へ進む
+                                        </Link>
+                                    </p>
+                                ) : null}
                             </div>
                         ) : null}
 
