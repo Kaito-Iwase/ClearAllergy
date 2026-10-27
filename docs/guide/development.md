@@ -64,6 +64,14 @@ IP制限では、Vercelが自動で設定する `VERCEL=1` の環境だけ転送
 
 ネットワークを使わない局所検証は `node --import tsx --test tests/test-environment-banner.test.ts tests/test-preview-blob.test.ts`。環境条件、明示token、設定不備時の停止、通常環境のSDK optionsをmockで検査します。実Clerk・DB・Blob・Preview操作の検証とは分けます。
 
+### main-schemaの別テストDB用手動手順（運用準備ブランチのみ）
+
+`scripts/initialize-main19-preview.ts` は新DB `clearallergy_main19` だけの手動初期化です。既存 `neondb` はガードで拒否します。接続host・role、Clerk所有者2名の順序、既存AppUser IDの対応を固定し、`scripts/main19-test-preview-migrations.json` の19件とchecksumが一致した場合だけ通常のPrisma migrate deployへ進みます。既存のCI/Composeガードや通常seedは変更・使用しません。新DB作成、資格情報の安全な受渡し、本人・接続先の実確認、実行対象の承認が揃うまでは実行しません。
+
+承認された作業用プロセスへ新DBの `DATABASE_URL` / `DIRECT_URL` と `CLEARALLERGY_TEST_PREVIEW=true` を一時的に渡し、固定した手順commitのrepoルートから `node --import tsx scripts/initialize-main19-preview.ts --owner-a user_3LFy4E2hco0VpC63CbjjMjOznIx --owner-b user_3LFyNjtUBNFHoDjyYiieTXEhHd0 --apply` を実行します。AppUser IDはコードの承認済み対応を使用し、Clerkユーザーを作成・変更しません。masterは一致確認後に不足分だけ追加し、架空2店舗・6下書きをtransactionで作成します。確認・公開履歴を合成しません。再実行・結果不明は読取確認を先に行い、reset・削除・上書き・自動retryはしません。診断には固定phase・許可されたcode・migration終了状態だけを出し、出力全文・接続文字列・秘密値は出しません。
+
+局所検証は `node --import tsx --test tests/test-main19-preview-initialization.test.ts`。これはmock検査であり、実DB・migration成功やWindowsのPrisma Client型検査を代替しません。この運用準備をアプリ配備候補へ自動で取り込まないでください。
+
 <a id="startup"></a>
 ## 2. 起動する
 
