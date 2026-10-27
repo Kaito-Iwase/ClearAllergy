@@ -16,10 +16,13 @@ type Environment = Record<string, string | undefined>;
 type Migration = { name: string; checksum: string };
 type MasterRow = { id: string; slug: string; nameJa: string; nameEn: string; sortOrder: number };
 
-// Intentionally empty. Only fill after the parent verifies both actual users in
-// the exact Development instance above through approved, trusted metadata.
-// A syntactically valid CLI user ID is not evidence of instance membership.
-const APPROVED_TEST_PREVIEW_OWNER_IDS: readonly string[] = [];
+// The existing browser task independently read back these two fictional users
+// in the exact Development app/instance above at 2026-10-27 01:22:55 UTC.
+// Parent handoff supplied that trusted metadata; CLI ID syntax alone is not proof.
+const APPROVED_TEST_PREVIEW_OWNER_IDS: readonly string[] = [
+    "user_3LFy4E2hco0VpC63CbjjMjOznIx",
+    "user_3LFyNjtUBNFHoDjyYiieTXEhHd0",
+];
 
 export function parseTestPreviewInitializationArgs(args: string[]): TestPreviewOwners {
     if (args.length !== 5 || args[0] !== "--owner-a" || args[2] !== "--owner-b" || args[4] !== "--apply"

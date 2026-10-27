@@ -146,7 +146,7 @@ mode・配備環境・branch・token・期待storeが不正なら、SDKを呼ぶ
 既存のtoken形式解析を再利用しています。固定版 [@vercel/blob 2.5.0公式実装](https://github.com/vercel/storage/blob/%40vercel%2Fblob%402.5.0/packages/blob/src/helpers.ts)では明示 `token` がOIDC＋store ID、環境変数tokenより優先され、store IDの大文字小文字を保持します。`tests/test-preview-blob.test.ts` はSDK通信を置き換え、明示binding・欠損/不一致時の停止・従来optionsを検査します。実upload・Blobの権限・配備設定の成功を示すものではありません。Blob bindingはDB初期化を行いません。
 
 <a id="test-preview-init"></a>
-### 新規NeonテストDBの手動INIT（実行保留）
+### 新規NeonテストDBの手動INIT（コード準備・未実行）
 
 `scripts/initialize-test-preview.ts` は次の固定リソース一組専用です。CI/Composeの接続ガードを変更せず、通常seed・SQLでのschema再構築・reset・deleteを使いません。package scripts・CI・build・deployには接続していません。
 
@@ -159,14 +159,14 @@ mode・配備環境・branch・token・期待storeが不正なら、SDKを呼ぶ
 | Clerk app / Development instance | `app_3LDk2uLf3DRxrxfMhuSUMFQ71A9` / `ins_3LDk2su6C7R2NXWTzjgi8ttubj2` |
 | 専用Public Blob | `store_wTqdbKlMg3bBQK4s`（SIN1。DB INITからはアクセスしない） |
 
-**現時点ではCLIはDBへ接続する前に停止します。** テストClerkユーザーは未作成で、`scripts/test-preview-initialization.ts` の `APPROVED_TEST_PREVIEW_OWNER_IDS` は空です。入力された `user_...` の形式だけでは本人確認・instance所属の根拠になりません。担当者が上記Development instanceの承認済みtrusted metadataから実ユーザー2名の存在・所属・IDを確認し、親がその証拠と有限の書込範囲を確認した後だけ、対象2 IDをコードのallowlistへ設定します。任意JSON・環境変数・CLIフラグでこの確認を代替する入口はありません。INITはClerkへ接続せず、アカウント作成・パスワード設定・メール送信もしません。
+2026-10-27 01:22:55 UTCに既存browser担当が上記Development app/instanceの架空ユーザー2名を独立に読み取り確認し、親の引継ぎでそのtrusted metadataが提供されました。`scripts/test-preview-initialization.ts` の `APPROVED_TEST_PREVIEW_OWNER_IDS` はその2 IDだけを固定しています。入力された `user_...` の形式だけでは本人確認・instance所属の根拠にならず、未知ID・片側の差替え・重複は接続前に拒否します。任意JSON・環境変数・CLIフラグでこの確認を代替する入口はありません。INITはClerkへ接続せず、アカウント作成・パスワード設定・メール送信もしません。この確認記録は実DB初期化の成功を示しません。
 
-実行場所とDB書込対象の承認も必要です。資格情報を新たにこのworkspaceへ転送したり、実キーをローカル環境ファイル・repo・ログへ保存しません。対象Preview branchの秘密を既に安全に利用できる、担当者が承認した手動実行場所が決まるまでは保留します。そこでPrisma Client・必要な公式engineが利用可能であることを別途確認します。既知の403を反復したり、TLS/checksum検証を回避しません。
+新規テストDBだけへの既存migration・User 2件・架空店舗2件・下書き6件の作成は、利用者の明示承認を引継ぎで確認しています。実行はrevisionと接続先を固定した別の専用executorで行い、このコード更新ではDBへ接続しません。接続情報は承認された作業processだけで一時利用し、実キーをローカル環境ファイル・repo・ログ・成果物へ保存しません。executor側でPrisma Client・必要な公式engineが利用可能であることを別途確認します。既知の403を反復したり、TLS/checksum検証を回避しません。
 
-次は承認・owner確認後だけ使う書式です。現状で実行して初期化できるという意味ではありません。
+次は確認済みA/BのIDを指定する書式です。この変更内では実行していません。executorは対象revision・固定DB・必要な依存を確認してから使います。
 
 ```powershell
-node --import tsx scripts/initialize-test-preview.ts --owner-a user_APPROVED_A --owner-b user_APPROVED_B --apply
+node --import tsx scripts/initialize-test-preview.ts --owner-a user_3LFy4E2hco0VpC63CbjjMjOznIx --owner-b user_3LFyNjtUBNFHoDjyYiieTXEhHd0 --apply
 ```
 
 `CLEARALLERGY_TEST_PREVIEW=true` と既に安全に提供された `DATABASE_URL`（固定pooler）・`DIRECT_URL`（固定direct）を検査します。URLは `postgresql:`、上記host/database/role、同一の非空password、port省略または5432に限定します。`sslmode=require` が必須で、追加で許可するqueryは `channel_binding=require`、`schema=public`、pooler側だけの `pgbouncer=true` です。重複query・別host/schemaへの迂回・fragmentは拒否します。project/branch ID文字列だけをDB認証の証明にせず、担当者がdashboard上のendpoint対応を確認した上で、このhost一組を固定しています。

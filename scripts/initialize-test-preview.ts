@@ -6,7 +6,7 @@ import { assertApprovedTestPreviewOwners, assertTestPreviewDatabaseTarget, initi
 async function main() {
     const owners = parseTestPreviewInitializationArgs(process.argv.slice(2));
     assertTestPreviewDatabaseTarget();
-    assertApprovedTestPreviewOwners(owners); // currently HOLD, before Prisma load or any connection
+    assertApprovedTestPreviewOwners(owners); // reject unapproved IDs before Prisma load or any connection
     const migrations = readTestPreviewMigrations();
     const { PrismaClient } = await import("@prisma/client");
     await initializeTestPreviewDatabase(owners, {

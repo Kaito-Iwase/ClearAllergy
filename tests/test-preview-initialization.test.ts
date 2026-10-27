@@ -6,6 +6,7 @@ import { assertApprovedTestPreviewOwners, assertTestPreviewDatabaseTarget, initi
     parseTestPreviewInitializationArgs, readTestPreviewMigrations, TEST_PREVIEW_TARGET, validatePartialTestPreviewMaster } from "../scripts/test-preview-initialization";
 
 const owners = ["user_FictionalA", "user_FictionalB"] as const;
+const approvedOwners = ["user_3LFy4E2hco0VpC63CbjjMjOznIx", "user_3LFyNjtUBNFHoDjyYiieTXEhHd0"] as const;
 const args = ["--owner-a", owners[0], "--owner-b", owners[1], "--apply"];
 const url = (host: string) => `postgresql://neondb_owner:mock-password@${host}/neondb?sslmode=require&channel_binding=require`;
 const env = { CLEARALLERGY_TEST_PREVIEW: "true", DATABASE_URL: url(TEST_PREVIEW_TARGET.poolerHost), DIRECT_URL: url(TEST_PREVIEW_TARGET.directHost) };
@@ -92,6 +93,14 @@ test("INITは明示された別々のowner IDとapplyを要求し、ID形式を�
     assert.throws(() => assertApprovedTestPreviewOwners(owners), /HOLD/);
 });
 
+test("trusted metadataで確認した二名だけを許可し、未知ID・片側差替え・重複は拒否する", () => {
+    assert.doesNotThrow(() => assertApprovedTestPreviewOwners(approvedOwners));
+    for (const invalid of [owners, [approvedOwners[0], owners[1]], [owners[0], approvedOwners[1]],
+        [approvedOwners[0], approvedOwners[0]], [approvedOwners[1], approvedOwners[1]]] as const) {
+        assert.throws(() => assertApprovedTestPreviewOwners(invalid));
+    }
+});
+
 test("DBガードは確認済みNeonのpooler/direct一組だけを許可し、URLの迂回設定も拒否する", () => {
     assert.doesNotThrow(() => assertTestPreviewDatabaseTarget(env));
     for (const key of ["DATABASE_URL", "DIRECT_URL"] as const) {
@@ -109,7 +118,7 @@ test("DBガードは確認済みNeonのpooler/direct一組だけを許可し、U
     assert.throws(() => assertTestPreviewDatabaseTarget({ ...env, CLEARALLERGY_TEST_PREVIEW: undefined }));
 });
 
-test("承認済みClerk owner未確定ではconnect・migration・fixtureの前に停止する", async t => {
+test("未承認のClerk ownerではconnect・migration・fixtureの前に停止する", async t => {
     setup(t);
     const { dependencies, calls } = mockDatabase();
     await assert.rejects(initializeTestPreviewDatabase(owners, { ...dependencies, verifyOwners: assertApprovedTestPreviewOwners }), /HOLD/);
@@ -136,14 +145,15 @@ test("migration失敗・ledger不一致ではfixture transactionに進まず自�
 test("不足masterだけ追加し、対応するowner2名・架空2店舗・6下書きを作り確認履歴を合成しない", async t => {
     setup(t);
     const { state, calls, dependencies } = mockDatabase();
-    const shops = await initializeTestPreviewDatabase(owners, dependencies);
+    const verifiedDependencies = { ...dependencies, verifyOwners: assertApprovedTestPreviewOwners };
+    const shops = await initializeTestPreviewDatabase(approvedOwners, verifiedDependencies);
     assert.equal(calls.commit, 1); assert.equal(state.master.length, ALLERGEN_MASTER.length);
     assert.equal(calls.masterCreates, ALLERGEN_MASTER.length - 1);
     assert.equal(state.master.find(a => a.slug === "pistachio")?.id, "existing-pistachio");
     assert.equal(state.users.length, 2); assert.equal(state.shops.length, 2); assert.equal(state.menus.length, 6);
     for (const [i, shop] of state.shops.entries()) {
-        assert.equal(shop.ownerClerkUserId, owners[i]); assert.equal(shop.userId, state.users[i].id);
-        assert.equal(state.users[i].clerkUserId, owners[i]); assert.equal(shop.isActive, true);
+        assert.equal(shop.ownerClerkUserId, approvedOwners[i]); assert.equal(shop.userId, state.users[i].id);
+        assert.equal(state.users[i].clerkUserId, approvedOwners[i]); assert.equal(shop.isActive, true);
         assert.match(shop.name as string, /^【架空・テスト専用】/);
         assert.equal(state.menus.filter(menu => menu.shopId === shop.id).length, 3);
     }
@@ -157,7 +167,7 @@ test("不足masterだけ追加し、対応するowner2名・架空2店舗・6下
         }
     }
     const saved = structuredClone(state);
-    await assert.rejects(initializeTestPreviewDatabase(owners, dependencies), /Existing business data/);
+    await assert.rejects(initializeTestPreviewDatabase(approvedOwners, verifiedDependencies), /Existing business data/);
     assert.deepEqual(state, saved); assert.equal(calls.migrate, 1);
 });
 

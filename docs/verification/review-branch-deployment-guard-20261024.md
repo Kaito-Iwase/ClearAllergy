@@ -6,4 +6,4 @@ Official specification checked before push: https://vercel.com/docs/project-conf
 
 Keep the branch entries while reviewing these changes. Do not enable a deployment or merge as part of this task. Any later removal or preview must separately confirm nonproduction connections.
 
-The local preparation branch `test/isolated-preview-fixtures-20261026` also has an exact `false` entry. This preparation does not add an enable entry for `test/staging`, change other entries, or authorize push/deployment. Its fixed test-resource initialization remains held before connecting until both Clerk owners and the manual execution scope are approved.
+The preparation branch `test/isolated-preview-fixtures-20261026` and `test/staging` both have exact `false` entries. The test-owner allowlist update preserves every deployment guard. The two fictional Clerk owners were independently read back in the approved Development instance at 2026-10-27 01:22:55 UTC and supplied in the parent handoff; only those IDs are pinned. Database initialization belongs to the separately authorized executor. This owner update does not connect to the DB, change service settings, or enable deployment.
