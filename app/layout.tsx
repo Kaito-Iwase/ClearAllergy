@@ -1,4 +1,6 @@
 import { PROTOTYPE_NOTICE } from "@/lib/public-prototype";
+import { isTestPreviewEnvironment } from "@/lib/test-preview-environment";
+import TestEnvironmentBanner from "@/components/layout/TestEnvironmentBanner";
 import type { Metadata } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
@@ -27,6 +29,7 @@ export default function RootLayout({
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    const testPreview = isTestPreviewEnvironment();
     return (
         <html lang="ja" className={uiFont.variable}>
             <head>
@@ -39,7 +42,9 @@ export default function RootLayout({
             </head>
             <body
                 className="antialiased"
+                data-test-preview={testPreview ? "" : undefined}
             >
+                {testPreview ? <TestEnvironmentBanner /> : null}
                 <aside aria-label="プロトタイプについて" className="mx-auto max-w-7xl px-4 pt-4">
                     <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">{PROTOTYPE_NOTICE}</p>
                 </aside>

@@ -1,4 +1,5 @@
 import { put } from "@vercel/blob";
+import { parseBlobReadWriteTokenStoreId } from "./image-url-policy";
 
 export const ALLOWED_IMAGE_MIME_TYPES = [
     "image/jpeg",
@@ -103,14 +104,34 @@ export function buildUploadJsonError(error: unknown) {
     };
 }
 
+function getTestPreviewBlobToken(): string | undefined {
+    const mode = process.env.CLEARALLERGY_TEST_PREVIEW;
+    const branch = process.env.VERCEL_GIT_COMMIT_REF;
+    if ((mode === undefined || mode === "" || mode === "false") && branch !== "test/staging") return undefined;
+    const configurationError = () => new Error("Test Preview Blob configuration is invalid.");
+    if (mode !== "true" || process.env.VERCEL !== "1" || process.env.VERCEL_ENV !== "preview" || branch !== "test/staging") {
+        throw configurationError();
+    }
+    const token = process.env.TEST_BLOB_READ_WRITE_TOKEN?.trim();
+    const expectedStoreId = process.env.EXPECTED_TEST_BLOB_STORE_ID?.trim().replace(/^store_/, "");
+    if (!expectedStoreId || !/^[a-zA-Z0-9]+$/.test(expectedStoreId)
+        || parseBlobReadWriteTokenStoreId(token) !== expectedStoreId) {
+        throw configurationError();
+    }
+    return token;
+}
+
 // 実際の保存処理はこの関数にまとめます。
 // API ごとに put() の呼び方がばらけると、保存設定の差分が事故の元になるためです。
 export async function uploadImageToBlob(args: {
     file: File;
     pathname: string;
 }) {
+    const testToken = getTestPreviewBlobToken();
     return put(args.pathname, args.file, {
         access: "public",
         addRandomSuffix: true,
+        // Explicit token takes priority over OIDC/storeId and shared environment credentials.
+        ...(testToken ? { token: testToken } : {}),
     });
 }

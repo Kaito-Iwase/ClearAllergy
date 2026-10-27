@@ -7,7 +7,14 @@
       "chore/harness-evidence-20261024": false,
       "chore/harness-p0-evidence-20261024": false,
       "fix/next-security-20261024": false,
-      "fix/runtime-dependency-security-20261024": false
+      "fix/runtime-dependency-security-20261024": false,
+      "codex/font-portability-local-20261025": false,
+      "codex/ui-error-observation-20261025": false,
+      "codex/ci-evidence-paths-20261025": false,
+      "codex/utc-migration-boundaries-20261025": false,
+      "codex/combined-validation-20261026": false,
+      "test/isolated-preview-fixtures-20261026": false,
+      "test/staging": false
     }
   }
 }

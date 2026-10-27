@@ -12,6 +12,40 @@ body {
   line-height: 1.7;
 }
 
+body[data-test-preview] {
+  --test-preview-banner-height: 3.5rem;
+}
+
+.test-environment-banner {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 0.75rem;
+  border-bottom: 1px solid #92400e;
+  background: #78350f;
+  padding: 0.5rem 1rem;
+  color: #fff;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+/* Account for wrapping/zoom without covering existing navigation or controls. */
+body[data-test-preview] header.sticky.top-0,
+body[data-test-preview] aside.lg\:sticky.lg\:top-0 {
+  top: var(--test-preview-banner-height);
+}
+
+body[data-test-preview] aside.lg\:sticky.lg\:top-0 {
+  height: calc(100dvh - var(--test-preview-banner-height));
+}
+
+body[data-test-preview] :where(a, button, input, select, textarea, [id]) {
+  scroll-margin-top: calc(var(--test-preview-banner-height) + 8rem);
+}
+
 /* Keep the dashboard canvas continuous beyond its content and during panel changes. */
 body:has([data-admin-dashboard]) {
   min-height: 100dvh;

@@ -42,6 +42,7 @@ DBデータ・コンテナ内依存・`.next`（Next.jsの生成物）はそれ�
 | `ENABLE_CLERK_ADMIN_AUTH` | Google / Clerk SSO（外部アカウントによるログイン）導線の表示判定に使う。全認証の無効化スイッチではない |
 | `NEXT_PUBLIC_APP_URL` | 公開URL・QR等の基準URL |
 | `BLOB_READ_WRITE_TOKEN` / `ALLOWED_IMAGE_URL_PREFIXES` | アップロードと許可する画像ストア。未設定なら画像機能を無理に試さない |
+| `CLEARALLERGY_TEST_PREVIEW` / `TEST_BLOB_READ_WRITE_TOKEN` / `EXPECTED_TEST_BLOB_STORE_ID` | 専用Previewの識別とBlobの明示binding。下記の全条件が必要。秘密tokenはserver-only |
 | `GOOGLE_MAPS_SERVER_API_KEY` | 管理画面のGoogle店舗候補検索用 |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` / `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | 旧地図用設定。現在の公開画面は動く地図を提供しない |
 | `ADMIN_REGISTRATION_MODE` / `ADMIN_REGISTRATION_INVITE_TOKEN` | 旧登録方式の設定。現行の自己登録停止を解除しない |
@@ -49,6 +50,19 @@ DBデータ・コンテナ内依存・`.next`（Next.jsの生成物）はそれ�
 `NEXT_PUBLIC_` が付いた値はブラウザへ届き得ます。秘密鍵やDB URLには使いません。ローカルで不足したキーを、CI用の非実在値や本番値で埋めればよいという手順ではありません。
 
 IP制限では、Vercelが自動で設定する `VERCEL=1` の環境だけ転送IPを使います。他の配備先でこの値を手動設定して信頼判定を迂回しないでください。Vercel以外ではIPが不明な共通枠を使うため、複数利用者で制限枠を共有します。[同一オリジンと回数制限](rules.md#request-security)を読み、別のプロキシを使う場合は公開Host・プロトコルと信頼するIP取得経路を検証します。
+
+<a id="test-preview"></a>
+### 専用テストPreviewの共通コード
+
+帯は `CLEARALLERGY_TEST_PREVIEW=true`、Vercel自動値 `VERCEL=1`、`VERCEL_ENV=preview`、`VERCEL_GIT_COMMIT_REF=test/staging` の完全一致で表示します。Productionでは表示しません。自動値を手動で偽装せず、専用flagと接続情報は対象branchのPreview設定へ限定します。DBとClerkも専用test resourceへ接続し、認証・店舗所有権・更新許可の検証を維持します。
+
+画像uploadはflagまたは対象branchでテスト経路と認識した時点で全条件を要求します。`TEST_BLOB_READ_WRITE_TOKEN` と `EXPECTED_TEST_BLOB_STORE_ID` の形式上のstore一致を確認し、サーバーからSDKへ専用tokenを明示します。欠損・不一致ではSDKを呼ばず、共有token・OIDCへfallbackしません。この一致検査はtokenの認証成功を保証するものではありません。`ALLOWED_IMAGE_URL_PREFIXES` も専用test Blobへ限定します。非test branchでflagが未設定・空・falseなら通常のupload動作を維持します。
+
+同じソースでもPreviewとProductionは環境別にbuildします。公開Clerkキーや画像許可originなどのbuild時設定が異なるため、Preview成果物の流用を動作確認の代わりにしません。`vercel.json` の既存branch guardはすべてfalseで、対象branchへのpushは自動配備を許可しません。mainへの共通コード採用、branch履歴置換、設定変更、配備は別途承認対象です。
+
+本候補はmainのschemaと19件のmigrationを保持しています。UTCを含む20件適用済みの既存test DBと同一状態ではありません。main-schemaの別テストDBは未作成のため実DB検証は未確認です。既存DBへ再INIT・migration・reset・seedを行う手順はこの変更に含めません。
+
+ネットワークを使わない局所検証は `node --import tsx --test tests/test-environment-banner.test.ts tests/test-preview-blob.test.ts`。環境条件、明示token、設定不備時の停止、通常環境のSDK optionsをmockで検査します。実Clerk・DB・Blob・Preview操作の検証とは分けます。
 
 <a id="startup"></a>
 ## 2. 起動する
