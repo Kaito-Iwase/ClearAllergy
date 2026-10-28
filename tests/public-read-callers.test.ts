@@ -28,7 +28,8 @@ function makeMenu(contains = false) {
         createdAt: new Date("2026-01-01T00:00:00Z"),
         updatedAt: new Date("2026-01-01T00:00:00Z"),
         shop: { id: shopId, name: "Transaction fixture shop" },
-        allergenLinks: allergens.map(({ slug }) => ({
+        allergenLinks: allergens.map(({ id, slug }) => ({
+            allergenId: id,
             status: contains && slug === handledSlug ? "CONTAINS" : "FREE",
             allergen: { slug },
         })),
