@@ -14,7 +14,8 @@
       "codex/utc-migration-boundaries-20261025": false,
       "codex/combined-validation-20261026": false,
       "test/isolated-preview-fixtures-20261026": false,
-      "test/staging": false
+      "test/staging": false,
+      "handoff/main19-preparation-20261028": false
     }
   }
 }
