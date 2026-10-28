@@ -143,7 +143,25 @@ runnerは `scripts/npm-cli.mjs` で解決したNode配布またはnpm lifecycle�
 <a id="phase-evidence"></a>
 ### 別実行の証拠を同じ候補へ結び付ける
 
-`verify`の`codeChecksStatus`は実行した基本検査の結果、`status` / `verificationComplete`は変更に必要な検証の充足を表す。実GitパスからDB制約・公開・所有者・snapshot・公開ブラウザ・反映・移行復旧・UI/認可手動確認を選ぶ。通常の部品へ実DBを一律要求しない。受入条件や呼出元の調査で追加する検証を減らす仕組みではない。基本検査が全てPASSでも必要な証拠が不足すればUNVERIFIED。手動確認をrunnerは自動承認せず、独立レビューとremote CIも別の未確認項目として残す。
+`selectedChecksStatus`（既存名 `codeChecksStatus` も保持）は選択された検査の結果、`acceptanceStatus` は独立して定義した受入要件の充足を表す。`status` / `verificationComplete` は両者と実Gitパス由来の必須検査・手動確認を合わせた判定で、選択分が全PASSだけでは完了にしない。実GitパスからDB制約・公開・所有者・snapshot・公開ブラウザ・反映・移行復旧・UI/認可手動確認の最低集合を選ぶ。通常の小変更へ実DBを一律要求せず、受入定義や呼出元の調査で追加した検証も削減しない。手動確認をrunnerは自動承認せず、独立レビューとremote CI、既存HOLD、採用・本番配備の判断は別に残す。
+
+受入定義の正本は、選択コマンドや成功receiptではなく、完全で新しいsnapshot内の当該Issueのassessmentにある `acceptanceCriteria` と `acceptanceChecks`。作業者・comment URL・Issue本文の `definitionHash`・base SHA・有効期限を照合する。既存の受入項目を省いて選択結果に合わせて作り直さない。全受入項目へ、次の形式で既存の固定phase IDを対応付ける。未知phase、空・重複・一部だけの対応、定義欠落・変更・期限切れ、`agent-blocked` / `human-review` はUNVERIFIEDで、`verificationComplete` はfalse。`--required` はこの定義元ではなく、選択する検査の追加指定である。
+
+```json
+{
+  "acceptanceCriteria": ["入力の回帰を満たす", "既存の基本検査を維持する"],
+  "acceptanceChecks": [
+    { "criterion": "入力の回帰を満たす", "phases": ["test"] },
+    { "criterion": "既存の基本検査を維持する", "phases": ["lint", "typecheck", "build", "context-links"] }
+  ]
+}
+```
+
+この対応の意味が十分かはタスクの受入定義を照合して判断する。runnerは自由文を実行せず、新しい検査・手動承認を作らない。機械検査だけで満たせない項目の対応が未定義なら未完了のまま残す。定義の内容hashを実行前に固定し、`acceptanceDefinitionSha256` として各phase・基本コマンドの証跡へ保存する。元の自由文は判定reportへ複写しない。定義を後付け・変更した場合、hashがない旧receiptや別定義の成功を受入証拠へ転用しない。従来のHEAD/base/source/lock/runner/build照合も維持する。保存処理はfalseをstatusのPASSだけでtrueへ昇格させない。
+
+例として、選択した基本検査がPASSでも独立要件の `db-snapshot` を省けば、選択結果はPASS、受入判定はUNVERIFIED、完了はfalse。正当な小変更で定義した全項目と最低検査の証拠が揃い、手動確認が残らなければ完了できる。これは記録された要件集合に対する判定であり、定義自体の意味・網羅性、commentの本人許可、署名付き証明、候補全体の採用や食品の安全性を保証しない。
+
+このF1差分は `codex/combined-validation-20261026` の固定base `72d7bd8e190c66f31b39c994ea995d552f22cb68` からの候補向け独立修正で、mainへのハーネス採用ではない。候補baseのPRは現 `ci.yml` のmain/developフィルタ外なので、最終HEADを指定して既存 `workflow_dispatch` を実行し、event・実checkout SHA・成果物を照合する。新branchの正確なdeploy falseと既存ルールを保ち、検証のためにtriggerやGitHub設定を拡張しない。実測結果は当該PR/checkへ結び付け、過去候補のCI成功を流用しない。
 
 以下の`phase` / `summarize`例も `--plan` / `--snapshot` を要求する。同じbaseと新しい完全snapshotで実Git範囲を再確認する。`--required`で減らしても、実変更から選んだ必須phaseは除かれない。基本検査の成功を全品質gateの完了へ読み替えない。
 

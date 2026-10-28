@@ -197,7 +197,10 @@ export function publishReport(handle, report, candidateUnchanged) {
     report.publicationSafe = sameReportLocation(handle);
     report.candidateUnchanged = report.candidateUnchanged && candidateUnchanged();
     if (!report.publicationSafe || !report.candidateUnchanged) report.status = "FAIL";
-    if (Object.hasOwn(report, "verificationComplete")) report.verificationComplete = report.status === "PASS";
+    if (Object.hasOwn(report, "verificationComplete")) {
+        report.verificationComplete = report.verificationComplete === true && report.status === "PASS";
+        if (report.status === "PASS" && !report.verificationComplete) report.status = "UNVERIFIED";
+    }
     write(report); // Held descriptor cannot follow a directory/link swapped during checks.
     return report;
 }
@@ -248,7 +251,8 @@ function reportPreflight(preflight, output) {
     try {
         return publishReport(handle, { version: 3, kind: "preflight", head, baseSha: preflight.baseSha,
             status: preflight.scope.status === "FAIL" ? "FAIL" : "UNVERIFIED", scope: preflight.scope, execution: preflight.execution,
-            commands: [], codeChecksStatus: "NOT_RUN", sourceIdentityCaptured: false, candidateUnchanged: true,
+            commands: [], codeChecksStatus: "NOT_RUN", selectedChecksStatus: "NOT_RUN", acceptanceStatus: "UNVERIFIED", verificationComplete: false,
+            sourceIdentityCaptured: false, candidateUnchanged: true,
             missingRequiredChecks: preflight.scope.verification.phases, manualChecks: preflight.scope.verification.manual,
             implementationAuthority: "UNVERIFIED" }, () => head === git("rev-parse", "HEAD") && before === sha256(JSON.stringify(readGitChanges(preflight.baseSha))));
     } finally { closeSync(handle.fd); }
@@ -278,7 +282,9 @@ export function runPhase({ base, phase, output, plan = null, snapshot = null }) 
         const after = captureCandidate(baseSha);
         const buildAfter = buildFingerprint(process.cwd());
         const buildUnchanged = !browser || (buildBefore !== null && buildBefore === buildAfter);
-        const report = { version: 2, kind: "phase", phase, runId, head: before.head, baseSha, startedAt: new Date(start).toISOString(), finishedAt: new Date().toISOString(),
+        const report = { version: 2, kind: "phase", phase, runId, head: before.head, baseSha,
+            acceptanceDefinitionSha256: preflight.scope.acceptance?.definitionSha256 ?? null,
+            startedAt: new Date(start).toISOString(), finishedAt: new Date().toISOString(),
             candidateBefore: before, candidateAfter: after, candidateUnchanged: before.id === after.id,
             exitCode: result.status, elapsedMs: Date.now() - start, outputSha256: sha256(contents), diagnostics: diagnostics(contents, result), buildBefore, buildAfter,
             completedCheckpoints: contents.split(/\r?\n/).filter(line => line.startsWith("PASS:")).length,
@@ -319,10 +325,15 @@ export function summarizePhases({ base, inputs, required, output, plan = null, s
         if (support) supports[receipt.serverEvidence] = support;
     }
     const needed = [...new Set([...required, ...preflight.scope.verification.phases])];
-    const report = { version: 3, kind: "summary", ...combinePhaseEvidence(receipts, needed, before, supports), scope: preflight.scope, candidateUnchanged: true,
-        manualChecks: preflight.scope.verification.manual.map(check => ({ check, status: "UNVERIFIED" })) };
-    if (report.status === "PASS" && report.manualChecks.length) report.status = "UNVERIFIED";
-    report.verificationComplete = report.status === "PASS";
+    const selected = combinePhaseEvidence(receipts, needed, before, supports);
+    const results = selected.phases.map(row => ({ name: row.phase, status: row.status,
+        acceptanceDefinitionSha256: receipts.find(receipt => receipt.phase === row.phase)?.acceptanceDefinitionSha256 }));
+    const outcome = verificationOutcome(preflight.scope.verification, results, true, true, true, preflight.scope.acceptance);
+    const status = selected.status === "PASS" ? outcome.status : selected.status;
+    const report = { version: 3, kind: "summary", ...selected, ...outcome, status,
+        codeChecksStatus: selected.status, selectedChecksStatus: selected.status,
+        verificationComplete: status === "PASS" && outcome.verificationComplete,
+        acceptanceDefinitionSha256: preflight.scope.acceptance?.definitionSha256 ?? null, scope: preflight.scope, candidateUnchanged: true };
     const handle = beginReport(process.cwd(), output ?? "phase-summary.json");
     try { return publishReport(handle, report, () => captureCandidate(baseSha).id === before.id); }
     finally { closeSync(handle.fd); }
@@ -362,7 +373,8 @@ export function verify({ base, output = "verification.json", plan = null, snapsh
             const match = combined.match(new RegExp(`^# ${key} (\\d+)$`, "m"));
             if (match) counts[key] = Number(match[1]);
         }
-        results.push({ name: command.name, commandDefinitionSha256: sha256(command.nodeScript ? "node scripts/check-context-links.mjs" : command.script ?? `prisma ${command.prisma}`), exitCode: result.status,
+        results.push({ name: command.name, acceptanceDefinitionSha256: preflight.scope.acceptance?.definitionSha256 ?? null,
+            commandDefinitionSha256: sha256(command.nodeScript ? "node scripts/check-context-links.mjs" : command.script ?? `prisma ${command.prisma}`), exitCode: result.status,
             status: result.status === 0 && !result.error && phaseBefore.id === candidate.id && phaseAfter.id === candidate.id ? "PASS" : "FAIL", elapsedMs: Date.now() - start, counts,
             diagnostics: diagnostics(combined, result), candidateBefore: phaseBefore.id, candidateAfter: phaseAfter.id,
             errorCode: result.error?.code ?? null, outputSha256: sha256(combined) });
@@ -379,7 +391,7 @@ export function verify({ base, output = "verification.json", plan = null, snapsh
         commands: results, diffCheck: whitespace.status === 0 ? "PASS" : "FAIL",
         scope: preflight.scope, execution: preflight.execution, implementationAuthority: "UNVERIFIED",
         unverified: ["real Clerk/Blob", "GitHub checks", "deployment and user comprehension"] };
-    Object.assign(report, verificationOutcome(preflight.scope.verification, results, results.length === commands.length, report.candidateUnchanged, report.diffCheck === "PASS"));
+    Object.assign(report, verificationOutcome(preflight.scope.verification, results, results.length === commands.length, report.candidateUnchanged, report.diffCheck === "PASS", preflight.scope.acceptance));
     return publishReport(handle, report, () => after === fingerprint() && head === git("rev-parse", "HEAD")
         && harnessBefore === sha256(readFileSync(new URL(import.meta.url))));
     } finally { closeSync(handle.fd); }
