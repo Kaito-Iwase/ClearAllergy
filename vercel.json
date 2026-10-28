@@ -11,7 +11,8 @@
       "ci/public-read-snapshot-pilot-20261028": false,
       "test/public-caller-transactions-20261028": false,
       "docs/commit-pr-conventions-20261028": false,
-      "docs/shop-account-main-20261028": false
+      "docs/shop-account-main-20261028": false,
+      "fix/html-error-main-20261028": false
     }
   }
 }
