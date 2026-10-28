@@ -87,6 +87,10 @@ jobs:
       - name: Prepare isolated fictional data
         run: node --import tsx scripts/setup-ci-env.ts
 
+      - name: Check public read snapshot consistency
+        timeout-minutes: 3
+        run: node --import tsx scripts/check-public-read-snapshot.ts
+
       - name: Check PostgreSQL constraints and rollback
         run: |
           node --import tsx scripts/check-ci-database.ts
