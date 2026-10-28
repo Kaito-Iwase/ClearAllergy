@@ -17,14 +17,18 @@ function getAllowedPrefixes() {
         .filter((url): url is URL => url !== null);
 }
 
+// Format binding only, not credential authentication. Matches the store segment
+// read by @vercel/blob 2.5.0; the SDK authenticates the token when making a request.
+export function parseBlobReadWriteTokenStoreId(token: string | undefined): string | null {
+    return /^vercel_blob_rw_([a-zA-Z0-9]+)_[^\s]+$/.exec(token?.trim() ?? "")?.[1] ?? null;
+}
+
 function getTrustedImagePrefixes(): URL[] {
     // 明示設定があればそのパス境界も尊重し、不正な設定は許可へ倒さない。
     if (process.env.ALLOWED_IMAGE_URL_PREFIXES?.trim()) return getAllowedPrefixes();
     // Vercel SDKのread-write tokenは vercel_blob_rw_<storeId>_<secret> 形式。
     // https://github.com/vercel/storage/blob/main/packages/blob/src/helpers.ts
-    const storeId = /^vercel_blob_rw_([a-zA-Z0-9]+)_[^\s]+$/.exec(
-        process.env.BLOB_READ_WRITE_TOKEN?.trim() ?? "",
-    )?.[1]?.toLowerCase();
+    const storeId = parseBlobReadWriteTokenStoreId(process.env.BLOB_READ_WRITE_TOKEN)?.toLowerCase();
     return storeId ? [new URL(`https://${storeId}.public.blob.vercel-storage.com`)] : [];
 }
 

@@ -113,3 +113,9 @@
 「CIが落ちる」なら環境行からジョブの失敗段階と同じコマンドを確認し、実認証を検証していない範囲を分けます。いずれも説明の変更先はこの表の「説明先」で特定し、実際に修正する範囲と確認だけの範囲を[保守ルール](maintenance.md)に従って分けてください。
 
 一覧の公開停止・店舗編集の直接ボタン・公開カードの共通補足は[店舗操作の検証記録](../verification/store-management-20261022.md)と上記の各画面を照合します。開発上の過去の技術比較・未確認の根拠は[設計判断と根拠](design-decisions.md)を参照し、現行仕様とは時点を区別します。
+
+## stagingの準備と環境分離
+
+| 対象 | 仕様・運用 | 実装・設定 | 検証入口 |
+| --- | --- | --- | --- |
+| exact test Previewの帯と専用画像保存、staging検証入口 | [stagingの準備](development.md#staging)。現段階はローカル準備・自動配備抑止。専用DB初期化は検証済み、再INIT禁止 | `app/layout.tsx`、`app/globals.css`、`components/layout/TestEnvironmentBanner.tsx`、`lib/test-preview-environment.ts`、`lib/storage/upload-images.ts`、`lib/storage/image-url-policy.ts`、`.github/workflows/ci.yml`、`vercel.json` | `tests/test-environment-banner.test.ts`（Production/main/他branchの非表示）、`tests/test-preview-blob.test.ts`（専用token・不正設定のfallback拒否）。実外部サービス・配備・画像uploadは別確認 |

@@ -402,6 +402,25 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 
 構造化ログは追加しましたが、通知先へのアラート配送やブラウザ例外収集は未導入です。既存配備ログの通知・保持で不足するかを確認してから、Sentry等の料金、担当人数、ソースマップの非公開管理、個人情報除去、通知試験を判断します。Replayや全要求トレースを一律に収集する構成ではありません。
 
+<a id="staging"></a>
+### stagingの準備と環境分離
+
+変更は最新mainを基点に独立branchで準備し、`test/staging`のテスト環境で人間が確認してからmainへのPRで採用範囲を判断します。旧staging全体のmerge、未採用候補・UTCの20件目migration・追加harnessの一括取り込みはしません。mainへの採用とProduction配備は別の承認対象です。
+
+この版はローカル準備です。`vercel.json`は準備branch `prepare/staging-main-v1-final-20261028` と `test/staging` の自動配備をfalseにしており、staging pushによるテスト環境自動更新はまだ有効ではありません。準備branchにはtest/staging専用の環境変数が適用されないため配備しません。最終切替前に最新mainの対象SHAを固定し、採用済み差分を保持したまま検証します。旧branch先端の置換が必要なら旧SHAを保持し、その操作について新しい承認を得ます。過去のforce-with-lease許可を再利用しません。
+
+テスト帯を表示するのは、`CLEARALLERGY_TEST_PREVIEW=true`、`VERCEL=1`、`VERCEL_ENV=preview`、`VERCEL_GIT_COMMIT_REF=test/staging`がすべて一致する場合だけです。Production、main、他branch、ローカル、設定不足では表示しません。帯は実店舗ではない架空データの案内であり、公開条件・権限・アレルゲンの意味は変えません。
+
+専用Previewの画像保存は `TEST_BLOB_READ_WRITE_TOKEN` と `EXPECTED_TEST_BLOB_STORE_ID` の対応を検査し、専用tokenをSDKへ明示します。対象branch・Preview条件や専用設定が不正なら共有Blobへfallbackせず停止します。通常のProduction環境では従来のSDK設定を維持します。token形式の検査は認証成功の確認ではありません。
+
+CIは既存job/check名・隔離PostgreSQL・権限を維持し、既存のpush/PR対象にexact `test/staging`だけを追加します。GitHub CIの成功だけでVercel配備・実Clerk・実Blob・外部DBを確認済みにしません。`prebuild`は従来どおりPrisma Client生成のみで、DB migrationやfixture作成を自動実行しません。
+
+専用 `clearallergy_main19` はmainと同じ19件のmigrationとchecksum、master29、User2・Shop2・Menu6（全draft）、アレルゲンリンク174、各history0の初期化後検証が完了しています。再INIT・通常seed・降順migration・reset・削除は行いません。旧 `neondb` の20件環境は保持します。自宅回線での読み取り接続と今回1回の初期化成功は、追加の接続・書き込み・再実行を許可するものではありません。過去のP1001原因は未確定です。VercelのPreview/exact test/stagingへのDB接続設定反映と実アプリの確認は別工程で、完了を確認するまで自動配備の抑止を維持します。
+
+自動更新を有効にする前に、VercelのGit連携・Production branch、対象SHA、exact branch guard、専用DB/Clerk/Blobの対応と変数scopeを秘密値なしで照合します。共通Preview値が残る場合、branch固有値が同名値を上書きすることと、専用branch以外へ適用されないことを確認します。配備抑止解除、環境設定の変更、push、merge、deployはこのローカル準備では実行しません。
+
+ローカルの帯・Blob回帰は `node --import tsx --test tests/test-environment-banner.test.ts tests/test-preview-blob.test.ts`。実認証・所有権分離・保存・公開・STOP・画像uploadは、対象SHAのテスト環境で別途確認します。単体テストをこれらのPASSとして扱いません。
+
 <a id="troubleshooting"></a>
 ## よくある失敗：原因 → 修正箇所 → 再確認
 
