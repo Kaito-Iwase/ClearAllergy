@@ -1,5 +1,7 @@
 # 文書の根拠と確認範囲
 
+公開4入口のtransaction client接続を検査するF3回帰は、[実callerの検証記録](../verification/public-read-callers-20261028.md)を参照してください。実route exportからDB境界の代用品までを通し、10種類の元clientへの誤置換を検出します。以下のsnapshot pilotによる実SQL回帰とは検証層を分けます。
+
 <a id="snapshot-ci-pilot"></a>
 ## 2026-10-28 公開読取snapshot回帰のCI接続パイロット
 

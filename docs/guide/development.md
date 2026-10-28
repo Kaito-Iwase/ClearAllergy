@@ -269,7 +269,7 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 
 成功条件は、snapshotなしで旧食品＋新FREEが混ざる負例と、本番用 `readPublicSnapshot` のRepeatableReadで旧食品＋旧CONTAINSを維持する正例の両方が成立し、各variantで実際の子SELECTを割り込んだassertを通り、訂正後の新しい公開読取がnullになることです。SQLの結果や時刻をmockする検査ではありません。通常終了時はプロキシ・Prisma接続を閉じ、今回作った店舗だけを削除します。強制timeout時のcleanup完了までは保証せず、CI serviceはjob終了時に破棄します。schema/migration・通常seedは変更しません。単独実行も同じcommandを使いますが、生成済みPrisma ClientとCI専用の使い捨てDB・fixtureを先に用意し、実サービスの接続情報を渡しません。
 
-このscriptは自身の読取callbackとsnapshot helperを検査します。`/shops`、`/shops/[shopId]`、`/shops/[shopId]/menus/[menuId]`、`GET /api/menus/:menuId` の実callerすべてのtx利用、HTTP・画面・cache・既に開いた画面の更新を保証する検査ではありません。公開読取を変更する際は実callerと店舗補足が同じtransaction clientを使うことを別に検証します。`tests/public-read-snapshot.test.ts` はtransaction完了不能と通常処理エラーの区別、既存取得不能表示への受渡しを代用品で検査します。
+このscriptは自身の読取callbackとsnapshot helperを検査します。実callerの接続は `tests/public-read-callers.test.ts` が `/shops`、`/shops/[shopId]`、`/shops/[shopId]/menus/[menuId]`、`GET /api/menus/:menuId` の実route exportから検査します。元のPrisma clientの読取を拒否し、別のtransaction clientで本体・マスタ・店舗補足を読むことを確認します。通常の `npm test` に含まれます。`node scripts/check-public-caller-mutations.mjs` は使い捨てソースコピーで10か所を個別に元clientへ戻し、各テストがclient逸脱により失敗することと復元後の成功を確認します。実DB・環境ファイルは不要ですが、生成済みPrisma Client・依存と一時ディレクトリへのlink作成権限が必要です。[再現手順と測定範囲](../verification/public-read-callers-20261028.md)を参照してください。これらはHTTP・画面描画・cache・既に開いた画面の更新の保証ではありません。`tests/public-read-snapshot.test.ts` はtransaction完了不能と通常処理エラーの区別、既存取得不能表示への受渡しを代用品で検査します。
 
 対象head SHA・lockfile・実Node/npm・PostgreSQL版、負例/正例の固定PASS行、終了状態、step所要時間を同じ実行結果に結び付けます。3分は初期上限で、実測時間・反復再現性は実行後に記録します。選択した検査の成功と必要受入条件全体の充足を区別し、このstepを接続しただけでCI必須化や公開4入口・P0全phaseの保証済みとはしません。今回の実施・未実施は[確認範囲](verification.md#snapshot-ci-pilot)を参照してください。
 
