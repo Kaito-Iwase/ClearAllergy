@@ -12,6 +12,8 @@
 
 公開3ページと `GET /api/menus/[menuId]` の実routeを通るtransaction client回帰は `tests/public-read-callers.test.ts`、10か所の元clientへの誤置換を検出する負例は `scripts/check-public-caller-mutations.mjs` です。以下の公開4入口すべてに対応し、実SQLの並行更新は別の `scripts/check-public-read-snapshot.ts` が担当します。[実測と限界](../verification/public-read-callers-20261028.md)を参照してください。F1/F4の候補専用コードはこの対応表のmain向け実装として扱いません。
 
+店舗一覧・店舗詳細の取得済み品目マスタの再利用は `features/public/shops/server/public-allergen-links.ts`、状態・欠損・未知ID・要求間の対応は `tests/public-allergen-links.test.ts` が入口です。F3 fixtureは新取得形の `allergenId` を含み、従来のメニュー詳細/API用のslugも保持します。4入口の正例・10負例・実SQL snapshotはそれぞれ上記の既存入口で検査し、[今回の測定](../verification/public-shop-read-performance-20261028.md)と旧候補の性能測定を区別します。
+
 ブラウザ回帰は `scripts/browser-runner.mjs` が入口です。`public` は公開画面だけ、`demo` は公開画面と保存しない管理デモを検査し、両方とも `scripts/check-first-use-browser.mjs` を使います。`ui` は `scripts/check-public-ui-browser.mjs` でCI（変更ごとの自動検査）用の架空データに対する5種類の画面幅の表示・設定・状態の誤読防止を検査します。
 
 `allergens` は実メニューカードと新規・編集フォームの入力ガイド、`composition` は実画像編集部品、`qr` は実QR部品と印刷PDFを、アプリ・認証・DBなしの隔離した検証用環境（fixture）で検査します。

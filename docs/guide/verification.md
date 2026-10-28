@@ -45,6 +45,8 @@ F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIの
 
 以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。
 
+PR #96の公開店舗読取の重複取得削減を最新mainへ限定採用する差分とF3 fixtureの追従は、[2026-10-28の検証記録](../verification/public-shop-read-performance-20261028.md)を参照してください。過去候補のSELECT本数比較を今回の測定や本番速度の保証に読み替えません。採用先PRのmerge SHA・最終CI・Production結果は元PR #96から辿る証跡に結び付け、未採用の統合候補全体とは区別します。
+
 PR #101のHTML障害応答修復を最新mainへ限定採用する差分と、元PRの名前・価格ブラウザケースの保持は、[2026-10-28の検証記録](../verification/api-html-error-20261028.md)を参照してください。統合候補全体の採用ではありません。採用先PRのmerge SHA・最終CI・Production結果は元PR #101から辿る最終証跡を正本とし、過去候補の結果で代用しません。
 
 公開4入口のtransaction client接続を検査するF3回帰は、[実callerの検証記録](../verification/public-read-callers-20261028.md)を参照してください。実route exportからDB境界の代用品までを通し、10種類の元clientへの誤置換を検出します。以下のsnapshot pilotによる実SQL回帰とは検証層を分けます。

@@ -12,7 +12,8 @@
       "test/public-caller-transactions-20261028": false,
       "docs/commit-pr-conventions-20261028": false,
       "docs/shop-account-main-20261028": false,
-      "fix/html-error-main-20261028": false
+      "fix/html-error-main-20261028": false,
+      "perf/public-read-main-20261028": false
     }
   }
 }

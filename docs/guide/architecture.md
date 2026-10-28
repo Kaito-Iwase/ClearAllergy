@@ -53,6 +53,8 @@ Vercel・Neonは想定する配備構成です。図はリポジトリの実装�
 
 公開3ページと公開メニューAPIは `features/public/shops/server/public-read-snapshot.ts` の `RepeatableRead` トランザクションを使い、親・品目リンク・マスタ・補足を同じDB時点から取得します。
 
+店舗一覧・店舗詳細は同じsnapshotで取得済みの品目マスタを `public-allergen-links.ts` の `createPublicAllergenLinkResolver` に渡し、リンクの `allergenId` からslugを解決します。リンクごとの品目取得を重複させず、照合用IDは公開DTOから除きます。対応Mapは要求間で保持しません。欠損リンクをFREEで補完せず、マスタにないIDは取得エラーとして扱います。[採用差分と検証範囲](../verification/public-shop-read-performance-20261028.md)を参照してください。
+
 Prismaの入れ子の取得指定（nested select）でもSQLが分かれるため、単に一回の関数呼出しにまとめるだけでは同時訂正をまたいで旧食品と新状態が混ざります。補足の読取にも同じトランザクション用クライアント（DB操作を行うオブジェクト）を渡します。開始済みの取得は訂正前の一貫した内容を返す場合がありますが、訂正確定後の新しい取得は停止を反映します。`P2028` の取得完了不能は既存の取得不能案内へ渡し、通常の処理・schemaエラーは隠しません。実配備先の接続プール（再利用するDB接続の集合）・負荷は未確認です。
 
 食品情報を載せる店舗一覧・店舗詳細・メニュー詳細は、ルート入口と実装の `force-dynamic` によりアクセスごとにDBを読みます。以前の `force-static` / `revalidate = 60` は、停止後も新しい要求へ古い情報を返すことがローカル本番buildで再現したため、これらの3ルートでは使いません。DB読取は増えます。Cache Componentsや別のDBキャッシュは導入していません。
