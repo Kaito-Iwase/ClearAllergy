@@ -17,6 +17,8 @@
 
 Windowsでは `npm.cmd` / `npx.cmd` を使います。既に準備済みの環境は、最初に再インストールせず状態を確認します。
 
+Context Evalsは[固定3課題・2条件の手順](../verification/context-evals-20261028.md)を使用します。`node scripts/context-evals.mjs prepare <fresh-temp-root> <case> <arm>` はOSのtemp内に未存在の `ca-context-eval-*` fixtureだけを作り、`node scripts/context-evals.mjs score <root>` は実編集・check exit・最終source・patchを採点します。`case` は `normal` / `unauthorized` / `missing-check`、`arm` は `task-only` / `context`。外部サービス・依存導入・実DBは不要です。scriptはmodelを起動せず、実agentの試行は別に割り当ててprovenanceを残します。既存fixtureをresetせず、新規rootを使い、scripted controlとagent実行を区別します。
+
 | 実行方法 | アプリ | DB（データベース） | 外部サービス・用途 |
 | --- | --- | --- | --- |
 | ホストの `npm.cmd run dev` | 通常3000番 | 環境変数で指定。ローカルDBを自動作成しない | 開発者が用意した接続。実データの接続を安易に流用しない |

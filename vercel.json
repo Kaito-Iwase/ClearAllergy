@@ -13,7 +13,8 @@
       "codex/ci-evidence-paths-20261025": false,
       "codex/utc-migration-boundaries-20261025": false,
       "codex/combined-validation-20261026": false,
-      "fix/candidate-verification-completeness-20261028": false
+      "fix/candidate-verification-completeness-20261028": false,
+      "eval/context-completion-20261028": false
     }
   }
 }

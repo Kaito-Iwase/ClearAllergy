@@ -104,6 +104,8 @@
 
 ハーネスや作業規則を変える場合は[自律開発](../agentic-development.md)、[仕様の正本](rules.md)、[文書の保守](maintenance.md)を読み、`scripts/agent-harness.mjs`、[範囲・必要検証の方針](../../scripts/harness-policy.mjs)、[phase証跡](../../scripts/verification-evidence.mjs)、[文書参照検査](../../scripts/check-context-links.mjs)を照合する。回帰入口は`tests/agent-harness.test.ts`、`tests/harness-context.test.ts`、`tests/verification-evidence.test.ts`。実Git範囲、重複PR、取得鮮度、候補/build/serverの一致、必要gate不足と承認の境界を対象にし、通常テスト成功を実Clerk/Blobや食品安全の確認へ拡大しない。CI接続変更は別の権限・検証を要する。
 
+有限のcontext比較は[評価手順](../verification/context-evals-20261028.md)、`scripts/context-evals.mjs`、`tests/context-evals.test.ts`を入口とする。これは固定fixtureの準備/採点で、汎用agent実行基盤や実製品の完遂証明ではない。main/候補・F3局所証跡との整合は[v1台帳](../verification/development-foundation-v1-20261028.md)へ分ける。
+
 <a id="examples"></a>
 ## 代表的な変更依頼での使い方
 
