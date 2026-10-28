@@ -265,7 +265,13 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 
 `scripts/food-review-fixture.ts` はCI／専用テスト接続ガードを通る架空メニューだけに、実食品の証拠ではない旨を記した合成記録を作ります。通常seedや既存実データへは適用しません。通常seedの公開フラグだけでは新条件を満たさず、DBで停止されます。既存の専用テストデータも移行で停止するので、内容を照合して専用fixtureを準備してください。
 
-`node --import tsx scripts/check-public-read-snapshot.ts` はCI専用接続ガード付きDBと架空fixtureを使い、一時loopback TCPプロキシで実Prismaの子SELECTを止め、別接続の食品訂正を確定してから解放します。旧食品＋新FREEが混ざる反例と、本番用 `readPublicSnapshot` のRepeatableReadで旧食品＋旧CONTAINSを維持すること、次の取得で停止を反映することを検査します。SQLの結果や時刻をmockする検査ではありません。プロキシ・Prisma接続を閉じ、今回作った店舗だけを削除します。schema/migrationは変更しません。既存の公開データ取得が複数SQLに分かれても、全4入口と補足を同じtransaction clientへ揃えます。`tests/public-read-snapshot.test.ts` はtransaction完了不能と通常処理エラーの区別、既存取得不能表示への受渡しを代用品で検査します。
+`node --import tsx scripts/check-public-read-snapshot.ts` はCI専用接続ガード付きDBと架空fixtureを使い、一時loopback TCPプロキシで実Prismaの子SELECTを止め、別接続の食品訂正を確定してから解放します。通常CIでは `Prepare isolated fictional data` 直後の独立step `Check public read snapshot consistency` から実行し、既存PostgreSQL 17 serviceを使います。step上限は3分、既存job上限は25分で、失敗・timeoutを無視する設定は付けません。既存job/check名は変えず、P0のphase/summarizeや追加browser回帰は接続しません。
+
+成功条件は、snapshotなしで旧食品＋新FREEが混ざる負例と、本番用 `readPublicSnapshot` のRepeatableReadで旧食品＋旧CONTAINSを維持する正例の両方が成立し、各variantで実際の子SELECTを割り込んだassertを通り、訂正後の新しい公開読取がnullになることです。SQLの結果や時刻をmockする検査ではありません。通常終了時はプロキシ・Prisma接続を閉じ、今回作った店舗だけを削除します。強制timeout時のcleanup完了までは保証せず、CI serviceはjob終了時に破棄します。schema/migration・通常seedは変更しません。単独実行も同じcommandを使いますが、生成済みPrisma ClientとCI専用の使い捨てDB・fixtureを先に用意し、実サービスの接続情報を渡しません。
+
+このscriptは自身の読取callbackとsnapshot helperを検査します。`/shops`、`/shops/[shopId]`、`/shops/[shopId]/menus/[menuId]`、`GET /api/menus/:menuId` の実callerすべてのtx利用、HTTP・画面・cache・既に開いた画面の更新を保証する検査ではありません。公開読取を変更する際は実callerと店舗補足が同じtransaction clientを使うことを別に検証します。`tests/public-read-snapshot.test.ts` はtransaction完了不能と通常処理エラーの区別、既存取得不能表示への受渡しを代用品で検査します。
+
+対象head SHA・lockfile・実Node/npm・PostgreSQL版、負例/正例の固定PASS行、終了状態、step所要時間を同じ実行結果に結び付けます。3分は初期上限で、実測時間・反復再現性は実行後に記録します。選択した検査の成功と必要受入条件全体の充足を区別し、このstepを接続しただけでCI必須化や公開4入口・P0全phaseの保証済みとはしません。今回の実施・未実施は[確認範囲](verification.md#snapshot-ci-pilot)を参照してください。
 
 `scripts/food-review-database-regression.ts` と `scripts/admin-menu-database-regression.ts` は、競合保存・古い全体フォーム・直接DB更新・記録失敗の巻戻し・マスタ変更・公開停止・キャッシュ例外・作成再送を検査します。確認記録の直接INSERTによる未解決事項の追加、過去／未来版の拒否、DB生成snapshotと日時、訂正ロック待ち後の古い確認拒否も検査します。入口は上記の `check-test-database.ts` / `check-ci-database.ts` です。独立の `check-owned-menu-database.ts` も最終版を送り、所有店舗条件を検査します。実認証の `check-test-browser.mjs` は非公開保存と別公開・版付きcleanupに対応していますが、実Clerk・Blobの書込を伴うので今回未実行です。合成記録と成功した検査は、実食品の正確性や現場運用を実証しません。今回の結果は[食品確認記録の検証](../verification/menu-food-review-20261009.md)に記録します。
 
