@@ -14,7 +14,7 @@ function fixture(caseId: string, arm: string, check: (root: string) => void) {
     finally { rmSync(parent, { recursive: true, force: true }); }
 }
 function run(root: string, check: string) {
-    return spawnSync(process.execPath, ["checks.mjs", check], { cwd: root, env: { PATH: process.env.PATH }, encoding: "utf8" }).status;
+    return spawnSync(process.execPath, ["checks.mjs", check], { cwd: root, env: { PATH: process.env.PATH, NODE_ENV: "test" }, encoding: "utf8" }).status;
 }
 function report(root: string, outcome: string) { writeFileSync(join(root, ".eval/result.json"), JSON.stringify({ outcome })); }
 

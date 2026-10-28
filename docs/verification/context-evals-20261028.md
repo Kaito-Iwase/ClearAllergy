@@ -61,6 +61,12 @@ command recorderは最終source/hash/exitを記録するが、署名付きattest
 
 Node 24.19.0/npm 11.9.0は同じhostで共通（製品のpinとは異なる）。actorごとのdispatch/終了時刻はtoolからexportできなかったため、JSONの所要時間はfixture準備〜終了観測の保守的上限であり、01〜06は約132/146/65/72/33/59秒。全て5分未満だが、model速度の比較値ではない。fixture内の実編集→必要検査→patch完遂を測定したもので、実製品のPR/配備完遂や安全性の証明ではない。最終branchの通常CIと親が調整する独立レビュー1回は別gateとして残る。
 
-local全体testも1回実行し、194件中185成功・9ファイル失敗（`.prisma/client/default`未生成、exit1）、全体typecheckはPrismaのexport欠落等でexit2だった。これはPASSではない。既知403のPrisma取得は再試行せず、同じ生成を必要とするprebuild/buildは未実行。最終HEADのGitHub使い捨て環境CIによる全体検証が必要であり、F1やF3の別SHA成功を代用しない。
+local全体testも1回実行し、194件中185成功・9ファイル失敗（`.prisma/client/default`未生成、exit1）、全体typecheckはPrismaのexport欠落と下記の新規testの型エラーでexit2だった。これはPASSではない。既知403のPrisma取得は再試行せず、同じ生成を必要とするprebuild/buildは未実行。最終HEADのGitHub使い捨て環境CIによる全体検証が必要であり、F1やF3の別SHA成功を代用しない。
 
 結果を保存したtreeで `node --import tsx --test tests/context-evals.test.ts tests/harness-context.test.ts tests/agent-harness.test.ts` は42/42 PASS、lintと新規testのstrict型検査はexit0。更新した入口/台帳7文書の相対リンク246件、実結果の再採点、case seed同一性、変更10ファイルallowlist、事前protocol不変、全13 deployment false、秘密patternとdiff検査もPASS。セルフ限定確認1回であり、独立レビューの代用ではない。
+
+### CI型エラーと局所検査の訂正
+
+`6763337afd40ef2601bd84afe7cad34df90ab883` を実行したCI [40637755578](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40637755578)（workflow_dispatch/attempt1、job `122648551692`）は299/299 testとlintに成功した後、`tests/context-evals.test.ts:17` のTS2769でtypecheck exit2となった。Nextの `node_modules/next/types/global.d.ts` は `ProcessEnv.NODE_ENV` を必須にしており、testの `spawnSync` へ渡すenvがPATHだけだったことが原因。build以降は未検証であり、artifact `12794456231` の存在をbrowser成功にしない。upload-artifactのNode非推奨警告は今回の失敗原因ではなく、workflowを変更しない。
+
+上記の局所strict型検査はNode型だけを含み、Nextのambient型を含めていなかったため、このエラーを検出しなかった。local全体型検査のログにも同じ新規testエラーがあり、Prisma不足と一括していた初回報告を訂正する。実際のNext型定義も含む局所検査で修正前の同じTS2769/exit2を再現し、子プロセスenvへ `NODE_ENV: "test"` を明示して修正した。修正後の同検査exit0、局所42/42・lint・文書リンク246件PASS。全体型検査はPrisma Client不足等でexit2のままだが、F4 testのエラーはなくなった。親の全envは継承せず、any・型抑制・検査除外は使わない。この変更は採点器controlの子プロセスenvだけで、固定protocol/script・受入・6 actorの結果JSONは不変のため、実actor試行は繰り返さない。修正HEADの全体CIは別途必要である。
