@@ -13,6 +13,9 @@
       "docs/commit-pr-conventions-20261028": false,
       "docs/shop-account-main-20261028": false,
       "fix/html-error-main-20261028": false,
+      "dependabot/**": false,
+      "chore/ca-dependabot-deploy-guard-20261026": false,
+      "chore/dependabot-guard-main-20261028": false,
       "perf/public-read-main-20261028": false
     }
   }
