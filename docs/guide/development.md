@@ -1,8 +1,8 @@
 # 起動・確認・変更の進め方
 
-[READMEへ](../../README.md) · [内部処理](architecture.md) · [変更対応表](change-map.md) · [文書の保守](maintenance.md)
+[READMEへ](../../README.md) · [内部処理](architecture.md) · [変更対応表](change-map.md) · [文書の保守](maintenance.md) · [コミット・PRの書き方](#commit-pr-conventions)
 
-ここに載せるコマンドはリポジトリの設定から整理した手順です。今回すべてを実行した記録ではありません。[確認範囲](verification.md)に実施と未実施を分けています。以下のコードブロックは**PowerShellで実行する手順**で、アプリのソース抜粋ではありません。
+ここに載せるコマンドはリポジトリの設定から整理した手順です。今回すべてを実行した記録ではありません。[確認範囲](verification.md)に実施と未実施を分けています。起動・検証・運用のコマンドブロックは**PowerShellで実行する手順**で、アプリのソース抜粋ではありません。コミットメッセージのコードブロックは書式例です。
 
 過去の依存更新と公開判断に関する記録：
 
@@ -207,6 +207,120 @@ node scripts/browser-runner.mjs ui
 - 登録側：専用環境で下書き保存→再読込→未設定の公開拒否→全品目を入力して公開→原材料変更時の確認→公開側への反映を確かめる。
 - 権限：未ログイン、別店舗、閲覧専用の各条件で拒否を確認する。運営招待は外部メール送信を伴うため別途許可された試験対象が必要。
 - 失敗時：DB障害と0件、設定の保存失敗、画像失敗、未保存移動の違いを確認する。実データを壊して障害を作らない。
+
+<a id="commit-pr-conventions"></a>
+### コミット・PRの書き方
+
+コミットメッセージとPRタイトルは、変更の意図と影響を後から追えるよう、英語のtypeと日本語の説明で書きます。基本構文は [Conventional Commits 1.0.0](https://www.conventionalcommits.org/ja/v1.0.0/) に従います。日本語、小文字のtype、以下の分類と長さの目安はClearAllergyの運用規約です。
+
+```text
+<type>[任意の(scope)][互換性破壊時の!]: <日本語の説明>
+
+<必要に応じて、理由・影響・検証を日本語で記載>
+
+<必要なIssue参照・互換性破壊の説明>
+```
+
+#### typeは変更の目的で選ぶ
+
+| type | 選ぶ基準 |
+| --- | --- |
+| `feat` | 利用者や呼び出し元が使える機能・能力を追加する |
+| `fix` | 利用者に表れる誤動作、契約違反、脆弱性を修正する。関連テストや文書も同じ目的なら含める |
+| `docs` | 文書・説明だけを変更する |
+| `test` | 回帰テスト、テスト用データ、評価・検証手順を追加・修正する。製品の振る舞いの修正が主目的なら `fix` を使う |
+| `refactor` | 外部から見た振る舞いを変えず、コードの構造を整理する |
+| `perf` | 性能を改善する。本文やPRに測定条件・結果、または未測定の範囲を示す |
+| `build` | ビルド・パッケージング・開発用ツールチェーンや依存関係を変更する |
+| `ci` | GitHub Actionsなど継続的な検証・自動実行の手順や実行環境を変更する |
+| `chore` | 上記に当てはまらない保守・運用準備を行う。内容が曖昧な変更をまとめるためには使わない |
+
+整形だけの変更には `style`、既存変更を戻すコミットには `revert` も使えます。`style` は画面デザイン変更の意味ではありません。`revert` の本文には戻すコミットのSHA、理由、影響を記載します。日本語の `設定:`、`修正:`、`検証:`、`テスト:` をtypeとして使いません。
+
+拡張子や「設定ファイルを編集した」という理由だけではtypeを決めません。たとえば、誤った本番URLによるリンク不具合の是正は `fix`、通常のビルド用Node更新は `build`、CIジョブのNode更新は `ci`、自動デプロイ抑止の導入準備は `chore` です。依存更新でも脆弱性の解消が主目的なら `fix` を選びます。機能追加とそのテスト・文書のように同じ目的に必要な変更はまとめ、独立した目的は別コミットにします。
+
+#### scopeと件名
+
+scopeは任意です。対象を絞ると読みやすい場合に、既存の機能名・モジュール名など短い英語の識別子を使います（例: `public`、`admin`、`api`、`deps`）。複数領域にまたがる場合や説明だけで明らかな場合は省略します。担当者名・一時的な作業番号・長いファイルパスをscopeにせず、新しい分類表を増やす必要もありません。
+
+コロンの後に半角スペースを1つ置き、何をどう変えるかを日本語で1行にまとめます。「修正した」「対応しました」という作業報告より、「保存競合時に入力内容を保持する」のように結果が分かる説明を優先します。「修正」「更新」「各種対応」「WIP」だけで終えません。末尾の句点は付けません。
+
+件名はtype・scopeを含めておおむね50文字を目安とします。これは機械的な上限ではありません。意味を削らないと収まらない場合は、長い背景を本文へ移し、必要な識別子は保持します。日本語の表示幅と英字の文字数は同じではないため、英語資料の50/72文字規則をそのまま失敗条件にしません。
+
+説明・本文は日本語にし、API名、コード識別子、ファイル名、コマンド、SHA、URL、`BREAKING CHANGE` などの固定語は翻訳しません。
+
+#### 本文・Issue参照・互換性破壊
+
+件名だけでは判断理由・影響が分からない変更には、空行を挟んで本文を付けます。従来の問題、選んだ対応の理由、利用者・呼び出し元・運用への影響、実施した検証と未実施の範囲を書きます。小さい誤字修正のように件名で十分な変更に定型文の水増しは不要です。本文の文字数下限は設けず、段落や箇条書きで読みやすくします。
+
+関連Issueがある場合は末尾に `Refs: #番号` を記載します。存在しないIssueを作り上げず、表記のためだけのIssue作成も不要です。`Closes` / `Fixes` / `Resolves` は、対象Issue全体の完了とクローズの意図が確認できる場合に限ります。部分対応・検証候補では自動クローズの語を使いません。
+
+互換性を壊す変更は、typeまたはscopeの直後、コロンの直前に `!` を付け、本文末尾に `BREAKING CHANGE: 日本語の説明` を記載します。Conventional Commits自体は片方の表記でも認めていますが、CAでは一覧での発見と移行説明の両方を残すため、両方を使います。何が互換でなくなるか、影響を受ける利用者・呼び出し元、必要な移行手順を具体的に示します。変更量の大きさや内部整理だけでは `!` を付けません。安全仕様変更・DB migration等の承認境界は別に維持します。
+
+#### PRタイトル・本文とマージ時の確認
+
+PRタイトルも同じ形式にし、最終差分全体の主目的を表します。調査の途中経過や最後のコミットだけを要約せず、範囲が変わったらタイトルと本文を実際の変更へ合わせます。F1/F3等の作業番号は必要なら補足に留め、変更内容が分かる説明を省略しません。
+
+PR本文は既存テンプレートに従い、日本語で問題・判断・検証・独立レビュー・リスク・文書更新を説明します。base/head SHA、実コマンド、実行環境、件数、CI run・checkout SHA・成果物への参照を対象の証跡と結び付けます。未確認を成功へ言い換えず、古いSHAの検証結果を現在のHEADの結果として扱いません。自己レビューと独立レビューは区別し、既存のレビュー回数上限を増やしません。
+
+squashを使うことが別途承認された場合は、マージ画面の最終コミット件名と本文を確認します。PRタイトルと同じ意味の英語type・日本語説明にし、必要な理由、Issue参照、互換性破壊の説明を残します。GitHubの既定値はリポジトリ設定とコミット数に依存するため、PRタイトルがそのまま採用されると決めつけません。この規約はマージ方式の変更やmerge・配備の承認を与えるものではありません。
+
+新しく作成するメッセージに適用し、過去の表記統一だけを目的としたamend・reword・rebase・force-pushは行いません。GitHub等が生成する既存のmergeメッセージや過去コミットは保持します。`[skip ci]` 等で必要な検証を省略せず、秘密情報、未確認の結果を成功とする記載、実施していないレビューを実施済みとする記載はメッセージへ含めません。
+
+#### 例
+
+| 避ける例 | 推奨例 | 理由 |
+| --- | --- | --- |
+| `設定: Vercelを設定` | `chore: Dependabot導入前のVercel自動デプロイ抑止を準備` | typeは英語にし、準備の目的を示す |
+| `test: テスト追加` | `test: 公開4入口のトランザクションクライアント利用を検証する` | 検査対象と狙いが分かる |
+| `chore: 設定変更` | `fix: 公開QRコードのリンク先に残るlocalhostを除く` | ファイル種別より修正目的を示す |
+| `style: 保存ボタンを追加` | `feat: メニュー編集画面に保存ボタンを追加する` | 画面の機能追加を整形扱いしない |
+| `fix: update` | `fix: 保存競合時に編集中の入力を保持する` | 日本語で変更後の振る舞いを示す |
+| `docs: 文書更新` | `docs: 開発用DBと本番DBの使い分けを説明する` | 文書の内容が分かる |
+
+本文を含む例（[PR #111](https://github.com/Kaito-Iwase/ClearAllergy/pull/111)のF3実測内容を用いた表記例であり、このガイドへの記載は同PRの統合や既存コミットの書換えを意味しません）:
+
+```text
+test: 公開4入口のトランザクションクライアント利用を検証する
+
+既存のAPIテストは元のPrismaクライアントをコールバックへ渡すため、
+呼び出し元が誤って元のクライアントへ戻っても検出できない。
+実際のルートを呼び、別のトランザクションクライアントによる読取を検査する。
+
+正例4件と、10境界を個別に戻した負例の失敗を確認した。
+製品コードは変更しない。実SQLの分離性は既存の専用DB回帰で別に確認する。
+
+Refs: #100
+```
+
+互換性破壊の構文例（架空の例であり、変更の提案・承認ではありません）:
+
+```text
+feat(api)!: 公開APIのページ指定をカーソル方式へ変更する
+
+BREAKING CHANGE: pageパラメータの受付を終了する。
+呼び出し元はnextCursorを保存し、次の要求のcursorへ渡す必要がある。
+```
+
+#### 参考にした一次資料とCAでの選択
+
+2026-10-28に確認した公開資料です。仕様の構文とCA固有の運用判断を分けます。
+
+以下は各公開リポジトリ・チーム文書の規則または実設定であり、Google・Microsoft・OpenAIの全社規約とは扱わない。履歴だけを規約の証拠にしていない。
+
+| 対象と一次資料 | 確認できた内容 | CAへ採る点／採らない点 |
+| --- | --- | --- |
+| [Conventional Commits 1.0.0](https://www.conventionalcommits.org/ja/v1.0.0/) | typeと説明、任意scope・本文・footer、feat/fix、互換性破壊の `!` または `BREAKING CHANGE`。それ以外のtypeも許容する | 構文の基礎を採る。日本語、type小文字、長さ、本文の書き分けはCAの選択と明記する。形式採用を自動リリース導入と結び付けない |
+| [Angularのコミット規約](https://github.com/angular/angular/blob/b81b37d58b966882c6cea7cf1f76e990bb2059e9/contributing-docs/commit-message-guidelines.md)（Google系公開OSS、angular/angular） | typeの用途、任意scope、動機・前後の挙動、breaking時の移行説明を定める。docs以外は本文必須・20文字以上。scopeにパッケージ名を使う | typeの意味、whyと影響、移行説明を採る。Angular固有のscope一覧、本文20文字の下限、docs以外への一律本文必須はCAへ移植しない |
+| [Microsoft ISE Engineering PlaybookのGit guidance](https://github.com/microsoft/code-with-engineering-playbook/blob/main/docs/source-control/git-guidance/README.md#commit-best-practices) | 論理単位の小さい変更、必要性・影響の説明、件名50文字・本文72文字、任意本文・trailers。Conventional Commitsは選べる例として紹介する | 意図と副作用を残すことを採る。英語中心の文字幅を日本語へ機械的に適用せず、CAは50文字を目安にする。これはISE向け公開playbookで、Microsoft全社の強制規約ではない |
+| [Microsoft FASTのCONTRIBUTING](https://github.com/microsoft/fast/blob/1d0ba188764c422101fb21141d36eb8addf654b4/CONTRIBUTING.md#merging-a-pull-request) | マージ時のコミットタイトルにPRタイトルを使い、Conventional Commitsへ合わせる。互換性破壊の移行文書も要求する。リリース用change fileは別に管理する | PRタイトルを変更全体の意図へ合わせ、最終squashメッセージを確認する運用を採る。CAのマージ方法を勝手に固定しない。Beachballやchange fileは導入しない |
+| [OpenAI Python SDKのrelease-please設定](https://github.com/openai/openai-python/blob/fa67521e1c59f11fb5cba7ef8b9b35b5fcac2ae4/release-please-config.json)、[CONTRIBUTING](https://github.com/openai/openai-python/blob/fa67521e1c59f11fb5cba7ef8b9b35b5fcac2ae4/CONTRIBUTING.md)、[AGENTS](https://github.com/openai/openai-python/blob/fa67521e1c59f11fb5cba7ef8b9b35b5fcac2ae4/AGENTS.md) | 実設定にfeat/fix/perf/revert/chore/docs/style/refactor/test/build/ciの分類があり、test・ciはchangelogで非表示。確認した2文書には件名長・scope・言語を一律に定めるコミット規約はない | typeがリリース用途に使われる実例として参照する。設定の存在を全コミットへの強制規約・OpenAI全社規約と呼ばない。CAにrelease-please、自動version付与、非表示分類を導入しない |
+| [OpenAI Codexのcontributing](https://github.com/openai/codex/blob/main/docs/contributing.md) | 読取時点の文書にはコミットメッセージ規約がない | 「OpenAIのコミット規約」として引用できる根拠にはしない。非公開の内部規約は不明 |
+| [GitのSubmittingPatches](https://github.com/git/git/blob/37b3475fb530c14109211faca33716a173db61ed/Documentation/SubmittingPatches) | 変更のwhy、従来の問題、選択理由・代替案を残す。件名50文字はsoft limit、areaを付ける慣行、論理単位の変更を勧める | 将来の保守に必要な理由を採る。Git固有のarea-prefixでCAのtype-prefixを置き換えない。メール投稿・署名等の別運用は持ち込まない |
+
+Microsoft VS Codeの `CONTRIBUTING.md` と公式 `How to Contribute` Wiki、TypeScriptの `CONTRIBUTING.md` も確認したが、その確認範囲には件名のtype・言語を統一する規則を見つけなかった。これらを「Microsoftは規約を持たない」という主張には広げない。補助比較として [microsoft/awesome-rayfin](https://github.com/microsoft/awesome-rayfin/blob/main/CONTRIBUTING.md#commit-messages) にはConventional Commitsと任意scopeが明記され、CIをchoreへ分類する。Angularのci分類と異なるため、typeの細分化は各repoの決定であることも確認できる。
+
+GitHubの既定squashメッセージと変更可能な項目は[公式説明](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/configuring-commit-squashing-for-pull-requests)で照合した。
 
 <a id="operations"></a>
 ## 5. 運用スクリプトとCI/CD
