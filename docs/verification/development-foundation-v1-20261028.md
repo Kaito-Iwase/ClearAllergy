@@ -17,14 +17,18 @@
 | 統合候補 | `codex/combined-validation-20261026` / `72d7bd8e190c66f31b39c994ea995d552f22cb68` | 固定cda3fefからの後続は証跡MDだけ。全体HOLD・未採用機能を維持 |
 | F1 | [PR #110](https://github.com/Kaito-Iwase/ClearAllergy/pull/110)、head `8fcd810e98ac5cead1786449b503631decd100bd`。CI [40632251353](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40632251353)、workflow_dispatch/attempt1、実checkout同SHA、294/294 PASS、lint/typecheck/build/既存DB/browser成功。セルフ1＋親側独立1、blocking0 | F1差分技術PASS。PR未merge、main/候補全体の採用や既存HOLD解除ではない |
 | F2 | ruleset `26009324`、親/本人によるPASS確定を受領 | この作業は設定を変更しない。CI成功だけで設定を証明したとは言わない |
-| F3 | 親が現行mainから独立担当へ割当済み | 局所証跡・最終SHA/CIは受領待ち。合成snapshot callbackだけで4実callerを保証しない |
-| F4 | [固定した評価手順](context-evals-20261028.md)と採点器controlを準備 | 実agent試行は別記。Skills要因未評価。fixture成功を実製品完遂にしない |
+| F3 | [PR #111](https://github.com/Kaito-Iwase/ClearAllergy/pull/111)、main base `e09b29c4b272623f41904e81c7842650412f43a1`、head `9c459656f591de4f260b428bdab04d893509dd23`。実export経由の正例4/4（各2要求）、root clientへ戻すmutation10/10をexit1/ROOT_CLIENT_READで検出、復元後4/4。host256/256・lint/typecheck/build成功 | 親から実測と独立レビュー1回PASS/blocking0を受領。実装・CI・独立レビューPASS、製品コード変更なし、未merge |
+| F4 | [固定した評価手順と実測](context-evals-20261028.md)、[PR #112](https://github.com/Kaito-Iwase/ClearAllergy/pull/112)。事前固定 `1f1703d279aedc57b522495f44d05c1441a1475a`、実fresh actor6試行。両条件で成功3/3、誤停止0/1、検証漏れ0/2、正常完遂1/1 | 条件間の差なし。採点器control5件と実actorを区別。Skills要因未評価。最終SHA CIと独立レビューは別gateで未完了 |
 
-F4はF1 headからのstacked branch/候補向けDraft PRとし、F1 headを変更しない。F3はmain基点なので、F3の実装をこのbranchへ自動統合しない。共有guide/台帳は親からF3の局所証跡を受領してから整合する。
+F4はF1 headからのstacked branch/候補向けDraft PRとし、F1 headを変更しない。F3はmain基点なので、F3の実装をこのbranchへ自動統合しない。共有guide/台帳は親から受領した局所証跡に限定して整合する。
+
+F3の[局所JSON](https://github.com/Kaito-Iwase/ClearAllergy/blob/9c459656f591de4f260b428bdab04d893509dd23/docs/verification/public-read-callers-20261028.json)はPR #111側だけに保持する。CI [40635474303](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40635474303)の実checkoutは一時merge `a540b736b8715c43011d276191110ecc5e8f5abd`、tree `241464e109ee84f17df522855e4b65449b5556b2` がhead treeと一致し、既存DB/browser検査も成功した。artifactは `12793407131`。これらは親から受領した結果で、F4担当による再実行ではない。
+
+F3は実callerの依存選択をmock DB境界で検査する。実SQLの分離/割込みを直接実行した証拠とは分け、main以外の候補treeへ自動転用しない。post-pushのVercel実一覧はtimeoutで未確認、GitHub deployment0件という観測だけで未配備を断定しない。F3のsource/test/guard/証跡8ファイルはF4へcherry-pickしない。
 
 ## 残る条件と依存
 
-F1/F2のPASSからv1全体を完了にしない。F3はactual callerのtx利用と旧clientへ戻した負例、F4は実行主体を伴う全trialと正常完遂、文書はこれらの対象SHA/CI/保証範囲の整合が必要。F1の受入対応の意味やhuman permissionは機械証明ではない。
+F1/F2のPASSだけでv1全体を完了にしない。F3のactual caller/旧client負例とF4の全trial/正常完遂は上記の範囲で証跡が揃った。文書は対象SHA/CI/保証範囲を対応付けたが、F4最終SHAのCIと親が調整する独立レビュー1回が残る。F1の受入対応の意味やhuman permissionは機械証明ではない。局所gateが揃ってもmain/候補への取り込み、Production配備、既存HOLD解除は別承認である。
 
 既存の[有限再開手順](ci-evidence-paths-20261025.md)どおり、通常CIとP0の`phase`/`summarize`全経路・`.agent-runs`の保存は別。候補workflowにはmain #109のsnapshot stepを自動移植しない。古い広いP1差分を一括採用しない。[追加harnessの境界](harness-context-main-20261025.md)にある#105の最終人間レビュー待ちと既存review上限、[追加UI観測](public-ui-error-observation-20261025.md)の403未達記録も維持する。既存CI browserの成功で追加UI/P0全phaseの未確認を消さない。
 
