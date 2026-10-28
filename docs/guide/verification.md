@@ -1,4 +1,51 @@
-# 文書の根拠と確認範囲
+# 検証・採用状況と確認範囲
+
+[READMEへ](../../README.md) · [変更対応表](change-map.md) · [保守ルール](maintenance.md)
+
+<a id="adoption-status"></a>
+## 開発基盤v1の採用範囲と証跡
+
+この節を採用状態の案内の正本とし、製品の状態・公開・権限の仕様は[共通ルール](rules.md)に置きます。コードがあること、対象SHAの検証が成功したこと、mainへの統合、Productionへの反映は別の状態です。日付付きの検証記録は当時の証拠であり、現在の配備版を示すものではありません。
+
+2026-10-28のユーザー合意では、F3をmainへ独立採用し、F1/F4は検証済み候補として保持します。開発基盤v1の正式な完成条件原本は先行作業の有限探索で特定できなかったため、公開4入口のtx回帰・既存snapshot回帰・mainのPR/必須CI・文書と対象SHAの対応という合意済み条件で判定します。候補全体の採用、#105のHOLD解除、DB migration、保護設定変更は含みません。
+
+### main採用範囲
+
+| 対象 | この版の内容と統合状態 | 検証の根拠・境界 |
+| --- | --- | --- |
+| 公開読取snapshot回帰 | [PR #109](https://github.com/Kaito-Iwase/ClearAllergy/pull/109)でmain採用済み。既存CIの独立stepで実行 | `scripts/check-public-read-snapshot.ts`。実SQLの負例・snapshotの正例を検査。実callerのtx利用とは別の検証層 |
+| F2: main保護 | ruleset `26009324`の読取確認。PR必須、required check `Test, lint, typecheck, and build`、strict有効、approval 0、force/delete禁止 | [main ruleset](https://github.com/Kaito-Iwase/ClearAllergy/rules/26009324)。本PRで設定変更せず、merge直前にも実効状態を確認する |
+| コミット・PR規約 | [PR #113](https://github.com/Kaito-Iwase/ClearAllergy/pull/113)でmain採用済み、merge `12d61d01837f81072864408cf0b2c5b168e6f36e` | [規約の正本](development.md#commit-pr-conventions)。英語type・日本語説明、過去SHA保持。commitlint・新CI・設定変更は含まない |
+| F3: 公開4入口のtx利用 | この版で追加するmain独立採用対象。[PR #111](https://github.com/Kaito-Iwase/ClearAllergy/pull/111)がopenの間はmain未採用、merged後は同PRのmerge SHA以降が採用版 | `tests/public-read-callers.test.ts`は実route exportを通す4件。`scripts/check-public-caller-mutations.mjs`は10境界を1か所ずつ元clientへ戻して失敗を要求。[初回測定](../verification/public-read-callers-20261028.md)と追従後のPR証跡を区別 |
+
+PR #111の初回HEAD `9c459656f591de4f260b428bdab04d893509dd23`は[CI 40635474303](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40635474303)で256/256、lint・型検査・build・既存DB/browserがPASS、独立レビュー1回PASS・重大指摘0でした。これは最新mainへの追従後のCI結果ではありません。追従後のHEAD・CI run・実checkout SHA・artifact、変更した追従/文書差分の確認はPR #111本文に結び付け、古い結果で代用しません。製品コード・schema・依存を変えず、既存のレビュー上限を維持します。
+
+この版のmain採用範囲を完成と判定する条件は、PR #111の当該HEADに対する必須CIと差分確認の成功、承認済みsquash merge、merge SHAのmain CI成功、同SHAのProduction Readyと公開4入口の読取確認です。merge前のCI成功だけで完成扱いにせず、最終実績は同PRの「統合後の確認結果」へ記録します。
+
+### 別ブランチで検証済み・main未採用
+
+| 対象 | 固定HEADと確認済み結果 | 未採用の理由・限界 |
+| --- | --- | --- |
+| F1 [PR #110](https://github.com/Kaito-Iwase/ClearAllergy/pull/110) | `8fcd810e98ac5cead1786449b503631decd100bd`、[CI 40632251353](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40632251353)、294/294・lint/typecheck/build・既存DB/browser PASS、限定独立レビューPASS | 未採用の統合候補に対する受入判定の修正。ユーザーの最終採用方針で候補として保持する。mainへ同機能を導入した結果ではなく、候補全体の採用根拠にも広げない |
+| F4 [PR #112](https://github.com/Kaito-Iwase/ClearAllergy/pull/112) | `01f7c2e80648836c6347ff19ce37f9b123f96851`、[CI 40640388044](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40640388044)、299/299・通常gate・既存DB/browser PASS。独立レビューと同一枠の修正差分確認PASS | F1を前提とする候補側評価。固定3課題×2条件の6試行は両条件とも期待結果3/3、通常完遂1/1、誤停止0/1、検証漏れ0/2。差は観測せず、一般的改善・因果効果は主張しない。Skills要因は未評価。ユーザー方針でmain未採用 |
+
+### 未検証・HOLDを維持する範囲
+
+- [PR #105](https://github.com/Kaito-Iwase/ClearAllergy/pull/105)と統合候補全体は未採用・HOLDのままです。既存review上限、追加UIの403、P0未確認をF1/F4の限定PASSで解消済みにしません。拒否されたworkflow送信の別経路実行や権限拡大も行いません。
+- 大学回線からのNeon接続は既存HOLDを維持し、再接続・INITを行いません。CIの使い捨てPostgreSQLでの成功は外部DB接続の確認ではありません。
+- 公開HTTPの読取確認は、実Clerk・Blob書込、管理者操作、食品の安全性、すべての閲覧者へのキャッシュ反映、利用者の理解度を検証するものではありません。これらの未検証範囲と、明示的なHOLDを区別します。
+
+### Productionの確認実績
+
+PR #111追従開始時の確認済みProductionは、PR #113の自動配備 `EoepJefp4mGi8HK4ZnRdxAT8baDv` / SHA `12d61d01837f81072864408cf0b2c5b168e6f36e`、Readyです。[main CI 40643203526](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40643203526)は同SHAで252/252・通常gate・隔離DB/browserが成功しました。2026-10-28 06:25 UTCに公開店舗一覧・店舗詳細・メニュー詳細・公開メニューAPIの認証なしGETがすべてHTTP 200で、対応する内容も確認済みです。詳細は[PR #113のマージ後の結果](https://github.com/Kaito-Iwase/ClearAllergy/pull/113)を参照してください。このProduction実績はF3採用前です。
+
+F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIのSHA、公開4入口の結果を記録し、上記の規約導入時点の結果と分けます。main更新は自動Production配備を起動するため、ユーザーの個別承認範囲を確認し、異常時は追加変更を止めます。rollbackは別承認です。ブランチ固有の配備抑止をmainの配備抑止と解釈しません。
+
+## 日付付きの検証記録
+
+以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。
+
+公開4入口のtransaction client接続を検査するF3回帰は、[実callerの検証記録](../verification/public-read-callers-20261028.md)を参照してください。実route exportからDB境界の代用品までを通し、10種類の元clientへの誤置換を検出します。以下のsnapshot pilotによる実SQL回帰とは検証層を分けます。
 
 <a id="snapshot-ci-pilot"></a>
 ## 2026-10-28 公開読取snapshot回帰のCI接続パイロット
@@ -88,7 +135,7 @@ Dockerは通常起動で復旧し、今回専用PostgreSQL17へ既存16 migratio
 - **UNVERIFIED**：アプリの再起動・ブラウザ操作・実DB／外部サービス接続・コード用の検証コマンド。文書と文書管理の変更に限定し、実行環境やデータを変更していない。
 
 <a id="issues"></a>
-## 現在の制約・不一致・未確認
+## 制約・不一致・未確認の記録
 
 2026-10-16 JST、main `cd502b` の隔離された実UIで、原材料変更または変更申告のみを保存する2条件について、公開する旨の確認文とPUTの公開設定falseの不一致を再現しました。先に疑ったUNKNOWN追加の条件は実際の状態遷移で反証しました。コードは未修正で、公開漏れ・実DB・実認証の再現ではありません。[6条件の実行記録と修復時の受入条件](../verification/material-change-confirmation-20261016.md)を参照してください。
 

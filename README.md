@@ -8,7 +8,7 @@
 
 [主な機能](#features) · [設計上の工夫](#design) · [システム構成](#architecture) · [デモ・起動](#demo) · [開発ドキュメント](#reading-order)
 
-二段階公開への変更を独立作業ブランチで実装・検証しました。新規・食品変更は非公開で保存し、保存済み内容を見直して別に公開します。以前の未解決がある場合は、表示された内容に対応して「この内容は解消した」を操作した後、別に公開します。[判断理由と承認範囲](docs/research/product/two-step-publication-decision-20261021.md)と[検証記録](docs/verification/two-step-publication-20261021.md)を参照してください。本番未適用です。
+mainへの採用、別ブランチで検証済みの候補、未検証・HOLD、Productionの確認結果は[検証・採用状況](docs/guide/verification.md#adoption-status)を参照してください。製品の公開条件は[共通ルール](docs/guide/rules.md#publication)、二段階公開の理由は[判断記録](docs/research/product/two-step-publication-decision-20261021.md)に分けています。
 
 ## 制作背景
 
@@ -119,6 +119,7 @@ npm.cmd run dev
 | 4 | [起動・確認・変更の進め方](docs/guide/development.md) | Windows・Docker、環境の選択、検証・運用コマンド |
 | 5 | [変更対応表](docs/guide/change-map.md) | ページ・機能から仕様、実装、API、DB、テストを探す入口 |
 | 6 | [文書の保守](docs/guide/maintenance.md) | 変更に伴う文書更新と完了条件 |
+| 7 | [検証・採用状況](docs/guide/verification.md#adoption-status) | main採用範囲、未採用候補、HOLD、Productionと証跡の対応 |
 
 開発者・AIエージェントは、変更前に[AGENTS.md](AGENTS.md)、[変更対応表](docs/guide/change-map.md)、関連仕様を読み、呼び出し元も検索して影響範囲を確認します。
 

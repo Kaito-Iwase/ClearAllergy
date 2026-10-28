@@ -1,0 +1,99 @@
+{
+  "generatedAt": "2026-10-28T04:57:55.675Z",
+  "node": "v22.15.1",
+  "sourceSha256": {
+    "tests/public-read-callers.test.ts": "eb8ea53ae9cc69a1de4ad264c144a4e8413a4c29e42e0b7baf2e44e7361848e5",
+    "scripts/check-public-caller-mutations.mjs": "7d01bb18d7673e96e9d6cceb3259e165f03f64b3ddc2c3e4d3bc219d8131d70e",
+    "package-lock.json": "4ea5af215223cdf2759effb0ba4a61d68bfb5276a0ff6cb40aaf24788e9e9dd0",
+    "features/public/shops/server/public-read-snapshot.ts": "bb9bc2dd2f054887a23914c7bf76620e20c6804ee2c4ba0d4acf848e3774076c",
+    "features/public/shops/server/storeAllergenSupplement.ts": "3e95a8d576140baad2f741cbf00f3466f89811963b38f7f61ba0e433af801c6e",
+    "features/public/shops/server/PublicShopListPage.tsx": "f9ada4d62266beff38515cc5c5ab028233cdebb85a70cdb4a8c2f97fd3bae63c",
+    "features/public/shops/server/PublicShopDetailPage.tsx": "7cea063d07e6ff94f334a5d454c017713aca4f2b2ef7f23a9d6606235cc9ae2e",
+    "features/public/shops/server/PublicMenuDetailPage.tsx": "afa7ce8184b67aa870dc803d06cce449fee30effaa59e765714d5424f4ba91a9",
+    "features/public/shops/server/publicMenuRoute.ts": "ad7cdda0876ca59727a78a1c1fa7dce4768fbad48eaae3fbc18831c62a0c7bc3"
+  },
+  "baselineExitCode": 0,
+  "mutations": [
+    {
+      "caller": "shop list",
+      "file": "PublicShopListPage.tsx",
+      "site": "tx.shop.findMany",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "shop list",
+      "file": "PublicShopListPage.tsx",
+      "site": "tx.allergen.findMany",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "shop detail",
+      "file": "PublicShopDetailPage.tsx",
+      "site": "tx.shop.findFirst",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "shop detail",
+      "file": "PublicShopDetailPage.tsx",
+      "site": "tx.allergen.findMany",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "menu detail",
+      "file": "PublicMenuDetailPage.tsx",
+      "site": "tx.menuItem.findFirst",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "menu detail",
+      "file": "PublicMenuDetailPage.tsx",
+      "site": "tx.allergen.findMany",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "menu detail",
+      "file": "PublicMenuDetailPage.tsx",
+      "site": "allergenMaster, tx)",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "menu API",
+      "file": "publicMenuRoute.ts",
+      "site": "tx.menuItem.findFirst",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "menu API",
+      "file": "publicMenuRoute.ts",
+      "site": "tx.allergen.findMany",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    },
+    {
+      "caller": "menu API",
+      "file": "publicMenuRoute.ts",
+      "site": "allergenMaster, tx)",
+      "exitCode": 1,
+      "rootReadDetected": true,
+      "expectedTestFailed": true
+    }
+  ],
+  "restoredExitCode": 0
+}
