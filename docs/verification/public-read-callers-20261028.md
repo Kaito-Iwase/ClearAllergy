@@ -1,5 +1,7 @@
 # F3: 公開読取4入口の transaction client 回帰
 
+以下はPR #111作成時の実装・測定記録です。後続mainへの追従、文書同期、採用とProductionの状態は[検証・採用状況](../guide/verification.md#adoption-status)と[PR #111](https://github.com/Kaito-Iwase/ClearAllergy/pull/111)の対象SHA別の結果を参照してください。「今回」「行わない」「README/AGENTSは編集しない」も作成時点の範囲を表し、後続の承認・実績は上書きしません。
+
 基準は main `e09b29c4b272623f41904e81c7842650412f43a1`（snapshot pilot #109 統合後）。branch は `test/public-caller-transactions-20261028`。Refs #100。候補全体・PR #96/#105/#110 は取り込まず、製品コード・公開条件・schema・依存・CI workflow は変更しない。
 
 ## 検査対象と既存検査との差

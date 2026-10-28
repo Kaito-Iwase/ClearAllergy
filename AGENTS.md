@@ -3,6 +3,7 @@
 ## 文書の入口と変更の完了条件
 
 - 初めて読む場合は [READMEの読む順番](README.md#reading-order) から進む。コード変更前には [変更対応表](docs/guide/change-map.md) と関連仕様を読み、呼び出し元も検索して影響範囲を確認する。
+- main採用範囲・未採用候補・HOLD・Productionの確認状況は[検証・採用状況](docs/guide/verification.md#adoption-status)を参照する。日付付き検証記録や別候補のPASSを、現在のmain・Productionの結果に読み替えない。
 - 「影響を受ける範囲」「実際に変更する範囲」「確認のみの範囲」を分け、依頼と無関係な変更を広げない。
 - 仕様・構成・操作方法・検証コマンドが変わる場合は、[変更対応表](docs/guide/change-map.md)から影響する文書を選び、[文書更新先と完了条件](docs/guide/maintenance.md#update-map)に従って、必要なdocsを同じ変更内で更新する。
 - 現行説明は古い記述への追記だけで済ませず、本文を整合させる。現行仕様と過去の記録を区別し、実装上の動作だけを理由に不具合を承認済み仕様にしない。

@@ -1,6 +1,6 @@
 # 変更対応表：機能から調査を始める
 
-[READMEへ](../../README.md) · [操作説明](product.md) · [保守ルール](maintenance.md) · [コミット・PRの書き方](development.md#commit-pr-conventions)
+[READMEへ](../../README.md) · [操作説明](product.md) · [保守ルール](maintenance.md) · [コミット・PRの書き方](development.md#commit-pr-conventions) · [検証・採用状況](verification.md#adoption-status)
 
 全ページ・主要機能・API（画面などから処理を呼び出す窓口）の入口をここだけで管理します。コードパスは**リポジトリルートからの相対パス**です。表は影響範囲の完全な保証ではありません。入口の関数・コンポーネント名を検索して、呼び出し元、共通処理、動的URL、テストを確認してください。行番号だけに依存しません。
 
@@ -9,6 +9,8 @@
 安全性（Safety）・情報セキュリティ（Security）・データ（Data）の研究・設計案は [研究入口](../research/README.md) を参照してください。根拠（Evidence）→危険要因（Hazard）→要件（Requirement）→維持すべき条件（Invariant）→想定テスト（Expected Test）→Issueの対応は [研究の対応表](../research/traceability-matrix.md) から追えます。研究資料の提案を現行仕様や実装済み機能として扱いません。
 
 表の「テスト」は検査するコードが存在するという意味で、今回実行済みという意味ではありません。APIの単体テストはClerk・DB・Blob等をモック（外部処理の代用品）に置き換え、実PostgreSQLの制約回帰とは分けています。「手動」は[開発手順のブラウザ確認](development.md#browser)に従います。専用テスト未整備の機能も、説明対象から除いていません。
+
+公開3ページと `GET /api/menus/[menuId]` の実routeを通るtransaction client回帰は `tests/public-read-callers.test.ts`、10か所の元clientへの誤置換を検出する負例は `scripts/check-public-caller-mutations.mjs` です。以下の公開4入口すべてに対応し、実SQLの並行更新は別の `scripts/check-public-read-snapshot.ts` が担当します。[実測と限界](../verification/public-read-callers-20261028.md)を参照してください。F1/F4の候補専用コードはこの対応表のmain向け実装として扱いません。
 
 ブラウザ回帰は `scripts/browser-runner.mjs` が入口です。`public` は公開画面だけ、`demo` は公開画面と保存しない管理デモを検査し、両方とも `scripts/check-first-use-browser.mjs` を使います。`ui` は `scripts/check-public-ui-browser.mjs` でCI（変更ごとの自動検査）用の架空データに対する5種類の画面幅の表示・設定・状態の誤読防止を検査します。
 
