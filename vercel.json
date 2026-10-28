@@ -8,7 +8,8 @@
       "chore/harness-p0-evidence-20261024": false,
       "fix/next-security-20261024": false,
       "fix/runtime-dependency-security-20261024": false,
-      "ci/public-read-snapshot-pilot-20261028": false
+      "ci/public-read-snapshot-pilot-20261028": false,
+      "docs/commit-pr-conventions-20261028": false
     }
   }
 }
