@@ -3,13 +3,17 @@
 <a id="snapshot-ci-pilot"></a>
 ## 2026-10-28 公開読取snapshot回帰のCI接続パイロット
 
-main `0b6ed291b2fd853230c7efdeeb1e061815404a81` を基準に、既存 `scripts/check-public-read-snapshot.ts` を通常CIのfixture準備直後へ独立stepとして接続する定義を追加しました。変更はworkflowと本ガイド・開発手順だけです。製品コード、schema、script、依存、job/check名、公開条件は変更せず、PR #96/#105や未公開の広いP1 workflow差分・統合候補を取り込んだものではありません。
+main `0b6ed291b2fd853230c7efdeeb1e061815404a81` を基準に、既存 `scripts/check-public-read-snapshot.ts` を通常CIのfixture準備直後へ独立stepとして接続しました。PR #109の変更は `.github/workflows/ci.yml`、本ガイド、`docs/guide/development.md`、`vercel.json` の4ファイルです。製品コード、schema、script、依存、job/check名、公開条件は変更せず、PR #96/#105や未公開の広いP1 workflow差分・統合候補を取り込んだものではありません。
 
-検査対象は、実SQLへの割込みによる負例（旧食品＋新FREE）、正例（snapshot内の旧食品＋旧CONTAINS）、割込み成立assert、訂正後の新規公開読取の停止、通常終了時のcleanupです。使い捨てPostgreSQL 17以外へは接続しません。実行条件・上限・記録項目は[開発手順](development.md#checks)を参照してください。
+初回実測の対象headは `d636d20f2130186b016c4efed33ff18d5a735dfc`、CI実checkoutはmainとの一時merge `40ddf5bea94b63a64f778bbfc953496301209f9b` で、両者のtreeは `ae7868585d1ee7f1b33ceb64c480c8937c78e7bf` と一致しました。[通常CI run 40618362779](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40618362779) は2026-10-28の `pull_request` event、attempt 1でSUCCESSです。既存job `Test, lint, typecheck, and build` は2分10秒で完了し、単体テスト252件、lint/typecheck/build、既存DB・browser検査も成功しました。CIはNode 22.23.4、PostgreSQL 17.11の使い捨てserviceを使用し、npm 11.18.0への整合stepも成功しました。Neon・Clerk・Blobや本番共有DBへ接続した結果ではありません。
 
-ローカル準備環境はNode 24.19.0/npm 11.9.0で、repo指定Node 22.23.4/npm 11.18.0とは異なります。生成済みPrisma ClientとPG17の実行用image・ローカルserverがなく、単独SQL回帰の負例/正例/割込み・cleanup・所要時間・反復再現性は**未確認**です。既知403のダウンロード再試行や接続guardの迂回は行いません。workflowはYAML解析と既存定義との差分照合、文書リンク51件、`git diff --check`、`npm run lint` がPASSです。生成済みPrisma Clientを必要とする全体typecheck/test/buildは未実行です。これらの静的確認と、実DB検証の成功を区別します。GitHubへのpush・PR・dispatchは未実施で、最終headの通常CI結果はまだありません。
+snapshot独立stepは02:01:33–02:01:34 UTC（API記録で約1秒、上限3分）に成功しました。実SQLへの割込みによる負例（旧食品＋新FREE）と正例（snapshot内の旧食品＋旧CONTAINS）のPASS行、両variantの実子SELECT割込み成立assert、訂正後の新規公開読取がnullになることを確認しました。通常finallyの完了はawaitされたcleanupとstep成功から確認し、job最後のcontainer削除も成功しました。削除後の個別残存SQL監査と、強制timeout時のcleanupは未検証です。artifact `12786650112` は `prototype-browser-40ddf5bea94b63a64f778bbfc953496301209f9b`（4,525,766 bytes）として保存されました。artifact内容は別途取得・精査していません。
 
-このstepだけでは公開3ページ・公開メニューAPIの実callerすべてのtx利用、HTTP・画面・cacheを保証しません。選択検査の成功と必要受入条件全体の充足を分離する判定は統合候補採用前の別gate、CI必須化は別の設定承認です。公開読取変更前の実caller検証と、正常な小変更が範囲内の受入条件を満たして完了できるcontrolを区別して残します。既存のHOLD・review上限は解除しません。
+この初回記録は1回の実測で、反復再現性を保証しません。後続の文書同期commitはそのcommitのCI結果を別に照合し、この初回head/runの記録を上書きしません。実行条件・保証範囲は[開発手順](development.md#checks)を参照してください。公開前のローカル準備ではNode 24.19.0/npm 11.9.0を使用し、workflowのYAML解析・既存定義との照合、文書リンク51件、`git diff --check`、`npm run lint` がPASSでした。生成済みPrisma ClientとPG17がなくローカルの実DB・全体typecheck/test/buildは未実行でしたが、上記CI結果とは区別します。既知403の取得再試行や接続guardの迂回は行っていません。
+
+Vercelは2026-10-28 02:13 UTCのユーザー提供一覧の表示範囲で、従来の `ee117a` Previewと `0b6ed291` Productionが維持され、`d636d20` の新配備は見られませんでした。Skippedイベント・branch別全履歴は未確認であり、この一覧だけで全配備履歴を保証しません。`vercel.json` はpilot branch `ci/public-read-snapshot-pilot-20261028` の `deploymentEnabled: false` を追加し、既存6件のfalseと他設定を保持しています。このguardはbranch廃止後に別途整理します。削除すると当該branchが自動配備対象へ戻り得るため、現時点では保持します。mainへのmerge可否と、既存Production連携による配備の実行許可は別判断です。
+
+このstepだけでは公開3ページ・公開メニューAPIの実callerすべてのtx利用、HTTP・画面・cache、P0全phaseを保証しません。選択検査の成功と必要受入条件全体の充足を分離する判定は統合候補採用前の別gate、CI必須化は別の設定承認です。公開読取変更前の実caller検証と、正常な小変更が範囲内の受入条件を満たして完了できるcontrolを区別して残します。既存のHOLD・review上限は解除しません。
 
 2026-10-23の保存後の同じページでの公開確認は、[実装・検証記録](../verification/saved-menu-publication-20261023.md)を参照してください。保存済み版の読取・公開、未設定時の修正、二重送信・競合・失敗時の表示を対象にし、公開条件やDB契約は変更しません。隔離画面・CIと本番の読取確認を区別します。
 
