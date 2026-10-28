@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, mkdirSync, writeFileSync, renameSync, rmSync, unlinkSync, linkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, renameSync, rmSync, unlinkSync, linkSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { execFileSync } from "node:child_process";
-import { verify, protectedArea, assessQueue, definitionHash, readServerEvidence } from "../scripts/agent-harness.mjs";
+import { verify, summarizePhases, protectedArea, assessQueue, definitionHash, readServerEvidence } from "../scripts/agent-harness.mjs";
 import { candidateIdentity, combinePhaseEvidence } from "../scripts/verification-evidence.mjs";
-import { readGitChanges, requiredVerification, scopePreflight, executionPreflight, verificationOutcome, scopesOverlap, INVENTORY_PARTS } from "../scripts/harness-policy.mjs";
+import { acceptanceRequirements, readGitChanges, requiredVerification, scopePreflight, executionPreflight, verificationOutcome, scopesOverlap, INVENTORY_PARTS } from "../scripts/harness-policy.mjs";
 import { checkContextLinks } from "../scripts/check-context-links.mjs";
 
 // Only fixed, authored no-op scripts run in these tiny owned fixtures. These
@@ -155,4 +155,113 @@ test("context links check local anchors and code lines while remote links remain
     writeFileSync(join(root, "source.md"), "[bad](target.md#absent) [bad code](code.ts#L999) [missing](absent.ts)");
     const report = checkContextLinks(root, ["source.md"]);
     assert.equal(report.status, "FAIL"); assert.equal(report.failures.length, 3);
+}));
+
+function acceptanceFixture(baseSha = fields.baseSha, phases = [["test"], ["lint", "typecheck", "build", "context-links"]]) {
+    const now = Date.now();
+    const issue = { number: 1, title: "Small fictional repair", body: "Preserve the existing behavior", state: "OPEN", labels: [] as string[], assignees: [], dependencies: [] };
+    const acceptanceCriteria = ["the regression passes", "the remaining required checks pass"];
+    return { repository: "Kaito-Iwase/ClearAllergy", actorLogin: "Kaito-Iwase", baseSha, fetchedAt: new Date(now).toISOString(),
+        collectionComplete: Object.fromEntries(INVENTORY_PARTS.map(key => [key, true])), pullRequests: [],
+        issues: [{ ...issue, assessment: { author: "Kaito-Iwase", url: "https://github.com/Kaito-Iwase/ClearAllergy/issues/1#issuecomment-1",
+            data: { state: "working", baseSha, definitionHash: definitionHash(issue), assessedAt: new Date(now).toISOString(), acceptanceCriteria,
+                acceptanceChecks: acceptanceCriteria.map((criterion, i) => ({ criterion, phases: phases[i] })) } } }] };
+}
+function definition(source = acceptanceFixture()) { return acceptanceRequirements(source.issues[0], source); }
+function acceptedResults(names: string[], acceptance: ReturnType<typeof definition>) {
+    return names.map(name => ({ name, status: "PASS", acceptanceDefinitionSha256: acceptance.definitionSha256 }));
+}
+
+test("selected checks cannot define away an independently required acceptance check", () => {
+    const selected = requiredVerification(["lib/utils/small-change.ts"]);
+    const acceptance = definition(acceptanceFixture(fields.baseSha, [["test"], ["db-snapshot"]]));
+    const outcome = verificationOutcome(selected, acceptedResults(selected.phases, acceptance), true, true, true, acceptance);
+    assert.equal(outcome.selectedChecksStatus, "PASS"); assert.equal(outcome.acceptanceStatus, "UNVERIFIED");
+    assert.equal(outcome.verificationComplete, false); assert.ok(outcome.missingAcceptanceChecks.includes("db-snapshot"));
+});
+
+test("an ordinary small repair completes its declared acceptance without unrelated DB gates", () => {
+    const selected = requiredVerification(["lib/utils/small-change.ts"]), acceptance = definition();
+    const outcome = verificationOutcome(selected, acceptedResults(selected.phases, acceptance), true, true, true, acceptance);
+    assert.equal(outcome.status, "PASS"); assert.equal(outcome.acceptanceStatus, "PASS"); assert.equal(outcome.verificationComplete, true);
+    assert.ok(!acceptance.phases.some(phase => phase.startsWith("db-")));
+    assert.equal("implementationAuthority" in outcome, false, "completion grants no implementation or adoption authority");
+});
+
+test("unknown, partial, stale and held acceptance definitions never complete successful checks", () => {
+    const selected = requiredVerification(["lib/utils/small-change.ts"]);
+    const mutations = [
+        (s: ReturnType<typeof acceptanceFixture>) => { Object.assign(s.issues[0].assessment.data, { acceptanceChecks: undefined }); },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].assessment.data.acceptanceChecks.pop(); },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].assessment.data.acceptanceChecks[1] = s.issues[0].assessment.data.acceptanceChecks[0]; },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].assessment.data.acceptanceChecks[0].phases = ["unknown-phase"]; },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].assessment.data.acceptanceChecks[0].phases = []; },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].assessment.data.acceptanceCriteria = []; },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].body += " changed"; },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.baseSha = "0".repeat(40); },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].assessment.author = "other-user"; },
+        (s: ReturnType<typeof acceptanceFixture>) => { Object.assign(s, { actorLogin: undefined }); },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].assessment.data.assessedAt = "2020-01-01"; },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.fetchedAt = "2020-01-01"; },
+        (s: ReturnType<typeof acceptanceFixture>) => { s.issues[0].labels = ["human-review"]; },
+    ];
+    for (const mutate of mutations) {
+        const source = acceptanceFixture(); mutate(source); const acceptance = definition(source);
+        const result = verificationOutcome(selected, acceptedResults(selected.phases, acceptance), true, true, true, acceptance);
+        assert.equal(result.selectedChecksStatus, "PASS"); assert.equal(result.verificationComplete, false);
+        assert.equal(acceptance.status, "UNVERIFIED");
+    }
+    assert.equal(verificationOutcome(selected, acceptedResults(selected.phases, definition())).verificationComplete, false);
+});
+
+test("acceptance declared or changed after checks cannot adopt their old success", () => {
+    const selected = requiredVerification(["lib/utils/small-change.ts"]), source = acceptanceFixture(), acceptance = definition(source);
+    const results = acceptedResults(selected.phases, acceptance);
+    for (const digest of [null, "0".repeat(64)]) {
+        assert.equal(verificationOutcome(selected, results.map(r => ({ ...r, acceptanceDefinitionSha256: digest })), true, true, true, acceptance).verificationComplete, false);
+    }
+    source.issues[0].assessment.data.acceptanceCriteria[0] = "a revised acceptance criterion";
+    source.issues[0].assessment.data.acceptanceChecks[0].criterion = source.issues[0].assessment.data.acceptanceCriteria[0];
+    const revised = definition(source);
+    assert.notEqual(revised.definitionSha256, acceptance.definitionSha256);
+    assert.equal(verificationOutcome(selected, results, true, true, true, revised).verificationComplete, false);
+});
+
+test("manual requirements, execution failures and empty selection cannot become completion", () => {
+    const acceptance = definition(), selected = requiredVerification(["lib/utils/small-change.ts"]), results = acceptedResults(selected.phases, acceptance);
+    assert.equal(verificationOutcome({ ...selected, manual: ["changed-ui-keyboard-and-states"] }, results, true, true, true, acceptance).verificationComplete, false);
+    assert.equal(verificationOutcome(selected, results.map(r => ({ ...r, status: "FAIL" })), true, true, true, acceptance).status, "FAIL");
+    assert.equal(verificationOutcome(selected, [], true, true, true, acceptance).verificationComplete, false);
+    assert.equal(verificationOutcome(selected, results, true, false, true, acceptance).verificationComplete, false);
+});
+
+test("summary and stored JSON distinguish omitted acceptance, a positive control and wrong-SHA evidence", () => fixture(root => {
+    writeFileSync(join(root, "allowed.txt"), "after");
+}, ({ root, base, git }) => {
+    const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+    const files = [...new Set(git("ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0").filter(Boolean))].sort();
+    const current = candidateIdentity({ head: git("rev-parse", "HEAD"), baseSha: base,
+        fingerprint: hash(JSON.stringify(files.map(path => [path, hash(readFileSync(join(root, path)))]))),
+        lockSha256: hash(readFileSync(join(root, "package-lock.json"))),
+        harnessSha256: hash(readFileSync(new URL("../scripts/agent-harness.mjs", import.meta.url))),
+        evidenceSha256: hash(readFileSync(new URL("../scripts/verification-evidence.mjs", import.meta.url))) });
+    const source = acceptanceFixture(base, [["context-links"], ["test"]]), acceptance = definition(source);
+    mkdirSync(join(root, ".agent-runs"));
+    const record = (phase: string, identity = current, digest = acceptance.definitionSha256) => ({ kind: "phase", phase, runId, status: "PASS", exitCode: 0,
+        candidateBefore: identity, candidateAfter: identity, candidateUnchanged: true, publicationSafe: true, acceptanceDefinitionSha256: digest });
+    const save = (name: string, data: object) => writeFileSync(join(root, ".agent-runs", name), JSON.stringify(data));
+    save("context.json", record("context-links")); save("test.json", record("test"));
+    const summarize = (inputs: string[], output: string) => summarizePhases({ base, inputs, required: ["context-links"], output,
+        plan: { paths: ["allowed.txt"], issueNumber: 1 }, snapshot: source });
+    const missing = summarize(["context.json"], "missing.json");
+    assert.equal(missing.selectedChecksStatus, "PASS"); assert.equal(missing.verificationComplete, false);
+    assert.ok(missing.missingAcceptanceChecks.includes("test"));
+    assert.equal(JSON.parse(readFileSync(join(root, ".agent-runs", "missing.json"), "utf8")).verificationComplete, false);
+    const positive = summarize(["context.json", "test.json"], "positive.json");
+    assert.equal(positive.status, "PASS"); assert.equal(positive.verificationComplete, true);
+    save("old.json", record("test", candidateIdentity({ ...current, head: "0".repeat(40) })));
+    const old = summarize(["context.json", "old.json"], "old-summary.json");
+    assert.equal(old.status, "FAIL"); assert.equal(old.verificationComplete, false);
+    save("unbound.json", record("test", current, null));
+    assert.equal(summarize(["context.json", "unbound.json"], "unbound-summary.json").verificationComplete, false);
 }));

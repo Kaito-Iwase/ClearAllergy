@@ -111,6 +111,16 @@ test("a changed candidate persists FAIL evidence instead of a stale PASS", () =>
         assert.equal(stored.verificationComplete, false);
     } finally { closeSync(handle.fd); assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep)); rmSync(root, { recursive: true, force: true }); }
 });
+test("report publication cannot promote selected PASS with incomplete acceptance", () => {
+    const root = mkdtempSync(join(tmpdir(), "clearallergy-report-incomplete-"));
+    const handle = beginReport(root, "report.json");
+    try {
+        const report = publishReport(handle, { status: "PASS", candidateUnchanged: true, selectedChecksStatus: "PASS", verificationComplete: false }, () => true);
+        assert.equal(report.verificationComplete, false);
+        assert.equal(report.status, "UNVERIFIED");
+        assert.equal(JSON.parse(readFileSync(handle.path, "utf8")).verificationComplete, false);
+    } finally { closeSync(handle.fd); rmSync(root, { recursive: true, force: true }); }
+});
 test("swapping the report directory cannot write through a new junction", () => {
     const root = mkdtempSync(join(tmpdir(), "clearallergy-report-swap-"));
     const outside = mkdtempSync(join(tmpdir(), "clearallergy-swap-outside-"));

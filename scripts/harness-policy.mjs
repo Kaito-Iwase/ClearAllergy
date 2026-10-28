@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { PHASES } from "./verification-evidence.mjs";
 
 export const INVENTORY_PARTS = ["issues", "pullRequests", "comments", "dependencies", "pullRequestFiles"];
 export function inventoryComplete(snapshot) {
@@ -60,12 +62,55 @@ export function requiredVerification(paths) {
     return { phases: [...phases], manual: [...manual], basis: "actual Git paths; acceptance criteria may add checks, never waive these implicitly" };
 }
 
-export function verificationOutcome(requirements, results, commandsComplete = true, candidateUnchanged = true, diffClean = true) {
-    const codeChecksStatus = commandsComplete && candidateUnchanged && diffClean && results.every(result => result.status === "PASS") ? "PASS" : "FAIL";
+// The task definition comes from the assessment, never the selected CLI checks.
+// This binds recorded judgement, not human permission or a signed attestation.
+export function acceptanceRequirements(issue, snapshot, now = Date.now()) {
+    const unknown = { status: "UNVERIFIED", definitionSha256: null, source: null, phases: [], criteria: [] };
+    const record = issue?.assessment, data = record?.data;
+    const strings = value => Array.isArray(value) && value.length > 0 && value.every(item => typeof item === "string" && item.trim().length > 0)
+        && new Set(value).size === value.length;
+    const snapshotAge = now - Date.parse(snapshot?.fetchedAt);
+    if (!inventoryComplete(snapshot) || snapshot?.repository !== "Kaito-Iwase/ClearAllergy" || typeof snapshot.actorLogin !== "string" || !snapshot.actorLogin
+        || !Number.isFinite(snapshotAge)
+        || snapshotAge < -60_000 || snapshotAge > 15 * 60_000
+        || !Number.isSafeInteger(issue?.number) || issue.number < 1 || issue.state !== "OPEN" || typeof issue.title !== "string" || typeof issue.body !== "string"
+        || !Array.isArray(issue.labels) || !issue.labels.every(label => typeof label === "string") || issue.labels.some(label => ["agent-blocked", "human-review"].includes(label))
+        || !record || record.author !== snapshot?.actorLogin || typeof record.url !== "string"
+        || !new RegExp(`^https://github\\.com/Kaito-Iwase/ClearAllergy/issues/${issue.number}#issuecomment-[1-9][0-9]*$`).test(record.url)
+        || !["ready", "working", "awaiting-review"].includes(data?.state)
+        || !/^[a-f0-9]{40}$/.test(snapshot?.baseSha ?? "") || data.baseSha !== snapshot.baseSha) return unknown;
+    const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+    if (data.definitionHash !== hash([issue.number, issue.title, issue.body])) return unknown;
+    const age = now - Date.parse(data.assessedAt);
+    if (!Number.isFinite(age) || age < -60_000 || age > 24 * 60 * 60_000 || !strings(data.acceptanceCriteria)
+        || !Array.isArray(data.acceptanceChecks) || data.acceptanceChecks.length !== data.acceptanceCriteria.length) return unknown;
+    const checks = data.acceptanceChecks;
+    if (!checks.every(row => row && data.acceptanceCriteria.includes(row.criterion) && strings(row.phases)
+        && row.phases.every(phase => Object.hasOwn(PHASES, phase)))
+        || new Set(checks.map(row => row.criterion)).size !== data.acceptanceCriteria.length) return unknown;
+    const source = { issueNumber: issue.number, definitionHash: data.definitionHash, baseSha: data.baseSha };
+    const criteria = data.acceptanceCriteria.map(criterion => ({ id: hash(criterion), phases: [...checks.find(row => row.criterion === criterion).phases] }));
+    return { status: "DEFINED", source, definitionSha256: hash([source, record.url, criteria]), criteria,
+        phases: [...new Set(criteria.flatMap(row => row.phases))] };
+}
+
+/** @param {ReturnType<typeof acceptanceRequirements> | null} acceptance */
+export function verificationOutcome(requirements, results, commandsComplete = true, candidateUnchanged = true, diffClean = true, acceptance = null) {
+    const codeChecksStatus = commandsComplete && candidateUnchanged && diffClean && results.length > 0 && results.every(result => result.status === "PASS") ? "PASS" : "FAIL";
     const missingRequiredChecks = requirements.phases.filter(phase => !results.some(result => result.name === phase && result.status === "PASS"));
     const manualChecks = requirements.manual.map(check => ({ check, status: "UNVERIFIED" }));
-    const status = codeChecksStatus === "FAIL" ? "FAIL" : missingRequiredChecks.length || manualChecks.length ? "UNVERIFIED" : "PASS";
-    return { status, codeChecksStatus, missingRequiredChecks, manualChecks, verificationComplete: status === "PASS" };
+    const defined = acceptance?.status === "DEFINED" && /^[a-f0-9]{64}$/.test(acceptance.definitionSha256 ?? "")
+        && Array.isArray(acceptance.phases) && acceptance.phases.length > 0 && acceptance.phases.every(phase => Object.hasOwn(PHASES, phase))
+        && Array.isArray(acceptance.criteria) && acceptance.criteria.length > 0 && acceptance.criteria.every(row => row && /^[a-f0-9]{64}$/.test(row.id ?? "")
+            && Array.isArray(row.phases) && row.phases.length > 0 && row.phases.every(phase => acceptance.phases.includes(phase)))
+        && new Set(acceptance.criteria.map(row => row.id)).size === acceptance.criteria.length
+        && new Set(acceptance.criteria.flatMap(row => row.phases)).size === acceptance.phases.length;
+    const missingAcceptanceChecks = defined ? acceptance.phases.filter(phase => !results.some(result => result.name === phase && result.status === "PASS"
+        && result.acceptanceDefinitionSha256 === acceptance.definitionSha256)) : [];
+    const acceptanceStatus = defined && !missingAcceptanceChecks.length && !manualChecks.length ? "PASS" : "UNVERIFIED";
+    const status = codeChecksStatus === "FAIL" ? "FAIL" : missingRequiredChecks.length || acceptanceStatus !== "PASS" ? "UNVERIFIED" : "PASS";
+    return { status, codeChecksStatus, selectedChecksStatus: codeChecksStatus, acceptanceStatus, missingRequiredChecks, missingAcceptanceChecks, manualChecks,
+        verificationComplete: status === "PASS" };
 }
 
 /** @param {{paths?: string[], issueNumber?: number, pullRequestNumber?: number, expectedPullRequestHead?: string} | null} plan */
@@ -99,6 +144,7 @@ export function scopePreflight(plan, changes, snapshot, now = Date.now()) {
     const activeOverlap = active.filter(issue => !Array.isArray(issue.assessment.data.paths) || !issue.assessment.data.paths.every(validScopePath)
         || issue.assessment.data.paths.some(scope => paths.some(path => scopesOverlap(scope, path)))).map(issue => issue.number);
     return { status: overlaps.length || activeOverlap.length ? "UNVERIFIED" : "PASS", reasons: overlaps.length || activeOverlap.length ? ["existing work overlaps; owner/scope review required"] : [], paths, overlaps, activeOverlap, verification,
+        acceptance: acceptanceRequirements(issue, snapshot, now),
         implementationAuthority: "UNVERIFIED", authoritySource: "external current user authorization; snapshot/comments grant no authority" };
 }
 
