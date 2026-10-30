@@ -1,0 +1,232 @@
+// Real Preview only. Reuses browser-runner's isolated Playwright; no credentials or state files.
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+export const target = Object.freeze({
+    origin: "https://clear-allergy-ernxjj96q-kaitoexe00-9350s-projects.vercel.app",
+    deployment: "dpl_7Ea2jsXwwf3kvcwftyiZNDd83PgX",
+    source: "6293d5a02758f72a7cf00201fec239afc6b699eb",
+    shop: "cmvs4x80y000twn0wbxkwzbt6",
+    anchor: "cmvuiodx30001jg08xmr6nexe",
+    anchorName: "【架空・Issue118 T1】ひよこ豆サラダ 20261030-A1",
+});
+
+export function assertAnchor(shop, menu) {
+    assert.equal(shop.id, target.shop);
+    assert.equal(menu.id, target.anchor);
+    assert.equal(menu.name, target.anchorName);
+    assert.equal(menu.isPublished, false);
+    assert.equal(menu.priceYen, 1000);
+    assert.equal(menu.foodVersion, 87);
+    assert.equal(menu.publicationConfirmedFoodVersion, 87);
+    assert.equal(menu.allergens.find(a => a.slug === "milk")?.status, "CONTAINS");
+    assert.ok(menu.allergens.length > 0);
+    assert.equal(new Set(menu.allergens.map(a => a.slug)).size, menu.allergens.length);
+}
+
+export function allowedMutation(method, pathname, phase, menuId) {
+    if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) return true;
+    // Login audit is ordinary authentication, not a data mutation authorization.
+    if (!pathname.startsWith("/api/admin/")) return true;
+    if (phase === "NONE" && pathname === "/api/admin/auth/login" && method === "POST") return true;
+    if (phase === "CREATE") return method === "POST" && pathname === "/api/admin/menus";
+    if (!menuId || !["PUBLISH", "CORRECT", "STOP", "CLEANUP"].includes(phase)) return false;
+    if (phase === "STOP" || phase === "CLEANUP") return method === "POST" && pathname === `/api/admin/menus/${menuId}/stop`;
+    return method === "PUT" && pathname === `/api/admin/menus/${menuId}`;
+}
+
+export function state(menu) {
+    return { id: menu.id, isPublished: menu.isPublished, version: menu.version,
+        foodVersion: menu.foodVersion, publicationConfirmedFoodVersion: menu.publicationConfirmedFoodVersion,
+        priceYen: menu.priceYen, milk: menu.allergens.find(a => a.slug === "milk")?.status,
+        unknown: menu.allergens.filter(a => a.status === "UNKNOWN").length };
+}
+
+// Handler is installed before the click. Unrelated dialogs are dismissed and fail the run.
+export async function stopWithDialog(page, name, click, timeout = 20000) {
+    let resolveDialog;
+    let rejectDialog;
+    const handled = new Promise((yes, no) => { resolveDialog = yes; rejectDialog = no; });
+    const handler = async dialog => {
+        try {
+            if (dialog.type() !== "confirm" || !dialog.message().includes(name) || !dialog.message().includes("公開を停止")) {
+                await dialog.dismiss();
+                throw Error("UNEXPECTED_DIALOG");
+            }
+            await dialog.accept();
+            resolveDialog();
+        } catch { rejectDialog(Error("DIALOG_HANDLER_FAILED")); }
+    };
+    page.once("dialog", handler);
+    let timer;
+    try {
+        await Promise.race([
+            Promise.all([handled, click()]),
+            new Promise((_, no) => { timer = setTimeout(() => no(Error("DIALOG_TIMEOUT")), timeout); }),
+        ]);
+    } finally { clearTimeout(timer); page.off("dialog", handler); }
+}
+
+export async function runLive() {
+    if (process.argv.slice(2).join(" ") !== "--apply") throw Error("EXPLICIT_APPLY_REQUIRED");
+    if (process.env.DEBUG || process.env.PWDEBUG || process.env.NODE_OPTIONS) throw Error("DEBUG_OR_PRELOAD_FORBIDDEN");
+    const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
+    const output = resolve(process.env.CLEARALLERGY_BROWSER_OUTPUT || join(".agent-runs", `issue118-live-${randomUUID()}`));
+    mkdirSync(dirname(output), { recursive: true });
+    mkdirSync(output, { recursive: false });
+    const report = { target, driver: "Isolated Playwright script / existing browser-runner, manual normal login",
+        sessionExport: false, traces: false, dbObservation: "NOT_RUN: app API is not independent SQL",
+        runnerScriptSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
+        run: randomUUID(), stage: "LOGIN", phase: "NONE", observations: [], requests: [], status: "RUNNING" };
+    const save = () => writeFileSync(join(output, "result.json"), JSON.stringify(report, null, 2));
+    let browser;
+    let context;
+    let page;
+    let menuId;
+    let name;
+    let phase = "NONE";
+    let cleanupAttempted = false;
+    let protectedBefore;
+    const protectedIds = ["cmvs4x86o000vwn0w93c8ttez", "cmvs4x8wt000xwn0wj6gwdih1", "cmvs4x986000zwn0wer2ymhow"];
+    const mutationCounts = new Map();
+    const record = (stage, menu) => { report.observations.push({ at: new Date().toISOString(), stage, ...state(menu) }); save(); };
+    const read = async id => {
+        const response = await context.request.get(`${target.origin}/api/admin/menus/${id}`, { timeout: 20000 });
+        assert.equal(response.status(), 200);
+        const { menu } = await response.json();
+        assert.equal(menu.id, id);
+        return menu;
+    };
+    const action = async (nextPhase, method, path, click) => {
+        phase = nextPhase; report.stage = nextPhase; save();
+        const response = page.waitForResponse(r => r.url() === target.origin + path && r.request().method() === method, { timeout: 20000 });
+        const [, actual] = await Promise.all([click(), response]);
+        assert.equal(actual.status(), 200);
+        phase = "NONE";
+        return actual;
+    };
+    const publish = async () => {
+        const panel = page.getByRole("region", { name: /保存しました|保存済み内容の確認/ });
+        if (!await panel.count()) await page.getByRole("button", { name: "公開する", exact: true }).click();
+        await panel.getByText(name, { exact: true }).waitFor();
+        await action("PUBLISH", "PUT", `/api/admin/menus/${menuId}`, () => panel.getByRole("button", { name: "この内容で公開", exact: true }).click());
+        await page.getByText("保存済み内容を公開しました。", { exact: true }).waitFor();
+    };
+    try {
+        save();
+        browser = await chromium.launch({ headless: false });
+        context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false });
+        await context.route("**/api/admin/**", async route => {
+            const request = route.request();
+            const url = new URL(request.url());
+            if (url.origin !== target.origin || !allowedMutation(request.method(), url.pathname, phase, menuId)) {
+                report.requests.push({ phase, method: request.method(), kind: "BLOCKED_ADMIN_REQUEST" });
+                return route.abort("blockedbyclient");
+            }
+            if (request.method() !== "GET" && url.pathname.startsWith("/api/admin/menus")) {
+                const count = (mutationCounts.get(phase) || 0) + 1;
+                mutationCounts.set(phase, count);
+                if (count > (phase === "PUBLISH" ? 2 : 1)) {
+                    report.requests.push({ phase, kind: "BLOCKED_DUPLICATE" });
+                    return route.abort("blockedbyclient");
+                }
+                report.requests.push({ phase, method: request.method(), kind: url.pathname.endsWith("/stop") ? "OWN_FIXTURE_STOP" : "OWN_FIXTURE_WRITE" });
+            }
+            return route.continue();
+        });
+        page = await context.newPage();
+        page.setDefaultTimeout(20000);
+        await page.goto(target.origin + "/admin");
+        report.loginWindowOpened = true;
+        report.loginGate = new URL(page.url()).hostname === "vercel.com" ? "VERCEL_PROTECTION" : page.url().startsWith(target.origin + "/admin/login") ? "APP_NORMAL_LOGIN" : "OTHER_OR_READY";
+        save();
+        console.log("MANUAL_NORMAL_LOGIN_REQUIRED: visible isolated Chromium; Vercel protection then ownerA. No session import or recording.");
+        await page.waitForURL(target.origin + "/admin/shop", { timeout: 15 * 60 * 1000 });
+        const own = await context.request.get(target.origin + "/api/admin/shop");
+        assert.equal(own.status(), 200);
+        const shopData = await own.json();
+        const anchor = await read(target.anchor);
+        assertAnchor(shopData.shop, anchor);
+        protectedBefore = await Promise.all(protectedIds.map(async id => state(await read(id))));
+        report.protectedBefore = protectedBefore;
+        report.stage = "TARGET_ANCHOR_VERIFIED"; save();
+        name = `【架空・Issue118 runner】ひよこ豆サラダ ${report.run.slice(0, 8)}`;
+        report.fixtureName = name;
+        report.specification = "Complete fictional initial dressing: chickpea/rice oil/rice vinegar/salt, listed allergens absent. Signal later adds milk; no real food claim.";
+        await page.goto(target.origin + "/admin/menus/new");
+        await page.getByLabel("メニュー名", { exact: true }).fill(name);
+        await page.getByLabel("価格（税込・円）", { exact: true }).fill("1000");
+        await page.getByLabel("原材料名", { exact: false }).fill("ひよこ豆、共通ドレッシング");
+        await page.getByLabel("説明", { exact: true }).fill("Issue118専用の架空検証。実食品ではありません。");
+        for (const allergen of anchor.allergens) {
+            await page.getByRole("group", { name: allergen.nameJa, exact: true }).getByRole("button", { name: "原材料に含まない登録", exact: true }).click();
+        }
+        const created = await action("CREATE", "POST", "/api/admin/menus", () => page.getByRole("button", { name: "メニューを登録する", exact: true }).click());
+        const body = await created.json();
+        assert.match(body.id, /^c[a-z0-9]+$/); menuId = body.id; report.fixtureId = menuId; save();
+        await page.waitForURL(target.origin + `/admin/menus/${menuId}/edit`);
+        let menu = await read(menuId); assert.equal(menu.name, name); assert.equal(menu.isPublished, false);
+        assert.ok(menu.allergens.every(a => a.status === "FREE")); record("CREATED_PRIVATE", menu);
+        await publish(); menu = await read(menuId); assert.equal(menu.isPublished, true); assert.equal(menu.publicationConfirmedFoodVersion, menu.foodVersion); record("INITIAL_PUBLISH", menu);
+        const initialPublic = await context.request.get(`${target.origin}/api/menus/${menuId}`);
+        assert.equal(initialPublic.status(), 200);
+        assert.equal((await initialPublic.json()).menu.allergens.find(a => a.slug === "milk").status, "FREE");
+        const initialFood = menu.foodVersion;
+        report.signal = "E11/E12 fictional milk-added label; ingredient string unchanged; AI knows gold."; save();
+        await action("STOP", "POST", `/api/admin/menus/${menuId}/stop`, () => stopWithDialog(page, name, () => page.getByRole("button", { name: "公開を停止する", exact: true }).click()));
+        menu = await read(menuId); assert.equal(menu.isPublished, false); assert.equal(menu.foodVersion, initialFood); record("EDITOR_DIALOG_STOP", menu);
+        assert.equal((await context.request.get(`${target.origin}/api/menus/${menuId}`)).status(), 404);
+        await page.reload();
+        await page.getByRole("group", { name: "乳", exact: true }).getByRole("button", { name: "含む", exact: true }).click();
+        await action("CORRECT", "PUT", `/api/admin/menus/${menuId}`, () => page.getByRole("button", { name: "保存する", exact: true }).click());
+        await page.getByRole("region", { name: "保存しました", exact: true }).waitFor();
+        menu = await read(menuId); assert.equal(menu.isPublished, false); assert.ok(menu.foodVersion > initialFood); assert.equal(menu.publicationConfirmedFoodVersion, null); assert.equal(state(menu).milk, "CONTAINS"); record("MILK_CORRECTED_PRIVATE", menu);
+        await publish(); menu = await read(menuId); assert.equal(menu.isPublished, true); assert.equal(menu.publicationConfirmedFoodVersion, menu.foodVersion); record("CORRECTED_SEPARATE_PUBLISH", menu);
+        const publicResponse = await context.request.get(`${target.origin}/api/menus/${menuId}`);
+        assert.equal(publicResponse.status(), 200); const published = await publicResponse.json();
+        assert.equal(published.menu.allergens.find(a => a.slug === "milk").status, "CONTAINS");
+        const viewer = await context.newPage(); await viewer.goto(`${target.origin}/shops/${target.shop}/menus/${menuId}`);
+        await viewer.getByRole("heading", { name, exact: true }).waitFor();
+        await viewer.getByText("乳", { exact: true }).waitFor();
+        assert.match(await viewer.getByText("乳", { exact: true }).locator("..").innerText(), /含む/);
+        report.publicApiMilk = "CONTAINS"; report.publicPageFixtureHeading = true;
+        report.status = "T1_APP_BROWSER_API_PASS_PENDING_INDEPENDENT_DB";
+    } catch (error) {
+        report.status = "FAILED_OR_UNCERTAIN";
+        const fixed = new Set(["DIALOG_TIMEOUT", "DIALOG_HANDLER_FAILED"]);
+        report.errorClass = error instanceof assert.AssertionError ? "ASSERTION_FAILED" : error instanceof Error && fixed.has(error.message) ? error.message : error instanceof Error && error.name === "TimeoutError" ? "OPERATION_TIMEOUT" : "UNCLASSIFIED_ERROR";
+        process.exitCode = 1;
+    } finally {
+        if (context && menuId) {
+            try {
+                const current = await read(menuId); assert.equal(current.name, name); record("CLEANUP_PRE_READ", current);
+                if (current.isPublished) {
+                    cleanupAttempted = true;
+                    await page.goto(target.origin + "/admin/menus");
+                    await action("CLEANUP", "POST", `/api/admin/menus/${menuId}/stop`, () => page.getByRole("button", { name: name + "の公開を停止", exact: true }).click());
+                }
+                const final = await read(menuId); assert.equal(final.name, name); assert.equal(final.isPublished, false); record("FINAL_PRIVATE_HISTORY_RETAINED", final);
+                report.cleanup = "PRIVATE_RETAINED_NO_DELETE";
+            } catch { report.cleanup = "UNVERIFIED_NO_AUTOMATIC_RETRY"; process.exitCode = 1; }
+        }
+        if (context && protectedBefore) {
+            try {
+                report.protectedAfter = await Promise.all(protectedIds.map(async id => state(await read(id))));
+                assert.deepEqual(report.protectedAfter, protectedBefore);
+                report.protectedRowsMatch = true;
+            } catch { report.protectedRowsMatch = false; process.exitCode = 1; }
+        }
+        report.cleanupStopAttempted = cleanupAttempted;
+        report.phase = phase; save();
+        await context?.close(); await browser?.close();
+        console.log(`ISSUE118_RESULT ${report.status}; cleanup=${report.cleanup || "NO_CREATED_ID"}`);
+    }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    runLive().catch(() => { console.error("ISSUE118_PREFLIGHT_FAILED_NO_RAW_ERROR"); process.exitCode = 1; });
+}

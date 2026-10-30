@@ -12,7 +12,7 @@ const runner = resolve(process.env.CLEARALLERGY_BROWSER_RUNNER_DIR || join(tmpdi
 const modulePath = join(runner, "node_modules", "playwright");
 const env = { ...process.env, PLAYWRIGHT_MODULE_PATH: modulePath, PLAYWRIGHT_BROWSERS_PATH: join(runner, "browsers") };
 const [command, ...options] = process.argv.slice(2);
-const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | ui | allergens | composition | qr | publication | demo | admin";
+const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | ui | allergens | composition | qr | publication | demo | admin | issue118-live-t1 --apply";
 class RunnerError extends Error {}
 
 function runNode(args, childEnv = env) {
@@ -42,6 +42,9 @@ try {
         assertInstalled();
         runNode([join(modulePath, "cli.js"), "install", ...options, "chromium"]);
         console.log(`Playwright ${version} and Chromium are ready. Start the isolated app, then run node scripts/browser-runner.mjs public.`);
+    } else if (command === "issue118-live-t1" && options.length === 1 && options[0] === "--apply") {
+        assertInstalled();
+        runNode(["scripts/check-issue118-live-t1-browser.mjs", "--apply"]);
     } else if (["public", "ui", "allergens", "composition", "qr", "publication", "demo", "admin"].includes(command) && options.length === 0) {
         assertInstalled();
         if (command === "admin") {
