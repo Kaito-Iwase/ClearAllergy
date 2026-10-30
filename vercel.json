@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
+      "test/issue118-live-t1-20261030": false,
       "fix/issue-triage-20261024": false,
       "fix/utc-db-timestamps-20261024": false,
       "chore/harness-evidence-20261024": false,

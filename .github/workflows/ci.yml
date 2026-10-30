@@ -109,6 +109,9 @@ jobs:
       - name: Install isolated browser runner
         run: node scripts/browser-runner.mjs install --with-deps
 
+      - name: Check offline Issue118 runner and CLI guards
+        run: node scripts/browser-runner.mjs issue118-live-guards
+
       - name: Check saved-menu publication flow with fictional intercepted API
         env:
           CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/clearallergy-browser-results
