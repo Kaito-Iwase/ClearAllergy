@@ -43,7 +43,7 @@ async function open({ width = 390, menu = {}, path = "/edit", intercept, acceptD
         const req = route.request(), url = new URL(req.url());
         if (url.origin !== origin) { external.push(url.origin); return route.abort(); }
         if (url.pathname.startsWith("/api/")) {
-            const method = req.method(), body = method === "GET" ? null : req.postDataJSON();
+            const method = req.method(), body = method === "GET" || url.pathname === "/api/admin/upload-menu-image" ? null : req.postDataJSON();
             if (method === "GET") f.reads++; else f.writes.push({ method, body, path: url.pathname });
             const overridden = intercept ? await intercept({ method, body, f, path: url.pathname }) : null;
             if (overridden?.abort) return route.abort();
@@ -80,6 +80,53 @@ const panel = f => f.page.getByRole("region", { name: "保存しました", exac
 const save = f => f.page.getByRole("button", { name: "保存する", exact: true }).click();
 async function check(name, run) { try { await run(); cases.push({ name, passed: true }); console.log("PASS " + name); } catch (e) { cases.push({ name, passed: false, error: e.message }); console.error("FAIL " + name + ": " + e.message); } }
 try {
+    await check("empty, invalid JSON, 500 or lost image upload response prevents menu creation and save", async () => {
+        const failures = [
+            { status: 500, body: { error: "fictional upload failure" } },
+            { rawBody: "not-json" },
+            { body: {} },
+            { body: { url: "" } },
+            { abort: true },
+        ];
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        for (const path of ["/new", "/edit"]) for (const failure of failures) {
+            const f = await open({ path, intercept: ({ path: requestPath }) => requestPath === "/api/admin/upload-menu-image" ? failure : null });
+            try {
+                const prefix = path === "/new" ? "new" : "edit";
+                const name = f.page.locator(`#${prefix}-menu-field-1`);
+                await name.fill("Fictional upload draft");
+                await f.page.locator(`#${prefix}-menu-field-7`).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                if (path === "/new") await f.page.locator("form").evaluate(form => form.requestSubmit());
+                else await save(f);
+                await f.page.getByRole("alert").waitFor();
+                assert.deepEqual(f.writes.map(write => write.path), ["/api/admin/upload-menu-image"]);
+                assert.equal(await name.inputValue(), "Fictional upload draft");
+                assert.equal(await f.page.locator(`#${prefix}-menu-field-7`).evaluate(input => input.files.length), 1);
+                assert.equal(await panel(f).count(), 0);
+                assert.equal(f.state.version, base.version);
+                assert.equal(f.state.isPublished, false);
+            } finally { await f.context.close(); }
+        }
+    });
+    await check("valid image upload reaches the separate menu write", async () => {
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        const uploaded = "https://fixture.public.blob.vercel-storage.com/menu-images/fixture/photo.png";
+        for (const path of ["/new", "/edit"]) {
+            const f = await open({ path, intercept: ({ path: requestPath }) => requestPath === "/api/admin/upload-menu-image" ? { body: { url: uploaded } } : null });
+            try {
+                const prefix = path === "/new" ? "new" : "edit";
+                await f.page.locator(`#${prefix}-menu-field-1`).fill("Fictional upload control");
+                await f.page.locator(`#${prefix}-menu-field-7`).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                if (path === "/new") await f.page.locator("form").evaluate(form => form.requestSubmit());
+                else await save(f);
+                await panel(f).waitFor();
+                assert.equal(f.writes.length, 2);
+                assert.equal(f.writes[0].path, "/api/admin/upload-menu-image");
+                assert.equal(f.writes[1].path, path === "/new" ? "/api/admin/menus" : `/api/admin/menus/${id}`);
+                assert.equal(f.writes[1].body.imageUrl, uploaded);
+            } finally { await f.context.close(); }
+        }
+    });
     await check("cancelling STOP preserves unsaved input without a request", async () => {
         const f = await open({ menu: { isPublished: true, publicationConfirmedFoodVersion: 29 } });
         try {
