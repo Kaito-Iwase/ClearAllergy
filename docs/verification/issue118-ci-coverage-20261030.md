@@ -7,14 +7,14 @@
 | 4状態とUNKNOWN、不完全なマスタをFREEにしない | `tests/allergen-display.test.ts`、`tests/menu-publication.test.ts`、`tests/public-menu-api.test.ts` | P0: 境界値と欠損の負例を維持。実食品の安全性は検証外 |
 | 保存と別公開、保存済み版との結合 | `tests/saved-menu.test.ts`、`tests/admin-menu-api.test.ts`、`scripts/check-saved-publication-browser.mjs`、`scripts/check-publication-database.ts` | P0: 実画面とAPI/DBを同じ試行でつなぐ検査は未実装。画面検査は架空HTTP、DB検査は別実行 |
 | 内容変更は非公開保存し、公開確認は別操作 | `tests/menu-save-plan.test.ts`、`tests/admin-menu-api.test.ts`、`scripts/publication-database-regression.ts` | 今回のAPI負例は、乳状態の変更または既存APIの変更申告と公開要求を同時に送っても確認記録を作らないことを検査。UIの変更申告機能を復活させない。DB triggerの実行は別検査 |
-| STOP・旧版・結果不明 | `tests/admin-menu-api.test.ts`、`scripts/check-saved-publication-browser.mjs` | 今回、APIスタブでSTOP後の旧版保存409と食品版不変を連続確認。実React＋架空HTTPではSTOP取消、公開反映未完了、旧フォーム入力保持・409、確定後に応答喪失した場合の結果不明を確認する。P0: 実app/DBとブラウザをまたぐ一連検査は不足。通常STOPだけでは食品版を進めない |
+| STOP・旧版・結果不明 | `tests/admin-menu-api.test.ts`、`scripts/check-saved-publication-browser.mjs`、`scripts/admin-menu-database-regression.ts` | 今回、APIスタブでSTOP後の旧版保存409と食品版不変を連続確認。実React＋架空HTTPではSTOP取消、公開反映未完了、旧フォーム入力保持・409、確定後に応答喪失した場合の結果不明を確認する。使い捨て実DB回帰にはSTOP後の旧版409・履歴不変と最新版の価格保存を追加。P0: 実app/DBとブラウザをまたぐ一連検査は不足。通常STOPだけでは食品版を進めない |
 | 一貫した公開読取と停止後の新規取得 | `tests/public-read-callers.test.ts`、`scripts/check-public-read-snapshot.ts`、`tests/public-menu-api.test.ts` | P0: 既存の実DB競合とcaller検査を再利用。P1: 既開タブ・戻る・通信断を新規GETと別々に測る。既開画面の自動訂正は現行保証ではない |
 | 店舗所有・Origin・招待・店舗保存 | `tests/admin-menu-api.test.ts`、`tests/admin-shop-api.test.ts`、`tests/admin-invitation-api.test.ts`、`scripts/check-owned-menu-database.ts`、`scripts/check-shop-database.ts` | P0: 未認証・他店舗・同時更新を既存レベルで維持。Clerkはテストダブルであり、実セッションの検証ではない |
 | 画像の入力・保存先・失敗 | `tests/admin-upload-api.test.ts`、`tests/image-url-policy.test.ts`、`tests/upload-image-validation.test.ts` | P1: 実Blobの認証・uploadは別途隔離確認後の少数smoke。mainにstaging専用Blobテストはない |
 | 公開検索・設定・レスポンシブ | `scripts/check-first-use-browser.mjs` の `public`、`tests/public-allergen-preferences.test.ts` | P1: 主要導線を保持し、利用者の理解や実店舗での有用性は別途人が評価 |
 | 共通食材・旧新在庫・無信号 | #118 T2/T3/対照の架空台帳 | P1: CSVの正解集合は未登録M06を含む4件。無信号を検知成功とせず、混在在庫の対応を新仕様として決めない |
 
-P0の残りは、実DBでのSTOP直後の旧版409と履歴・食品版不変、実appと画面をつなぐ保存/公開、書込み確定後の通信断の一連観測である。現在のDB route検査は所有権競合を対象とし、上記の追加画面検査はHTTPを模擬する。P1はT4既開タブ・戻ると別owner、実Clerk/Blob、T2/T3・無信号の観測であり、架空データでも実サービス隔離・所有者・cleanupの確認が必要。各層に未検証が残ることは、単体test件数の増加で消えない。
+P0の残りは、実appと画面をつなぐ保存/公開、書込み確定後の通信断の一連観測である。追加した実DB route検査も実Clerk/画面を使わず、追加画面検査はHTTPを模擬する。P1はT4既開タブ・戻ると別owner、実Clerk/Blob、T2/T3・無信号の観測であり、架空データでも実サービス隔離・所有者・cleanupの確認が必要。各層に未検証が残ることは、単体test件数の増加で消えない。
 
 ## CIを二段に分ける
 
