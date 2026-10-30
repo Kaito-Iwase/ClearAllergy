@@ -3,7 +3,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityReceipt,
     newWriteLedger, beginWrite, holdWrite, confirmWrite, consumeWriteResponse, canCleanup,
-    claimMutation, protectedApiSnapshot, overallResult } from "../scripts/check-issue118-live-t1-browser.mjs";
+    claimMutation, protectedApiSnapshot, overallResult, openCreatedEditor } from "../scripts/check-issue118-live-t1-browser.mjs";
 
 const response = (status, body) => ({ status: () => status, json: async () => body });
 const saved = { menu: { id: "cnewfixture", version: 4, foodVersion: 2, isPublished: true, publicationConfirmedFoodVersion: 2 } };
@@ -127,5 +127,36 @@ test("real isolated Chromium handles confirm before click without external reque
         assert.equal(await page.locator("output").innerText(), "DISMISSED");
         await assert.rejects(stopWithDialog(page, "架空メニュー", async () => {}, 100), /DIALOG_TIMEOUT/);
         assert.deepEqual(external, []);
+    } finally { await context.close(); await browser.close(); }
+});
+
+test("post201 page stays on new; runner follows only the acknowledged fixture edit link", async () => {
+    const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext();
+    const origin = "https://issue118-offline.example";
+    const id = "cnewfixture";
+    const reads = []; let mutations = 0;
+    await context.route("**/*", route => {
+        const request = route.request(); const url = new URL(request.url());
+        if (request.method() !== "GET") { mutations++; return route.abort(); }
+        if (url.origin !== origin) return route.abort();
+        if (!["/admin/menus/new", `/admin/menus/${id}/edit`].includes(url.pathname)) return route.abort();
+        reads.push(url.pathname);
+        const html = url.pathname === "/admin/menus/new"
+            ? `<h1>Saved201</h1><a href="/admin/menus/${id}/edit">Open saved editor</a>`
+            : "<h1>Persisted fixture editor</h1>";
+        return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
+    });
+    try {
+        const page = await context.newPage();
+        await page.goto(origin + "/admin/menus/new");
+        assert.equal(page.url(), origin + "/admin/menus/new");
+        await openCreatedEditor(page, origin, id);
+        assert.equal(page.url(), origin + `/admin/menus/${id}/edit`);
+        assert.equal(await page.getByRole("heading").innerText(), "Persisted fixture editor");
+        assert.deepEqual(reads, ["/admin/menus/new", `/admin/menus/${id}/edit`]);
+        assert.equal(mutations, 0);
+        await assert.rejects(openCreatedEditor(page, origin, "../other"));
     } finally { await context.close(); await browser.close(); }
 });

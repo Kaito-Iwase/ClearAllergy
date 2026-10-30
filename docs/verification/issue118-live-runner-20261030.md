@@ -16,6 +16,8 @@ node scripts/browser-runner.mjs issue118-live-t1 --apply
 
 T1は毎回新しい架空メニューで実行。架空の完全仕様で初期allergen FREEを登録し、架空の新ドレッシングラベルで乳が加わった条件を記録する。実食品の安全判断ではない。初回別公開→編集画面STOP→乳訂正を非公開保存→保存済み食品版確認→別公開→公開API/画面確認。STOPのconfirm handlerをクリック前に登録し、対象名・confirm種別・停止文言を照合してacceptする。作成は201、保存／公開／STOPは200と各応答shapeを検証。作成201の有効IDは、付加フィールドの検証や後続UI待ちより先に追跡する。
 
+現行`NewMenuForm.tsx:295-307`は作成後も`/admin/menus/new`に留まり、保存済みIDへの編集リンクを表示する。runnerは自動遷移を期待せず、201で確定したIDに完全一致する可視リンクを押して編集画面へ進む。これにより後のSTOP後reloadも同じ保存済みメニューを指す。リンク到達は局所DOM navigation検査であり、実React・実APIのT1成功に読み替えない。
+
 メニュー書込みはCREATE1回、INITIAL_PUBLISH1回、REPUBLISH1回、CORRECT1回、STOP1回、cleanup STOP最大1回に限定する。DELETEや既存anchor・他メニュー・店舗への書込みは遮断する。
 
 write操作はARMED→IN_FLIGHT→応答とbody検証・クリック完了→CONFIRMED_SUCCESSとする。timeout・応答parse失敗・不正応答・クリック未完はINDETERMINATEとなり、run全体をHOLDへ固定する。直後のGETが非公開でも、元requestの遅延commitがない証明にしない。HOLD後は新たなwriteをすべて遮断し、**自動cleanupもしない**。後からresponse headers／transport完了が観測されても自動再開しない。成功応答とクリック完了の両方を確定できた操作だけで進み、すべて確定済みの場合に限り、通常一覧STOPによる最後の非公開化を最大1回行う。

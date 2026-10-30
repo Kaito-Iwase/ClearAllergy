@@ -120,6 +120,16 @@ export function state(menu) {
         unknown: menu.allergens.filter(a => a.status === "UNKNOWN").length };
 }
 
+export async function openCreatedEditor(page, origin, id) {
+    assert.match(id, /^c[a-z0-9]+$/);
+    const editPath = `/admin/menus/${id}/edit`;
+    // NewMenuForm deliberately stays on /new after201 and renders this persisted-ID link.
+    const link = page.locator(`a[href="${editPath}"]`).filter({ visible: true });
+    await link.waitFor({ state: "visible" });
+    await link.click();
+    await page.waitForURL(origin + editPath);
+}
+
 // Handler is installed before the click. Unrelated dialogs are dismissed and fail the run.
 export async function stopWithDialog(page, name, click, timeout = 20000) {
     let resolveDialog;
@@ -267,7 +277,9 @@ export async function runLive() {
             await page.getByRole("group", { name: allergen.nameJa, exact: true }).getByRole("button", { name: "原材料に含まない登録", exact: true }).click();
         }
         await action("CREATE", "POST", "/api/admin/menus", () => page.getByRole("button", { name: "メニューを登録する", exact: true }).click());
-        await page.waitForURL(target.origin + `/admin/menus/${menuId}/edit`);
+        report.stage = "CREATED_EDITOR_LINK"; save();
+        await openCreatedEditor(page, target.origin, menuId);
+        report.stage = "CREATED_PRIVATE_VERIFY"; save();
         let menu = await read(menuId); assert.equal(menu.name, name); assert.equal(menu.isPublished, false);
         assert.ok(menu.allergens.every(a => a.status === "FREE")); record("CREATED_PRIVATE", menu);
         await publish("INITIAL_PUBLISH"); menu = await read(menuId); assert.equal(menu.isPublished, true); assert.equal(menu.publicationConfirmedFoodVersion, menu.foodVersion); record("INITIAL_PUBLISH", menu);
