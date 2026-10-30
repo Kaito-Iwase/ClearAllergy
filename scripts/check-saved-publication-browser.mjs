@@ -218,6 +218,47 @@ try {
         try { await f.page.getByLabel("価格（税込・円）", { exact: true }).fill("450"); await save(f); await f.page.getByText(/保存しました。公開状態：公開/).waitFor(); assert.equal(await panel(f).count(), 0); assert.equal(f.reads, 0); assert.deepEqual(f.dialogs, []); }
         finally { await f.context.close(); }
     });
+    await check("new and edit reject malformed image upload URLs without a menu write", async () => {
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        for (const path of ["/new", "/edit"]) for (const value of [42, true, {}, [], " ", "not-a-url", "http://fixture.invalid/a"]) {
+            const f = await open({ path });
+            try {
+                let uploads = 0;
+                await f.page.route("**/api/admin/upload-menu-image", route => { uploads++; return route.fulfill({ json: { url: value } }); });
+                const prefix = path === "/new" ? "new" : "edit";
+                const name = f.page.locator(`#${prefix}-menu-field-1`);
+                await name.fill("Fictional draft");
+                const file = f.page.locator(`#${prefix}-menu-field-7`);
+                await file.setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                if (path === "/new") await f.page.locator("form").evaluate(form => form.requestSubmit());
+                else await save(f);
+                await f.page.getByRole("alert").waitFor();
+                assert.equal(uploads, 1);
+                assert.equal(f.writes.length, 0);
+                assert.equal(await name.inputValue(), "Fictional draft");
+                assert.equal(await file.evaluate(input => input.files.length), 1);
+                assert.equal(await panel(f).count(), 0);
+            } finally { await f.context.close(); }
+        }
+    });
+    await check("valid image upload reaches the separate menu save", async () => {
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        const url = "https://fixture.public.blob.vercel-storage.com/menu-images/fixture/image.png";
+        for (const path of ["/new", "/edit"]) {
+            const f = await open({ path });
+            try {
+                await f.page.route("**/api/admin/upload-menu-image", route => route.fulfill({ json: { url } }));
+                const prefix = path === "/new" ? "new" : "edit";
+                await f.page.locator(`#${prefix}-menu-field-1`).fill("Fictional control");
+                await f.page.locator(`#${prefix}-menu-field-7`).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                if (path === "/new") await f.page.locator("form").evaluate(form => form.requestSubmit());
+                else await save(f);
+                await panel(f).waitFor();
+                assert.equal(f.writes.length, 1);
+                assert.equal(f.writes[0].body.imageUrl, url);
+            } finally { await f.context.close(); }
+        }
+    });
     await check("320/390/768/1536 responsive layout, keyboard entry/exit, all-state details and long notes", async () => {
         for (const width of [320, 390, 768, 1536]) {
             const f = await open({ width, menu: { name: "長い架空メニュー名".repeat(10), precaution: "架空の長い注意です。".repeat(100), allergens: base.allergens.map((a, i) => ({ ...a, status: ["CONTAINS", "FREE", "MAY_CONTAIN"][i % 3] })) } });

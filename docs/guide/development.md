@@ -181,6 +181,7 @@ node scripts/browser-runner.mjs ui
 | `scripts/check-image-composition-browser.mjs` | `composition` で実行。架空SVG画像と実編集部品で、描画した画素の移動・範囲・ズームとタッチを検査。ブラウザの外部通信を遮断し、DB・認証・画像保存は使わない。変更前後のスクリーンショットとPASS出力を確認 |
 | `scripts/check-shop-qr-browser.mjs` | `qr` で実行。実QR部品と架空URLで、4幅の正方形・サイズ比率・入力、印刷mm指定・説明の非印刷・afterprint解除を検査。JSON・スクリーンショットとA4／100%のPDFを出力。外部通信・DB・実印刷は使わない |
 | `scripts/check-saved-publication-browser.mjs` | `node scripts/browser-runner.mjs publication` で実行。実新規・編集・公開確認部品と同じworktreeのビルド済みCSSを使い、全通信を架空応答へ置換。保存と公開の失敗・版不一致・二重クリック・新規再読込・UNKNOWNの修正再保存・320/390/768/1536px・キーボードを検査。DB・Clerk・Blob・本番・利用者の既存ブラウザは使わない。JSON・画像を `CLEARALLERGY_BROWSER_OUTPUT` へ出力。CIでも実行 |
+| `scripts/check-shop-save-browser.mjs` | `node scripts/browser-runner.mjs shop-save` で実行。実店舗編集部品、ビルド済みCSS、架空HTTPを使用。保存結果不明・競合・画像送信応答の不正値・入力保持・二重送信防止を検査。DB・Clerk・Blobには接続しない。CIでも実行 |
 | `scripts/check-test-browser.mjs` | 固定localhost:3101、専用アカウントファイル、Dockerのテストアプリを使う。実Clerkログイン、店舗説明更新、メニュー作成・公開・編集・削除、Blob画像追加、別店舗拒否。許可した専用環境だけでランナーの `admin` を実行 |
 | `scripts/check-test-database.ts` | 専用DBガード後、共通の `scripts/database-regression.ts` で公開条件、リンク置換、メニュー移転後の店舗条件付き更新・削除と巻戻し、実ハンドラの移転/消失後404・両店舗fields/links不変・正常操作、pending招待の一意性、行ロック、受諾済み行への取消防止、招待置換失敗の巻戻しを確認。当該実行の一時店舗・監査記録だけを最後に削除。`docker compose -f compose.test.yaml exec app node --import tsx scripts/check-test-database.ts` |
 | `scripts/check-ci-database.ts` | CI専用接続先のガード後、同じ実DB回帰を実行。CIのfixture準備後に `node --import tsx scripts/check-ci-database.ts`。通常の開発DBや共有DBに接続先を差し替えて実行しない |
