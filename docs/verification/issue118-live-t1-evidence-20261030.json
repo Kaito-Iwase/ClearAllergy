@@ -1,0 +1,406 @@
+{
+  "recordedUtc": "2026-10-30T13:26:01.4930761Z",
+  "applicationSource": "6293d5a02758f72a7cf00201fec239afc6b699eb",
+  "deployment": "dpl_7Ea2jsXwwf3kvcwftyiZNDd83PgX",
+  "runnerSource": "ed39657a391f6efd2fbaafbf5d7129df2f7e877b",
+  "runnerScriptSha256": "0599ffc8f99612ad014b147c9baadfc9f2558f8a7bbbe9b305a607b410238d79",
+  "externalIdentityReceiptSha256": "474447de1a09d48699b88675fc712c891a54dcc51a013defa646ea505c96cf15",
+  "previousFailedAttempt": {
+    "stage": "CREATE",
+    "independentDb": {
+      "audit": [
+        {
+          "action": "menu_create",
+          "success": true,
+          "shop_matches": true,
+          "actor_matches": true
+        }
+      ],
+      "fixture": {
+        "id": "cmvuy8d4z0003jw07e9fobsdm",
+        "shop_id": "cmvs4x80y000twn0wbxkwzbt6",
+        "version": 29,
+        "free_rows": 29,
+        "price_yen": 1000,
+        "food_version": 29,
+        "is_published": false,
+        "review_count": 0,
+        "unknown_rows": 0,
+        "allergen_rows": 29,
+        "owner_matches": true,
+        "app_user_matches": true,
+        "publication_count": 0,
+        "creation_operation_id": "dc612ab7-7d7a-4581-bd22-757db647a573",
+        "publication_confirmed_food_version": null
+      },
+      "read_only": "on",
+      "role_matches": true,
+      "database_matches": true
+    },
+    "writes": {
+      "held": false,
+      "operations": [
+        {
+          "phase": "CREATE",
+          "state": "CONFIRMED_SUCCESS",
+          "requestSent": true,
+          "creationOperationId": "dc612ab7-7d7a-4581-bd22-757db647a573",
+          "responseHeadersObserved": true,
+          "observedHttpStatus": 201,
+          "httpStatus": 201,
+          "transportFinished": true,
+          "createdId": "cmvuy8d4z0003jw07e9fobsdm",
+          "bodyValidated": true
+        }
+      ]
+    },
+    "sourceModifiedByThisReport": false,
+    "run": "ada91a8f-344e-49a5-a84c-8b66bee69652",
+    "cleanup": "PRIVATE_VERIFIED",
+    "observations": [
+      {
+        "at": "2026-10-30T12:29:24.788Z",
+        "stage": "CLEANUP_PRE_READ",
+        "id": "cmvuy8d4z0003jw07e9fobsdm",
+        "isPublished": false,
+        "version": 29,
+        "foodVersion": 29,
+        "publicationConfirmedFoodVersion": null,
+        "priceYen": 1000,
+        "milk": "FREE",
+        "unknown": 0
+      },
+      {
+        "at": "2026-10-30T12:29:25.04Z",
+        "stage": "FINAL_PRIVATE_HISTORY_RETAINED",
+        "id": "cmvuy8d4z0003jw07e9fobsdm",
+        "isPublished": false,
+        "version": 29,
+        "foodVersion": 29,
+        "publicationConfirmedFoodVersion": null,
+        "priceYen": 1000,
+        "milk": "FREE",
+        "unknown": 0
+      }
+    ],
+    "flow": "FAIL",
+    "status": "FAIL_OR_INCOMPLETE",
+    "cause": "Runner incorrectly waited for automatic navigation after confirmed create201; actual form remains on new and exposes edit link",
+    "originalResultSha256": "85DF3CBF2129F5F1A8C5B220440B021251CFD1B6729C544AE2ECA844CA4ACE53"
+  },
+  "finalAttempt": {
+    "cleanup": "PRIVATE_VERIFIED",
+    "publicApiMilk": "CONTAINS",
+    "originalStatus": "INCOMPLETE_INDEPENDENT_DB",
+    "observations": [
+      {
+        "at": "2026-10-30T13:07:28.803Z",
+        "stage": "CREATED_PRIVATE",
+        "id": "cmvuzlqhf0003l308lem3uwck",
+        "isPublished": false,
+        "version": 29,
+        "foodVersion": 29,
+        "publicationConfirmedFoodVersion": null,
+        "priceYen": 1000,
+        "milk": "FREE",
+        "unknown": 0
+      },
+      {
+        "at": "2026-10-30T13:07:30.32Z",
+        "stage": "INITIAL_PUBLISH",
+        "id": "cmvuzlqhf0003l308lem3uwck",
+        "isPublished": true,
+        "version": 32,
+        "foodVersion": 29,
+        "publicationConfirmedFoodVersion": 29,
+        "priceYen": 1000,
+        "milk": "FREE",
+        "unknown": 0
+      },
+      {
+        "at": "2026-10-30T13:07:31.518Z",
+        "stage": "EDITOR_DIALOG_STOP",
+        "id": "cmvuzlqhf0003l308lem3uwck",
+        "isPublished": false,
+        "version": 33,
+        "foodVersion": 29,
+        "publicationConfirmedFoodVersion": 29,
+        "priceYen": 1000,
+        "milk": "FREE",
+        "unknown": 0
+      },
+      {
+        "at": "2026-10-30T13:07:33.715Z",
+        "stage": "MILK_CORRECTED_PRIVATE",
+        "id": "cmvuzlqhf0003l308lem3uwck",
+        "isPublished": false,
+        "version": 92,
+        "foodVersion": 87,
+        "publicationConfirmedFoodVersion": null,
+        "priceYen": 1000,
+        "milk": "CONTAINS",
+        "unknown": 0
+      },
+      {
+        "at": "2026-10-30T13:07:34.69Z",
+        "stage": "CORRECTED_SEPARATE_PUBLISH",
+        "id": "cmvuzlqhf0003l308lem3uwck",
+        "isPublished": true,
+        "version": 95,
+        "foodVersion": 87,
+        "publicationConfirmedFoodVersion": 87,
+        "priceYen": 1000,
+        "milk": "CONTAINS",
+        "unknown": 0
+      },
+      {
+        "at": "2026-10-30T13:07:36.228Z",
+        "stage": "CLEANUP_PRE_READ",
+        "id": "cmvuzlqhf0003l308lem3uwck",
+        "isPublished": true,
+        "version": 95,
+        "foodVersion": 87,
+        "publicationConfirmedFoodVersion": 87,
+        "priceYen": 1000,
+        "milk": "CONTAINS",
+        "unknown": 0
+      },
+      {
+        "at": "2026-10-30T13:07:39.975Z",
+        "stage": "FINAL_PRIVATE_HISTORY_RETAINED",
+        "id": "cmvuzlqhf0003l308lem3uwck",
+        "isPublished": false,
+        "version": 96,
+        "foodVersion": 87,
+        "publicationConfirmedFoodVersion": 87,
+        "priceYen": 1000,
+        "milk": "CONTAINS",
+        "unknown": 0
+      }
+    ],
+    "protection": "PASS_API_REPRESENTATION",
+    "flow": "PASS_APP_BROWSER_API",
+    "sourceModifiedByThisReport": false,
+    "run": "f6c348cd-414d-4f3d-97d7-d2fb70710231",
+    "originalResultSha256": "E00D7AA342BB4DFF14553A5F49D8D6824D3B4D6F5CAA073D9F61BC9843A7E42D",
+    "browserClose": "CONFIRMED",
+    "wrapperExit": 1,
+    "publicPageFixtureHeading": true,
+    "originalDbObservation": "NOT_RUN: app API is not independent SQL",
+    "writes": {
+      "held": false,
+      "operations": [
+        {
+          "phase": "CREATE",
+          "state": "CONFIRMED_SUCCESS",
+          "requestSent": true,
+          "creationOperationId": "f9678424-d2e0-4c93-8191-c7a42ac146b4",
+          "responseHeadersObserved": true,
+          "observedHttpStatus": 201,
+          "httpStatus": 201,
+          "transportFinished": true,
+          "createdId": "cmvuzlqhf0003l308lem3uwck",
+          "bodyValidated": true
+        },
+        {
+          "phase": "INITIAL_PUBLISH",
+          "state": "CONFIRMED_SUCCESS",
+          "requestSent": true,
+          "responseHeadersObserved": true,
+          "observedHttpStatus": 200,
+          "httpStatus": 200,
+          "transportFinished": true,
+          "bodyValidated": true
+        },
+        {
+          "phase": "STOP",
+          "state": "CONFIRMED_SUCCESS",
+          "requestSent": true,
+          "responseHeadersObserved": true,
+          "observedHttpStatus": 200,
+          "httpStatus": 200,
+          "transportFinished": true,
+          "bodyValidated": true
+        },
+        {
+          "phase": "CORRECT",
+          "state": "CONFIRMED_SUCCESS",
+          "requestSent": true,
+          "responseHeadersObserved": true,
+          "observedHttpStatus": 200,
+          "httpStatus": 200,
+          "transportFinished": true,
+          "bodyValidated": true
+        },
+        {
+          "phase": "REPUBLISH",
+          "state": "CONFIRMED_SUCCESS",
+          "requestSent": true,
+          "responseHeadersObserved": true,
+          "observedHttpStatus": 200,
+          "httpStatus": 200,
+          "transportFinished": true,
+          "bodyValidated": true
+        },
+        {
+          "phase": "CLEANUP",
+          "state": "CONFIRMED_SUCCESS",
+          "requestSent": true,
+          "responseHeadersObserved": true,
+          "observedHttpStatus": 200,
+          "httpStatus": 200,
+          "transportFinished": true,
+          "bodyValidated": true
+        }
+      ]
+    },
+    "childOverallStatus": "INCOMPLETE_INDEPENDENT_DB",
+    "childExpectedExitFromSource": 2
+  },
+  "independentDbAddendum": {
+    "status": "PASS_T1_BROWSER_API_AUTH_AND_INDEPENDENT_DB_CHECK",
+    "observed_date_utc": "2026-10-30",
+    "run": "f6c348cd-414d-4f3d-97d7-d2fb70710231",
+    "runner_commit": "ed39657a391f6efd2fbaafbf5d7129df2f7e877b",
+    "deployment": "dpl_7Ea2jsXwwf3kvcwftyiZNDd83PgX",
+    "application_source": "6293d5a02758f72a7cf00201fec239afc6b699eb",
+    "target": {
+      "project": "patient-heart-55595249",
+      "branch": "br-flat-wildflower-aoeragrs",
+      "database": "clearallergy_main19",
+      "role": "neondb_owner",
+      "ui_endpoint": "ep-silent-bonus-aofdajar"
+    },
+    "channel": "Existing normal Brave Neon SQL Editor; BEGIN READ ONLY; one SELECT; ROLLBACK",
+    "actual_db_result": {
+      "audit": [
+        {
+          "action": "menu_create",
+          "success": true,
+          "shop_matches": true,
+          "actor_matches": true
+        },
+        {
+          "action": "menu_publish",
+          "success": true,
+          "shop_matches": true,
+          "actor_matches": true
+        },
+        {
+          "action": "menu_unpublish",
+          "success": true,
+          "shop_matches": true,
+          "actor_matches": true
+        },
+        {
+          "action": "menu_update",
+          "success": true,
+          "shop_matches": true,
+          "actor_matches": true
+        },
+        {
+          "action": "menu_publish",
+          "success": true,
+          "shop_matches": true,
+          "actor_matches": true
+        },
+        {
+          "action": "menu_unpublish",
+          "success": true,
+          "shop_matches": true,
+          "actor_matches": true
+        }
+      ],
+      "fixture": {
+        "id": "cmvuzlqhf0003l308lem3uwck",
+        "milk": "CONTAINS",
+        "shop_id": "cmvs4x80y000twn0wbxkwzbt6",
+        "version": 96,
+        "free_rows": 28,
+        "price_yen": 1000,
+        "food_version": 87,
+        "is_published": false,
+        "review_count": 0,
+        "unknown_rows": 0,
+        "allergen_rows": 29,
+        "owner_matches": true,
+        "app_user_matches": true,
+        "creation_operation_id": "f9678424-d2e0-4c93-8191-c7a42ac146b4",
+        "publication_confirmed_food_version": 87
+      },
+      "read_only": "on",
+      "publications": [
+        {
+          "food_version": 29,
+          "actor_matches": true
+        },
+        {
+          "food_version": 87,
+          "actor_matches": true
+        }
+      ],
+      "role_matches": true,
+      "database_matches": true
+    },
+    "rollback_statement_executed_successfully": true,
+    "read_scope": "Only this new fixture, related ownership, allergen counts/status, audit and publication records",
+    "this_verification": {
+      "data_writes": 0,
+      "cleanup_writes": 0,
+      "secret_reads": 0,
+      "clipboard_access": false,
+      "runner_reexecution": false,
+      "protected_existing_menu_db_reads": false
+    },
+    "original_result": {
+      "path": "runner-live-2dc8dfa3-6774-4419-8ef0-513b8634d1bb/result.json",
+      "sha256": "E00D7AA342BB4DFF14553A5F49D8D6824D3B4D6F5CAA073D9F61BC9843A7E42D",
+      "original_status_retained": "INCOMPLETE_INDEPENDENT_DB",
+      "modified": false
+    },
+    "combined_assessment": {
+      "flow": "PASS_APP_BROWSER_API",
+      "normal_owner_auth": "PASS_OBSERVED_FOR_OWNER_A_IN_THIS_RUN",
+      "cleanup": "PRIVATE_VERIFIED_API_AND_DB_HISTORY_RETAINED",
+      "protected_menus": "PASS_API_REPRESENTATION_3_BEFORE_AFTER_HASHES_ONLY",
+      "db": "PASS_FINAL_STATE_OWNERSHIP_AUDIT_PUBLICATION_VERSIONS",
+      "overall": "PASS_T1_DEFINED_SCOPE",
+      "new_fixture_deleted": false
+    },
+    "limits": [
+      "Post-run SQL verifies final state and retained history; it does not reconstruct SQL snapshots after every intermediate browser action.",
+      "Protected pre-existing menus were compared using app API representations only; they were not queried in this narrowly approved SQL.",
+      "This is one Owner A T1 run, not a T2/T3/T4, owner-B, upload, full security, real-food-safety or human-usability PASS.",
+      "The synthetic fixture remains private with history retained. No data was deleted or reset.",
+      "The runner wrapper's original nonzero exit and original result remain unchanged; this addendum supplies the later independent DB observation."
+    ]
+  },
+  "limits": [
+    "No original receipt or exit status was rewritten.",
+    "DB verifies final state and retained history, not SQL snapshots at every intermediate UI stage.",
+    "Protected-menu invariance is limited to three returned API representations.",
+    "Owner B/T2-T4/upload/human factors/real food safety are not proven by this T1.",
+    "No auth profile/session/credential files or raw network logs are included."
+  ],
+  "finalLocalChecks": {
+    "runnerCases": "12/12 PASS",
+    "cliGuardCases": "2/2 PASS",
+    "commands": [
+      "node --test tests/issue118-live-browser.test.mjs",
+      "node --import tsx --test tests/browser-runner.test.ts",
+      "npm run typecheck",
+      "npm run lint"
+    ],
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "diffCheck": "PASS",
+    "fullTest": "NOT_RERUN_DOC_EVIDENCE_ONLY",
+    "build": "NOT_RERUN_DOC_EVIDENCE_ONLY",
+    "newCI": "NOT_RUN_PUSH_PENDING",
+    "node": "22.23.4",
+    "npm": "11.18.0",
+    "playwright": "1.61.0",
+    "credentialsIncluded": false,
+    "browserRuntimeIncluded": false
+  }
+}
