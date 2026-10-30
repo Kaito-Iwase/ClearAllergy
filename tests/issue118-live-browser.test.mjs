@@ -19,6 +19,20 @@ test("external identity receipt is required, exact and recent", () => {
     }
 });
 
+test("new Project pin rejects old Project receipts and bootstrap Production", () => {
+    const now = Date.parse("2026-10-30T17:30:00Z");
+    const receipt = { ...target, environment: "Preview", status: "Ready", verifiedBy: "browser_metadata_observer", evidenceReference: "offline synthetic", observedUtc: "2026-10-30T17:29:00Z" };
+    assert.equal(target.projectId, "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK");
+    assert.equal(target.deployment, "dpl_FCdWVUy7Zo1GQd2xXdbDiFUD2wz3");
+    assertIdentityReceipt(receipt, now);
+    for (const change of [{ project: "clear-allergy" }, { projectId: "other" }, { project: undefined },
+        { origin: "https://clear-allergy-ernxjj96q-kaitoexe00-9350s-projects.vercel.app" },
+        { deployment: "dpl_7Ea2jsXwwf3kvcwftyiZNDd83PgX" },
+        { origin: "https://clear-allergy-e2e-co7nvr7xf-kaitoexe00-9350s-projects.vercel.app", environment: "Production" }]) {
+        assert.throws(() => assertIdentityReceipt({ ...receipt, ...change }, now));
+    }
+});
+
 test("create201 records ID before optional-field validation, and 200 is not accepted", async () => {
     const ledger = newWriteLedger(); const op = beginWrite(ledger, "CREATE"); let id;
     await consumeWriteResponse(ledger, op, response(201, { id: "cnewfixture" }), undefined, value => { id = value; });
@@ -114,7 +128,7 @@ test("read-only anchor rejects wrong shop, public state, version or milk", () =>
 
 test("real isolated Chromium handles confirm before click without external requests", async () => {
     const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ headless: true, channel: 'chromium' });
     const context = await browser.newContext();
     const external = [];
     await context.route("**/*", route => { external.push("unexpected request"); return route.abort(); });
@@ -132,7 +146,7 @@ test("real isolated Chromium handles confirm before click without external reque
 
 test("post201 page stays on new; runner follows only the acknowledged fixture edit link", async () => {
     const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ headless: true, channel: 'chromium' });
     const context = await browser.newContext();
     const origin = "https://issue118-offline.example";
     const id = "cnewfixture";

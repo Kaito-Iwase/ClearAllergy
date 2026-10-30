@@ -1,6 +1,16 @@
 # Issue #118：実Preview T1の再現runnerと運用記録
 
-対象は固定Preview `dpl_7Ea2jsXwwf3kvcwftyiZNDd83PgX`、ソース`6293d5a02758f72a7cf00201fec239afc6b699eb`。実行先はその不変URLだけで、main・Production・別Previewへ切り替える引数はない。実行前に同DeploymentのReady/Preview/SHAとalias対応を別途読み取り照合する。
+現在のrunner準備対象は専用Project `clear-allergy-e2e` / `prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK`、固定Preview `dpl_FCdWVUy7Zo1GQd2xXdbDiFUD2wz3`、ソース`6293d5a02758f72a7cf00201fec239afc6b699eb`。実行先は `https://clear-allergy-e2e-kzfhilgul-kaitoexe00-9350s-projects.vercel.app` だけで、main・Production・別Previewへ切り替える引数はない。実行前に同DeploymentのReady/Preview/SHA、Project IDとalias対応を別途読み取り照合する。**新Projectでの実T1・無人認証は未実行**。外部確認receiptはProject名/IDも必須で、旧Projectやbootstrap Productionのreceiptを拒否する。過去の実測は旧Preview `dpl_7Ea2jsXwwf3kvcwftyiZNDd83PgX` の結果であり、新対象の成功へ読み替えない。
+
+## 無人認証前の準備境界
+
+`scripts/issue118-preview-transport.mjs`はまだlive runnerへ有効接続していない。OIDC取得・Clerk Testing Token発行・Secret保存・Trusted Sources設定も行わない。以下の実行コマンドは書込みを伴うため、現在は起動しない。旧ローカルlauncherのhash pinと旧receiptは維持しており、新runnerの起動用として流用しない。
+
+将来承認されたOIDCを送る場合も、global `extraHTTPHeaders` は使わず固定Preview originだけに限定する。browser側は `route.fetch({maxRedirects:0,maxRetries:0})` を使い、全3xxをabortして固定code `PROTECTED_REDIRECT_BLOCKED` で停止する。token付き`route.continue`や自動redirect追跡は使わない。直接API helperはGET/HEADだけで、書込みmethodと別originを接続前に拒否する。失敗時の再試行0、provider raw errorを返さない。
+
+このtransportを将来統合するときも、既存の許可対象・phase・重複write・unknown ledgerガードを先に通した末端の転送だけに使う。汎用routeを後から追加して既存guardを短絡させない。POST後のredirect/transport失敗はcommitなしを意味しないため、unknown HOLDとcleanup禁止を維持する。Clerk認証の自動化は別途承認後の局所統合・回帰が必要で、このmodule単独では無人T1を実行できない。
+
+## 既存T1の操作・安全条件と過去の実測
 
 既存の`browser-runner.mjs`／Playwright 1.61.0を使う。アプリ依存やlockfileへ新しいpackageは追加しない。
 
@@ -59,7 +69,9 @@ write操作はARMED→IN_FLIGHT→応答とbody検証・クリック完了→CON
 
 ## 秘密を使わないCI guard配線
 
-後続変更で`node scripts/browser-runner.mjs issue118-live-guards`を追加した。既存の`.github/workflows/ci.yml`でbrowser install直後の独立stepから呼び、通常の`npm test`・DB検査・build・既存ブラウザ検査は残す。このモードはCLI guard 2件とrunner固有12件だけをNode Test runnerへ渡す。`--apply`や他の引数は拒否し、実T1 entrypointを呼ばない。実サービス、Clerkの通常ログイン、DB接続、fixture作成をCIへ持ち込まない。
+後続変更で`node scripts/browser-runner.mjs issue118-live-guards`を追加した。既存の`.github/workflows/ci.yml`でbrowser install直後の独立stepから呼び、通常の`npm test`・DB検査・build・既存ブラウザ検査は残す。現在のローカル差分ではCLI guard 2件、runner固有13件、transport9件の計24件をNode Test runnerへ渡す。従来14件のCI成功とは別の検証対象。transportにはproviderのallHeaders/非対象originのcontinueが非同期に失敗する負例も含み、両処理をawaitする固定エラー境界を検査する。`--apply`や他の引数は拒否し、実T1 entrypointを呼ばない。実サービス、Clerkの通常ログイン、DB接続、fixture作成をCIへ持ち込まない。
+
+transport試験はsynthetic tokenと自作loopback serverだけを使う。実Playwright HTTPエンジンで301/302/303/307/308を各1回送り、転送先serverへの到達0を検査する。browser route interfaceにも同じHTTPエンジンを注入するが、実Preview・実Clerk・browser navigationの試験ではない。既存2つのChromium DOM検査は `channel:'chromium'` の公式new-headlessを明示し、既存の完全な通常Chromiumを利用する。新browserのdownloadやOS保護変更は不要。
 
 runtimeのmodule/browserパスは既存browser runnerの`node:os`の`tmpdir()`と`node:path`の`join()`で解決し、Windows絶対パスやLinux固定`/tmp`をworkflowへ埋め込まない。CIは既存installで完全なLinux Chromiumを準備する。ローカルでは同版の既存・完全なheadless runtimeを明示し、この新しい一括コマンドで14/14 PASS、typecheck/lint PASSを確認した。通常testのglobに`.mjs`が入らなくても、この独立stepで12件を実行する。イベント・権限・env・他の既存stepが不変であることもYAML構造比較で確認した。
 

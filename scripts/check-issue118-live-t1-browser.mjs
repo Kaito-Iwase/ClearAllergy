@@ -7,10 +7,12 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const target = Object.freeze({
-    origin: "https://clear-allergy-ernxjj96q-kaitoexe00-9350s-projects.vercel.app",
-    deployment: "dpl_7Ea2jsXwwf3kvcwftyiZNDd83PgX",
+    project: "clear-allergy-e2e",
+    projectId: "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK",
+    origin: "https://clear-allergy-e2e-kzfhilgul-kaitoexe00-9350s-projects.vercel.app",
+    deployment: "dpl_FCdWVUy7Zo1GQd2xXdbDiFUD2wz3",
     source: "6293d5a02758f72a7cf00201fec239afc6b699eb",
-    alias: "https://clear-allergy-git-test-staging-kaitoexe00-9350s-projects.vercel.app",
+    alias: "https://clear-allergy-e2e-git-test-staging-kaitoexe00-9350s-projects.vercel.app",
     shop: "cmvs4x80y000twn0wbxkwzbt6",
     anchor: "cmvuiodx30001jg08xmr6nexe",
     anchorName: "【架空・Issue118 T1】ひよこ豆サラダ 20261030-A1",
@@ -41,7 +43,7 @@ export function allowedMutation(method, pathname, phase, menuId) {
 }
 
 export function assertIdentityReceipt(receipt, now = Date.now()) {
-    for (const key of ["origin", "deployment", "source", "alias"]) assert.equal(receipt[key], target[key]);
+    for (const key of ["project", "projectId", "origin", "deployment", "source", "alias"]) assert.equal(receipt[key], target[key]);
     assert.equal(receipt.environment, "Preview"); assert.equal(receipt.status, "Ready");
     assert.ok(["human", "browser_metadata_observer"].includes(receipt.verifiedBy));
     assert.ok(typeof receipt.evidenceReference === "string" && receipt.evidenceReference.length > 0);
