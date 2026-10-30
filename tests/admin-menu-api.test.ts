@@ -222,6 +222,34 @@ test("STOPのreadonly拒否と、停止確定後のcache未確認を区別する
     assert.equal(writes, 1);
 });
 
+test("STOP後の旧版保存は409で、停止状態と食品版を上書きしない", async t => {
+    setup(t);
+    const stored = { id: "own-menu", shopId: "own-shop", name: "元の架空料理", isPublished: true,
+        version: 30, foodVersion: 29, publicationConfirmedFoodVersion: 29, allergenLinks: [] };
+    let stopWrites = 0;
+    replace(t, prisma.menuItem, "update", async ({ where, data }: Args) => {
+        assert.deepEqual(where, { id: stored.id, shopId: stored.shopId });
+        assert.deepEqual(data, { isPublished: false });
+        stopWrites++; stored.isPublished = false; stored.version++;
+        return { id: stored.id, isPublished: stored.isPublished, version: stored.version };
+    });
+    replace(t, prisma.menuItem, "findFirst", async ({ where }: Args) => {
+        assert.deepEqual(where, { id: stored.id, shopId: stored.shopId });
+        return { ...stored };
+    });
+    const stopped = await menuRoute.STOP(request("POST", "/api/admin/menus/own-menu/stop"));
+    assert.equal(stopped.status, 200);
+    assert.deepEqual(await stopped.json(), { ok: true, menu: { id: stored.id, isPublished: false, version: 31 } });
+    const stale = await menuRoute.PUT(request("PUT", "/api/admin/menus/own-menu", JSON.stringify({
+        expectedVersion: 30, name: "旧フォームの架空変更", isPublished: true,
+    })));
+    assert.equal(stale.status, 409);
+    assert.equal(stopWrites, 1);
+    assert.equal(stored.name, "元の架空料理"); assert.equal(stored.isPublished, false);
+    assert.equal(stored.version, 31); assert.equal(stored.foodVersion, 29);
+    assert.equal(stored.publicationConfirmedFoodVersion, 29);
+});
+
 test("空objectの下書きは所有店舗に作成し、欠損状態をすべてUNKNOWNで保存する", async (t) => {
     setup(t);
     let savedLinks: { status: string }[] = [];
