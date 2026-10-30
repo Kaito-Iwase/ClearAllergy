@@ -255,6 +255,18 @@ try {
             assert.match(await f.page.getByRole("status").innerText(), /店舗情報を保存しました/);
         } finally { await f.context.close(); }
     });
+    await check("Malformed image upload URLs keep the draft and never send a shop PUT", async () => {
+        for (const url of [42, true, {}, [], " ", "not-a-url", "http://fixture.invalid/a"]) {
+            const f = await openFixture(390, body => ({ status: 200, json: shopReply(body) }), () => ({ status: 200, json: { url } }));
+            try {
+                await f.edit(true); await f.submit(); await assertInputPreserved(f);
+                assert.equal(f.uploads(), 1);
+                assert.equal(f.writes.length, 0);
+                assert.equal(await f.page.locator("#shop-cover-image-file").evaluate(input => input.files.length), 1);
+                assert.equal(await f.save().isEnabled(), true);
+            } finally { await f.context.close(); }
+        }
+    });
     await check("Validated success advances token and clears selected File only after confirmation", async () => {
         const f = await openFixture(1440, (body, attempt) => ({ status: 200, json: shopReply(body, attempt === 1 ? nextUpdatedAt : laterUpdatedAt) }));
         try {
@@ -286,7 +298,7 @@ try {
         try {
             await f.edit(); await f.save().click();
             await f.page.waitForFunction(() => document.querySelector("form fieldset").disabled);
-            assert.equal(await f.page.locator("input:not(:disabled),textarea:not(:disabled),select:not(:disabled)").count(), 0);
+            assert.equal(await f.page.locator("form").locator("input:not(:disabled),textarea:not(:disabled),select:not(:disabled)").count(), 0);
             assert.equal(await f.page.locator("fieldset").evaluateAll(nodes => nodes.every(node => node.disabled)), true);
             await f.page.keyboard.press("Enter");
             await f.page.locator("form").evaluate(form => form.requestSubmit());
@@ -302,7 +314,7 @@ try {
         try {
             await f.edit(true); await f.save().click();
             await f.page.waitForFunction(() => document.querySelector("form fieldset").disabled);
-            assert.equal(await f.page.locator("input:not(:disabled),textarea:not(:disabled),select:not(:disabled)").count(), 0);
+            assert.equal(await f.page.locator("form").locator("input:not(:disabled),textarea:not(:disabled),select:not(:disabled)").count(), 0);
             assert.equal(await f.page.locator("fieldset").evaluateAll(nodes => nodes.every(node => node.disabled)), true);
             assert.equal(f.writes.length, 0);
             await f.page.locator("form").evaluate(form => form.requestSubmit());

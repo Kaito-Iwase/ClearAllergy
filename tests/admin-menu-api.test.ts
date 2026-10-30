@@ -80,6 +80,23 @@ function request(method: string, path = "/api/admin/menus/foreign-menu", body?: 
     });
 }
 
+test("menu routes reject numeric image URLs and normalize blank strings before storage", async (t) => {
+    setup(t);
+    const invalid = JSON.stringify({ name: "Fixture", imageUrl: 42 });
+    assert.equal((await menusRoute.POST(request("POST", "/api/admin/menus", invalid))).status, 400);
+    assert.equal((await menuRoute.PUT(request("PUT", "/api/admin/menus/own-menu", invalid))).status, 400);
+    let storedImage: unknown = "not-written";
+    replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
+        $executeRaw: async () => 0,
+        menuItem: { findFirstOrThrow: async () => ({ id: "new-menu", isPublished: false }),
+            create: async ({ data }: Args) => { storedImage = data?.imageUrl; return { id: "new-menu" }; } },
+        menuItemAllergen: { createMany: async () => ({}) },
+    }));
+    const response = await menusRoute.POST(request("POST", "/api/admin/menus", JSON.stringify({ name: "Fixture", imageUrl: "  " })));
+    assert.equal(response.status, 201);
+    assert.equal(storedImage, null);
+});
+
 test("未ログインは管理メニューの取得・作成・更新・削除を401で拒否する", async (t) => {
     setup(t);
     clerkUserId = null;
