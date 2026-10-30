@@ -56,3 +56,11 @@ write操作はARMED→IN_FLIGHT→応答とbody検証・クリック完了→CON
 ローカルの関連検査は`node --test tests/issue118-live-browser.test.mjs`と`node --import tsx --test tests/browser-runner.test.ts`。Playwright moduleとbrowser cacheの明示先は検証者のtask-local配置に合わせ、ネットワーク不要のfixture検査として実サービスT1と分ける。通常の`npm run typecheck`／`npm run lint`も実施する。この成果物追加では製品・schema・公開条件・認可・依存・workflowを変更せず、追加のlive試験や配備は行わない。
 
 今回の最終ローカル確認はrunner固有12/12、既存CLI guard 2/2、typecheck、lint、差分の空白検査がPASS。2つのテストコマンドを別々に実行した計14件であり、全体testやCIの件数ではない。Playwright APIは修復済みtask-local 1.61.0、通信不要のheadless fixture検査は既存の完全なheadless shellを読取り利用した。live T1のheaded Chromiumは別途修復済みの1228。今回の文書・証拠追加に全体test/buildは再実行していない。アプリ配備6293d5aのReadyや過去CIを、この文書追加HEADの新CI/build成功とは扱わない。
+
+## 秘密を使わないCI guard配線
+
+後続変更で`node scripts/browser-runner.mjs issue118-live-guards`を追加した。既存の`.github/workflows/ci.yml`でbrowser install直後の独立stepから呼び、通常の`npm test`・DB検査・build・既存ブラウザ検査は残す。このモードはCLI guard 2件とrunner固有12件だけをNode Test runnerへ渡す。`--apply`や他の引数は拒否し、実T1 entrypointを呼ばない。実サービス、Clerkの通常ログイン、DB接続、fixture作成をCIへ持ち込まない。
+
+runtimeのmodule/browserパスは既存browser runnerの`node:os`の`tmpdir()`と`node:path`の`join()`で解決し、Windows絶対パスやLinux固定`/tmp`をworkflowへ埋め込まない。CIは既存installで完全なLinux Chromiumを準備する。ローカルでは同版の既存・完全なheadless runtimeを明示し、この新しい一括コマンドで14/14 PASS、typecheck/lint PASSを確認した。通常testのglobに`.mjs`が入らなくても、この独立stepで12件を実行する。イベント・権限・env・他の既存stepが不変であることもYAML構造比較で確認した。
+
+これはローカルWindowsでの配線検証であり、新HEADのLinux CIはpush前のため未実行。実T1の6293d5a／ed39657という実測対象も変更しない。配備抑止済み専用branchへのpush、新SHAでのCI実行、Draft PR作成は、対象を具体化した承認と直前gate照合の後に進める。自動authやlive T1のCI化は別の判断・承認事項。

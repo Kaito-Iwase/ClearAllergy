@@ -402,5 +402,24 @@
     "playwright": "1.61.0",
     "credentialsIncluded": false,
     "browserRuntimeIncluded": false
+  },
+  "offlineCiWiring": {
+    "command": "node scripts/browser-runner.mjs issue118-live-guards",
+    "localWindowsResult": "14/14 PASS, exit0",
+    "unitCliCases": 2,
+    "offlineRunnerCases": 12,
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "workflowStructureComparison": "PASS_ONE_STEP_ONLY",
+    "workflowStep": "Check offline Issue118 runner and CLI guards",
+    "placement": "after Install isolated browser runner, before saved-menu publication browser check",
+    "eventsPermissionsEnvironmentAndOtherStepsUnchanged": true,
+    "liveEntrypointInvoked": false,
+    "applyArgumentRejected": true,
+    "automaticInstallOnGuardCommand": false,
+    "moduleAndBrowserPaths": "Existing tmpdir()/join() platform resolution; optional task-local explicit runner directory",
+    "newLinuxCI": "NOT_RUN_PUSH_PENDING",
+    "sourceOfLiveT1Still": "application6293d5a / runnered39657",
+    "fullTestAndBuild": "NOT_RERUN_NO_APPLICATION_DEPENDENCY_OR_SCHEMA_CHANGE"
   }
 }
