@@ -7,7 +7,7 @@ on:
       confirmation:
         description: Approve ONE new fictional T1 fixture and private cleanup on the pinned Preview
         type: choice
-        options: [HOLD, APPROVE_NEW_FIXTURE_T1]
+        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY]
         default: HOLD
         required: true
       expected_runner_sha:
@@ -33,7 +33,7 @@ jobs:
       github.ref == 'refs/heads/test/issue118-live-t1-20261030' &&
       github.event_name == 'workflow_dispatch' &&
       github.run_attempt == 1 &&
-      inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' &&
+      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY') &&
       inputs.expected_runner_sha == github.sha
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -50,6 +50,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Check the external receipt before dependency install or secret delivery
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
         env:
           IDENTITY_RECEIPT_JSON: ${{ inputs.identity_receipt }}
           EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
@@ -69,6 +70,7 @@ jobs:
           } catch { console.error('IDENTITY_RECEIPT_OR_SHA_REFUSED'); process.exitCode = 1; }
           NODE
       - name: Prepare the existing isolated Playwright version (no app secrets)
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
         env:
           CLEARALLERGY_BROWSER_RUNNER_DIR: ${{ runner.temp }}/issue118-playwright
         run: |
@@ -76,7 +78,15 @@ jobs:
           export npm_execpath="$RUNNER_TEMP/issue118-npm/node_modules/npm/bin/npm-cli.js"
           node "$npm_execpath" ci --ignore-scripts --no-audit --no-fund
           node scripts/browser-runner.mjs install --with-deps
+      - name: OIDC target predicates only; stop before any request
+        if: inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: OIDC_TARGET_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+        run: node scripts/check-issue118-oidc-target.mjs --diagnose-only
       - name: ONE guarded T1; independent SQL observation remains separate
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
         env:
           ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
           ISSUE118_APPLY: 'true'
@@ -88,10 +98,18 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
         run: node scripts/check-issue118-live-t1-browser.mjs --ci-apply
       - name: Retain only the fixed-schema non-secret result, never browser/session/trace output
-        if: always()
+        if: always() && inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
         uses: actions/upload-artifact@v5
         with:
           name: issue118-t1-${{ github.run_id }}
           path: ${{ runner.temp }}/issue118-result/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only boolean OIDC target diagnostics
+        if: always() && inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-oidc-target-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-oidc-target/result.json
           if-no-files-found: ignore
           retention-days: 7

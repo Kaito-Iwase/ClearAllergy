@@ -118,3 +118,12 @@ Vercelの信頼は同ProjectのPreview配備群への権限であり、一つの
 run 41221986209（runner 6d9bb467）はCI_ACCESS / UNCLASSIFIED_ERROR、write台帳0・fixtureなしで終了。元のresult.jsonは保持する。CI_ACCESSはOIDC準備とブラウザ生成を包含していたため、過去runの原因やOIDC発行有無は遡及確定できない。Clerk認証開始には未到達。
 
 後続ローカル差分はCI_ENV_VALIDATE、OIDC_TARGET_VALIDATE、OIDC_REQUEST、OIDC_CLAIMS_VALIDATE、CI_ACCESS_READY、BROWSER_LAUNCH、BROWSER_CONTEXT、BROWSER_PAGEに分離し、固定コードだけ記録する。providerのmessage/stack/cause/token/URLは残さない。既存のtarget・claims・認証・再試行禁止・結果不明HOLD・cleanup条件は不変。mock負例は分類器と段階通知の検査であり、live auth/T1の成功ではない。新しいlive実行・設定・credential変更は行わない。
+
+
+## OIDC要求先だけの停止診断
+
+run 41223541368 は OIDC_TARGET_VALIDATE / OIDC_REQUEST_TARGET_REFUSED、要求前・認証前・write0で終了。元のresultは保持する。後続の DIAGNOSE_OIDC_TARGET_ONLY は同workflow/ref/Environment/attempt1/SHA制約で、要求先の存在・parse・HTTPS・host/path・userinfo/port/fragment条件をbooleanと固定コードだけで記録して終了する。OIDC要求tokenは参照せず、Clerk Secretはstepへ渡さない。依存install・ブラウザ・アプリ接続・fixture処理はskipする。診断codeのMATCHは通常ガードとの一致だけで、provider信頼や認証・T1成功ではない。通常APPROVE_NEW_FIXTURE_T1経路のガード条件は不変更。
+
+診断dispatchは confirmation=DIAGNOSE_OIDC_TARGET_ONLY、expected_runner_sha=レビュー済み完全SHA、identity_receipt=OIDC_TARGET_ONLY_NO_APP_ACCESS を指定する。最後の値は診断時には読まれず、通常liveには有効なfresh JSON receiptが引き続き必要。HOLDは何も起動しない。出力はissue118-oidc-target-<run id>のresult.jsonのみ。取得先の生URL、hostname/path/query、token、例外は保存しない。条件を緩める判断は診断結果を基に別途行う。
+
+公式GitHub Actions OIDC referenceはrunner提供ACTIONS_ID_TOKEN_REQUEST_URLの利用を記載するが固定host/path形状を保証していない。公式actions/toolkitのoidc-utils.tsもその値を取得して用いる。現行targetガードが実行環境の値を拒否したことは判明したが、存在・parse・protocol・host/path・userinfo・port・fragmentのどの条件かは診断前に断定しない。参照: https://docs.github.com/en/actions/reference/security/oidc / https://github.com/actions/toolkit/blob/main/packages/core/src/oidc-utils.ts

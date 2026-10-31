@@ -47,6 +47,26 @@ export function oidcRequestUrl(value) {
     url.searchParams.set('audience', ciIdentity.audience);
     return url.href;
 }
+// Predicate-only observation. Never return input, host, path, query, token or an exception.
+// The live validator above is deliberately unchanged; tests require predicate parity.
+export function inspectOidcRequestTarget(value) {
+    const result = { present: typeof value === 'string' && value.length > 0, parseable: false,
+        https: false, hostAllowed: false, pathAllowed: false, userinfoAbsent: false,
+        portAbsent: false, fragmentAbsent: false, guardAccepts: false };
+    let url;
+    try { if (result.present) url = new URL(value); } catch { /* fixed booleans only */ }
+    if (url) {
+        result.parseable = true;
+        result.https = url.protocol === 'https:';
+        result.hostAllowed = url.hostname.endsWith('.actions.githubusercontent.com');
+        result.pathAllowed = url.pathname.endsWith('/idtoken');
+        result.userinfoAbsent = !url.username && !url.password;
+        result.portAbsent = !url.port;
+        result.fragmentAbsent = !url.hash;
+        result.guardAccepts = Object.values(result).slice(0, -1).every(value => value === true);
+    }
+    return result;
+}
 export function assertClerkPublishableKey(key) {
     if (typeof key !== 'string' || !key.startsWith('pk_test_')) fail('CLERK_FRONTEND_REFUSED');
     let decoded;

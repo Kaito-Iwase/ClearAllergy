@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname, resolve, basename } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { assertCiEnvironment, ciIdentity, assertOidcClaims, oidcRequestUrl, assertClerkPublishableKey, createCiAccess } from '../scripts/issue118-ci-auth.mjs';
+import { assertCiEnvironment, ciIdentity, assertOidcClaims, oidcRequestUrl, inspectOidcRequestTarget, assertClerkPublishableKey, createCiAccess } from '../scripts/issue118-ci-auth.mjs';
+import { oidcTargetDiagnostic } from '../scripts/check-issue118-oidc-target.mjs';
 import { target, classifyLiveError } from '../scripts/check-issue118-live-t1-browser.mjs';
 
 const syntheticSecret = 'sk_test_SYNTHETIC_NOT_REAL';
@@ -24,6 +27,67 @@ const jwt = body => 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify(body)).t
 const response = body => ({ ok: true, json: async () => body });
 const code = expected => error => error.message === expected && !error.cause && !String(error.stack).includes(syntheticSecret);
 const publicKey = 'pk_test_' + Buffer.from(ciIdentity.clerkDomain + '$').toString('base64');
+const diagnosticEnv = () => ({ ...env(), ISSUE118_APPLY: undefined, ISSUE118_TEST_CLERK_SECRET_KEY: undefined,
+    ISSUE118_DIAGNOSTIC_MODE: 'OIDC_TARGET_ONLY' });
+
+test('OIDC predicate mirror matches unchanged live validator, never returns URL parts or exceptions', () => {
+    const base = 'https://run-actions-synthetic.actions.githubusercontent.com/only/idtoken?api-version=2.0';
+    for (const value of [undefined, '', 'not a URL', base, base.replace('https:', 'http:'),
+        base.replace('run-actions-synthetic.actions.githubusercontent.com', 'actions.githubusercontent.com'),
+        base.replace('actions.githubusercontent.com', 'actions.githubusercontent.com.evil.invalid'),
+        base.replace('/idtoken', '/other'), base.replace('/idtoken?', '/idtoken/?'),
+        base.replace('https://', 'https://sk_test_SYNTHETIC:password@'),
+        base.replace('.com/', '.com:444/'), base.replace('.com/', '.com:443/'),
+        base + '#sk_test_SYNTHETIC', base + '&secret=sk_test_SYNTHETIC']) {
+        const result = inspectOidcRequestTarget(value);
+        let accepted = true; try { oidcRequestUrl(value); } catch { accepted = false; }
+        assert.equal(result.guardAccepts, accepted);
+        assert.ok(Object.values(result).every(item => typeof item === 'boolean'));
+        assert.ok(!/SYNTHETIC|password|https:|api-version|other/.test(JSON.stringify(result)));
+    }
+    const object = { toString() { throw Error('must not inspect secret-like object'); } };
+    assert.equal(inspectOidcRequestTarget(object).parseable, false);
+});
+
+test('diagnostic accepts only fixed context and always stops before fetch/auth/browser/write', t => {
+    let network = 0; t.mock.method(globalThis, 'fetch', () => { network++; throw Error(syntheticSecret); });
+    for (const value of [env().ACTIONS_ID_TOKEN_REQUEST_URL, 'https://u:sk_test_SYNTHETIC@invalid/']) {
+        const result = oidcTargetDiagnostic({ ...diagnosticEnv(), ACTIONS_ID_TOKEN_REQUEST_URL: value });
+        assert.equal(result.stage, 'DIAGNOSTIC_STOP_BEFORE_REQUEST');
+        for (const field of ['oidcRequestSent', 'clerkStarted', 'browserStarted', 'fixtureWriteStarted']) assert.equal(result[field], false);
+        assert.ok(['OIDC_TARGET_GUARD_MATCH', 'OIDC_REQUEST_TARGET_REFUSED'].includes(result.code));
+        assert.ok(!JSON.stringify(result).includes('SYNTHETIC'));
+    }
+    for (const change of [{ ISSUE118_APPLY: 'true' }, { ISSUE118_TEST_CLERK_SECRET_KEY: syntheticSecret },
+        { GITHUB_RUN_ATTEMPT: '2' }, { GITHUB_REF: 'wrong' }, { GITHUB_WORKFLOW_REF: 'wrong' },
+        { ISSUE118_GITHUB_ENVIRONMENT: 'wrong' }, { ISSUE118_EXPECTED_RUNNER_SHA: 'wrong' },
+        { ISSUE118_DIAGNOSTIC_MODE: 'LIVE' }, { NODE_OPTIONS: 'secret-like preload' }, { ACTIONS_STEP_DEBUG: 'true' }])
+        assert.throws(() => oidcTargetDiagnostic({ ...diagnosticEnv(), ...change }), code('OIDC_DIAGNOSTIC_CONTEXT_REFUSED'));
+    assert.equal(network, 0);
+});
+
+test('actual diagnose-only CLI emits booleans/fixed codes, never raw URL, and cannot run apply or overwrite', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'issue118-oidc-target-test-'));
+    const configuration = { SystemRoot: process.env.SystemRoot, ...diagnosticEnv(), RUNNER_TEMP: directory,
+        ACTIONS_ID_TOKEN_REQUEST_URL: 'https://u:sk_test_SYNTHETIC@wrong.invalid/private/idtoken?token=secret#fragment' };
+    const child = args => spawnSync(process.execPath, ['scripts/check-issue118-oidc-target.mjs', ...args], {
+        env: configuration, encoding: 'utf8', windowsHide: true });
+    try {
+        const result = child(['--diagnose-only']); assert.equal(result.status, 0); assert.equal(result.stderr, '');
+        const report = JSON.parse(result.stdout);
+        assert.equal(report.stage, 'DIAGNOSTIC_STOP_BEFORE_REQUEST'); assert.equal(report.predicates.userinfoAbsent, false);
+        assert.ok(!/SYNTHETIC|wrong.invalid|private|token=|fragment#/.test(result.stdout));
+        const path = join(directory, 'issue118-oidc-target', 'result.json'); const prior = readFileSync(path, 'utf8');
+        for (const args of [['--apply'], ['--diagnose-only', '--ci-apply'], ['--diagnose-only']]) {
+            const refused = child(args); assert.equal(refused.status, 1); assert.equal(refused.stdout, '');
+            assert.equal(refused.stderr.trim(), 'OIDC_DIAGNOSTIC_REFUSED_NO_RAW_ERROR'); assert.equal(readFileSync(path, 'utf8'), prior);
+        }
+    } finally {
+        assert.equal(dirname(resolve(directory)), resolve(tmpdir()));
+        assert.ok(basename(directory).startsWith('issue118-oidc-target-test-'));
+        rmSync(directory, { recursive: true });
+    }
+});
 
 test('access setup reports fixed stages, never secrets, with no auth or retry on failure', async () => {
     const cases = [
@@ -224,6 +288,12 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.deepEqual(parsed.jobs['live-t1'].permissions, { contents: 'read', 'id-token': 'write' });
     const secretSteps = parsed.jobs['live-t1'].steps.filter(step => Object.values(step.env || {}).some(value => String(value).includes('secrets.')));
     assert.equal(secretSteps.length, 1); assert.equal(secretSteps[0].run, 'node scripts/check-issue118-live-t1-browser.mjs --ci-apply');
+    assert.equal(secretSteps[0].if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
+    const diagnostic = parsed.jobs['live-t1'].steps.find(step => step.run === 'node scripts/check-issue118-oidc-target.mjs --diagnose-only');
+    assert.equal(diagnostic.if, "inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'");
+    assert.ok(!JSON.stringify(diagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(diagnostic.env, 'ISSUE118_APPLY'));
+    for (const name of ['Check the external receipt before dependency install or secret delivery', 'Prepare the existing isolated Playwright version (no app secrets)'])
+        assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === name).if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
     assert.match(yaml, /workflow_dispatch:/); assert.ok(!/\n  (push|pull_request|schedule|workflow_call):/.test(yaml));
     assert.equal((yaml.match(/id-token: write/g) || []).length, 1);
     assert.match(yaml, /environment: clearallergy-e2e-test/); assert.match(yaml, /cancel-in-progress: false/);
