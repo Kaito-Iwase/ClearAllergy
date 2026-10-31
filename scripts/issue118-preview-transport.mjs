@@ -1,4 +1,4 @@
-// Not enabled by the live runner. OIDC acquisition/use still requires separate approval.
+// Used only by the explicitly guarded CI path; the manual-login path has no OIDC token.
 // No global extraHTTPHeaders: the token belongs to one fixed Preview origin only.
 export const previewOrigin = 'https://clear-allergy-e2e-kzfhilgul-kaitoexe00-9350s-projects.vercel.app';
 const oidcHeader = 'x-vercel-trusted-oidc-idp-token';

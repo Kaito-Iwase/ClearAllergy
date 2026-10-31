@@ -76,3 +76,38 @@ transport試験はsynthetic tokenと自作loopback serverだけを使う。実Pl
 runtimeのmodule/browserパスは既存browser runnerの`node:os`の`tmpdir()`と`node:path`の`join()`で解決し、Windows絶対パスやLinux固定`/tmp`をworkflowへ埋め込まない。CIは既存installで完全なLinux Chromiumを準備する。ローカルでは同版の既存・完全なheadless runtimeを明示し、この新しい一括コマンドで14/14 PASS、typecheck/lint PASSを確認した。通常testのglobに`.mjs`が入らなくても、この独立stepで12件を実行する。イベント・権限・env・他の既存stepが不変であることもYAML構造比較で確認した。
 
 これはローカルWindowsでの配線検証であり、新HEADのLinux CIはpush前のため未実行。実T1の6293d5a／ed39657という実測対象も変更しない。配備抑止済み専用branchへのpush、新SHAでのCI実行、Draft PR作成は、対象を具体化した承認と直前gate照合の後に進める。自動authやlive T1のCI化は別の判断・承認事項。
+
+## 2026-10-31：限定承認後の無人認証・workflow準備（live未実行）
+
+以下は後続のローカル実装で、前節の過去実測を更新するものではない。アプリ・認可・schema・4状態・公開条件は変更していない。
+
+本人の具体承認後、新Project `clear-allergy-e2e` にGitHub issuerのTrusted Sourceを保存し、保存後にaud／sub／repository／repository_id／ref／workflow_ref／environmentの7条件とPreviewだけの対象scopeを再読した。GitHub Environment `clearallergy-e2e-test` は専用branch `test/issue118-live-t1-20261030` だけのbranch policyを持つ。Secret `ISSUE118_TEST_CLERK_SECRET_KEY` は本人入力待ちで、この実装・負例検査は保存値を読まない。
+
+Vercelの信頼は同ProjectのPreview配備群への権限であり、一つのURLやSHAだけのサービス側ACLではない。固定URL・Deployment・アプリSHA `6293d5a02758f72a7cf00201fec239afc6b699eb` と外部receiptの期限はrunner側で制限する。GitHub EnvironmentのSecretもworkflowファイル単独のACLではなく、Environment／branchポリシーとコードレビューで保護する。OIDCのworkflow_ref完全一致はVercel側、job単位の `id-token: write` は専用workflow側の条件である。
+
+### 今回変更した入口と認証方式
+
+- `.github/workflows/issue118-live-e2e.yml` は手動 `workflow_dispatch` だけ。通常CIのイベント・権限・Secretを増やさない。job `live-t1` だけが `contents: read` と `id-token: write` を持ち、Secretは実行stepだけへ渡す。app DB／Blob／Vercel CLIの資格情報はGitHubへ保存しない。workflowの `github.run_attempt == 1` とadapterの `GITHUB_RUN_ATTEMPT === '1'` の両方で同一runの再実行を認証前に拒否する。別dispatchの承認・前run結果照合の代替にはならない。main19共用fixture群のworkflow concurrencyは1、進行中jobを自動cancelしない。ただし他の手動操作や別workflowをサービス側で排他化するものではなく、開始前の調整は必要。
+- `scripts/issue118-ci-auth.mjs` はimport時のI/Oなし。GitHub repo／ID／ref／workflow_ref／Environment／イベント／完全runner SHA／明示実行と、debug・DB URL・Clerk overrideの不存在を先に検査する。OIDC取得先はGitHub ActionsのHTTPS idtoken endpointだけ、audience固定、1回・20秒・redirect拒否。JWTのローカル照合は追加の拒否guardであり、署名検証の代替ではない。Vercelが署名とclaimsを検証する。
+- `check-issue118-live-t1-browser.mjs --ci-apply` はheadlessの一時contextを使う。Clerkを読む `/admin/login` へ進み、公開鍵から期待Development domainを確認後、固定ユーザーAのBackend API GETでIDとテストメールを照合する。その後だけTesting Tokenを1回、120秒のsign-in ticketを1回発行し、公式Clerk JSの `signIn.create({strategy:'ticket'})` と `setActive` を使う。通常password/MFAの試験ではない。Bの認証・T2〜T4は今回の実装対象外。
+- `@clerk/testing@2.2.52` は既存の隔離配置で内容を照合したが、helper内部にTesting Token取得の再試行とFAPI失敗時のURL／本文出力があるため、live経路からは呼ばない。Clerk公式が許容する手動Testing Token付与と公式Backend API／Clerk JSを小さなadapterで使い、アプリ依存・lockfileを変更しない。`dotenv`読取、keyの自動探索、新account作成、auth bypass endpointを追加しない。
+- OIDC headerは固定Previewへだけ付与する。ClerkのTesting Tokenは期待FAPIの `/v1/` だけ。Clerkと専用Blobへの要求からVercel headerを除去し、それ以外のoriginはbrowser routeで遮断する。全転送はredirect0／retry0／20秒。ticket作成POSTは一度だけ。providerの例外・本文・URL・token・sessionは記録せず固定codeへ変換する。
+- 既存の201応答ID追跡、phase別1要求、結果不明HOLDと後続write／cleanup禁止を保持する。routeエラーは未加工のunhandled rejectionにせず状態へ記録し、実行中writeがあればHOLD、既知fixtureなら追加writeなしの未確認cleanupとして残す。全フロー後のsign-outも別に判定する。session作成／activationの応答が不明なら、local sessionがnullでも `SIGNOUT_UNVERIFIED` とし、provider session終了の証明へ読み替えない。認証が確定したsessionへのsign-outと、local session消失の確認が揃う場合だけ終了確認とする。未確認を総合PASSにしない。
+
+### 入力後の実行条件と停止条件
+
+1. 本人がClerk Test Developmentの既存キーを上記EnvironmentのSecretへ直接保存する。値はchat・ファイル・trace・browser profile・artifactへ載せない。保存後も実認証成功やinstance対応を推測しない。
+2. この差分の独立レビュー、最終runner SHAとdeploy抑止、外部observerによる新Project／Deployment／Preview／6293／aliasのfresh receipt（60分以内）、残存run・不明writeなし、他のbackend操作との衝突なしを確認する。キー入力だけで必ず完了できるとはしない。
+3. **workflowの初回起動は未成立条件がある。** [GitHub公式のworkflow_dispatch条件](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)ではworkflowファイルがdefault branchに存在する必要がある。現在のmainにはこの新ファイルがなく、今回main変更・mergeは禁止。専用branchへのpushだけで手動起動可能と扱わず、dispatchは未実施のまま止める。既存workflowへ権限を付け替えたり、trusted workflow_refを緩めたり、別triggerへ切り替えて回避しない。default branchへの最小導入等が必要なら別途具体判断を求める。
+4. 起動可能になった場合も `confirmation=APPROVE_NEW_FIXTURE_T1`、レビュー済み完全 `expected_runner_sha` と非秘密の `identity_receipt` JSONが必要。入力をshellへ直接展開せず、環境経由でJSON解析・固定照合してから一時receiptを書き、依存導入とSecret利用へ進む。任意targetの入力はない。
+5. liveは1回だけ。未知例外、書込みtimeout、transport不明なら再送・自動cleanupなし。routeの固定停止後も元の要求がcommitした可能性を否定しない。今回新fixtureのAPI結果と監査をREAD ONLYで照合し、元receiptは書き換えず別追補にする。
+
+このworkflowはDB資格情報を持たず、独立SQL確認を実施しない。アプリ／browser／APIが通っても `INCOMPLETE_INDEPENDENT_DB`、子exit2のままjobは非成功になる。artifactは固定スキーマの `result.json` 1本のみ、trace／HTML／スクリーンショット／profile／raw stderrをuploadしない。手動READ ONLY追補後の総合判定とCI jobの終了結果を混同しない。新実行のfixtureは今回の具体承認範囲で照合できるが、既存パンケーキ等は対象外。
+
+### オフライン検査の範囲
+
+`tests/issue118-ci-auth.test.mjs` は15グループ。合成GitHub claims／偽fetch／VMのClerk代替で、誤target・誤owner・本番key区分・期限切れ後の再発行なし・redirect・重複auth・token発行失敗・signout未確認・秘密を含む例外と、実CLIの未準備停止を検査する。レビュー指摘後、同一run再実行の事前拒否と、provider session作成後のcreate応答喪失／setActive失敗／activation応答喪失を追加した。実Clerk、OIDC発行、browser認証、DBの成功ではない。workflow YAMLも既存 `js-yaml` で構造検査する。既存 `issue118-live-guards` に追加し、通常CIから同じ負例を実行する。全体test／lint／typecheckの今回の実行結果はレビュー用証跡に記録し、過去の270や24を新差分へ転用しない。アプリbuildは製品・依存が不変のため、この検証adapter差分では再実行していない。
+
+根拠： [Clerk Testing Tokens](https://clerk.com/docs/guides/development/testing/overview#testing-tokens)、[公式Playwright helperの認証方式](https://clerk.com/docs/guides/development/testing/playwright/test-helpers)、[sign-in token](https://clerk.com/docs/reference/backend/sign-in-tokens/create-sign-in-token)、[GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc)。ライブ認証・発行／受入れ・新fixture操作・新Previewでの実T1は未実行。
+
+今回の通常全体testは269/270、既存 `agent-harness.test.ts` の `report preflight preserves existing files/links and rejects directory junctions` がhardlink作成の `EPERM` でFAIL。この差分で当該テストやOS保護を修正せず、既存の品質調査結果で今回の失敗をPASSへ読み替えない。新差分の最終guard／lint／typecheck結果はレビュー用manifestに記録する。新workflowのremote CI、default branch導入、OIDC実受入れ、実auth、DBは未実行。

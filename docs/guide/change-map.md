@@ -16,7 +16,7 @@
 
 ブラウザ回帰は `scripts/browser-runner.mjs` が入口です。`public` は公開画面だけ、`demo` は公開画面と保存しない管理デモを検査し、両方とも `scripts/check-first-use-browser.mjs` を使います。`ui` は `scripts/check-public-ui-browser.mjs` でCI（変更ごとの自動検査）用の架空データに対する5種類の画面幅の表示・設定・状態の誤読防止を検査します。
 
-`issue118-live-guards` は専用runner・CLI拒否・transportの局所回帰です。`tests/issue118-preview-transport.test.mjs`は合成tokenとloopback HTTPでredirect遮断を検査し、実Clerk・DBへ接続しません。新Project向けtarget・未承認の無人認証・過去実測の境界は [Issue118 runner運用記録](../verification/issue118-live-runner-20261030.md) を参照してください。`issue118-live-t1 --apply` は別の実書込み操作で、guard検査の一部ではありません。
+`issue118-live-guards` は専用runner・CLI拒否・transport・CI認証adapterの局所回帰です。`tests/issue118-preview-transport.test.mjs`は合成tokenとloopback HTTPでredirect遮断、`tests/issue118-ci-auth.test.mjs`は合成claims・偽fetch・VM内のClerk代替で認証とworkflowの拒否条件を検査し、実Clerk・DBへ接続しません。限定承認後の設定、本人Secret入力待ち、専用workflowの実行条件と過去実測の境界は [Issue118 runner運用記録](../verification/issue118-live-runner-20261030.md) を参照してください。`issue118-live-t1 --apply` と専用workflowの `--ci-apply` は別の実書込み操作で、guard検査の一部ではありません。
 
 `allergens` は実メニューカードと新規・編集フォームの入力ガイド、`composition` は実画像編集部品、`qr` は実QR部品と印刷PDFを、アプリ・認証・DBなしの隔離した検証用環境（fixture）で検査します。
 

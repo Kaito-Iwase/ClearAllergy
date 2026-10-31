@@ -1,10 +1,11 @@
-// Real Preview only. Reuses browser-runner's isolated Playwright; no credentials or state files.
+// Real Preview only. Reuses isolated Playwright; no credential or session-state files.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createCiAccess, assertCiEnvironment } from "./issue118-ci-auth.mjs";
 
 export const target = Object.freeze({
     project: "clear-allergy-e2e",
@@ -158,7 +159,9 @@ export async function stopWithDialog(page, name, click, timeout = 20000) {
 }
 
 export async function runLive() {
-    if (process.argv.slice(2).join(" ") !== "--apply") throw Error("EXPLICIT_APPLY_REQUIRED");
+    const ciMode = process.argv.slice(2).join(" ") === "--ci-apply";
+    if (!ciMode && process.argv.slice(2).join(" ") !== "--apply") throw Error("EXPLICIT_APPLY_REQUIRED");
+    if (ciMode) assertCiEnvironment(process.env);
     if (process.env.DEBUG || process.env.PWDEBUG || process.env.NODE_OPTIONS) throw Error("DEBUG_OR_PRELOAD_FORBIDDEN");
     if (!process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT) throw Error("EXTERNAL_IDENTITY_RECEIPT_REQUIRED");
     const identityBytes = readFileSync(process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT);
@@ -168,7 +171,7 @@ export async function runLive() {
     const output = resolve(process.env.CLEARALLERGY_BROWSER_OUTPUT || join(".agent-runs", `issue118-live-${randomUUID()}`));
     mkdirSync(dirname(output), { recursive: true });
     mkdirSync(output, { recursive: false });
-    const report = { target, driver: "Isolated Playwright script / existing browser-runner, manual normal login",
+    const report = { target, driver: ciMode ? "Isolated Playwright / official Clerk temporary testing authentication" : "Isolated Playwright script / existing browser-runner, manual normal login",
         sessionExport: false, traces: false, dbObservation: "NOT_RUN: app API is not independent SQL",
         runnerScriptSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
         externalIdentityReceiptSha256: createHash("sha256").update(identityBytes).digest("hex"),
@@ -188,16 +191,20 @@ export async function runLive() {
     const ledger = newWriteLedger(); report.writes = ledger;
     const requestOperations = new WeakMap();
     let activeOperation;
+    let ciAccess;
+    let ciTransportFailed = false;
     const record = (stage, menu) => { report.observations.push({ at: new Date().toISOString(), stage, ...state(menu) }); save(); };
     const read = async id => {
-        const response = await context.request.get(`${target.origin}/api/admin/menus/${id}`, { timeout: 20000 });
+        const response = await readRequest(`${target.origin}/api/admin/menus/${id}`);
         assert.equal(response.status(), 200);
         const { menu } = await response.json();
         assert.equal(menu.id, id);
         return menu;
     };
+    const readRequest = url => ciAccess ? ciAccess.read(context.request, url) : context.request.get(url, { timeout: 20000 });
     const action = async (nextPhase, method, path, click) => {
         assertIdentityReceipt(identityReceipt);
+        if (ciTransportFailed) throw Error("CI_TRANSPORT_HELD");
         const op = beginWrite(ledger, nextPhase); activeOperation = op;
         phase = nextPhase; report.stage = nextPhase; save();
         try {
@@ -221,8 +228,18 @@ export async function runLive() {
     };
     try {
         save();
-        browser = await chromium.launch({ headless: false });
-        context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false });
+        if (ciMode) { report.stage = "CI_ACCESS"; save(); ciAccess = await createCiAccess(process.env); }
+        browser = await chromium.launch({ headless: ciMode, ...(ciMode ? { channel: "chromium" } : {}) });
+        context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false, serviceWorkers: "block" });
+        const ciRoute = async route => {
+            try { await ciAccess.route(route); }
+            catch {
+                ciTransportFailed = true; report.transportError = "CI_ROUTE_FAILED";
+                if (activeOperation) holdWrite(ledger, activeOperation, "TRANSPORT_RESULT_UNCONFIRMED");
+                save();
+            }
+        };
+        if (ciAccess) await context.route("**/*", ciRoute);
         context.on("response", response => {
             const op = requestOperations.get(response.request());
             if (op) { op.responseHeadersObserved = true; op.observedHttpStatus = response.status(); save(); }
@@ -249,17 +266,24 @@ export async function runLive() {
                 }
                 report.requests.push({ phase, method: request.method(), kind: url.pathname.endsWith("/stop") ? "OWN_FIXTURE_STOP" : "OWN_FIXTURE_WRITE" });
             }
-            return route.continue();
+            return ciAccess ? ciRoute(route) : route.continue();
         });
         page = await context.newPage();
         page.setDefaultTimeout(20000);
-        await page.goto(target.origin + "/admin");
-        report.loginWindowOpened = true;
-        report.loginGate = new URL(page.url()).hostname === "vercel.com" ? "VERCEL_PROTECTION" : page.url().startsWith(target.origin + "/admin/login") ? "APP_NORMAL_LOGIN" : "OTHER_OR_READY";
-        save();
-        console.log("MANUAL_NORMAL_LOGIN_REQUIRED: visible isolated Chromium; Vercel protection then ownerA. No session import or recording.");
-        await page.waitForURL(target.origin + "/admin/shop", { timeout: 15 * 60 * 1000 });
-        const own = await context.request.get(target.origin + "/api/admin/shop");
+        if (ciAccess) {
+            report.stage = "CI_AUTHENTICATION"; save();
+            await ciAccess.authenticate(page);
+            report.authentication = "OFFICIAL_TEST_TICKET_OWNER_A";
+        } else {
+            await page.goto(target.origin + "/admin");
+            report.loginWindowOpened = true;
+            report.loginGate = new URL(page.url()).hostname === "vercel.com" ? "VERCEL_PROTECTION" : page.url().startsWith(target.origin + "/admin/login") ? "APP_NORMAL_LOGIN" : "OTHER_OR_READY";
+            save();
+            console.log("MANUAL_NORMAL_LOGIN_REQUIRED: visible isolated Chromium; Vercel protection then ownerA. No session import or recording.");
+            await page.waitForURL(target.origin + "/admin/shop", { timeout: 15 * 60 * 1000 });
+        }
+        if (ciTransportFailed) throw Error("CI_TRANSPORT_HELD");
+        const own = await readRequest(target.origin + "/api/admin/shop");
         assert.equal(own.status(), 200);
         const shopData = await own.json();
         const anchor = await read(target.anchor);
@@ -285,21 +309,21 @@ export async function runLive() {
         let menu = await read(menuId); assert.equal(menu.name, name); assert.equal(menu.isPublished, false);
         assert.ok(menu.allergens.every(a => a.status === "FREE")); record("CREATED_PRIVATE", menu);
         await publish("INITIAL_PUBLISH"); menu = await read(menuId); assert.equal(menu.isPublished, true); assert.equal(menu.publicationConfirmedFoodVersion, menu.foodVersion); record("INITIAL_PUBLISH", menu);
-        const initialPublic = await context.request.get(`${target.origin}/api/menus/${menuId}`);
+        const initialPublic = await readRequest(`${target.origin}/api/menus/${menuId}`);
         assert.equal(initialPublic.status(), 200);
         assert.equal((await initialPublic.json()).menu.allergens.find(a => a.slug === "milk").status, "FREE");
         const initialFood = menu.foodVersion;
         report.signal = "E11/E12 fictional milk-added label; ingredient string unchanged; AI knows gold."; save();
         await action("STOP", "POST", `/api/admin/menus/${menuId}/stop`, () => stopWithDialog(page, name, () => page.getByRole("button", { name: "公開を停止する", exact: true }).click()));
         menu = await read(menuId); assert.equal(menu.isPublished, false); assert.equal(menu.foodVersion, initialFood); record("EDITOR_DIALOG_STOP", menu);
-        assert.equal((await context.request.get(`${target.origin}/api/menus/${menuId}`)).status(), 404);
+        assert.equal((await readRequest(`${target.origin}/api/menus/${menuId}`)).status(), 404);
         await page.reload();
         await page.getByRole("group", { name: "乳", exact: true }).getByRole("button", { name: "含む", exact: true }).click();
         await action("CORRECT", "PUT", `/api/admin/menus/${menuId}`, () => page.getByRole("button", { name: "保存する", exact: true }).click());
         await page.getByRole("region", { name: "保存しました", exact: true }).waitFor();
         menu = await read(menuId); assert.equal(menu.isPublished, false); assert.ok(menu.foodVersion > initialFood); assert.equal(menu.publicationConfirmedFoodVersion, null); assert.equal(state(menu).milk, "CONTAINS"); record("MILK_CORRECTED_PRIVATE", menu);
         await publish("REPUBLISH"); menu = await read(menuId); assert.equal(menu.isPublished, true); assert.equal(menu.publicationConfirmedFoodVersion, menu.foodVersion); record("CORRECTED_SEPARATE_PUBLISH", menu);
-        const publicResponse = await context.request.get(`${target.origin}/api/menus/${menuId}`);
+        const publicResponse = await readRequest(`${target.origin}/api/menus/${menuId}`);
         assert.equal(publicResponse.status(), 200); const published = await publicResponse.json();
         assert.equal(published.menu.allergens.find(a => a.slug === "milk").status, "CONTAINS");
         const viewer = await context.newPage(); await viewer.goto(`${target.origin}/shops/${target.shop}/menus/${menuId}`);
@@ -307,16 +331,20 @@ export async function runLive() {
         await viewer.getByText("乳", { exact: true }).waitFor();
         assert.match(await viewer.getByText("乳", { exact: true }).locator("..").innerText(), /含む/);
         report.publicApiMilk = "CONTAINS"; report.publicPageFixtureHeading = true;
+        if (ciTransportFailed) throw Error("CI_TRANSPORT_HELD");
         report.flow = "PASS_APP_BROWSER_API";
     } catch (error) {
         report.flow = ledger.held ? "HOLD_UNCERTAIN_WRITE" : "FAIL";
-        const fixed = new Set(["DIALOG_TIMEOUT", "DIALOG_HANDLER_FAILED", "WRITE_RESULT_UNCERTAIN"]);
+        const fixed = new Set(["DIALOG_TIMEOUT", "DIALOG_HANDLER_FAILED", "WRITE_RESULT_UNCERTAIN", "CI_AUTHENTICATION_FAILED", "CI_TRANSPORT_HELD", "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED"]);
         report.errorClass = error instanceof assert.AssertionError ? "ASSERTION_FAILED" : error instanceof Error && fixed.has(error.message) ? error.message : error instanceof Error && error.name === "TimeoutError" ? "OPERATION_TIMEOUT" : "UNCLASSIFIED_ERROR";
     } finally {
         if (ledger.held) {
             report.cleanup = "HOLD_ORIGINAL_REQUEST_UNCONFIRMED_NO_WRITE";
             report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No automatic cleanup/retry. Reconcile original operation terminal result, creationOperationId/name, current API/DB state and audit history before any further write.";
-        } else if (context && menuId && canCleanup(ledger)) {
+        } else if (menuId && ciTransportFailed) {
+            report.cleanup = "UNVERIFIED_NO_AUTOMATIC_RETRY";
+            report.residualRisk = "Transport failed with a known fixture. No further write; inspect this fixture state read-only.";
+        } else if (context && menuId && canCleanup(ledger) && !ciTransportFailed) {
             try {
                 const current = await read(menuId); assert.equal(current.name, name); record("CLEANUP_PRE_READ", current);
                 if (current.isPublished) {
@@ -338,9 +366,11 @@ export async function runLive() {
         report.cleanupStopAttempted = cleanupAttempted;
         report.phase = phase;
         if (ledger.held) report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No further write/cleanup/retry. Read-only reconciliation must establish the original operation outcome, creationOperationId/name, current API/DB state and audit history; otherwise keep HOLD.";
+        if (ciAccess && page) report.authenticationCleanup = await ciAccess.signOut(page);
         const closes = await Promise.allSettled([context?.close(), browser?.close()]);
         report.browserClose = closes.every(result => result.status === "fulfilled") ? "CONFIRMED" : "UNVERIFIED";
-        const overall = overallResult(report.flow, report.cleanup, report.protection, ledger.held, report.browserClose === "CONFIRMED");
+        const overall = overallResult(report.flow, report.cleanup, report.protection, ledger.held,
+            report.browserClose === "CONFIRMED" && report.authenticationCleanup !== "SIGNOUT_UNVERIFIED" && !ciTransportFailed);
         report.overall = overall.status; report.status = overall.status;
         process.exitCode = overall.exit; save();
         console.log(`ISSUE118_RESULT ${report.overall}; flow=${report.flow}; cleanup=${report.cleanup}`);
