@@ -7,6 +7,25 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCiAccess, assertCiEnvironment } from "./issue118-ci-auth.mjs";
 
+const fixedErrors = new Set(["DIALOG_TIMEOUT", "DIALOG_HANDLER_FAILED", "WRITE_RESULT_UNCERTAIN",
+    "CI_AUTHENTICATION_FAILED", "CI_TRANSPORT_HELD", "CI_IDENTITY_REFUSED", "CI_AMBIENT_CONFIGURATION_REFUSED",
+    "CI_DEBUG_REFUSED", "TEST_CLERK_KEY_REQUIRED", "OIDC_REQUEST_TARGET_REFUSED", "OIDC_REQUEST_AUTH_REQUIRED",
+    "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_INVALID", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED",
+    "BROWSER_LAUNCH_FAILED", "BROWSER_CONTEXT_FAILED", "BROWSER_PAGE_FAILED"]);
+export function classifyLiveError(error) {
+    if (error instanceof assert.AssertionError) return "ASSERTION_FAILED";
+    if (!(error instanceof Error)) return "UNCLASSIFIED_ERROR";
+    // Only exact fixed strings survive; never retain provider text, cause, stack or URL.
+    const message = Object.getOwnPropertyDescriptor(error, "message")?.value;
+    const name = Object.getOwnPropertyDescriptor(error, "name")?.value;
+    return fixedErrors.has(message) ? message : name === "TimeoutError" ? "OPERATION_TIMEOUT" : "UNCLASSIFIED_ERROR";
+}
+export async function browserSetupStage(stage, operation, onStage) {
+    assert.ok(["BROWSER_LAUNCH", "BROWSER_CONTEXT", "BROWSER_PAGE"].includes(stage));
+    onStage(stage);
+    try { return await operation(); } catch { throw Error(stage + "_FAILED"); }
+}
+
 export const target = Object.freeze({
     project: "clear-allergy-e2e",
     projectId: "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK",
@@ -228,9 +247,10 @@ export async function runLive() {
     };
     try {
         save();
-        if (ciMode) { report.stage = "CI_ACCESS"; save(); ciAccess = await createCiAccess(process.env); }
-        browser = await chromium.launch({ headless: ciMode, ...(ciMode ? { channel: "chromium" } : {}) });
-        context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false, serviceWorkers: "block" });
+        const setupStage = stage => { report.stage = stage; (report.setupStages ??= []).push(stage); save(); };
+        if (ciMode) ciAccess = await createCiAccess(process.env, fetch, setupStage);
+        browser = await browserSetupStage("BROWSER_LAUNCH", () => chromium.launch({ headless: ciMode, ...(ciMode ? { channel: "chromium" } : {}) }), setupStage);
+        context = await browserSetupStage("BROWSER_CONTEXT", () => browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false, serviceWorkers: "block" }), setupStage);
         const ciRoute = async route => {
             try { await ciAccess.route(route); }
             catch {
@@ -268,7 +288,7 @@ export async function runLive() {
             }
             return ciAccess ? ciRoute(route) : route.continue();
         });
-        page = await context.newPage();
+        page = await browserSetupStage("BROWSER_PAGE", () => context.newPage(), setupStage);
         page.setDefaultTimeout(20000);
         if (ciAccess) {
             report.stage = "CI_AUTHENTICATION"; save();
@@ -335,8 +355,7 @@ export async function runLive() {
         report.flow = "PASS_APP_BROWSER_API";
     } catch (error) {
         report.flow = ledger.held ? "HOLD_UNCERTAIN_WRITE" : "FAIL";
-        const fixed = new Set(["DIALOG_TIMEOUT", "DIALOG_HANDLER_FAILED", "WRITE_RESULT_UNCERTAIN", "CI_AUTHENTICATION_FAILED", "CI_TRANSPORT_HELD", "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED"]);
-        report.errorClass = error instanceof assert.AssertionError ? "ASSERTION_FAILED" : error instanceof Error && fixed.has(error.message) ? error.message : error instanceof Error && error.name === "TimeoutError" ? "OPERATION_TIMEOUT" : "UNCLASSIFIED_ERROR";
+        report.errorClass = classifyLiveError(error);
     } finally {
         if (ledger.held) {
             report.cleanup = "HOLD_ORIGINAL_REQUEST_UNCONFIRMED_NO_WRITE";

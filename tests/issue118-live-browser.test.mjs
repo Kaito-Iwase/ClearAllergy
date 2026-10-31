@@ -3,7 +3,28 @@ import test from "node:test";
 import { createRequire } from "node:module";
 import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityReceipt,
     newWriteLedger, beginWrite, holdWrite, confirmWrite, consumeWriteResponse, canCleanup,
-    claimMutation, protectedApiSnapshot, overallResult, openCreatedEditor } from "../scripts/check-issue118-live-t1-browser.mjs";
+    claimMutation, protectedApiSnapshot, overallResult, openCreatedEditor, classifyLiveError, browserSetupStage } from "../scripts/check-issue118-live-t1-browser.mjs";
+
+test("fixed setup errors remain distinguishable without provider text or getters", async () => {
+    for (const code of ["CI_IDENTITY_REFUSED", "CI_AMBIENT_CONFIGURATION_REFUSED", "CI_DEBUG_REFUSED",
+        "TEST_CLERK_KEY_REQUIRED", "OIDC_REQUEST_TARGET_REFUSED", "OIDC_REQUEST_AUTH_REQUIRED",
+        "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_INVALID", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED"])
+        assert.equal(classifyLiveError(Error(code)), code);
+    for (const secret of ["sk_test_SYNTHETIC", "https://u:p@invalid/", "秘密・架空"])
+        assert.equal(classifyLiveError(Error(secret)), "UNCLASSIFIED_ERROR");
+    const getter = Error(); Object.defineProperty(getter, "message", { get() { throw Error("must not inspect"); } });
+    assert.equal(classifyLiveError(getter), "UNCLASSIFIED_ERROR");
+    for (const stage of ["BROWSER_LAUNCH", "BROWSER_CONTEXT", "BROWSER_PAGE"]) {
+        const observed = []; let calls = 0;
+        await assert.rejects(browserSetupStage(stage, async () => { calls++; throw Error("sk_test_SYNTHETIC https://u:p@invalid/ 秘密"); }, value => observed.push(value)),
+            error => classifyLiveError(error) === stage + "_FAILED" && !error.message.includes("SYNTHETIC"));
+        assert.equal(calls, 1); assert.deepEqual(observed, [stage]);
+        assert.equal(await browserSetupStage(stage, async () => 42, () => {}), 42);
+    }
+    let invalidCalls = 0;
+    await assert.rejects(browserSetupStage("ARBITRARY_SECRET", () => { invalidCalls++; }, () => {}));
+    assert.equal(invalidCalls, 0);
+});
 
 const response = (status, body) => ({ status: () => status, json: async () => body });
 const saved = { menu: { id: "cnewfixture", version: 4, foodVersion: 2, isPublished: true, publicationConfirmedFoodVersion: 2 } };

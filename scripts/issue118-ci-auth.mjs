@@ -60,12 +60,17 @@ async function jsonOnce(fetcher, url, options, code) {
         return await response.json();
     } catch { fail(code); } // No provider message, response body, header, URL or stack leaves this boundary.
 }
-export async function createCiAccess(env, fetcher = fetch) {
+export async function createCiAccess(env, fetcher = fetch, onStage = () => {}) {
+    onStage('CI_ENV_VALIDATE');
     assertCiEnvironment(env);
+    onStage('OIDC_TARGET_VALIDATE');
     const requestUrl = oidcRequestUrl(env.ACTIONS_ID_TOKEN_REQUEST_URL);
     if (!env.ACTIONS_ID_TOKEN_REQUEST_TOKEN) fail('OIDC_REQUEST_AUTH_REQUIRED');
+    onStage('OIDC_REQUEST');
     const issued = await jsonOnce(fetcher, requestUrl, { headers: { Authorization: `bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` } }, 'OIDC_REQUEST_FAILED');
+    onStage('OIDC_CLAIMS_VALIDATE');
     const oidc = assertOidcClaims(issued.value);
+    onStage('CI_ACCESS_READY');
     const token = () => assertOidcClaims(oidc);
     let testingToken;
     let authenticated = false;

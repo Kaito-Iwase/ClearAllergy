@@ -111,3 +111,10 @@ Vercelの信頼は同ProjectのPreview配備群への権限であり、一つの
 根拠： [Clerk Testing Tokens](https://clerk.com/docs/guides/development/testing/overview#testing-tokens)、[公式Playwright helperの認証方式](https://clerk.com/docs/guides/development/testing/playwright/test-helpers)、[sign-in token](https://clerk.com/docs/reference/backend/sign-in-tokens/create-sign-in-token)、[GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc)。ライブ認証・発行／受入れ・新fixture操作・新Previewでの実T1は未実行。
 
 今回の通常全体testは269/270、既存 `agent-harness.test.ts` の `report preflight preserves existing files/links and rejects directory junctions` がhardlink作成の `EPERM` でFAIL。この差分で当該テストやOS保護を修正せず、既存の品質調査結果で今回の失敗をPASSへ読み替えない。新差分の最終guard／lint／typecheck結果はレビュー用manifestに記録する。新workflowのremote CI、default branch導入、OIDC実受入れ、実auth、DBは未実行。
+
+
+## 2026-10-31：CI_ACCESS失敗後のoffline診断修正（live再実行なし）
+
+run 41221986209（runner 6d9bb467）はCI_ACCESS / UNCLASSIFIED_ERROR、write台帳0・fixtureなしで終了。元のresult.jsonは保持する。CI_ACCESSはOIDC準備とブラウザ生成を包含していたため、過去runの原因やOIDC発行有無は遡及確定できない。Clerk認証開始には未到達。
+
+後続ローカル差分はCI_ENV_VALIDATE、OIDC_TARGET_VALIDATE、OIDC_REQUEST、OIDC_CLAIMS_VALIDATE、CI_ACCESS_READY、BROWSER_LAUNCH、BROWSER_CONTEXT、BROWSER_PAGEに分離し、固定コードだけ記録する。providerのmessage/stack/cause/token/URLは残さない。既存のtarget・claims・認証・再試行禁止・結果不明HOLD・cleanup条件は不変。mock負例は分類器と段階通知の検査であり、live auth/T1の成功ではない。新しいlive実行・設定・credential変更は行わない。

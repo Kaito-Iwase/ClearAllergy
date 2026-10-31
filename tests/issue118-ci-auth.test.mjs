@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { assertCiEnvironment, ciIdentity, assertOidcClaims, oidcRequestUrl, assertClerkPublishableKey, createCiAccess } from '../scripts/issue118-ci-auth.mjs';
-import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { target, classifyLiveError } from '../scripts/check-issue118-live-t1-browser.mjs';
 
 const syntheticSecret = 'sk_test_SYNTHETIC_NOT_REAL';
 const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_RUN_ATTEMPT: '1',
@@ -24,6 +24,28 @@ const jwt = body => 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify(body)).t
 const response = body => ({ ok: true, json: async () => body });
 const code = expected => error => error.message === expected && !error.cause && !String(error.stack).includes(syntheticSecret);
 const publicKey = 'pk_test_' + Buffer.from(ciIdentity.clerkDomain + '$').toString('base64');
+
+test('access setup reports fixed stages, never secrets, with no auth or retry on failure', async () => {
+    const cases = [
+        [{ ...env(), GITHUB_REF: 'wrong' }, response({}), ['CI_ENV_VALIDATE'], 'CI_IDENTITY_REFUSED', 0],
+        [{ ...env(), ACTIONS_ID_TOKEN_REQUEST_URL: 'https://other.invalid/' }, response({}), ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE'], 'OIDC_REQUEST_TARGET_REFUSED', 0],
+        [{ ...env(), ACTIONS_ID_TOKEN_REQUEST_TOKEN: '' }, response({}), ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE'], 'OIDC_REQUEST_AUTH_REQUIRED', 0],
+        [env(), null, ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE', 'OIDC_REQUEST'], 'OIDC_REQUEST_FAILED', 1],
+        [env(), response({ value: 'secret-like-invalid-jwt' }), ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE', 'OIDC_REQUEST', 'OIDC_CLAIMS_VALIDATE'], 'OIDC_CLAIMS_INVALID', 1],
+        [env(), response({ value: jwt({ ...claims(), ref: 'wrong' }) }), ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE', 'OIDC_REQUEST', 'OIDC_CLAIMS_VALIDATE'], 'OIDC_CLAIMS_REFUSED', 1],
+    ];
+    for (const [configuration, result, expected, category, count] of cases) {
+        const observed = []; let calls = 0;
+        await assert.rejects(createCiAccess(configuration, async () => { calls++; if (!result) throw Error(syntheticSecret + ' https://u:p@invalid/ 秘密'); return result; }, stage => observed.push(stage)),
+            error => classifyLiveError(error) === category);
+        assert.equal(calls, count); assert.deepEqual(observed, expected);
+        assert.ok(!JSON.stringify(observed).includes(syntheticSecret));
+    }
+    const observed = []; let calls = 0;
+    const access = await createCiAccess(env(), async () => { calls++; return response({ value: jwt(claims()) }); }, stage => observed.push(stage));
+    assert.deepEqual(observed, ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE', 'OIDC_REQUEST', 'OIDC_CLAIMS_VALIDATE', 'CI_ACCESS_READY']);
+    assert.equal(calls, 1); assert.equal(access.isAuthenticated(), false);
+});
 
 test('CI guards reject wrong event/repo/ref/workflow/environment/SHA and absent apply before I/O', async () => {
     assertCiEnvironment(env());
