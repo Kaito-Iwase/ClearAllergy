@@ -1,0 +1,31 @@
+# Default-branch discovery only. This version never executes a job.
+# A separately reviewed ref supplies the actual workflow; no live code is adopted here.
+name: Issue118 dedicated live T1
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Approve ONE new fictional T1 fixture and private cleanup on the pinned Preview
+        type: choice
+        options: [HOLD, APPROVE_NEW_FIXTURE_T1]
+        default: HOLD
+        required: true
+      expected_runner_sha:
+        description: Exact reviewed 40-character runner commit (not the app SHA)
+        type: string
+        required: true
+      identity_receipt:
+        description: Fresh non-secret external Project/Deployment/SHA/Ready/alias receipt JSON
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  registration-only:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Unreachable marker
+        run: exit 1
