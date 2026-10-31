@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
+      "ci/issue118-workflow-registration": false,
       "fix/issue-triage-20261024": false,
       "fix/utc-db-timestamps-20261024": false,
       "chore/harness-evidence-20261024": false,

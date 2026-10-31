@@ -16,6 +16,8 @@
 
 ブラウザ回帰は `scripts/browser-runner.mjs` が入口です。`public` は公開画面だけ、`demo` は公開画面と保存しない管理デモを検査し、両方とも `scripts/check-first-use-browser.mjs` を使います。`ui` は `scripts/check-public-ui-browser.mjs` でCI（変更ごとの自動検査）用の架空データに対する5種類の画面幅の表示・設定・状態の誤読防止を検査します。
 
+[Issue118の手動workflow登録stub](../../.github/workflows/issue118-live-e2e.yml)は、default branch上の定義を必要とする[GitHubのworkflow_dispatch](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)向けの登録専用です。この定義は権限なし・job常時falseで、checkout・Environment・資格情報・認証・fixture処理を持ちません。実処理は別途承認・レビューしたref上の同パスの定義であり、このstub追加を実E2E成功や実処理のmain採用と扱いません。準備branch `ci/issue118-workflow-registration` だけは `vercel.json` で配備を抑止します。main抑止は追加せず、mainはVercel両ProjectのProduction追跡先なので、workflowだけのmergeでも本番自動再配備を誘発し得ます。merge・配備・本番への影響は適用前の別判断が必要です。
+
 `allergens` は実メニューカードと新規・編集フォームの入力ガイド、`composition` は実画像編集部品、`qr` は実QR部品と印刷PDFを、アプリ・認証・DBなしの隔離した検証用環境（fixture）で検査します。
 
 `admin` は `scripts/check-test-browser.mjs` を使い、専用テスト環境の実Clerk・DB・Blobを必要とします。CIの公開画面回帰の成功を、実認証や外部サービス連携の確認済みとは扱いません。今回の観察・修正・確認範囲は [UI/UX精査記録](ui-ux-review.md) を参照してください。
