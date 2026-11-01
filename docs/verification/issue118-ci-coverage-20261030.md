@@ -135,3 +135,28 @@ run claimは、8件の作成ID/operationId/版を持つmanifestを原子的に�
 `prepareOriginalScenario`は同じモジュールの一連の入口である。CREATE前の永続run claim、2 owner/context、8個の作成operationIdを必須とし、作成/初回公開→既存STOP操作器→T2のみ非公開訂正/保存済み実食品版の再取得/別再公開へつなぐ。T3は2件STOP後のロットHOLDで終了する。各メニューの作成/公開/訂正ledgerと、既存STOPの単一送信ledgerの責務を分け、T1の送信wrapperを重ねない。201の有効IDは後のreadback失敗より前に記録する。送信前拒否と送信後unknownを分け、unknown/不一致/途中中止で後続write・再送・自動cleanupへ進まない。記録はID/実版/phase/固定状態のみで、原例外や認証情報を出力しない。
 
 これらは依存注入された操作の合成実行までである。実行側には新しい複数fixtureの具体承認、最新target/isolation receipt、実A/B context、保護transport、永続排他、独立SQL、公開ページ/API観測、既知結果に対する明示的な非公開cleanupが必要。既存のT1一件用`APPROVE_NEW_FIXTURE_T1`を拡大解釈しない。実T2/T3、T4四観測の同一run結線、実Blob、実通信断は未実施のまま保持する。
+
+### 実Blobと書込み応答喪失：実試験へ渡す最終差分
+
+画像修正はDraft PR #121の`3605dd7b3237f80b6a13c351f9bae2b1987513c9`にある。未mergeで、固定Previewのsource `6293d5a`には含まれない。修正を含む隔離アプリの配備receipt（Project/Deployment/Preview/実source SHA/保護/DB/Clerk/Blob scope）を別担当が確認するまで、以下の実試験は全てNOT_RUN。PR #121の3画面回帰とPR #119の架空upload/保存失敗検査を再利用し、同じUIの負例を重複追加しない。
+
+`scripts/issue118-service-observer.ts`は、既存保護transportへ渡す1要求の観測器であり、HTTP/Blob SDK/認証/ファイル/CLIの実装は持たない。通常配達、送信callback前の遮断、上流応答取得後の返却抑止を分ける。method/pathと独立した期待payloadのdigestを照合し、scope/owner確認と永続claimの後にだけ唯一のforward callbackを呼ぶ。claimはmode別に再取得せず、同じ論理writeを別modeで再送しない。multipartのdigestは可変boundaryを含むwire文字列ではなく、既知fixtureのbytes hash・MIME・field名等の正規形から作る。観測要求自体を期待値へコピーしない。
+
+callbackは現行target/owner guardを維持し、自動redirect/retryなし・既存timeout付きの送信を一回だけ行う。T1の送信wrapperを重ねず、forward失敗で`continue`/`fallback`へ逃がさない。`requestId()`は既存の`X-Request-Id`一項目だけを取得し、全headers/cookieを収集しない。作成201の有効IDは後の契約検査失敗前に記録し、creation operationIdと照合する。200/201だけではDB commitを認定しない。既存menu/shop応答schemaとSTOPのID/版を検査し、画面へ未配達ならclient unknownを維持する。abort/deliver自体の結果不明、UIの入力/File喪失・成功表示・後続要求、証跡失敗もHOLDにする。送信前に一回もforwardしなかった観測と、独立SQLによる不変確認は別である。
+
+Blobは、確認済み専用public store origin・本人shopのPNG path・応答pathnameの一致だけを受け入れ、同runの非公開receiptへ既知URL/path/相関IDを保存する。公開結果にはobjectのhashだけを出す。未知URLの推測やstore一覧を使わず、資格情報なし・自動redirectなし・既知fixtureサイズ上限付きのGETでこの1 URLのbytes hash/サイズ/MIMEを確認する。アプリ向けOIDC・Clerk cookieをBlob originへ転送しない。既知objectが読めても、返却抑止されたwriteのHOLDは解除しない。既存`check-saved-publication-browser.mjs`の1px架空PNGは68 bytes、SHA256 `f6d6acb2dcf66d4e1b6419962726cf72cb16371556bc7dbdfd4e66e2caee2b8c`で再利用できる。本差分で画像を実uploadした値ではない。
+
+| 実試験の順序（各条件独立の架空fixture） | 一度行う操作と再利用先 | 完了に必要な実観測・残る境界 |
+| --- | --- | --- |
+| 1. 新規画像の通常経路 | 既存1px架空PNGを一回uploadし、private menu作成へ進む。PR #121 NewMenuForm/既存作成ledgerを使用 | upload 200の相関ID・専用store/本人path、資格情報なしBlob GETの実bytes、menu 201の実ID、保存済みGETと独立DBの同じimage URL、画面の保存済み表示を対応付ける。公開配信まで主張する場合は既存の別公開と公開ページも取得 |
+| 2. 編集画像の通常経路 | 今回作成した専用menuの現在版を取り、同PNGを選び一回upload→非公開PUT。PR #121 MenuEditClientを使用 | 実版・image URLのAPI/DB一致、食品版/公開状態の想定不変、選択した画像の表示を確認。既存stagingメニューを上書きしない |
+| 3. 店舗画像の通常経路 | 所有/復元条件と排他が確認された専用架空shopだけでupload→expectedUpdatedAt付き保存。PR #121 ShopEditClientを使用 | 実shop GET/DB/画面のcover URLとupdatedAt、baseline全項目を照合。共有demoしか使えず所有/復元が不明ならこの条件だけ停止。元URLを推測で消さない |
+| 4. 送信前遮断 | 対象はCREATE/SAVE/SHOP_SAVE/STOP/UPLOADから明示した1要求。送信callbackへ入る前にその要求だけabort | sender呼出0、画面入力/File保持・成功表示なし・後続writeなし、対象行/監査の独立SQL不変を記録。画面のunknownを「未送信確定表示」へ変えない。全種の実行を一件の成功で代用しない |
+| 5. 上流応答取得後の返却抑止 | 別の初期fixture/operationで同じ1要求をforwardし、HTTP status/相関ID/既存schemaを確認後に一回abort。画面へfulfillしない | 取得済み上流応答と画面のunknown・入力/File保持・成功/再公開/自動再送なしを分離。独立SQLの版/作成operation/成功監査相関で原要求の確定結果を確認する。GETだけでunknownを解除しない。uploadでURLを得られなければ列挙・推測回収をせずHOLD |
+| 6. 状態と残存物の確定 | 全fixtureの最終GETと独立SQL、既存保護対象不変を確認し、既知の新fixtureを許可範囲で非公開に保つ | 画像参照付きprivate fixtureとBlobを所有記録付きで保持する終了方法を既定にする。監査履歴は削除しない。unknown/復旧不能は後続writeとcleanupを停止し残す |
+
+既知objectの削除は試験成功の必須条件ではない。実施する場合だけ、**その1 object hashへの明示承認**、同run/相関ID/本人のupload成功監査、全原要求の結果確定、fixtureの既知非公開、公開/非公開を含むDB参照ゼロ、専用ownerへの他writeを除外できる排他を必要とする。`cleanupKnownBlob`は同じ既知URLの実bytesを再照合し、削除直前に排他下の独立DB参照ゼロを再確認してから、exact objectだけのdelete callbackを一度呼ぶ。ack＋そのURLの404以外は完了としない。削除応答不明/検証不能でも再送しない。他writerを除外できない場合は保持に戻す。`#45/#55`のorphan保持/画像公開政策を変更する実装ではなく、store全体削除・prefix削除・既存object削除は持たない。
+
+実行に必要な具体承認は、(a) PR #121を含む隔離Previewの確認済みsourceへ実験配備すること、(b) 指定する専用owner/shopと新menu/PNGの通常upload・保存・必要な別公開と復旧、(c) 上記の対象/phaseごとの一要求遮断または返却抑止と独立DB照合、(d) 削除する場合だけ既知object一件の削除、である。通常uploadはアプリ既存の専用Blob tokenを使い、runnerへ新しいBlob keyを渡すことを前提にしない。削除を本人/既承認管理器で行えなければ、追加key配布を自動実施せず保持する。現在このworkerは実HTTP/Blob/Clerk/秘密値/fixtureを操作していない。
+
+`tests/issue118-service-observer.test.ts`はメモリ内callbackのみで、単一送信/不一致の無操作/上流応答抑止/201 ID保持/原例外秘匿/既知object限定/cleanup拒否と削除結果不明を検査する。実サービスのPASSではない。既存`.test.ts` globに含まれるためCI/workflow/権限追加は不要。実adapterの接続、全セルの実行receipt、T2/T3/T4・B ownerの実観測、実利用者によるA/B/C理解/操作評価は別であり、ソフトウェア検査だけで網羅完成とはしない。
