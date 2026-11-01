@@ -129,3 +129,5 @@ Issue118 OIDC停止診断モードは専用workflow・scripts/check-issue118-oid
 Issue118認証/route診断を変更する場合はscripts/issue118-ci-auth.mjs・issue118-preview-transport.mjs・check-issue118-live-t1-browser.mjs、tests/issue118-ci-auth.test.mjs、runner運用記録を照合する。固定分類だけを保存し、認証/transportの制約を変更しない。
 
 保存済み公開のfocus検査はscripts/check-saved-publication-browser.mjsと上記運用記録を照合する。既存requestAnimationFrame後の同一対象へのfocusを標準toBeFocusedで待ち、未focus・別対象・期限超過のFAILを維持する。製品動作の変更とは区別する。
+
+Issue118初回redirect停止診断はscripts/check-issue118-preview-redirect.mjs・issue118-redirect-location.mjs、tests/issue118-redirect-diagnostic.test.mjs、専用workflowとrunner運用記録を照合する。Secret配達なし、単発固定GET・manual redirect、全分岐でfollow/Clerk/fixture前停止を維持する。通常liveの認証経路とは分ける。

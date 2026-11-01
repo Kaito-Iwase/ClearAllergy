@@ -7,7 +7,7 @@ on:
       confirmation:
         description: Approve ONE new fictional T1 fixture and private cleanup on the pinned Preview
         type: choice
-        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY]
+        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY]
         default: HOLD
         required: true
       expected_runner_sha:
@@ -33,7 +33,7 @@ jobs:
       github.ref == 'refs/heads/test/issue118-live-t1-20261030' &&
       github.event_name == 'workflow_dispatch' &&
       github.run_attempt == 1 &&
-      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY') &&
+      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY') &&
       inputs.expected_runner_sha == github.sha
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -50,7 +50,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Check the external receipt before dependency install or secret delivery
-        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'
         env:
           IDENTITY_RECEIPT_JSON: ${{ inputs.identity_receipt }}
           EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
@@ -97,6 +97,14 @@ jobs:
           PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
         run: node scripts/check-issue118-live-t1-browser.mjs --ci-apply
+      - name: ONE fixed Preview GET; classify redirect booleans and STOP before any follow or Clerk
+        if: inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: PREVIEW_REDIRECT_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+        run: node scripts/check-issue118-preview-redirect.mjs --redirect-only
       - name: Retain only the fixed-schema non-secret result, never browser/session/trace output
         if: always() && inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
         uses: actions/upload-artifact@v5
@@ -111,5 +119,13 @@ jobs:
         with:
           name: issue118-oidc-target-${{ github.run_id }}
           path: ${{ runner.temp }}/issue118-oidc-target/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only fixed redirect classification; no headers, URLs or response bodies
+        if: always() && inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-preview-redirect-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-preview-redirect/result.json
           if-no-files-found: ignore
           retention-days: 7
