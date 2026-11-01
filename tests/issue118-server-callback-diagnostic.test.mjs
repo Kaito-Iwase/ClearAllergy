@@ -4,11 +4,14 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { classifyLegacyCallback, serverCallbackDiagnostic, callbackDiagnosticHeader } from '../lib/verification/issue118-callback-diagnostic.mjs';
+import { classifyLegacyCallback, serverCallbackDiagnostic, callbackDiagnosticHeader,
+    keyClassDiagnosticMarker, inspectSecretKeyClass } from '../lib/verification/issue118-callback-diagnostic.mjs';
 
 const root = process.env.ISSUE118_SDK_MODULE_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jwtEntry = createRequire(join(root, 'package.json')).resolve('@clerk/backend/jwt');
 const { decodeJwt, hasValidSignature } = await import(pathToFileURL(join(dirname(jwtEntry), 'index.mjs')).href);
+const keysEntry = createRequire(join(root, 'package.json')).resolve('@clerk/shared/keys');
+const { isDevelopmentFromSecretKey } = await import(pathToFileURL(join(dirname(keysEntry), 'keys.mjs')).href);
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'SYNTHETIC_KID', alg: 'RS256', use: 'sig' };
 const sentinel = 'SYNTHETIC_SENSITIVE_VALUE_NOT_A_CREDENTIAL';
@@ -141,4 +144,139 @@ for (const [name, options, code] of [
     const r = await exercise(options);
     assert.equal(r.status, 409); assert.equal(r.body.code, code); assert.equal(r.fetches, 1); assert.equal(r.signatures, 0);
     if (options.chunkedOversize) assert.equal(r.bodyCancels, 1);
+});
+
+const secretClassCases = [
+    ['absent', undefined], ['null', null], ['number', 42], ['boolean', false], ['bigint', 42n],
+    ['symbol', Symbol(sentinel)], ['function', () => sentinel],
+    ['unknown object never coerced', { toString() { throw Error(sentinel); }, valueOf() { throw Error(sentinel); } }],
+    ['empty', ''], ['modern', 'sk_test_' + sentinel], ['legacy', 'test_' + sentinel],
+    ['short modern', 'sk_test_a'], ['production modern', 'sk_live_' + sentinel],
+    ['production legacy', 'live_' + sentinel], ['publishable', 'pk_test_' + sentinel],
+    ['leading whitespace', ' sk_test_' + sentinel], ['trailing whitespace', 'sk_test_' + sentinel + ' '],
+    ['CR', 'sk_test_' + sentinel + '\r'], ['LF', 'sk_test_' + sentinel + '\n'],
+    ['NUL', 'sk_test_' + sentinel + '\0'], ['tab', 'sk_test_' + sentinel + '\t'],
+    ['other ASCII control', 'sk_test_' + sentinel + '\u0001'],
+    ['unicode trim difference', 'sk_test_' + sentinel + '\u00a0'],
+];
+const secretClassFields = [
+    'keyReadAttempted', 'keyReadCompleted', 'keyPresent', 'typeUndefined', 'typeNull', 'typeString',
+    'typeNumber', 'typeBoolean', 'typeObject', 'typeFunction', 'typeSymbol', 'typeBigInt',
+    'nonEmptyString', 'modernTestPrefix', 'legacyTestPrefix', 'productionPrefix', 'publishablePrefix',
+    'minimumLength16', 'hasCr', 'hasLf', 'hasNul', 'hasOtherAsciiControl', 'trimWouldChange',
+    'sdkDevelopmentCheckAttempted', 'sdkDevelopmentCheckCompleted', 'sdkDevelopmentClassified',
+    'existingDiagnosticGuardWouldAllow',
+];
+function assertSecretClassShape(body) {
+    assert.deepEqual(Object.keys(body).sort(), [...secretClassFields].sort());
+    for (const value of Object.values(body)) assert.equal(typeof value, 'boolean');
+    assert.equal(JSON.stringify(body).includes(sentinel), false);
+}
+for (const [name, value] of secretClassCases) test('one-GET key class observes every predicate: ' + name, async () => {
+    let reads = 0, sdkCalls = 0, fetches = 0, decodes = 0, signatures = 0;
+    const dependencies = { getSecretKey: () => { reads++; return value; },
+        isDevelopmentFromSecretKey: input => { sdkCalls++; assert.equal(input, value); return isDevelopmentFromSecretKey(input); },
+        decode: () => { decodes++; throw Error(sentinel); },
+        verifySignature: () => { signatures++; throw Error(sentinel); },
+        fetch: () => { fetches++; throw Error(sentinel); },
+    };
+    const response = await serverCallbackDiagnostic(new Request('https://' + host + '/admin/login',
+        { headers: { [callbackDiagnosticHeader]: keyClassDiagnosticMarker } }), meta, dependencies);
+    const body = await response.json(); assertSecretClassShape(body);
+    assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal(response.headers.get('location'), null); assert.equal(response.headers.get('set-cookie'), null);
+    assert.equal(reads, 1); assert.equal(fetches, 0); assert.equal(decodes, 0); assert.equal(signatures, 0);
+    const string = typeof value === 'string';
+    assert.equal(body.keyReadCompleted, true); assert.equal(body.typeString, string);
+    assert.equal(body.keyPresent, value !== null && value !== undefined);
+    assert.equal(Object.entries(body).filter(([k, v]) => k.startsWith('type') && v).length, 1);
+    const typeFields = { undefined: 'typeUndefined', string: 'typeString', number: 'typeNumber',
+        boolean: 'typeBoolean', object: 'typeObject', function: 'typeFunction', symbol: 'typeSymbol', bigint: 'typeBigInt' };
+    assert.equal(body[value === null ? 'typeNull' : typeFields[typeof value]], true);
+    assert.equal(body.nonEmptyString, string && value.length > 0);
+    assert.equal(body.modernTestPrefix, string && value.startsWith('sk_test_'));
+    assert.equal(body.legacyTestPrefix, string && value.startsWith('test_'));
+    assert.equal(body.productionPrefix, string && (value.startsWith('sk_live_') || value.startsWith('live_')));
+    assert.equal(body.publishablePrefix, string && (value.startsWith('pk_test_') || value.startsWith('pk_live_')));
+    assert.equal(body.minimumLength16, string && value.length >= 16);
+    for (const [flag, char] of [['hasCr', '\r'], ['hasLf', '\n'], ['hasNul', '\0']]) assert.equal(body[flag], string && value.includes(char));
+    assert.equal(body.hasOtherAsciiControl, string && /[\u0001-\u0009\u000b\u000c\u000e-\u001f\u007f]/.test(value));
+    assert.equal(body.trimWouldChange, string && value.trim() !== value);
+    assert.equal(sdkCalls, string ? 1 : 0);
+    assert.equal(body.sdkDevelopmentCheckCompleted, string);
+    assert.equal(body.sdkDevelopmentCheckAttempted, string);
+    assert.equal(body.sdkDevelopmentClassified, string && isDevelopmentFromSecretKey(value));
+    // Comparison only: the old transmission guard is unchanged and is not used here.
+    assert.equal(body.existingDiagnosticGuardWouldAllow,
+        string && value.startsWith('sk_test_') && value.length >= 16 && !/[\r\n\0]/.test(value));
+});
+
+test('one-GET key class guards every target/query/header before key access', async t => {
+    const negatives = [
+        { meta: { projectId: 'other' } }, { meta: { environment: 'production' } }, { meta: { branch: 'main' } },
+        { meta: { branch: 'another' } }, { meta: { sourceSha: '' } }, { meta: { deploymentHost: 'other.invalid' } },
+        { url: 'https://alias.vercel.app/admin/login' }, { url: 'http://' + host + '/admin/login' },
+        { url: 'https://' + host + ':444/admin/login' }, { url: 'https://user:pass@' + host + '/admin/login' },
+        { url: 'https://' + host + '/admin/login#fragment' }, { url: 'https://' + host + '/api/admin/menus' },
+        { url: 'https://' + host + '/admin/login?__clerk_handshake=' + sentinel },
+        { url: 'https://' + host + '/admin/login?unknown=' + sentinel },
+        { method: 'POST' }, { method: 'HEAD' }, { marker: 'unknown' }, { marker: null },
+    ];
+    for (let i = 0; i < negatives.length; i++) await t.test('key class input guard ' + i, async () => {
+        const change = negatives[i]; let reads = 0, sdkCalls = 0, forbiddenCalls = 0;
+        const fail = () => { forbiddenCalls++; throw Error(sentinel); };
+        // Structural request seam also reaches userinfo rejection; the real
+        // Request constructor itself refuses credential-bearing URLs earlier.
+        const response = await serverCallbackDiagnostic({ url: change.url || 'https://' + host + '/admin/login',
+            method: change.method || 'GET', headers: new Headers(change.marker === null ? {} :
+                { [callbackDiagnosticHeader]: change.marker || keyClassDiagnosticMarker }) }, { ...meta, ...change.meta },
+        { getSecretKey: () => { reads++; return sentinel; }, isDevelopmentFromSecretKey: () => { sdkCalls++; return false; },
+            decode: fail, verifySignature: fail, fetch: fail });
+        assert.equal(response.status, 409); assert.equal(reads, 0); assert.equal(sdkCalls, 0); assert.equal(forbiddenCalls, 0);
+        const body = await response.json(); assert.ok(['RUNTIME_TARGET_HELD', 'KEY_CLASS_QUERY_HELD'].includes(body.code));
+        assert.equal(JSON.stringify(body).includes(sentinel), false);
+    });
+});
+
+test('key getter and SDK helper exceptions never inspect or serialize unknown values', async () => {
+    const hostile = { get message() { throw Error(sentinel); }, get stack() { throw Error(sentinel); },
+        toString() { throw Error(sentinel); } };
+    const getterFailure = inspectSecretKeyClass(() => { throw hostile; }, isDevelopmentFromSecretKey);
+    assertSecretClassShape(getterFailure); assert.equal(getterFailure.keyReadAttempted, true);
+    assert.equal(getterFailure.keyReadCompleted, false);
+    assert.equal(Object.entries(getterFailure).some(([k, v]) => k.startsWith('type') && v), false);
+    for (const classifier of [undefined, () => { throw hostile; }, () => hostile]) {
+        const body = inspectSecretKeyClass(() => 'sk_test_' + sentinel, classifier);
+        assertSecretClassShape(body); assert.equal(body.keyReadCompleted, true);
+        assert.equal(body.sdkDevelopmentCheckAttempted, true); assert.equal(body.sdkDevelopmentCheckCompleted, false);
+        assert.equal(body.sdkDevelopmentClassified, false);
+    }
+});
+
+test('key getter/SDK observation failure is explicit HTTP409 with no callback or network', async () => {
+    for (const source of ['getter', 'sdk']) {
+        let forbiddenCalls = 0;
+        const fail = () => { forbiddenCalls++; throw Error(sentinel); };
+        const response = await serverCallbackDiagnostic(new Request('https://' + host + '/admin/login',
+            { headers: { [callbackDiagnosticHeader]: keyClassDiagnosticMarker } }), meta,
+        { getSecretKey: () => { if (source === 'getter') throw Error(sentinel); return 'sk_test_' + sentinel; },
+            isDevelopmentFromSecretKey: () => { throw Error(sentinel); }, decode: fail, verifySignature: fail, fetch: fail });
+        assert.equal(response.status, 409); const body = await response.json(); assertSecretClassShape(body);
+        assert.equal(body.keyReadCompleted, source !== 'getter');
+        assert.equal(body.sdkDevelopmentCheckCompleted, false); assert.equal(forbiddenCalls, 0);
+    }
+});
+
+test('dependency accessors also stay inside the separate key/SDK boolean error boundaries', async () => {
+    for (const source of ['keyAccessor', 'sdkAccessor']) {
+        const dependencies = { get getSecretKey() { if (source === 'keyAccessor') throw Error(sentinel);
+            return () => 'sk_test_' + sentinel; },
+        get isDevelopmentFromSecretKey() { throw Error(sentinel); } };
+        const response = await serverCallbackDiagnostic(new Request('https://' + host + '/admin/login',
+            { headers: { [callbackDiagnosticHeader]: keyClassDiagnosticMarker } }), meta, dependencies);
+        assert.equal(response.status, 409); const body = await response.json(); assertSecretClassShape(body);
+        assert.equal(body.keyReadCompleted, source !== 'keyAccessor');
+        assert.equal(body.sdkDevelopmentCheckAttempted, source === 'sdkAccessor');
+        assert.equal(body.sdkDevelopmentCheckCompleted, false);
+    }
 });

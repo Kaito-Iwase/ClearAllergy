@@ -122,3 +122,5 @@
 ## Issue #118 callback独立比較候補
 
 [候補の範囲と留保](../verification/issue118-server-callback-candidate-20261101.md)、proxy.ts、lib/verification/issue118-callback-diagnostic.mjs、同.d.mts、tests/issue118-server-callback-diagnostic.test.mjsを照合する。既存SDKの例外捕捉やauth代替ではなく、未配備Preview候補の独立した署名・形状比較に限定する。
+
+Issue118 key-class-only candidate: docs/verification/issue118-server-callback-candidate-20261101.md, proxy.ts, lib/verification/issue118-callback-diagnostic.mjs and its declaration/tests are maintained together. One query-free marked GET reports only boolean class predicates and returns before decode/fetch/auth. Existing signature transmission guards remain unchanged; no deployment/live execution is implied.

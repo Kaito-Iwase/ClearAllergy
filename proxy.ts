@@ -2,6 +2,7 @@ import {
     clerkMiddleware,
 } from "@clerk/nextjs/server";
 import { decodeJwt, hasValidSignature } from "@clerk/backend/jwt";
+import { isDevelopmentFromSecretKey } from "@clerk/shared/keys";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { callbackDiagnosticHeader, serverCallbackDiagnostic } from "./lib/verification/issue118-callback-diagnostic.mjs";
 
@@ -21,6 +22,7 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
         deploymentHost: process.env.VERCEL_URL,
     }, {
         getSecretKey: () => process.env.CLERK_SECRET_KEY,
+        isDevelopmentFromSecretKey,
         decode: decodeJwt,
         verifySignature: hasValidSignature,
         fetch,
