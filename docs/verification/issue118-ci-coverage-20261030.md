@@ -81,7 +81,7 @@ PR毎のtimeoutは現行CIの25分を基準とし、追加検査の時間・失�
 | B店舗の権限 | S1/S2の別owner・別context。本人の自店取得と相手の対象拒否を分け、各fixtureの前後を比較 | 既存Development ClerkのB本人IDと所有shopの照合receipt。今回のIDダブルDB検査で実sessionを代用しない。新account/keyを自動作成しない |
 | T2 | S1のM01/M02、S2のM05/M06を担当別にSTOPし、他4件を維持。4件を真値分母にする | 元レシピ・E21/E23・初期CSVのhashは親側の原本実バイト照合済み。実fixtureへの内容取込み・実ID対応表・両ownerの実認証は別途必要。gold既知のAIによる指定4件停止と、操作者の影響発見を別集計 |
 | T3 | S1 M01・S2 M05。新ロットの乳含有は既知、各皿の旧新割当は不明。STOP後に保留し、再公開しない | E31/E32と旧新在庫の元fixture。単一切替日・一律MAYへの置換・ロットモデル追加を正解にしない。食品判定を製品側で変更しない |
-| T4 | M02。新規API、fresh page、既開tab、戻る、再取得失敗を別々に記録 | 実Previewで各request開始/完了と表示を対応付ける。API404とpageのnotFound（streamingでは200の場合あり）を分離。戻るのGET有無とbfcacheを区別し、Playwrightの戻る試験だけでbfcache実証としない |
+| T4 | M02。新規API、fresh page、既開tab、戻る、再取得失敗を別々に記録。後述の4ページ観測器を準備 | 実Previewへの配線・実行は未実施。各request開始/完了と表示を対応付け、API404とpageのnotFound（streamingでは200の場合あり）を分離。戻るのGET有無とbfcacheを区別し、戻る試験だけでbfcache実証としない |
 | 画像 | 専用架空画像、uploadと後続menu/shop保存、失敗時のFile/入力保持とBlob残存を分ける | 実Clerk/専用Blobの確認と対象アプリSHA。現在の固定Preview `6293d5a`はPR #121の修正検証対象ではない。失敗/結果不明で再upload・削除・cleanupを自動再送しない |
 | 通信失敗 | 送信前の遮断と、応答取得後にブラウザへの返却を抑止する条件を区別。原要求・API・独立DBを対応付ける | 1対象/1要求の注入許可と観測方法。模擬HTTPのabortを実サービスの未送信/確定後喪失へ読み替えず、unknownのまま再送しない |
 | 対照 | C_PRICE=M04、食品不変C_STOP=M07、C_SILENTの現物影響M08と観測必要STOPなし | ケースごとに独立初期値を使う。通常完遂2機会と有信号8件・無信号1件を分離。人の初見理解・所要時間・A/B/Cの優位性は未承認の人試験へ昇格しない |
@@ -96,8 +96,18 @@ PR毎のtimeoutは現行CIの25分を基準とし、追加検査の時間・失�
 | --- | --- | --- |
 | 別owner | CIのA/B実DB拒否と、T1の対象receipt・保護hash・unknown ledger | 実A/Bの別contextと自店正例、所有shop照合。T1の固定A/1メニューを単にBへ置換して全検査としない |
 | T2/T3 | 元CSVの親側hash照合、既存採点、今回の`prepareFixtureStops`で8件の対応とowner別STOP前版を局所検査 | 元カード本文からの実fixture作成・保存/公開、実A/B認証、各メニューに独立した既存write ledger。T1のphase一回制限を緩めて同じSTOPを反復しない。計画を作れても実行許可・実成功ではない |
-| T4 | M02と通常STOPの期待値、CIのfresh公開読取、T1の公開API/画面観測 | STOP前の既開tab、STOP後fresh API/page、履歴の戻る、再取得失敗を同一fixtureで記録するrunner。bfcacheの有無を未観測のまま断定しない |
+| T4 | M02と通常STOPの期待値、CIのfresh公開読取、T1の公開API/画面観測、後述の4ページ観測器 | 実T1 runnerへのguard付き接続と同一実fixtureでの実行は未実施。bfcacheの有無を未観測のまま断定しない |
 | 実画像 | PR #121の3画面の局所修正・模擬回帰、既存の専用架空PNG例 | #121を含む確認済み対象アプリ、実Blob成功と後続保存/配信の同一run観測。共有Blobの削除/列挙・orphan政策を前提にせず、対象URLと所有fixtureだけを記録 |
 | 実通信失敗 | 模擬画面の送信前/モデル更新後abortと入力保持、T1のunknown停止 | 1要求だけの送信前遮断、実応答取得後の返却抑止を既存保護transportと衝突せず配線。応答200だけで独立DB確定とせず、不明write後の再送/cleanupを禁止 |
 
 `scripts/issue118-fixture-map.ts`は認証・DB・Blob・browserをimportしない純粋な準備関数で、CLIや自動実行入口を持たない。今回runの8件の一意なメニューID/作成operationId、S1/S2別shop/context、201確定作成、名前、公開中の保存済み版を入力上で照合する。既存保護3件、anchor、既知の旧T1 fixtureを拒否する。T2のM06欠落を拒否し、T3の次段をロット割当HOLD、T4を4観測待ちとして返す。各STOP後の食品版不変を期待し、現在版の再取得やledgerを代替しない。元レシピ/29品目の内容照合、contextの実認証、receiptの真正性はこの関数の保証外で、`PREPARATION_ONLY`を返す。採点者だけが使い、初見操作者の発見率/操作時間と混ぜない。
+
+### T4の4ページ観測器と合成HTTP回帰
+
+`scripts/issue118-t4-observer.mjs`は、呼出し側の既存context・対象再確認callback・保護済み公開GET callbackを受け、同一メニューを既開/戻る用/fresh/再取得失敗用の4ページで観測する。認証・STOP・DB接続・Secret取得・セッション出力・実行CLIは持たない。対象はloopbackまたは現在の固定Preview originだけ。既存T1 guard/transport/ledgerを取り込まず、呼出し側が各読取前に照合する。新Previewや別アプリへ自動追従しない。
+
+baseline公開APIの対象IDと4画面の架空名を確認してから、呼出し側が別途外部STOPを行う。`afterExternalChange()`は1回だけ、既開画面、新API/fresh画面、履歴の戻る、1document GETの送信前遮断を別々に記録する。対象requestの開始/応答status/完了/失敗、画面の食品名/notFound、`pageshow.persisted`を値の絞られたJSONへ残す。戻る応答nullだけでbfcacheを判断しない。fresh API404だけやDOM取得不能は成功相当にならず、食品表示残存・未確認を区別する。STOP/独立DBは常に`NOT_ATTESTED`で総合PASSを返さない。
+
+再取得失敗用のpage routeは該当URLのdocument GETだけをabortし、他要求には`fallback()`を使う。`continue()`/`fetch()`で既存context保護を短絡せず、headers/cookieを取得・付加しない。複数の自動試行やabort未確定は注入未確認になる。これはブラウザによる送信前GET遮断であり、実サービス停止・書込み応答喪失ではない。routeを使うとHTTP cacheへ影響するため、呼出し側のtransport条件も別記する。[Playwright 1.61のroute仕様](https://github.com/microsoft/playwright/blob/v1.61.0/docs/src/api/class-route.md)と[pageshow](https://developer.mozilla.org/en-US/docs/Web/API/Window/pageshow_event)を参照。
+
+`check-issue118-t4-offline.mjs`は自作loopback HTTPと実Chromiumでこの観測器を呼ぶ。架空公開→非公開、変更なし、fresh API例外、fresh HTTP500/notFound、baseline HTTP500の5条件を比較する。baseline画面はHTTP200、fresh画面はHTTP200/404を要求し、500が同じDOMを返しても未確認とする。streamingを模したHTTP200/notFound、既開食品表示、戻るのrequest/イベント、対象GET遮断、1回制限と所有4ページの後片付けを確認する。ClearAllergy/Next/実DB/Clerk/Blobの結果ではない。既存`publication` browser入口へ1群を接続し、`.test.ts`は既存`npm test`へ含めるためworkflow変更は不要。実Previewの四観測、T2/T3の複数店舗実行、画像・実通信失敗の残条件は維持する。

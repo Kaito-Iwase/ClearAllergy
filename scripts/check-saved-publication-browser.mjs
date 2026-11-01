@@ -6,6 +6,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkT4ObserverOffline } from "./check-issue118-t4-offline.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(join(root, "package.json"));
@@ -80,6 +81,10 @@ const panel = f => f.page.getByRole("region", { name: "保存しました", exac
 const save = f => f.page.getByRole("button", { name: "保存する", exact: true }).click();
 async function check(name, run) { try { await run(); cases.push({ name, passed: true }); console.log("PASS " + name); } catch (e) { cases.push({ name, passed: false, error: e.message }); console.error("FAIL " + name + ": " + e.message); } }
 try {
+    await check("T4 observer separates held/fresh/back/failed-refetch and rejects unchanged/unavailable fresh reads (synthetic loopback HTTP only)", async () => {
+        const reports = await checkT4ObserverOffline(browser);
+        writeFileSync(join(output, "issue118-t4-offline-result.json"), JSON.stringify({ scope: "Synthetic loopback HTTP plus real Chromium; no app/auth/DB/Blob/real STOP", reports }, null, 2));
+    });
     await check("empty, invalid JSON, 500 or lost image upload response prevents menu creation and save", async () => {
         const failures = [
             { status: 500, body: { error: "fictional upload failure" } },
