@@ -127,3 +127,5 @@ Issue118 runnerのCI準備段階・固定エラー分類を変更する場合は
 Issue118 OIDC停止診断モードは専用workflow・scripts/check-issue118-oidc-target.mjs・tests/issue118-ci-auth.test.mjsと上記runner運用記録を照合する。通常liveガードを緩めず、Secret非配達・要求前停止を検証する。
 
 Issue118認証/route診断を変更する場合はscripts/issue118-ci-auth.mjs・issue118-preview-transport.mjs・check-issue118-live-t1-browser.mjs、tests/issue118-ci-auth.test.mjs、runner運用記録を照合する。固定分類だけを保存し、認証/transportの制約を変更しない。
+
+保存済み公開のfocus検査はscripts/check-saved-publication-browser.mjsと上記運用記録を照合する。既存requestAnimationFrame後の同一対象へのfocusを標準toBeFocusedで待ち、未focus・別対象・期限超過のFAILを維持する。製品動作の変更とは区別する。
