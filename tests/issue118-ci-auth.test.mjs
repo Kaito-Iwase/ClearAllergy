@@ -95,6 +95,28 @@ test('wired handshake HOLD or evidence failure prevents Backend API auth and nev
     }
 });
 
+test('wired legacy carrier completes only the same bounded document exchange; mixed and malformed carriers stop before Backend auth',async()=>{
+    const outbound=new URL('https://'+ciIdentity.clerkDomain+'/v1/client/handshake');
+    for(const [k,v] of Object.entries({redirect_url:target.origin+'/admin/login',__clerk_api_version:'2026-05-12',
+        suffixed_cookies:'true',__clerk_hs_reason:'dev-browser-missing',format:'nonce'}))outbound.searchParams.set(k,v);
+    const legacy=target.origin+'/admin/login?__clerk_handshake=synthetic.payload.signature';
+    const r=(status,location)=>({status:()=>status,headers:()=>({location})});
+    for(const [location,allowed] of [[legacy,true],[legacy+'&__clerk_handshake_nonce=SYNTHETIC',false],
+        [legacy+'&__clerk_db_jwt=SYNTHETIC',false],[legacy.replace('synthetic.payload.signature','not-jwt'),false]]){
+        const fixture=authFixture(),reports=[];
+        const access=await createCiAccess(env(),fixture.fetcher,()=>{},{handshake:x=>reports.push(x)});
+        const model=wireAuthPage(access,fixture.page);
+        model.responses.push(r(307,outbound.href),r(307,location),r(307,target.origin+'/admin/login'),r(200));
+        if(allowed){await access.authenticate(fixture.page);assert.equal(model.requests.length,4);assert.equal(access.isAuthenticated(),true);}
+        else{await assert.rejects(access.authenticate(fixture.page),code('CI_AUTHENTICATION_FAILED'));
+            assert.equal(model.requests.length,2);assert.equal(fixture.calls.length,1);
+            assert.equal(access.authenticationProgress().ownerLookupStarted,false);assert.equal(access.authenticationProgress().testingTokenRequestStarted,false);}
+        assert.equal(model.requests[1].options.headers['x-vercel-trusted-oidc-idp-token'],undefined);
+        for(const {options}of model.requests){assert.equal(options.maxRedirects,0);assert.equal(options.maxRetries,0);assert.equal(options.method,'GET');}
+        assert.doesNotMatch(JSON.stringify(reports),/synthetic\.payload|SYNTHETIC|https:/);
+    }
+});
+
 test('transport report permits enums/status/booleans only and retains first unexpected failure beyond cap', () => {
     const report = {};
     recordTransportDiagnostic(report, { originRole: syntheticSecret, method: 'https://u:p@invalid/', status: syntheticSecret,

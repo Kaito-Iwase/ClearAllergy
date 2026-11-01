@@ -45,6 +45,20 @@ createCiAccess.authenticateの初回page.gotoのmain-frame documentだけへ適�
 検査コマンド:
 `node --test tests/issue118-initial-handshake-candidate.test.mjs`
 
+## 2026-11-01 legacy callback候補と承認後の配線
+
+診断41281320271のboolean観察は固定return origin/pathと安全条件一致、nonceなし、既知legacy queryありだった。値の取得・JWT妥当性・SDKでの実消費は未確認。nonce形式を要求した送信元SDKだけから、FAPIが必ずnonceで返すとは保証できなかった。元runをこの診断で遡及証明しない。
+
+固定 `@clerk/backend` 3.11.0 のchunk-EXSW62UK.mjsでは、initHandshakeValues（662行）が `__clerk_handshake` を取得し、getCookiesFromHandshake（6662行）のnonce不在側でverifyHandshakeTokenを呼ぶ。6560行以降でJWKを解決し、6536行以降でtyp/alg/署名を確認したpayloadのhandshake配列だけをcookie directivesへ使う。Developmentは6695行以降でhandshake等のqueryを除去する。これは実装の根拠であり、実サービス値を検証した証拠ではない。
+
+ローカル候補 `allowLegacyCandidate:true` は固定app/loginへの `__clerk_handshake` 1件だけを別の分岐で認める。nonce/dev-browser/追加queryとの混在・重複・空値は拒否。compact JWTの構文だけを確認し、decode・署名検証・payload適用をdriverで代行しない。検証は変更しないappのSDKへ委ね、document-readyを認証成功とは扱わない。nonce経路は既存条件のまま。HTTPS/host/path/userinfo/port/fragment、3転送/4 GET、retry0、ClerkへOIDCを送らない制約は維持する。
+
+候補単独の既定値はfalse。別途承認した通常ci-authの初回document呼出しだけが `allowLegacyCandidate:true` を明示する。nonceとlegacy双方の配線・混在拒否をmockで検査し、新SHAのCI・実試行結果は別記する。既存callback停止診断のcallbackContractMatchesは既定nonce条件のままで、legacy受理や認証の成功とは別である。nonceとの違いは、Clerkからappへのcallbackが参照用nonceではなく署名付きhandshake payloadを運ぶ点。payloadはcookie/session関連directiveを含み得るため秘密相当として扱い、Actions/trace/artifactへ値を保存しない。サービス通常ログの保存範囲は未確認。
+
+offlineでは一時生成した合成RSA鍵だけで実SDKのauthenticateRequestを呼び、合成directiveの受理と署名改ざん拒否、fetch0を検査する。実Clerk鍵の発行や利用ではない。現在のlegacy拒否も既定経路で維持する。
+
+終了処理候補はcontext.close完了後にbrowser.closeを呼び、各attempt/handle/close成功を独立booleanで保持する。context失敗後もbrowser終了は試みるが、一方の成功で両完了にしない。handle未取得も未確認。41281320271の同時closeが原因だったかは未確定で、過去resultを修正しない。provider状態の失効とローカル終了は別である。
+
 ## 限定承認の範囲
 
 > 固定試験Previewと、設定済みClerk Developmentの間だけ、初回ログイン画面GETのhandshakeを許可していい？ `/v1/client/handshake` と元の `/admin/login` のnonce callback・query除去に限定し、最大3転送・4 GET、再試行なしにする。OIDCはappだけへ送り、Clerkへは送らない。Clerkの一時client/nonceやCookieが作られ、callback値は同じVercel appへ戻る。こちらのActions log・artifact・session fileには値を保存しないが、各サービス側の通常アクセスログ保管は変更しない。候補を専用runnerへ配線し、限定確認・push・両CI成功後、instance/owner確認を通った場合だけ既存のテスト認証と新fixtureのT1・最後の非公開化を1回実行する。想定外の転送や結果不明ではHOLDにして再送しない。main・Production・新しいキーや権限設定・既存データは変更しない。

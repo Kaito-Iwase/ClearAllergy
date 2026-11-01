@@ -7,6 +7,7 @@ import { ciIdentity } from '../scripts/issue118-ci-auth.mjs';
 import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
 import { initialHandshakeContract as contract, createInitialHandshakeCandidate } from '../scripts/issue118-initial-handshake-candidate.mjs';
 import { callbackPredicates, handshakeCallbackDiagnostic } from '../scripts/check-issue118-handshake-callback.mjs';
+import { closeIsolatedBrowser } from '../scripts/issue118-close-browser.mjs';
 
 const secret='SYNTHETIC_PRIVATE_VALUE';
 const callback=contract.appLogin+'?__clerk_handshake_nonce='+secret+'&__clerk_db_jwt='+secret;
@@ -148,4 +149,22 @@ test('workflow selects callback-only without secret, APPLY or normal live step, 
 test('CLI wrong arguments refuse with fixed non-secret output',()=>{
     const r=spawnSync(process.execPath,['scripts/check-issue118-handshake-callback.mjs','--wrong'],{env:{SystemRoot:process.env.SystemRoot},encoding:'utf8'});
     assert.equal(r.status,1);assert.equal(r.stdout,'');assert.match(r.stderr,/^HANDSHAKE_CALLBACK_DIAGNOSTIC_REFUSED_NO_RAW_ERROR\s*$/);
+});
+
+test('context close completes before browser close, with independent booleans and no raw error',async()=>{
+    for(const contextFails of [false,true])for(const browserFails of [false,true]){
+        const order=[];
+        const context={close:async()=>{order.push('context-start');await Promise.resolve();order.push('context-end');if(contextFails)throw Error(secret);}};
+        const browser={close:async()=>{assert.deepEqual(order,['context-start','context-end']);order.push('browser');if(browserFails)throw Error(secret);}};
+        const r=await closeIsolatedBrowser(context,browser,{contextCreateAttempted:true,browserLaunchAttempted:true});safe(r);
+        assert.equal(r.contextCloseConfirmed,!contextFails);assert.equal(r.browserCloseConfirmed,!browserFails);
+        assert.equal(r.allLocalClosed,!contextFails&&!browserFails);assert.equal(r.contextCloseAttempted,true);assert.equal(r.browserCloseAttempted,true);
+    }
+    for(const attempts of [{browserLaunchAttempted:true},{browserLaunchAttempted:true,contextCreateAttempted:true}]){
+        const r=await closeIsolatedBrowser(undefined,undefined,attempts);safe(r);assert.equal(r.allLocalClosed,false);
+        assert.equal(r.browserCloseConfirmed,false);assert.equal(r.contextCloseConfirmed,false);
+    }
+    const none=await closeIsolatedBrowser(undefined,undefined);assert.equal(none.allLocalClosed,true);assert.equal(none.contextCloseConfirmed,false);assert.equal(none.browserCloseConfirmed,false);
+    const sync=await closeIsolatedBrowser({close:()=>{throw Error(secret);}},{close:()=>{}},{browserLaunchAttempted:true,contextCreateAttempted:true});safe(sync);
+    assert.equal(sync.contextCloseConfirmed,false);assert.equal(sync.browserCloseConfirmed,true);assert.equal(sync.allLocalClosed,false);
 });

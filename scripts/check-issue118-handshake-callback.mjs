@@ -8,6 +8,7 @@ import { assertIdentityReceipt } from './check-issue118-live-t1-browser.mjs';
 import { assertRedirectDiagnosticEnvironment } from './check-issue118-preview-redirect.mjs';
 import { initialHandshakeContract as contract, validateInitialHandshakeTarget } from './issue118-initial-handshake-candidate.mjs';
 import { scopedOidcHeaders } from './issue118-preview-transport.mjs';
+import { closeIsolatedBrowser } from './issue118-close-browser.mjs';
 
 export function callbackPredicates(response, base) {
     const p = { locationReadSucceeded:false, singleLocationHeader:false, locationPresent:false,
@@ -81,8 +82,8 @@ export async function handshakeCallbackDiagnostic(env,receipt,fetcher,browserFac
         // Deliberately NO third fetch, even when every callback predicate matches.
     }catch{r.diagnosticFailed=true;}
     finally{
-        const closes=await Promise.allSettled([Promise.resolve().then(()=>context?.close()),Promise.resolve().then(()=>browser?.close())]);
-        r.localCloseConfirmed=(!r.browserLaunchAttempted||!!browser)&&(!r.contextCreateAttempted||!!context)&&closes.every(x=>x.status==='fulfilled');
+        const closes=await closeIsolatedBrowser(context,browser,r);
+        Object.assign(r,closes);r.localCloseConfirmed=closes.allLocalClosed;
         if(!r.localCloseConfirmed)r.diagnosticFailed=true;
     }
     return r;

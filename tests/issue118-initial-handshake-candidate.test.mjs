@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { ciIdentity, assertOidcClaims } from '../scripts/issue118-ci-auth.mjs';
 import { createInitialHandshakeCandidate, initialHandshakeContract as c } from '../scripts/issue118-initial-handshake-candidate.mjs';
 import { routePreviewRequest } from '../scripts/issue118-preview-transport.mjs';
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { createClerkClient } from '@clerk/backend';
 
 const secret = 'SYNTHETIC_NONCE_OR_JWT_NOT_REAL';
 const jwt = (extra = {}) => 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify({
@@ -40,7 +42,8 @@ function fixture(responses=happy(), requestChange={}, options={}) {
         allHeaders:()=>assert.fail('Never copy original Cookie/OIDC/bypass headers'),...requestChange};
     const route={request:()=>request,fulfill:async ({response:r})=>{fulfills++;assert.equal(r.status(),200);if(options.fulfillFailure)throw Error(secret);},
         abort:async()=>{aborts++;if(options.abortFailure)throw Error(secret);}};
-    const policy=createInitialHandshakeCandidate(page,()=>{getters++;return assertOidcClaims(options.expireOnGetter===getters?jwt({exp:0}):token);});
+    const policy=createInitialHandshakeCandidate(page,()=>{getters++;return assertOidcClaims(options.expireOnGetter===getters?jwt({exp:0}):token);},
+        {allowLegacyCandidate:options.allowLegacyCandidate});
     return {policy,route,calls,get fulfills(){return fulfills;},get aborts(){return aborts;},get getters(){return getters;}};
 }
 function safeReport(f) {
@@ -112,6 +115,46 @@ test('cleanup URL and status are exact; loops or a fourth redirect never start a
     await held(fixture([response(307,outbound()),response(302,callback()),response(200)]),3);
     await held(fixture([...happy().slice(0,3),response(307,outbound())]),4);
 });
+
+test('LOCAL legacy candidate is opt-in, exact carrier only; nonce remains separate and all hop/header constraints stay',async()=>{
+    const legacy=c.appLogin+'?__clerk_handshake=synthetic.payload.signature';
+    await held(fixture([response(307,outbound()),response(307,legacy)]),2);
+    for(const status of [302,303,307]){
+        const f=fixture([response(307,outbound()),response(status,legacy),response(307,c.appLogin),response(200)],{}, {allowLegacyCandidate:true});
+        await f.policy.run(f.route);assert.equal(safeReport(f).complete,true);assert.equal(f.calls.length,4);assert.equal(f.getters,3);
+    }
+    const nonce=fixture(happy(),{}, {allowLegacyCandidate:true});await nonce.policy.run(nonce.route);assert.equal(nonce.fulfills,1);
+    for(const value of [legacy+'&__clerk_handshake_nonce='+secret,legacy+'&__clerk_db_jwt='+secret,legacy+'&__clerk_handshake=duplicate',
+        legacy+'&__clerk_help=1',legacy+'&other='+secret,legacy.replace('synthetic.payload.signature',''),
+        legacy.replace('synthetic.payload.signature','not-jwt'),legacy.replace('synthetic.payload.signature','a.b.'),
+        legacy.replace('https:','http:'),legacy.replace('/admin/login','/api/admin/menus'),
+        legacy.replace(c.appLogin,'https://other.invalid/admin/login'),legacy+'#fragment','/admin/login?__clerk_handshake=a.b.c']){
+        await held(fixture([response(307,outbound()),response(307,value)],{}, {allowLegacyCandidate:true}),2);
+    }
+});
+
+test('pinned REAL SDK verifies legacy signature offline before applying directives; driver format check is not validation',async()=>{
+    // Ephemeral synthetic cryptographic fixture only, never a Clerk service key.
+    const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+    const publicPem=publicKey.export({format:'pem',type:'spki'});
+    const client=createClerkClient({publishableKey:'pk_test_'+Buffer.from('synthetic.clerk.accounts.dev$').toString('base64'),
+        secretKey:'sk_test_synthetic_not_real',jwtKey:publicPem,telemetry:{disabled:true}});
+    const jwtHeader=Buffer.from(JSON.stringify({alg:'RS256',typ:'JWT',kid:'synthetic'})).toString('base64url');
+    const payload=Buffer.from(JSON.stringify({handshake:['synthetic_offline_directive=verified; Path=/; Secure; SameSite=Lax']})).toString('base64url');
+    const data=jwtHeader+'.'+payload,signature=sign('RSA-SHA256',Buffer.from(data),privateKey).toString('base64url');
+    const signed=data+'.'+signature;
+    const originalFetch=globalThis.fetch;let network=0;
+    globalThis.fetch=async()=>{network++;throw Error('OFFLINE_NETWORK_FORBIDDEN');};
+    try {
+        const request=token=>new Request(c.appLogin+'?__clerk_handshake='+token,{headers:{'Sec-Fetch-Dest':'document'}});
+        const valid=await client.authenticateRequest(request(signed));
+        assert.match(valid.headers.get('set-cookie'),/synthetic_offline_directive=verified/);
+        assert.equal(valid.headers.get('location'),c.appLogin);assert.equal(valid.isAuthenticated,false);
+        const corrupt=data+'.'+(signature[0]==='A'?'B':'A')+signature.slice(1);
+        await assert.rejects(client.authenticateRequest(request(corrupt)),/invalid signature/i);
+        assert.equal(network,0);
+    } finally {globalThis.fetch=originalFetch;}
+});
 test('provider failures and expired OIDC are HOLD, never retry; cookie/provider state is not claimed cleared',async()=>{
     for(const hop of [1,2,3,4]) {const f=fixture(happy(),{}, {networkFailure:hop});await held(f,hop);assert.equal(safeReport(f).lastHttpStatus,null);}
     await held(fixture(happy(),{}, {expireOnGetter:1}),0);
@@ -129,7 +172,7 @@ test('existing normal API-write redirect refusal remains intact; callsite is ini
     assert.ok(live.includes('createInitialHandshakeCandidate'));
     assert.match(live,/initialDocumentWindow && request\.isNavigationRequest\(\) && request\.resourceType\(\) === 'document'/);
     assert.match(live,/request\.frame\(\) === initialPage\.mainFrame\(\)/);
-    assert.match(live,/createInitialHandshakeCandidate\(page, token\)/);
+    assert.match(live,/createInitialHandshakeCandidate\(page, token, \{ allowLegacyCandidate: true \}\)/);
     assert.match(live,/finally \{ initialDocumentWindow = false; \}/);
     const runner=readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs',import.meta.url),'utf8');
     const contextCreation=runner.slice(runner.indexOf('browser.newContext('),runner.indexOf('const ciRoute ='));

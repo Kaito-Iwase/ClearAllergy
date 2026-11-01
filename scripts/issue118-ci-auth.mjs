@@ -189,7 +189,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
             authenticationAttempted = true;
             try {
                 if (routeHeld) fail('CI_TRANSPORT_HELD');
-                initialPage = page; initialHandshake = createInitialHandshakeCandidate(page, token);
+                initialPage = page; initialHandshake = createInitialHandshakeCandidate(page, token, { allowLegacyCandidate: true });
                 initialDocumentWindow = true;
                 mark('loginNavigationStarted');
                 await page.goto(previewOrigin + '/admin/login');

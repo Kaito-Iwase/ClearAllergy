@@ -33,12 +33,19 @@ function handshakeUrl(value) {
 }
 // The callback-only diagnostic shares the SAME outbound contract, without following a callback.
 export { handshakeUrl as validateInitialHandshakeTarget };
-function callbackUrl(value) {
+function callbackUrl(value, allowLegacyCandidate = false) {
     const url = safeAbsolute(value);
     if (url.origin !== previewOrigin || url.pathname !== '/admin/login') refuse();
-    // The pinned SDK requests nonce format and consumes this exact query name.
-    // Legacy JWT payload/help/organization/satellite flows are deliberately excluded.
-    query(url, ['__clerk_handshake_nonce'], ['__clerk_db_jwt']);
+    if (allowLegacyCandidate === true && url.searchParams.has('__clerk_handshake')) {
+        // LOCAL candidate, opt-in only. Exactly one legacy carrier, never mixed
+        // with nonce/dev-browser or other query. Shape is NOT JWT verification.
+        query(url, ['__clerk_handshake']);
+        if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(url.searchParams.get('__clerk_handshake'))) refuse();
+        // The fixed app's unchanged Clerk SDK must verify typ/alg/signature and
+        // consume signed directives. The driver never decodes or trusts payload.
+    } else {
+        query(url, ['__clerk_handshake_nonce'], ['__clerk_db_jwt']);
+    }
     return url.href;
 }
 function cleanUrl(value) {
@@ -54,7 +61,7 @@ function locationOnly(response) {
 
 // The supplier must be createCiAccess's existing token() (which validates exact
 // claims/expiry on every app use), matching the current normal transport contract.
-export function createInitialHandshakeCandidate(page, getValidatedOidcToken) {
+export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { allowLegacyCandidate = false } = {}) {
     let used = false;
     const report = { stage: 'NOT_STARTED', complete: false, held: false, requests: 0, redirects: 0, lastHttpStatus: null,
         handshakeUsed: false, cookieOrProviderStateMayExist: false, contextDisposalRequired: false,
@@ -93,7 +100,7 @@ export function createInitialHandshakeCandidate(page, getValidatedOidcToken) {
                         return;
                     }
                     if (index === 0 && status === 307) { report.stage = 'APP_TO_CLERK_VALIDATE'; url = handshakeUrl(locationOnly(response)); report.handshakeUsed = true; }
-                    else if (index === 1 && [302,303,307].includes(status)) { report.stage = 'CLERK_TO_APP_VALIDATE'; url = callbackUrl(locationOnly(response)); }
+                    else if (index === 1 && [302,303,307].includes(status)) { report.stage = 'CLERK_TO_APP_VALIDATE'; url = callbackUrl(locationOnly(response), allowLegacyCandidate); }
                     else if (index === 2 && status === 307) { report.stage = 'APP_CLEAN_TARGET_VALIDATE'; url = cleanUrl(locationOnly(response)); }
                     else refuse();
                     report.redirects++;

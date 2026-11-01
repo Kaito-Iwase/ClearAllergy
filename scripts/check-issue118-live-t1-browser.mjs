@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCiAccess, assertCiEnvironment } from "./issue118-ci-auth.mjs";
 import { transportObservation } from "./issue118-preview-transport.mjs";
+import { closeIsolatedBrowser } from "./issue118-close-browser.mjs";
 
 export function recordTransportDiagnostic(report, observation) {
     const safe = transportObservation(observation.originRole, observation.method, observation.status,
@@ -209,6 +210,8 @@ export async function runLive() {
     const save = () => writeFileSync(join(output, "result.json"), JSON.stringify(report, null, 2));
     let browser;
     let context;
+    let browserLaunchAttempted = false;
+    let contextCreateAttempted = false;
     let page;
     let menuId;
     let name;
@@ -266,7 +269,9 @@ export async function runLive() {
                 save();
             },
         });
+        browserLaunchAttempted = true;
         browser = await browserSetupStage("BROWSER_LAUNCH", () => chromium.launch({ headless: ciMode, ...(ciMode ? { channel: "chromium" } : {}) }), setupStage);
+        contextCreateAttempted = true;
         context = await browserSetupStage("BROWSER_CONTEXT", () => browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false, serviceWorkers: "block" }), setupStage);
         const ciRoute = async route => {
             try { await ciAccess.route(route); }
@@ -405,8 +410,8 @@ export async function runLive() {
         if (ciAccess) report.authenticationProgress = ciAccess.authenticationProgress();
         if (ciAccess) report.initialHandshake = ciAccess.handshakeProgress();
         if (ciAccess && page) report.authenticationCleanup = await ciAccess.signOut(page);
-        const closes = await Promise.allSettled([context?.close(), browser?.close()]);
-        report.browserClose = closes.every(result => result.status === "fulfilled") ? "CONFIRMED" : "UNVERIFIED";
+        report.localClose = await closeIsolatedBrowser(context, browser, { browserLaunchAttempted, contextCreateAttempted });
+        report.browserClose = report.localClose.allLocalClosed ? "CONFIRMED" : "UNVERIFIED";
         const overall = overallResult(report.flow, report.cleanup, report.protection, ledger.held,
             report.browserClose === "CONFIRMED" && report.authenticationCleanup !== "SIGNOUT_UNVERIFIED" && !ciTransportFailed);
         report.overall = overall.status; report.status = overall.status;

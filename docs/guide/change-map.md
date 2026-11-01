@@ -135,3 +135,5 @@ Issue118初回redirect停止診断はscripts/check-issue118-preview-redirect.mjs
 初回handshake例外は[限定設計](../verification/issue118-initial-handshake-candidate-20261101.md)、scripts/issue118-initial-handshake-candidate.mjs・issue118-ci-auth.mjs、同名testとrunner receiptを照合する。初回main-frame documentだけの固定SDK経路であり、通常API/後続navigationのredirect禁止は維持する。
 
 callback条件の調査は scripts/check-issue118-handshake-callback.mjs と tests/issue118-handshake-callback.test.mjs、専用workflowのDIAGNOSE_HANDSHAKE_CALLBACK_ONLYを照合する。既存SDK外向きguardのまま最大2 GETで停止し、callback送信・認証・fixtureは実行しない。全predicateはbooleanだけであり、正常な認証/T1の証明ではない。
+
+legacy callbackは上記限定設計とci-authの明示的な初回document配線を参照。nonceとの分離と実SDKのoffline署名検査を維持する。browser終了はscripts/issue118-close-browser.mjsの独立booleanを通常runner/停止診断で照合し、片方失敗・handle未取得を全終了と扱わない。
