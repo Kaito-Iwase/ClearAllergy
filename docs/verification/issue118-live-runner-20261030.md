@@ -165,18 +165,30 @@ contextのCookie jarはorigin単位で通常の送受信を行うが、読取/ex
 
 分類後に別途承認した[限定handshake](issue118-initial-handshake-candidate-20261101.md)を通常CI認証の最初のdocumentにだけ適用する。既存の新規nonpersistent context・global headerなし・claims検証済みtoken()を維持し、OIDCはappだけへ送る。固定SDKの順序で最大3転送/4 GET、各fetchの自動redirect/retryは0。API writeや後続navigationのredirect禁止は変更しない。initialHandshakeの固定stage/HTTP status/count/booleanを結果へ保存し、HOLD/証跡保存不明ではClerk Backend API前に停止する。document-readyを認証やsession失効確認に読み替えない。
 
-## 原本T2/T3の呼出し接続（未有効化のmanaged候補）
+## 原本T2/T3/T4の呼出し接続（未有効化のmanaged候補）
 
 既存入口の`prepareOriginalBatchRun(input)`は、原本から投影する`prepareOriginalScenario`へ既存の4つの純粋ledger関数を直接注入する。新規のCLIや認証経路は持たず、`runLive`、`--ci-apply`、workflow、従来のT1一件用承認は変えない。TS読込みは既存依存`tsx/cjs/api`を使い、この関数を呼ぶときだけ行う。
 
-純粋adapterを注入する従来形に加え、`input.managed`を渡すと、一度だけのT2→独立T3を準備する。`mode: PREPARATION_ONLY`、親run UUID、別のT2/T3 run UUID、16個の異なるoperation UUID、freshな固定配備receipt、A/B別のowner evidence・context/page/access、task/CI所有の永続claimDirectoryが必要。Bの実IDはコードに補完しない。現在のCI authはA固定で、B認証・UI送信・無人live起動は未実装のまま。既存`runLive`・CLI・workflowはmanaged入口を呼ばない。
+純粋adapterを注入する従来形に加え、`input.managed`を渡すと、一度だけのT2→独立T3→独立T4を準備する。`mode: PREPARATION_ONLY`、親run UUID、別のT2/T3/T4 run UUID、17個の異なるoperation UUID（T2/T3各8とT4のM02）、freshな固定配備receipt、A/B別のowner evidence・context/page/access、T4 evidence level、task/CI所有の永続claimDirectoryが必要。既存`runLive`・CLI・workflowはmanaged入口を呼ばない。
+
+Bの期待Clerk IDとAppUser IDの組は、既存ローカルの`main19-execution-readiness.json`、`main19-source-db-review.json`、`owner-readiness.json`から識別できた。2026-10-28のmain19初期化receiptもVERIFIED/ownersMatchを記録しているため、期待Clerk IDを固定する。ただし現在のB店舗ID・認証済みcontext・freshなowner対応は未確認。雛形`readonly-expected-output.json`のshop欄はplaceholderで、実測値として使わない。CI authはA固定のままで、B認証・UI送信・無人live起動は未実装。新アカウント/鍵の作成や取得は行わない。
 
 送信ごとに固定target、fresh owner evidence、context結合、管理画面URL、Clerk userと既存Development公開鍵guard、所有店舗GETを再照合する。GETは既存`protectedPreviewFetch`、唯一のwrite senderは固定API pathだけに既存OIDC header/claims guardを適用する。自動redirect/retryは0。T1の送信も行う`action()`は注入しない。取得した201 IDだけをowner/scenarioに結び、既存保護IDやscenario越境を拒否する。
 
 同じclaimDirectoryを再利用し、親run、各scenario setup/STOP、各操作を`wx`作成+`fsync`で永続claimする。安全なJSONLを送信前にfsyncし、失敗はHOLD。claimやjournalは自動で消さず、新directoryへ移すことで再試行を回避しない。プロセス再起動後も既存claimがあれば拒否する。通常の合成testだけは自分が作成した一時fixture directoryを終了時に削除する。これは実fixture/監査履歴のcleanupとは別。
 
-原本8件の非公開作成→初回公開→T2四件/T3二件STOPまでを一連で呼び、T2だけ原本E21/E23の乳CONTAINS非公開訂正→保存済み食品版の取得→別再公開へ進む。T3はロット割当HOLDで終わる。201実IDは後のreadback失敗前に保持し、unknown/不一致/中止で後続write・再送・自動cleanupをしない。独立SQL、公開ページ/API、既知状態の明示cleanupは別に必要で、結果は実サービス総合PASSを返さない。
+原本8件の非公開作成→初回公開→T2四件/T3二件STOPまでを一連で呼び、T2だけ原本E21/E23の乳CONTAINS非公開訂正→保存済み食品版の取得→別再公開へ進む。T3のロット割当HOLDを維持したまま、別run/別M02 fixtureのT4へ進む。T3の再公開は行わない。201実IDは後のreadback失敗前に保持し、unknown/不一致/中止で後続write・再送・自動cleanupをしない。独立SQL、既知状態の明示cleanupは別に必要で、結果は実サービス総合PASSを返さない。
 
 `tests/issue118-original-entry.test.ts`はこの既存入口から原本投影/既存ledgerへ至るT2/T3の合成完遂と作成応答喪失を検査する。HTTP/Clerk/DB/Blob/秘密値は使わず、実認証やUI実行の証拠ではない。既存の`.test.ts` globに含め、workflowは変更しない。
 
-T4の再利用元はPR119 `3e494a30766b054963fefd220846849e330206f4` の`prepareT4Observation({context,fixture,assertReadTarget,readPublicApi,evidenceLevel})`。baselineはSTOP前、`afterExternalChange()`はSTOP確定・API readback後、最後に`close()`で所有ページの終了を別確認する。page routeは非対象をfallbackし、既存context保護を通す。実装済み観測器を新たに複製しない。今回のmanaged接続はT2/T3までで、T4観測器の呼出し自体は未配線（結果にも`NOT_PREPARED_REUSE_PORT_DOCUMENTED`）。原本T4・公開伝播・戻る・通信断の実試験成功には数えない。全体test/CIや原本投影の合成成功も実サービス総合PASSではない。
+T4は原本M02の800円/29状態を別fixtureへ投影し、非公開作成→初回公開→baseline→STOP→API readback→観測→終了を接続した。再利用元はPR119 `3e494a30766b054963fefd220846849e330206f4` の`prepareT4Observation({context,fixture,assertReadTarget,readPublicApi,evidenceLevel})`で、`scripts/issue118-t4-observer.mjs`と対応testをbyte不変で取り込む（実装blob `8a9859a40e7b9443342f95456e9c1e59dffaffb0`）。baselineはSTOP前、`afterExternalChange()`はSTOP確定・API readback後、最後に`close()`で所有ページの終了を別確認する。既存ページを閉じず、close不明は全体HOLD。page routeは非対象をfallbackし、既存context保護を通す。合成Page/HTTPモデルのイベントは実ブラウザ・cache・BFCache・実サービス障害の実証ではない。実試験は未実施。
+
+## サービス応答観測の未有効化接続
+
+同じmanaged objectの`execute()`が確定した後だけ、`prepareServiceObservation(config)`で1論理操作を準備できる。同時probeを許さず、unknownでrun全体をHOLDする。再利用元の`scripts/issue118-service-observer.ts`と対応testはPR119 `0ca5a48758b19434c45cbbd592c686478363d520` のbyte不変コピー（提供patch SHA256 `937f6e6075cbb1867d11e6448a74ebd78dab23ffaf69b5de80e26d5e83f4483d`）。新しい実行CLIやworkflow権限は追加しない。
+
+current-run 201台帳とownerに結び、固定method/path/body hashと既存論理claimで通常配達/送信前遮断/上流応答後返却抑止を区別する。logical claimはfault modeをキーに含めない。routeのrequest frame→指定page→選択actor contextと、固定作成/編集URLを送信前に照合する。管理画面guard用pageと操作UI pageは同じactor context内で分ける。唯一の`route.fetch`はOIDCを固定appだけへ送り、redirect/retryは0。CREATE201の有効IDは相関header検査より先にledger・私有receiptへ残し、相関不明でも失わない。正常時もUI・所有APIを別照合し、上流200だけをDB成功にしない。
+
+Blobは既存の専用originだけを許可し、acknowledged objectのURLを私有claimDirectoryへ記録する。public log/artifactにはURLやheader/body/認証値を出さない。`observeKnownBlob`は1回だけ既知1URLのcredential-free読取adapterを使い、unknownを解除しない。wrapperは削除methodを公開せず既定RETAIN。新しいBlobキーは不要。現在runの新shop証跡がないためSHOP_SAVE/SHOP_UPLOADは拒否する。必要なら別途、明示承認されたshop対象・現在値・復元条件・所有対応を先に固定する。
+
+画像修正の実証にはPR121 `3605dd7b3237f80b6a13c351f9bae2b1987513c9` を含む別の隔離candidate receiptが必要。最低限の製品差分候補は`NewMenuForm.tsx`、`MenuEditClient.tsx`、`ShopEditClient.tsx`、`lib/validators/upload-response.ts`と対応API/validator/browser tests・文書。依存/競合を確認した新SHA・環境・副作用を確定してから配備対象を決める。診断app `aa92dbb`へ移植も配備もしていない。現在の接続は合成のみで、normal image new/edit/shop、実Blob、実応答喪失、独立DB照合はいずれも未実施。

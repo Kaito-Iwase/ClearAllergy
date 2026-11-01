@@ -144,4 +144,4 @@ legacy callbackは上記限定設計とci-authの明示的な初回document配�
 
 Issue118 server callback CI candidate: [未有効化候補](../verification/issue118-server-callback-ci-preparation-20261101.md)、scripts/check-issue118-server-callback-candidate.mjs、同名test、専用workflowの未対応mode、browser-runnerのoffline guardsを照合する。架空URL/receiptでの検査を実配備・認証・T1の成功と扱わない。
 
-原本T2/T3の未有効化managed接続は[runner運用](../verification/issue118-live-runner-20261030.md)、scripts/check-issue118-live-t1-browser.mjsのprepareOriginalBatchRun、issue118-batch-stop.ts/fixture-map.ts/stop-oracle.ts、tests/issue118-original-entry.test.tsとissue118-batch-stop.test.tsを照合する。A/B別context・fresh外部owner根拠・永続claim・単一送信・unknown停止を維持し、実B認証やT4観測の未実施を隠さない。通常test globだけに載せ、live workflow権限を変えない。
+原本T2/T3/T4とサービス観測の未有効化managed接続は[runner運用](../verification/issue118-live-runner-20261030.md)、scripts/check-issue118-live-t1-browser.mjsのprepareOriginalBatchRun/prepareServiceObservation、再利用したissue118-batch-stop.ts/fixture-map.ts/stop-oracle.ts/t4-observer.mjs/service-observer.tsと対応testを照合する。A/B別context・fresh外部owner根拠・永続claim・単一送信・unknown停止を維持し、実B認証/画像/Blob/応答喪失/DBの未実施を隠さない。通常test globだけに載せ、live workflow権限を変えない。PR121を含む別app candidateは未作成/未配備。

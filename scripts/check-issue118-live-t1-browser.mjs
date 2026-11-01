@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { createCiAccess, assertCiEnvironment, ciIdentity, assertOidcClaims, assertClerkPublishableKey } from "./issue118-ci-auth.mjs";
 import { transportObservation, scopedOidcHeaders, protectedPreviewFetch } from "./issue118-preview-transport.mjs";
 import { closeIsolatedBrowser } from "./issue118-close-browser.mjs";
+import { prepareT4Observation } from "./issue118-t4-observer.mjs";
 
 // Callable bridge for the separately scoped T2/T3 run. It deliberately does not
 // change runLive(), --ci-apply, its one-fixture confirmation, auth or workflow.
@@ -16,7 +17,8 @@ import { closeIsolatedBrowser } from "./issue118-close-browser.mjs";
 export function prepareOriginalBatchRun(input) {
     const { prepareOriginalScenario } = createRequire(import.meta.url)("tsx/cjs/api").require("./issue118-batch-stop.ts", import.meta.url);
     if (input.managed) {
-        try { return prepareManagedOriginalBatch(input, prepareOriginalScenario); }
+        const source = createRequire(import.meta.url)("tsx/cjs/api").require("./issue118-batch-stop.ts", import.meta.url);
+        try { return prepareManagedOriginalBatch(input, source); }
         catch { throw Error("ORIGINAL_MANAGED_PREPARATION_HELD"); }
     }
     return prepareOriginalScenario({ ...input, ledgerPort: { newWriteLedger, beginWrite, holdWrite, confirmWrite } });
@@ -26,7 +28,7 @@ export function prepareOriginalBatchRun(input) {
 // authentication entrypoint calls this. Existing A-only authentication is unchanged.
 // A future caller must supply TWO independently authenticated guarded contexts and
 // fresh external owner evidence. No real ownerB is inferred or stored in this code.
-function prepareManagedOriginalBatch(input, prepareOriginalScenario) {
+function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOriginalPayloads, fixturePayload }) {
     const refused = () => { throw Error("ORIGINAL_MANAGED_PREPARATION_HELD"); };
     const check = value => { if (!value) refused(); };
     const uuid = value => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -47,6 +49,10 @@ function prepareManagedOriginalBatch(input, prepareOriginalScenario) {
             && actor.page.context() === actor.context);
     }
     check(actors.get("S1").expectedUserId === ciIdentity.ownerId && actors.get("S1").binding.shopId === target.shop);
+    // Historical approved main19 pair, not evidence of a current B session/shop.
+    check(actors.get("S2").expectedUserId === "user_3LFyNjtUBNFHoDjyYiieTXEhHd0");
+    check(typeof actors.get("S1").context.newPage === "function" && typeof actors.get("S1").context.pages === "function"
+        && ["SYNTHETIC_HTTP_BROWSER", "APP_BROWSER_READS_ONLY"].includes(cfg.t4EvidenceLevel));
     const evidence = structuredClone(cfg.ownerEvidence), identityReceipt = structuredClone(cfg.identityReceipt);
     const validate = () => {
         assertIdentityReceipt(identityReceipt, now());
@@ -63,13 +69,15 @@ function prepareManagedOriginalBatch(input, prepareOriginalScenario) {
         }
     };
     validate();
-    check(uuid(cfg.runIds?.T2) && uuid(cfg.runIds?.T3) && new Set([input.runId, cfg.runIds.T2, cfg.runIds.T3]).size === 3);
+    check(["T2", "T3", "T4"].every(s => uuid(cfg.runIds?.[s]))
+        && new Set([input.runId, cfg.runIds.T2, cfg.runIds.T3, cfg.runIds.T4]).size === 4);
     const batchRunId = input.runId, runIds = structuredClone(cfg.runIds);
     const operationIds = structuredClone(cfg.operationIds);
     check(["T2", "T3"].every(s => Object.keys(operationIds?.[s] || {}).length === 8
         && Array.from({ length: 8 }, (_, i) => "M0" + (i + 1)).every(k => uuid(operationIds[s][k])))
-        && new Set(Object.values(operationIds).flatMap(x => Object.values(x))).size === 16);
-    let used = false, held = false, journal, sequence = 0;
+        && Object.keys(operationIds).length === 3 && Object.keys(operationIds.T4 || {}).length === 1 && uuid(operationIds.T4.M02)
+        && new Set(Object.values(operationIds).flatMap(x => Object.values(x))).size === 17);
+    let used = false, held = false, journal, sequence = 0, managedReady = false, serviceActive = false;
     const claimDirectory = resolve(cfg.claimDirectory), created = new Map(), observations = [];
     const claim = (file, data) => {
         let fd;
@@ -91,9 +99,9 @@ function prepareManagedOriginalBatch(input, prepareOriginalScenario) {
         validate();
         return protectedPreviewFetch(actor.context.request, target.origin + path, {}, assertOidcClaims(actor.access.token(), now()));
     };
-    const verifyActor = async binding => {
+    const verifyActor = async (binding, readOnlyReconciliation = false) => {
         try {
-            check(!held && !input.signal?.aborted); validate();
+            check((!held || readOnlyReconciliation) && !input.signal?.aborted); validate();
             const actor = actors.get(binding.owner);
             check(actor && actor.binding.shopId === binding.shopId && actor.binding.contextRef === binding.contextRef
                 && actor.page.context() === actor.context && actor.page.url() === target.origin + "/admin/shop");
@@ -153,13 +161,209 @@ function prepareManagedOriginalBatch(input, prepareOriginalScenario) {
             } };
         } catch { held = true; refused(); }
     };
-    return { async execute() {
+    const runT4 = async () => {
+        const { savedMenuResponseSchema } = createRequire(import.meta.url)("tsx/cjs/api").require("../features/admin/menus/schemas/menu-response.ts", import.meta.url);
+        const actor = actors.get("S1"), owner = actor.binding, key = "M02", ledger = newWriteLedger();
+        const payload = projectOriginalPayloads(runIds.T4).expectedByMenu.M02;
+        const report = { scenario: "T4", status: "T4_HOLD_NO_FURTHER_WRITES", stage: "SETUP", code: "HOLD", fixtureId: null, writes: ledger,
+            observation: null, ownedPagesClosed: null, preexistingPagesPreserved: null, database: "NOT_ATTESTED", automaticCleanup: false };
+        let observer, beforePages, menuId, previous;
+        const readOwn = async () => savedMenuResponseSchema.parse({ menu: (await adapter("T4").readOwnMenu({ key, menuId, shopId: owner.shopId, contextRef: owner.contextRef })).menu }).menu;
+        const mutate = async (phase, method, path, body) => {
+            report.stage = phase;
+            const op = beginWrite(ledger, phase); op.state = "IN_FLIGHT";
+            try {
+                const response = await send("T4", { key, owner, phase, method, path, menuId, body });
+                const parsed = await consumeWriteResponse(ledger, op, response, menuId, id => { menuId = id; report.fixtureId = id; });
+                const menu = await readOwn();
+                assert.deepEqual(fixturePayload(menu), payload);
+                check(menu.allergens.length === 29 && new Set(menu.allergens.map(a => a.slug)).size === 29);
+                if (phase === "CREATE") check(!menu.isPublished && menu.publicationConfirmedFoodVersion === null);
+                else {
+                    check(previous && menu.version === parsed.menu.version && menu.version > previous.version
+                        && menu.foodVersion === previous.foodVersion);
+                    if (phase === "INITIAL_PUBLISH") check(menu.isPublished && menu.publicationConfirmedFoodVersion === menu.foodVersion);
+                    else {
+                        check(!menu.isPublished);
+                        const stable = value => { const copy = structuredClone(value); delete copy.version; delete copy.isPublished; return copy; };
+                        assert.deepEqual(stable(menu), stable(previous));
+                    }
+                }
+                confirmWrite(ledger, op); previous = menu;
+                await record({ stage: "T4_RESPONSE_AND_API_READBACK_CONFIRMED", key, menuId, version: menu.version });
+            } catch { holdWrite(ledger, op, "T4_RESULT_OR_READBACK_UNCONFIRMED"); held = true; refused(); }
+        };
+        try {
+            check(claim("T4-setup", { runId: runIds.T4, operationId: operationIds.T4.M02 }));
+            await mutate("CREATE", "POST", "/api/admin/menus", { ...payload, operationId: operationIds.T4.M02, isPublished: false });
+            await mutate("INITIAL_PUBLISH", "PUT", `/api/admin/menus/${menuId}`, { expectedVersion: previous.version, publicationAction: "publish" });
+            await verifyActor(owner); beforePages = new Set(actor.context.pages());
+            report.stage = "OBSERVER_BASELINE";
+            observer = await prepareT4Observation({ context: actor.context,
+                fixture: { origin: target.origin, shopId: owner.shopId, menuId, name: payload.name },
+                assertReadTarget: () => verifyActor(owner), evidenceLevel: cfg.t4EvidenceLevel,
+                readPublicApi: async url => {
+                    check(url === target.origin + "/api/menus/" + menuId); await verifyActor(owner);
+                    const response = await readProtected(actor, "/api/menus/" + menuId), status = response.status();
+                    return { status, ...(status === 200 ? { menuId: (await response.json())?.menu?.id } : {}) };
+                } });
+            await record({ stage: "T4_BASELINE_READY_BEFORE_STOP", key, menuId });
+            await mutate("STOP", "POST", `/api/admin/menus/${menuId}/stop`, { expectedVersion: previous.version });
+            report.stage = "OBSERVER_AFTER_STOP";
+            report.observation = await observer.afterExternalChange();
+            report.stage = "OBSERVATION_VALIDATE";
+            check(report.observation.freshReadOutcome === "FRESH_READS_HIDE_TARGET" && !report.observation.truncated
+                && !report.observation.observationFailed && report.observation.held.targetMatched === true
+                && report.observation.back.targetMatched === true
+                && report.observation.failedRefetch.injection === "ONE_DOCUMENT_GET_ABORTED_BEFORE_FORWARD");
+            await record({ stage: "T4_OBSERVATION_COLLECTED_NOT_DATABASE_ATTESTATION", key, menuId });
+            report.status = "T4_STOP_API_AND_OBSERVATIONS_CONFIRMED_NOT_LIVE_PASS";
+            report.code = "MODEL_OR_ADAPTER_OBSERVATIONS_ONLY";
+        } catch { report.code = report.stage + "_HELD"; held = true; }
+        finally {
+            try {
+                const close = observer ? await observer.close() : null;
+                report.ownedPagesClosed = beforePages ? (!close || close.allOwnedPagesClosed === true)
+                    && actor.context.pages().every(p => beforePages.has(p) || p.isClosed()) : true;
+                report.preexistingPagesPreserved = beforePages ? [...beforePages].every(p => !p.isClosed()) : true;
+            } catch { report.ownedPagesClosed = false; report.preexistingPagesPreserved = false; }
+            if (!report.ownedPagesClosed || !report.preexistingPagesPreserved) held = true;
+        }
+        if (held) report.status = "T4_HOLD_NO_FURTHER_WRITES";
+        return report;
+    };
+    const prepareServiceObservation = cfgProbe => {
+        check(managedReady && !held && !serviceActive); validate();
+        const { prepareWriteObservation } = createRequire(import.meta.url)("tsx/cjs/api").require("./issue118-service-observer.ts", import.meta.url);
+        const { menuCreateResponseSchema } = createRequire(import.meta.url)("tsx/cjs/api").require("../features/admin/menus/schemas/menu-response.ts", import.meta.url);
+        const probeTarget = structuredClone(cfgProbe.target), mode = cfgProbe.mode;
+        check(["MENU_CREATE", "MENU_SAVE", "STOP", "MENU_UPLOAD"].includes(probeTarget.kind));
+        const actor = actors.get(cfgProbe.owner);
+        check(actor && typeof cfgProbe.observeUi === "function");
+        if (probeTarget.kind !== "MENU_CREATE") check(created.get(probeTarget.menuId)?.owner === actor.binding.owner);
+        if (probeTarget.kind === "MENU_UPLOAD") check(cfgProbe.upload?.origin === "https://wtqdbklmg3bbqk4s.public.blob.vercel-storage.com");
+        const logical = createHash("sha256").update(JSON.stringify({ kind: probeTarget.kind,
+            id: probeTarget.menuId || probeTarget.creationOperationId, version: probeTarget.beforeVersion ?? null })).digest("hex");
+        if (probeTarget.kind === "MENU_CREATE") check(!Object.values(operationIds).flatMap(x => Object.values(x)).includes(probeTarget.creationOperationId));
+        const serviceLedger = newWriteLedger(); let op, rawResponse, started = false, body, before, forwardCalls = 0, abortCalls = 0, createdMenuId;
+        const assertRequestActor = () => {
+            const page = cfgProbe.page, expectedPath = probeTarget.kind === "MENU_CREATE" ? "/admin/menus/new" : `/admin/menus/${probeTarget.menuId}/edit`;
+            check(page && page.context() === actor.context && page.url() === target.origin + expectedPath
+                && cfgProbe.route.request().frame().page() === page);
+        };
+        const serviceRecord = async event => {
+            const safe = { sequence: ++sequence, stage: event.stage,
+                ...(Number.isInteger(event.httpStatus) ? { httpStatus: event.httpStatus } : {}),
+                ...(uuid(event.requestId) ? { requestId: event.requestId } : {}),
+                ...(/^c[a-z0-9]+$/.test(event.menuId || "") ? { menuId: event.menuId } : {}),
+                ...(/^[a-f0-9]{64}$/.test(event.objectSha256 || "") ? { objectSha256: event.objectSha256 } : {}) };
+            check(/^[A-Z0-9_]+$/.test(safe.stage)); let fd;
+            try {
+                check(JSON.parse(readFileSync(join(claimDirectory, "managed-run.json"), "utf8")).runId === batchRunId);
+                check(lstatSync(join(claimDirectory, "events.jsonl")).isFile() && !lstatSync(join(claimDirectory, "events.jsonl")).isSymbolicLink());
+                fd = openSync(join(claimDirectory, "events.jsonl"), "a"); writeFileSync(fd, JSON.stringify(safe) + "\n"); fsyncSync(fd);
+                if (event.stage === "CREATED_201_ID_RECORDED") {
+                    check(event.menuId === createdMenuId && created.get(event.menuId)?.owner === actor.binding.owner
+                        && created.get(event.menuId)?.creationOperationId === probeTarget.creationOperationId);
+                }
+            } catch { held = true; refused(); } finally { if (fd !== undefined) closeSync(fd); }
+        };
+        const readBoundMenu = async id => {
+            check(created.get(id)?.owner === actor.binding.owner);
+            await verifyActor(actor.binding);
+            const response = await readProtected(actor, "/api/admin/menus/" + id);
+            check(response.status() === 200); const menu = (await response.json())?.menu;
+            check(menu?.id === id); return menu;
+        };
+        const source = prepareWriteObservation({ scope: { runId: batchRunId, applicationSha: target.source, shopId: actor.binding.shopId,
+            isolationReceiptSha256: createHash("sha256").update(JSON.stringify(identityReceipt)).digest("hex") },
+            target: probeTarget, mode, fileExpected: cfgProbe.fileExpected, upload: cfgProbe.upload,
+            adapter: {
+                assertScope: async () => { await verifyActor(actor.binding);
+                    if (probeTarget.kind !== "MENU_CREATE") check(created.get(probeTarget.menuId)?.owner === actor.binding.owner); },
+                claim: async () => { op = beginWrite(serviceLedger, "SERVICE");
+                    const ok = claim("service-" + logical, { runId: batchRunId, kind: probeTarget.kind,
+                        menuId: probeTarget.menuId, creationOperationId: probeTarget.creationOperationId });
+                    if (!ok) holdWrite(serviceLedger, op, "SERVICE_LOGICAL_CLAIM_HELD"); return ok; },
+                forwardOnce: async () => {
+                    assertRequestActor(); await verifyActor(actor.binding);
+                    if (probeTarget.kind === "MENU_CREATE") {
+                        const data = JSON.parse(body.toString("utf8"));
+                        check(data.operationId === probeTarget.creationOperationId && data.isPublished === false
+                            && typeof data.name === "string" && data.name.startsWith("【架空") && data.name.includes(batchRunId));
+                    } else {
+                        before = await readBoundMenu(probeTarget.menuId);
+                        if (probeTarget.kind !== "MENU_UPLOAD") check(before.version === probeTarget.beforeVersion
+                            && JSON.parse(body.toString("utf8")).expectedVersion === probeTarget.beforeVersion);
+                    }
+                    const headers = scopedOidcHeaders(target.origin + probeTarget.path, await cfgProbe.route.request().allHeaders(),
+                        assertOidcClaims(actor.access.token(), now()));
+                    assertRequestActor();
+                    op.requestSent = true; op.state = "IN_FLIGHT"; forwardCalls++;
+                    rawResponse = await cfgProbe.route.fetch({ headers, maxRedirects: 0, maxRetries: 0, timeout: 20000 });
+                    check(rawResponse.status() < 300 || rawResponse.status() >= 400);
+                    if (probeTarget.kind === "MENU_CREATE" && rawResponse.status() === 201) {
+                        const raw = await rawResponse.json(), parsedId = menuCreateResponseSchema.shape.id.safeParse(raw?.id);
+                        if (parsedId.success) {
+                            createdMenuId = parsedId.data; op.createdId = createdMenuId;
+                            check(!created.has(createdMenuId) && ![target.anchor, "cmvs4x86o000vwn0w93c8ttez", "cmvs4x8wt000xwn0wj6gwdih1",
+                                "cmvs4x986000zwn0wer2ymhow", "cmvuy8d4z0003jw07e9fobsdm", "cmvuzlqhf0003l308lem3uwck"].includes(createdMenuId));
+                            check(claim("service-created-" + probeTarget.creationOperationId, { runId: batchRunId, menuId: createdMenuId,
+                                creationOperationId: probeTarget.creationOperationId, correlation: "NOT_YET_VERIFIED" }));
+                            created.set(createdMenuId, { key: "SERVICE", owner: actor.binding.owner, scenario: "SERVICE", creationOperationId: probeTarget.creationOperationId });
+                            await serviceRecord({ stage: "CREATED_201_ID_HELD_BEFORE_CORRELATION", menuId: createdMenuId });
+                        }
+                    }
+                    return { status: () => rawResponse.status(), requestId: async () => rawResponse.headers()["x-request-id"] ?? null,
+                        json: () => rawResponse.json() };
+                },
+                abortClient: async () => { abortCalls++; await cfgProbe.route.abort("failed"); },
+                deliverOnce: async () => { assertRequestActor(); await cfgProbe.route.fulfill({ response: rawResponse }); },
+                observeUi: cfgProbe.observeUi, record: serviceRecord,
+                recordKnownObject: async ref => claim("object-" + ref.objectSha256, ref),
+            } });
+        serviceActive = true;
+        return {
+            async execute() {
+                check(!started); started = true; let result, sourceEntered = false;
+                try {
+                    assertRequestActor();
+                    const request = cfgProbe.route.request(), url = new URL(request.url());
+                    check(url.href === target.origin + probeTarget.path && !url.username && !url.password && !url.search && !url.hash);
+                    body = request.postDataBuffer(); check(Buffer.isBuffer(body) && body.length <= 6 * 1024 * 1024);
+                    sourceEntered = true; result = await source.execute({ method: request.method(), path: url.pathname,
+                        bodySha256: createHash("sha256").update(body).digest("hex") });
+                    if (result.stage === "REQUEST_MISMATCH_NO_ACTION") { abortCalls++; await cfgProbe.route.abort("failed"); }
+                    check(result.clientDelivery === "DELIVERY_CONFIRMED" && result.bodyValidated && !result.clientUnknown
+                        && result.ui?.successDisplayed === true && result.ui?.followupWrites === 0);
+                    const id = result.createdMenuId || probeTarget.menuId, after = await readBoundMenu(id);
+                    if (probeTarget.kind === "MENU_UPLOAD") assert.deepEqual(after, before);
+                    else if (probeTarget.kind === "MENU_CREATE") check(after.isPublished === false && after.name === JSON.parse(body.toString("utf8")).name);
+                    else { const responseBody = await rawResponse.json(); check(after.version === responseBody.menu.version
+                        && (probeTarget.kind !== "STOP" || after.isPublished === false)); }
+                    op.bodyValidated = true; confirmWrite(serviceLedger, op);
+                    return { status: "SERVICE_DELIVERED_AND_OWN_API_CONFIRMED_NOT_LIVE_PASS", result, writes: serviceLedger, transportForwardCalls: forwardCalls,
+                        ...(createdMenuId ? { createdMenuId, creationOperationId: probeTarget.creationOperationId } : {}),
+                        imageFix: "NOT_ATTESTED_PR121_CANDIDATE_REQUIRED", cleanup: "RETAIN_NO_DELETE_METHOD" };
+                } catch {
+                    held = true; if (op) holdWrite(serviceLedger, op, "SERVICE_RESULT_OR_UI_OR_READBACK_HELD");
+                    if (!sourceEntered && abortCalls === 0) { abortCalls++; try { await cfgProbe.route.abort("failed"); } catch { /* never retry abort */ } }
+                    return { status: "SERVICE_HOLD_NO_FURTHER_WRITES", result, writes: serviceLedger, transportForwardCalls: forwardCalls,
+                        ...(createdMenuId ? { createdMenuId, creationOperationId: probeTarget.creationOperationId } : {}), cleanup: "RETAIN_NO_DELETE_METHOD" };
+                } finally { serviceActive = false; }
+            },
+            // This does not clear held/clientUnknown and never exposes deletion.
+            observeKnownBlob: readExactObject => source.observeKnownBlob({
+                assertScope: () => verifyActor(actor.binding, true), readExactObject }),
+        };
+    };
+    return { prepareServiceObservation, async execute() {
         check(!used); used = true;
         const results = []; let report;
         try {
             validate(); for (const owner of owners) await verifyActor(owner);
             mkdirSync(claimDirectory, { recursive: true }); check(lstatSync(claimDirectory).isDirectory() && !lstatSync(claimDirectory).isSymbolicLink());
-            check(claim("managed-run", { runId: batchRunId, scenarios: ["T2", "T3"], runIds }));
+            check(claim("managed-run", { runId: batchRunId, scenarios: ["T2", "T3", "T4"], runIds }));
             journal = openSync(join(claimDirectory, "events.jsonl"), "wx", 0o600);
             for (const scenario of ["T2", "T3"]) {
                 const result = await prepareOriginalScenario({ scenario, runId: runIds[scenario], owners, operationIds: operationIds[scenario],
@@ -168,7 +372,10 @@ function prepareManagedOriginalBatch(input, prepareOriginalScenario) {
                 const expected = scenario === "T2" ? "SCENARIO_APP_RESPONSES_CONFIRMED_NOT_LIVE_PASS" : "SCENARIO_STOP_CONFIRMED_LOT_HOLD_NOT_LIVE_PASS";
                 if (held || result.status !== expected) refused();
             }
-            report = { status: "MANAGED_ADAPTER_SEQUENCE_CONFIRMED_NOT_LIVE_PASS", results, observations, t4: "NOT_PREPARED_REUSE_PORT_DOCUMENTED",
+            const t4 = await runT4(); results.push(t4);
+            check(!held && t4.status === "T4_STOP_API_AND_OBSERVATIONS_CONFIRMED_NOT_LIVE_PASS");
+            observations.push(t4.observation);
+            report = { status: "MANAGED_ADAPTER_SEQUENCE_CONFIRMED_NOT_LIVE_PASS", results, observations, t4,
                 authentication: "CALLER_CONTEXTS_NOT_INDEPENDENTLY_ATTESTED", independentDatabase: "NOT_ATTESTED", automaticCleanup: false };
         } catch { report = { status: "MANAGED_HOLD_NO_FURTHER_WRITES", results, observations, automaticCleanup: false, automaticRetry: false }; }
         finally {
@@ -177,6 +384,7 @@ function prepareManagedOriginalBatch(input, prepareOriginalScenario) {
             }
         }
         if (held) report.status = "MANAGED_HOLD_NO_FURTHER_WRITES";
+        managedReady = !held && report.status === "MANAGED_ADAPTER_SEQUENCE_CONFIRMED_NOT_LIVE_PASS";
         return report;
     } };
 }
