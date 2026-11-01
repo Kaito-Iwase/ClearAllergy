@@ -111,3 +111,17 @@ baseline公開APIの対象IDと4画面の架空名を確認してから、呼出
 再取得失敗用のpage routeは該当URLのdocument GETだけをabortし、他要求には`fallback()`を使う。`continue()`/`fetch()`で既存context保護を短絡せず、headers/cookieを取得・付加しない。複数の自動試行やabort未確定は注入未確認になる。これはブラウザによる送信前GET遮断であり、実サービス停止・書込み応答喪失ではない。routeを使うとHTTP cacheへ影響するため、呼出し側のtransport条件も別記する。[Playwright 1.61のroute仕様](https://github.com/microsoft/playwright/blob/v1.61.0/docs/src/api/class-route.md)と[pageshow](https://developer.mozilla.org/en-US/docs/Web/API/Window/pageshow_event)を参照。
 
 `check-issue118-t4-offline.mjs`は自作loopback HTTPと実Chromiumでこの観測器を呼ぶ。架空公開→非公開、変更なし、fresh API例外、fresh HTTP500/notFound、baseline HTTP500の5条件を比較する。baseline画面はHTTP200、fresh画面はHTTP200/404を要求し、500が同じDOMを返しても未確認とする。streamingを模したHTTP200/notFound、既開食品表示、戻るのrequest/イベント、対象GET遮断、1回制限と所有4ページの後片付けを確認する。ClearAllergy/Next/実DB/Clerk/Blobの結果ではない。既存`publication` browser入口へ1群を接続し、`.test.ts`は既存`npm test`へ含めるためworkflow変更は不要。実Previewの四観測、T2/T3の複数店舗実行、画像・実通信失敗の残条件は維持する。
+
+### T2/T3の注入可能なSTOP操作器（原本payload投影と実接続は別）
+
+`scripts/issue118-batch-stop.ts`は、201で作成済み・初期公開済みの今回8件を`prepareFixtureStops`で照合し、T2の4件/T3の2件へSTOPだけを実行する。CREATE、食品訂正、公開、retry、cleanup、再公開のメソッドはない。HTTP/auth/DB/Blob/ファイルの実装を持たず、target/actor照合、所有者GET、唯一の`dispatchStop`、証跡保存とrun claimを注入する。読取callbackへはmethod/path/bodyを渡さず、STOP送信は`expectedVersion`だけの固定bodyと固定menu pathを1回渡す。
+
+PR #120の`newWriteLedger/beginWrite/holdWrite/confirmWrite`の純粋な状態管理を読み取り確認した。main基準branchから未採用live/auth moduleをimportしないため同じ状態管理だけを局所化し、既存4関数をそのまま注入できるportを用意した。**送信も行うT1の`action()`/click wrapperは注入しない。** 各menuに異なるledgerを1個持ち、phaseはSTOP一回のみ、唯一の送信callback以外から送らない。portを共有して2メニューへ使う入力は拒否する。
+
+run claimは、8件の作成ID/operationId/版を持つmanifestを原子的に保存し、同じrunの再instance/別processを拒否する呼出し側の責務。単なる常にtrueのcallbackではこの保証にならない。既存の専用出力receiptと排他を使い、pending/unknownを自動解除しない。モジュールのinstanceも一回制限を持つが、永続排他の代替ではない。dispatch intentを保存してからactorを再照合し、元の版で一回だけ送る。原例外・headers・本文・食品テキストは証跡に出さない。
+
+結果はdispatcher未呼出、既知HTTP非成功、未確定応答、既知応答/readback保留、確定応答＋所有者GET照合を区別する。送信callback開始後の例外/本文喪失/中止はunknownへ固定し、GETによる推定・後続送信・再送・cleanupをしない。中止はserver rollbackではなく、遅延commitもあり得る。全件確定後も他4件を含む8件のGET表現を再照合する。通常STOPで食品版/確認版/食品内容を変えず、公開反映pendingはfalseへ丸めず記録する。公開ページ・監査/全DB・実Clerkは`NOT_ATTESTED`で、総合live PASSを返さない。T3の次段は常にロット割当HOLDである。
+
+`PayloadPack.expectedByMenu`は、**原本CSVから独立に投影した初期payload**を呼出し側が供給する。`fixturePayload()`は既存SavedMenu DTOから比較形を作る関数であり、実GETを期待値にコピーして原本一致と呼んではいけない。`CALLER_PROJECTED_ORIGINAL`では既知のZIP/recipe/physical-gold hashとのメタデータ一致を要求するが、CSV本文/投影自体を認定しない。今回workspaceに原本本文がなく、原本CSV→初期payload生成は未実装・共有待ち。架空の値で補っていない。
+
+`tests/issue118-batch-stop.test.ts`は明示的なSYNTHETIC payloadとメモリ内adapterだけを使い、確定成功、送信前拒否、合成commit後の応答本文喪失、中止と遅延成功、別instance再送拒否、版競合、payload/所有者/品目差異、証跡失敗、非対象変化を確認する。実HTTP・実fixture・原本payloadの実行ではない。既存`.test.ts` globでCIへ入り、workflow変更は不要。
