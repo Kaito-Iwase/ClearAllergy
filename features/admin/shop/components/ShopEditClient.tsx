@@ -7,6 +7,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import React from "react";
+import { parseUploadedImageUrl } from "@/lib/validators/upload-response";
 import { useUnsavedMenuChanges } from "@/features/admin/menus/components/useUnsavedMenuChanges";
 import ShareShopUrlButton from "@/features/public/shops/components/ShareShopUrlButton";
 import ShopQrCard from "@/features/admin/shop/components/ShopQrCard";
@@ -269,14 +270,15 @@ export default function ShopEditClient({
                 error?: string;
             } | null;
 
-            if (!res.ok || !data?.url) {
+            const url = parseUploadedImageUrl(data);
+            if (!res.ok || !url) {
                 throw new Error(
                     data?.error ?? "画像アップロードに失敗しました。",
                 );
             }
 
-            setCoverImageUrl(data.url);
-            return data.url;
+            setCoverImageUrl(url);
+            return url;
         } finally {
             setUploading(false);
         }
