@@ -45,7 +45,7 @@ try {
     } else if (command === "issue118-live-guards" && options.length === 0) {
         // Offline unit/fixture tests only; never invoke the live entrypoint or --apply.
         assertInstalled();
-        runNode(["--import", "tsx", "--test", "tests/browser-runner.test.ts", "tests/issue118-live-browser.test.mjs", "tests/issue118-preview-transport.test.mjs", "tests/issue118-ci-auth.test.mjs", "tests/issue118-redirect-diagnostic.test.mjs", "tests/issue118-initial-handshake-candidate.test.mjs", "tests/issue118-handshake-callback.test.mjs", "tests/issue118-sdk-bootstrap.test.mjs"]);
+        runNode(["--import", "tsx", "--test", "tests/browser-runner.test.ts", "tests/issue118-live-browser.test.mjs", "tests/issue118-preview-transport.test.mjs", "tests/issue118-ci-auth.test.mjs", "tests/issue118-redirect-diagnostic.test.mjs", "tests/issue118-initial-handshake-candidate.test.mjs", "tests/issue118-handshake-callback.test.mjs", "tests/issue118-sdk-bootstrap.test.mjs", "tests/issue118-server-callback-candidate.test.mjs"]);
     } else if (command === "issue118-live-t1" && options.length === 1 && options[0] === "--apply") {
         assertInstalled();
         runNode(["scripts/check-issue118-live-t1-browser.mjs", "--apply"]);

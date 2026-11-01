@@ -7,7 +7,7 @@ on:
       confirmation:
         description: Approve ONE new fictional T1 fixture and private cleanup on the pinned Preview
         type: choice
-        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY]
+        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED]
         default: HOLD
         required: true
       expected_runner_sha:
