@@ -142,6 +142,6 @@ legacy callbackは上記限定設計とci-authの明示的な初回document配�
 
 全hop観測と3 GET停止診断候補は[認証経路点検](../verification/issue118-clean-target-observation-20261101.md)、scripts/issue118-handshake-observation.mjs、同helper/停止診断と既存testを照合する。boolean観測を許可判断に使わず、Cookie共有の構造と実受理、最終fulfillと認証完了を分ける。
 
-Issue118 server callback CI candidate: [未有効化候補](../verification/issue118-server-callback-ci-preparation-20261101.md)、scripts/check-issue118-server-callback-candidate.mjs、同名test、専用workflowの未対応mode、browser-runnerのoffline guardsを照合する。架空URL/receiptでの検査を実配備・認証・T1の成功と扱わない。
+Issue118 server callback diagnostic: [execution boundary](../verification/issue118-server-callback-ci-preparation-20261101.md), scripts/check-issue118-server-callback-candidate.mjs, its tests, the dedicated workflow and browser-runner offline guards are maintained together. The old synthetic mode remains disabled; the approved pinned Preview diagnostic stops at 3 GETs / 1 server JWKS GET. This is not authentication, T1 or DB/Blob success.
 
 原本T2/T3/T4とサービス観測の未有効化managed接続は[runner運用](../verification/issue118-live-runner-20261030.md)、scripts/check-issue118-live-t1-browser.mjsのprepareOriginalBatchRun/prepareServiceObservation、再利用したissue118-batch-stop.ts/fixture-map.ts/stop-oracle.ts/t4-observer.mjs/service-observer.tsと対応testを照合する。A/B別context・fresh外部owner根拠・永続claim・単一送信・unknown停止を維持し、実B認証/画像/Blob/応答喪失/DBの未実施を隠さない。通常test globだけに載せ、live workflow権限を変えない。PR121を含む別app candidateは未作成/未配備。

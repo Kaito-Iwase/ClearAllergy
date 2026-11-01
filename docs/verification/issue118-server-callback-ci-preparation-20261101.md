@@ -1,21 +1,36 @@
-# Issue118 server callback 診断のCI側未有効化候補
+# Issue118 callback signature/shape-only diagnostic
 
-## 状態と対象
+## Fixed deployment and existing modes
 
-実通信・実認証・配備は未実施。アプリ候補は `aa92dbba35088f807b8f54a7548556ab4009a37b`（6293d5a基準、ローカル未配備）。実際の新しいDeployment IDとURLは未確認。この検査の `https://candidate-preview.issue118.invalid` / `dpl_SYNTHETIC_ONLY` は架空fixtureであり、実配備receiptではない。
+App source: `aa92dbba35088f807b8f54a7548556ab4009a37b`, based on 6293d5a. Existing test Project `clear-allergy-e2e` / `prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK`, Preview / exact `test/staging`.
 
-`scripts/check-issue118-server-callback-candidate.mjs` は合成seam専用で、CLIからは常に `SERVER_CALLBACK_CANDIDATE_DISABLED_NO_NETWORK` / exit 1。workflowの `PREPARE_SERVER_CALLBACK_DISABLED` はdefaultではなく、対応job自体を設けない。既存の唯一のlive jobもこのmodeを受理しないため、このmodeでEnvironment・Secret・OIDCに到達しない。通常modeと既存送信先の許可範囲は変更しない。
+- Deployment: `dpl_3eX9TYFPF4JyCTTJoBpkwpy1hq3C`
+- Immutable origin: `https://clear-allergy-e2e-96jt03000-kaitoexe00-9350s-projects.vercel.app`
+- Clerk Development: `one-dolphin-7936.clerk.accounts.dev`
 
-## 合成検査の責務
+Dashboard and CLI metadata identify Ready / Preview / source SHA / branch. Existing 4 Secrets and 8 Configs remain Preview/test/staging scoped; All Deployments protection remains enabled. Metadata is not cryptographic source proof: retain the sent clean local tree and file manifest. A fresh non-secret receipt no older than 10 minutes must match target/source/owner/shop/protection before any request. Owner matching is receipt matching, not a fresh authenticated ownership proof.
 
-固定Project・Preview・test/staging・候補SHA・Deployment・origin・Clerk・owner/shopと10分以内のreceiptを照合する。ownerはreceipt内の一致だけで、実APIでの所有者確認ではない。OIDCは架空署名を持つ合成値だけを受理し、claims/期限の局所guardを検査する。実際のOIDC取得・署名検証を成功と主張しない。
+`PREPARE_SERVER_CALLBACK_DISABLED` and its synthetic .invalid fixture stay disabled. Normal live/T1 targets, authentication and write guards are unchanged. The distinct entry is `DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY` / `--deployed-diagnostic-only`. Default HOLD, workflow_dispatch only, exact repository/ref/workflow/Environment, run_attempt=1, expected runner SHA, job-local OIDC and exclusive concurrency are retained. No Clerk Secret is delivered to this diagnostic job step.
 
-注入したHTTPモデルだけで、appの初回GET→固定ClerkのGET→app callbackのGETの最大3回を検査。OIDCはappだけ、診断headerは3回目だけに付ける。自動redirect/retry、Cookie等の明示転送、4 GET目、ClerkJS、Backend token、session API、fixture書込みには進まない。診断応答の固定schema・署名結果booleanを照合し、未知errorは固定HOLDにする。応答本文の16KiB制限は受理サイズの制限であり、Playwrightによるbuffer前のメモリ上限ではない。
+## Requests and unconditional stop
 
-URL異常、送信先逸脱、重複query、legacy/nonce混在、署名否定、期限切れ、oversize、raw error、owner不一致、context/browser終了失敗を拒否する。providerの値・URL・header・body・token・Cookieは結果へ転記しない。contextとbrowserの終了は別々に判定し、不明を成功にしない。注入モデルのassertion自体の失敗も別判定し、期待HOLDに飲み込ませない。
+1. One OIDC request using only the official runner-provided URL under the existing guard. Local claim checking is a deny guard, not signature verification; Vercel verifies the token.
+2. A new temporary browser context request API sends GET to fixed app `/admin/login`.
+3. GET to the configured Clerk Development initial handshake, using the existing pinned SDK contract.
+4. GET containing exactly one legacy carrier back to the same fixed app `/admin/login`. Only this callback has the diagnostic marker header.
 
-## 検査入口と限界
+There are at most three app/Clerk GETs. OIDC headers go to the app only, never Clerk. No global context headers, personal profile, or imported session. Redirects/retries are zero. Callback and cookies may contain session-related information; values, URLs and hashes are not logged.
 
-`node --test tests/issue118-server-callback-candidate.test.mjs`。既存 `node scripts/browser-runner.mjs issue118-live-guards` にも接続する。モデル成功は実SDK callback受理、実JWT署名、Cookie継承、認証、実API/DB、T1成功の証拠ではない。新しいserver候補は旧6293配備を遡って証明しない。
+The app checks its guards before accessing the existing test Secret, then performs at most one GET to fixed `https://api.clerk.com/v1/jwks`. Public SDK crypto compares signature and directive shape only; normal callback application is skipped. No fourth GET, ClerkJS, Backend testing token, ticket/login/session API, menu API, DB or Blob operation. This diagnostic does not establish T1 success or retroactively prove the old deployment's root cause.
 
-実行可能化には、正規の新Preview配備方法と必要なCLI認証・PC保存範囲の具体承認、実Deployment/SHA/unique URL/branch scopeのfresh receipt、合成target置換と専用modeの有効化に対する別確認が必要。現在の候補をdispatchしても実診断は始まらない。VercelのProject指定は認証権限そのものをProject限定にする保証ではない。既存Secretを取り出したり新branchへコピーしたりしない。
+## Results, unknowns and closing
+
+Only closed server schemas are accepted: fixed stage/code plus 17 booleans, or a fixed two-field GUARD. Valid HTTP409 diagnostic classifications are retained. Unknown strings/fields/types, contradictory success, Location, oversize or unknown exceptions produce HOLD without raw provider output. The 16KiB response bound is an acceptance limit after Playwright buffering, not a preallocation memory guarantee.
+
+Diagnostic completion and signature/shape acceptance are separate. A completed HOLD observation is not signature success; CLI exits 1. Context and browser are closed in that order and confirmed independently. One close success cannot prove both; missing handles after attempted creation are unverified. Local closing does not prove provider state/cookie revocation. No automatic replay after uncertainty.
+
+## Verification and execution boundary
+
+`node --test tests/issue118-server-callback-candidate.test.mjs` and existing `node scripts/browser-runner.mjs issue118-live-guards` use synthetic claims/transport/server responses only. Cases cover fixed/new/old targets, branch/source/owner/protection, attempt2, ambient secrets, OIDC target/claims, redirects/queries, invalid signatures, fixed server HOLD, unknown sensitive extra fields, unknown errors, bounds/deadlines, closing failures and T1-only Secret delivery.
+
+Only after limited review and both head/PR CI pass for the new runner SHA may the approved single diagnostic run occur with fresh receipt and no concurrent live run. Normal authentication, DB/Blob and full live coverage on this new app remain unverified.
