@@ -95,7 +95,7 @@ PR毎のtimeoutは現行CIの25分を基準とし、追加検査の時間・失�
 | 対象 | 既に利用できる部分 | 未配線・開始前に必要な部分 |
 | --- | --- | --- |
 | 別owner | CIのA/B実DB拒否と、T1の対象receipt・保護hash・unknown ledger | 実A/Bの別contextと自店正例、所有shop照合。T1の固定A/1メニューを単にBへ置換して全検査としない |
-| T2/T3 | 元CSVの親側hash照合、既存採点、今回の`prepareFixtureStops`で8件の対応とowner別STOP前版を局所検査 | 元カード本文からの実fixture作成・保存/公開、実A/B認証、各メニューに独立した既存write ledger。T1のphase一回制限を緩めて同じSTOPを反復しない。計画を作れても実行許可・実成功ではない |
+| T2/T3 | 元CSVの親側hash照合、8件の初期payload投影、既存採点、owner別STOPと作成～別再公開の合成呼出し | 実A/B認証、既存保護transport/永続排他のadapter、実fixture実行、独立DB/公開観測。T1のphase一回制限や一件用承認を拡大しない。合成呼出しは実行許可・実成功ではない |
 | T4 | M02と通常STOPの期待値、CIのfresh公開読取、T1の公開API/画面観測、後述の4ページ観測器 | 実T1 runnerへのguard付き接続と同一実fixtureでの実行は未実施。bfcacheの有無を未観測のまま断定しない |
 | 実画像 | PR #121の3画面の局所修正・模擬回帰、既存の専用架空PNG例 | #121を含む確認済み対象アプリ、実Blob成功と後続保存/配信の同一run観測。共有Blobの削除/列挙・orphan政策を前提にせず、対象URLと所有fixtureだけを記録 |
 | 実通信失敗 | 模擬画面の送信前/モデル更新後abortと入力保持、T1のunknown停止 | 1要求だけの送信前遮断、実応答取得後の返却抑止を既存保護transportと衝突せず配線。応答200だけで独立DB確定とせず、不明write後の再送/cleanupを禁止 |
@@ -114,7 +114,7 @@ baseline公開APIの対象IDと4画面の架空名を確認してから、呼出
 
 ### T2/T3の注入可能なSTOP操作器（原本payload投影と実接続は別）
 
-`scripts/issue118-batch-stop.ts`は、201で作成済み・初期公開済みの今回8件を`prepareFixtureStops`で照合し、T2の4件/T3の2件へSTOPだけを実行する。CREATE、食品訂正、公開、retry、cleanup、再公開のメソッドはない。HTTP/auth/DB/Blob/ファイルの実装を持たず、target/actor照合、所有者GET、唯一の`dispatchStop`、証跡保存とrun claimを注入する。読取callbackへはmethod/path/bodyを渡さず、STOP送信は`expectedVersion`だけの固定bodyと固定menu pathを1回渡す。
+`scripts/issue118-batch-stop.ts`の`prepareBatchStops`は、201で作成済み・初期公開済みの今回8件を`prepareFixtureStops`で照合し、T2の4件/T3の2件へSTOPだけを実行する。この関数にはCREATE、食品訂正、公開、retry、cleanup、再公開のメソッドはない。HTTP/auth/DB/Blob/ファイルの実装を持たず、target/actor照合、所有者GET、唯一の`dispatchStop`、証跡保存とrun claimを注入する。読取callbackへはmethod/path/bodyを渡さず、STOP送信は`expectedVersion`だけの固定bodyと固定menu pathを1回渡す。
 
 PR #120の`newWriteLedger/beginWrite/holdWrite/confirmWrite`の純粋な状態管理を読み取り確認した。main基準branchから未採用live/auth moduleをimportしないため同じ状態管理だけを局所化し、既存4関数をそのまま注入できるportを用意した。**送信も行うT1の`action()`/click wrapperは注入しない。** 各menuに異なるledgerを1個持ち、phaseはSTOP一回のみ、唯一の送信callback以外から送らない。portを共有して2メニューへ使う入力は拒否する。
 
@@ -122,6 +122,16 @@ run claimは、8件の作成ID/operationId/版を持つmanifestを原子的に�
 
 結果はdispatcher未呼出、既知HTTP非成功、未確定応答、既知応答/readback保留、確定応答＋所有者GET照合を区別する。送信callback開始後の例外/本文喪失/中止はunknownへ固定し、GETによる推定・後続送信・再送・cleanupをしない。中止はserver rollbackではなく、遅延commitもあり得る。全件確定後も他4件を含む8件のGET表現を再照合する。通常STOPで食品版/確認版/食品内容を変えず、公開反映pendingはfalseへ丸めず記録する。公開ページ・監査/全DB・実Clerkは`NOT_ATTESTED`で、総合live PASSを返さない。T2の未完了結果は次段の案内も元操作照合HOLDへ固定し、T3の次段は常にロット割当HOLDである。
 
-`PayloadPack.expectedByMenu`は、**原本CSVから独立に投影した初期payload**を呼出し側が供給する。`fixturePayload()`は既存SavedMenu DTOから比較形を作る関数であり、実GETを期待値にコピーして原本一致と呼んではいけない。`CALLER_PROJECTED_ORIGINAL`では既知のZIP/recipe/physical-gold hashとのメタデータ一致を要求するが、CSV本文/投影自体を認定しない。今回workspaceに原本本文がなく、原本CSV→初期payload生成は未実装・共有待ち。架空の値で補っていない。
+`PayloadPack.expectedByMenu`は、**原本から独立に投影した初期payload**である。`fixturePayload()`は既存SavedMenu DTOから比較形を作る関数であり、実GETを期待値にコピーして原本一致と呼んではいけない。`CALLER_PROJECTED_ORIGINAL`では既知のZIP/recipe/physical-gold hashとのメタデータ一致を要求するが、この一致だけでCSV本文/投影自体を認定しない。親側で取得・hash照合した原本の転記を受領し、`projectOriginalPayloads`/`originalCreateRequests`へ投影した。転記はUTF-8 BOM付き原本のbyte同一コピーではない。出所は`PARENT_ORIGINAL_TRANSCRIPTION_NOT_BYTE_COPY`で、原本CSV hash・出典行を別に保持する。
 
-`tests/issue118-batch-stop.test.ts`は明示的なSYNTHETIC payloadとメモリ内adapterだけを使い、確定成功、送信前拒否、合成commit後の応答本文喪失、中止と遅延成功、別instance再送拒否、版競合、payload/所有者/品目差異、証跡失敗、非対象変化を確認する。実HTTP・実fixture・原本payloadの実行ではない。既存`.test.ts` globでCIへ入り、workflow変更は不要。
+`tests/issue118-batch-stop.test.ts`は明示的なSYNTHETIC payloadとメモリ内adapterを使い、確定成功、送信前拒否、合成commit後の応答本文喪失、中止と遅延成功、別instance再送拒否、版競合、payload/所有者/品目差異、証跡失敗、非対象変化を確認する。原本投影値の合成実行も追加した。実HTTP・実fixture・実Clerk/DB/Blobの結果ではない。既存`.test.ts` globでCIへ入り、workflow変更は不要。
+
+### 原本payloadと一連のT2/T3呼出し
+
+`menu-register.csv` L2–9の架空名・原材料・800円と、`allergen-baseline.csv` L2–59の29slugを投影する。AV-BASEは全FREE、M01のAV-CHICKENはchickenだけCONTAINSで乳はFREE。現行masterに欠落/追加/重複があれば停止する。店舗/メニューの論理IDはAPI内部IDへ置換しない。模擬version1・架空時刻・PUB-D0履歴を作成bodyに入れず、作成は非公開、201の実IDと所有者GETの実観測版を追跡する。fixture名にはrun UUIDと論理ID、原本名を保持する。条件ごとに別runで初期値を投影し、T2の訂正をT3へ引き継がない。
+
+`originalEvidence`はevidence-cards L4–8の開始/照会カードを分ける。T2のE21/E23で乳成分追加が確定した4件（M06を含む）だけ、`t2PrivateCorrections`が原材料の乳成分追記と乳CONTAINSの非公開保存bodyを作る。追記文はこの2枚からの派生値で原本CSVセルではない。照会の履歴は呼出し側へ記録し、自動テストが原本を知っていることを人の発見率・時間の測定にしない。T3は皿とロットの割当が不明なため、全体MAYへの置換や再公開bodyを用意しない。
+
+`prepareOriginalScenario`は同じモジュールの一連の入口である。CREATE前の永続run claim、2 owner/context、8個の作成operationIdを必須とし、作成/初回公開→既存STOP操作器→T2のみ非公開訂正/保存済み実食品版の再取得/別再公開へつなぐ。T3は2件STOP後のロットHOLDで終了する。各メニューの作成/公開/訂正ledgerと、既存STOPの単一送信ledgerの責務を分け、T1の送信wrapperを重ねない。201の有効IDは後のreadback失敗より前に記録する。送信前拒否と送信後unknownを分け、unknown/不一致/途中中止で後続write・再送・自動cleanupへ進まない。記録はID/実版/phase/固定状態のみで、原例外や認証情報を出力しない。
+
+これらは依存注入された操作の合成実行までである。実行側には新しい複数fixtureの具体承認、最新target/isolation receipt、実A/B context、保護transport、永続排他、独立SQL、公開ページ/API観測、既知結果に対する明示的な非公開cleanupが必要。既存のT1一件用`APPROVE_NEW_FIXTURE_T1`を拡大解釈しない。実T2/T3、T4四観測の同一run結線、実Blob、実通信断は未実施のまま保持する。

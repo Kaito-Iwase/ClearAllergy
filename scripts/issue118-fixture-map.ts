@@ -11,6 +11,14 @@ export const phase1Source = Object.freeze({
     recipeCardsSha256: "85cb69e60f2695a5b451c698f0f24455027e0e5437f58c2d9faef0cda2624dfe",
     csvMappingSha256: "7e6570c855a845a2257cae0aca481deaeb7d67c8082976817c2db019fe5dc338",
     viewerFixturesSha256: "f4f21a9b169785a9d875f5f09b3c37b8999efff6fc3d7ea32744d59ebcc70eac",
+    menuRegisterSha256: "efd0962f992fdb2fdf40fa45a91f308e0812ee31855ef177b86f73ed22f58cd4",
+    allergenBaselineSha256: "f012288ea61313ee2b260ffe6cb45f01bcf9a3c5c3e2611d5a17a8a648f5b89c",
+    evidenceCardsSha256: "a0344ab69fd25c815a270451b91ec16d2c2c9e4ab48d21889c90110a092ae04c",
+    phase1DesignSha256: "53b4fe259e8bb048b26d4a806d5906307416b68f9403e3606cbf1d457b3915f6",
+});
+export const originalMenuNames: Readonly<Record<MenuId, string>> = Object.freeze({
+    M01: "鶏ソース皿", M02: "温野菜ソース", M03: "豆の小鉢", M04: "白飯",
+    M05: "魚ソース皿", M06: "日替り温サラダ", M07: "塩焼き芋", M08: "野菜スープ",
 });
 type Owner = "S1" | "S2";
 export type FixtureBinding = {
@@ -36,7 +44,7 @@ function refuse(condition: unknown) {
 }
 export function fixtureName(runId: string, key: MenuId) {
     refuse(uuid(runId) && Object.hasOwn(menuOwners, key));
-    return `【架空・Issue118 batch】${runId} ${key}`;
+    return `【架空・Issue118 batch】${runId} ${key} ${originalMenuNames[key]}`;
 }
 
 // Called AFTER creation/publication has been separately authorized and confirmed.

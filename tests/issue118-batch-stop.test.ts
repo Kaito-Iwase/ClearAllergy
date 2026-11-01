@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fixturePayload, prepareBatchStops, type LedgerPort, type PayloadPack, type StopCommand } from "../scripts/issue118-batch-stop";
+import { fixturePayload, originalCreateRequests, originalEvidence, prepareBatchStops, prepareOriginalScenario, projectOriginalPayloads, t2PrivateCorrections, type LedgerPort, type OriginalScenarioAdapter, type PayloadPack, type StopCommand } from "../scripts/issue118-batch-stop";
 import { fixtureName, type FixtureBinding, type OwnerBinding } from "../scripts/issue118-fixture-map";
 import { menuOwners, type MenuId } from "../scripts/issue118-stop-oracle";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
@@ -185,4 +185,148 @@ test("不正なstatus値を生ログへ混入させずunknownとする", async (
     const result = await prepareBatchStops(f.input).execute();
     assert.equal(result.journal[0].httpStatus, null); assert.equal(result.journal[0].state, "INDETERMINATE");
     assert.equal(JSON.stringify(result).includes("secret invalid status"), false);
+});
+
+test("原本転記8件を800円/正確な原材料/29明示状態へ投影し、モック版やPUB履歴を作成bodyへ入れない", () => {
+    const pack = projectOriginalPayloads(runId);
+    assert.equal(pack.kind, "CALLER_PROJECTED_ORIGINAL");
+    const operations = Object.fromEntries((Object.keys(menuOwners) as MenuId[]).map((key, i) => [key, `33333333-3333-4333-8333-${String(i).padStart(12, "0")}`])) as Record<MenuId, string>;
+    const requests = originalCreateRequests(runId, operations);
+    assert.equal(requests.length, 8);
+    assert.equal(requests[5].originalName, "日替り温サラダ"); assert.equal(requests[5].recipeIngredientId, "P-SAUCE");
+    assert.equal(requests[5].body.ingredients, "かぼちゃ、にんじん、共通ソース（トマト、ひまわり油、塩）");
+    for (const request of requests) {
+        assert.equal(request.body.priceYen, 800); assert.equal(request.body.isPublished, false);
+        assert.equal(Object.keys(request.body.allergenStatusBySlug!).length, 29); assert.equal(request.body.allergenStatusBySlug!.milk, "FREE");
+        assert.equal(request.body.name?.includes(request.originalName), true);
+        assert.equal(Object.keys(request.body).some(key => /version|review|publication|checkedAt/i.test(key)), false);
+        assert.equal(request.source.provenance, "PARENT_ORIGINAL_TRANSCRIPTION_NOT_BYTE_COPY");
+    }
+    assert.equal(requests[0].body.allergenStatusBySlug!.chicken, "CONTAINS");
+    assert.ok(requests.slice(1).every(request => Object.values(request.body.allergenStatusBySlug!).every(state => state === "FREE")));
+    assert.equal(requests.filter(request => request.recipeIngredientId === "P-SAUCE").length, 4);
+    assert.throws(() => originalCreateRequests(runId, { ...operations, M06: operations.M05 }), /BATCH_INPUT_REFUSED/);
+});
+
+test("条件ごとに原本初期値を独立投影し、マスタ欠落/追加と照会カードの先渡しを拒む", () => {
+    const first = projectOriginalPayloads(runId); first.expectedByMenu.M03.allergenStatusBySlug.milk = "CONTAINS";
+    assert.equal(projectOriginalPayloads(runId).expectedByMenu.M03.allergenStatusBySlug.milk, "FREE");
+    assert.throws(() => projectOriginalPayloads(runId, ALLERGEN_MASTER.slice(1).map(a => a.slug)), /BATCH_INPUT_REFUSED/);
+    assert.throws(() => projectOriginalPayloads(runId, [...ALLERGEN_MASTER.map(a => a.slug), "unknown"]), /BATCH_INPUT_REFUSED/);
+    assert.deepEqual(originalEvidence("T2", "START").map(card => card.id), ["E21"]);
+    assert.deepEqual(originalEvidence("T3", "START").map(card => card.id), ["E31"]);
+    assert.deepEqual(originalEvidence("T2", "PHYSICAL_SOURCE_LOOKUP").map(card => card.id), ["E23"]);
+    assert.deepEqual(originalEvidence("T3", "LOT_ALLOCATION_LOOKUP").map(card => card.id), ["E32"]);
+    assert.deepEqual(originalEvidence("T3", "PHYSICAL_SOURCE_LOOKUP"), []);
+});
+
+test("T2のE21/E23訂正はM06を含む4件の乳CONTAINSを非公開で作り、T3や一律MAYへ流用しない", () => {
+    assert.throws(() => t2PrivateCorrections(runId, ["E21"]), /BATCH_INPUT_REFUSED/);
+    const corrections = t2PrivateCorrections(runId, ["E21", "E23"]);
+    assert.deepEqual(corrections.map(c => c.key), ["M01", "M02", "M05", "M06"]);
+    assert.ok(corrections.every(c => c.body.isPublished === false && c.body.allergenStatusBySlug.milk === "CONTAINS" && c.body.ingredients.includes("乳成分")));
+    assert.equal(corrections[0].body.allergenStatusBySlug.chicken, "CONTAINS");
+    assert.ok(corrections.every(c => !("publicationAction" in c.body) && !("foodReview" in c.body) && !("foodChangeReported" in c.body)));
+});
+
+function originalRun(scenario: "T2" | "T3" = "T2") {
+    const f = setup(scenario), writes: Array<{ key: MenuId; phase: string }> = [], claims = new Set<string>();
+    f.model.clear();
+    const operationIds = Object.fromEntries((Object.keys(menuOwners) as MenuId[]).map((key, i) => [key,
+        `44444444-4444-4444-8444-${String(i).padStart(12, "0")}`])) as Record<MenuId, string>;
+    const adapter: OriginalScenarioAdapter = { ...f.adapter,
+        async claimScenario(manifest) { if (claims.has(manifest.runId)) return false; claims.add(manifest.runId); return true; },
+        async assertOwner(owner) { assert.ok(f.input.owners.some(o => o.contextRef === owner.contextRef && o.shopId === owner.shopId)); },
+        async dispatch(command) {
+            writes.push({ key: command.key, phase: command.phase });
+            assert.equal(command.owner.owner, menuOwners[command.key]);
+            const body = command.body;
+            if (command.phase === "CREATE") {
+                assert.equal(command.method, "POST"); assert.equal(command.path, "/api/admin/menus"); assert.equal(body.isPublished, false);
+                const i = Object.keys(menuOwners).indexOf(command.key);
+                const menu: SavedMenu = { ...projectOriginalPayloads(runId).expectedByMenu[command.key],
+                    id: `c${String(i + 1).padStart(24, "0")}`, allergens: ALLERGEN_MASTER.map(a => ({ ...a, status: body.allergenStatusBySlug![a.slug] })),
+                    version: 24 + i, foodVersion: 12 + i, reviewedFoodVersion: null, publicationConfirmedFoodVersion: null, isPublished: false, foodReviews: [] };
+                f.model.set(command.key, menu);
+                return { status: () => 201, json: async () => ({ id: menu.id }) };
+            }
+            const menu = f.model.get(command.key)!;
+            assert.equal(command.method, "PUT"); assert.equal(command.path, `/api/admin/menus/${menu.id}`); assert.equal(body.expectedVersion, menu.version);
+            menu.version++;
+            if (command.phase === "CORRECT_PRIVATE") {
+                assert.equal(menu.isPublished, false); assert.equal(body.isPublished, false);
+                menu.ingredients = body.ingredients!; menu.foodVersion++; menu.publicationConfirmedFoodVersion = null;
+                menu.allergens = menu.allergens.map(a => ({ ...a, status: body.allergenStatusBySlug![a.slug] }));
+            } else {
+                assert.equal(body.publicationAction, "publish"); menu.isPublished = true; menu.publicationConfirmedFoodVersion = menu.foodVersion;
+            }
+            return { status: () => 200, json: async () => ({ menu: structuredClone(menu) }) };
+        },
+    };
+    return { ...f, adapter, writes, input: { scenario, runId, owners: f.input.owners, operationIds, adapter } };
+}
+
+test("一連のT2入口が原本8件を独立作成し、4件STOP/非公開訂正/保存版からの別再公開を各1回だけ行う", async () => {
+    const f = originalRun(), run = prepareOriginalScenario(f.input), result = await run.execute();
+    assert.equal(result.status, "SCENARIO_APP_RESPONSES_CONFIRMED_NOT_LIVE_PASS");
+    assert.equal(result.created.length, 8); assert.equal(f.writes.length, 24);
+    assert.deepEqual(f.calls.map(c => c.key), ["M01", "M02", "M05", "M06"]);
+    assert.equal(new Set(result.created.map(c => c.menuId)).size, 8);
+    assert.ok(f.writes.filter(w => w.phase === "CORRECT_PRIVATE").every(w => ["M01", "M02", "M05", "M06"].includes(w.key)));
+    assert.equal(f.model.get("M06")!.allergens.find(a => a.slug === "milk")!.status, "CONTAINS");
+    assert.ok(Object.values(result.finalVersions).every(m => m.foodVersion > 1 && m.isPublished && m.foodVersion === m.publicationConfirmedFoodVersion));
+    assert.equal(result.externalAuthAndDatabase, "NOT_ATTESTED"); assert.equal(result.automaticCleanup, false);
+    await assert.rejects(run.execute(), /BATCH_INPUT_REFUSED/);
+    assert.equal(f.writes.length, 24);
+});
+
+test("一連のT3入口は初期FREEから2件STOP後HOLDし、訂正や再公開へ進まずT2初期値を引き継がない", async () => {
+    const f = originalRun("T3"), result = await prepareOriginalScenario(f.input).execute();
+    assert.equal(result.status, "SCENARIO_STOP_CONFIRMED_LOT_HOLD_NOT_LIVE_PASS");
+    assert.equal(result.next, "HOLD_LOT_ALLOCATION_NO_REPUBLICATION");
+    assert.equal(f.writes.length, 16); assert.deepEqual(f.calls.map(c => c.key), ["M01", "M05"]);
+    assert.ok([...f.model.values()].every(m => m.allergens.find(a => a.slug === "milk")!.status === "FREE"));
+    assert.equal(result.finalVersions.M01.isPublished, false); assert.equal(result.finalVersions.M05.isPublished, false);
+    assert.equal("overall" in result, false);
+});
+
+test("作成201のIDは読取失敗前に保持し、create body喪失/読取不一致/応答後喪失は後続書込とcleanupを止める", async () => {
+    for (const fault of ["BODY_LOST", "READBACK_LOST", "RESPONSE_LOST"] as const) {
+        const f = originalRun(), send = f.adapter.dispatch;
+        f.adapter.dispatch = async command => {
+            const response = await send(command);
+            if (fault === "RESPONSE_LOST") throw Error("secret network failure");
+            if (fault === "BODY_LOST") return { status: response.status, json: async () => { throw Error("secret body"); } };
+            f.model.get(command.key)!.priceYen = 999; return response;
+        };
+        const result = await prepareOriginalScenario(f.input).execute();
+        assert.equal(result.status, "HOLD_NO_FURTHER_WRITES"); assert.equal(f.writes.length, 1); assert.equal(f.calls.length, 0);
+        assert.equal(result.created.length, fault === "READBACK_LOST" ? 1 : 0);
+        assert.equal(result.phases[0].state, fault === "READBACK_LOST" ? "KNOWN_RESPONSE_VERIFICATION_HELD" : "INDETERMINATE");
+        assert.equal(result.next, "HOLD_RECONCILE_ORIGINAL_OPERATION_NO_WRITES"); assert.equal(JSON.stringify(result).includes("secret"), false);
+    }
+});
+
+test("シナリオ排他/owner送信前拒否と途中中止では、未送信の操作をunknown成功とせずその後を送らない", async () => {
+    for (const fault of ["CLAIM", "OWNER", "ABORT"] as const) {
+        const f = originalRun(), controller = new AbortController();
+        if (fault === "CLAIM") f.adapter.claimScenario = async () => false;
+        if (fault === "OWNER") f.adapter.assertOwner = async () => { throw Error("private owner"); };
+        if (fault === "ABORT") {
+            const send = f.adapter.dispatch;
+            f.adapter.dispatch = async command => { const response = await send(command); controller.abort(); return response; };
+        }
+        const result = await prepareOriginalScenario({ ...f.input, signal: controller.signal }).execute();
+        assert.equal(f.writes.length, fault === "ABORT" ? 1 : 0); assert.equal(f.calls.length, 0);
+        assert.notEqual(result.status, "SCENARIO_APP_RESPONSES_CONFIRMED_NOT_LIVE_PASS"); assert.equal(result.automaticRetry, false);
+    }
+});
+
+test("バッチSTOPの応答不明では初期作成後の訂正/再公開を一切送らない", async () => {
+    const f = originalRun(), stop = f.adapter.dispatchStop;
+    f.adapter.dispatchStop = async command => { await stop(command); throw Error("unknown STOP response"); };
+    const result = await prepareOriginalScenario(f.input).execute();
+    assert.equal(result.status, "HOLD_NO_FURTHER_WRITES"); assert.equal(result.next, "HOLD_RECONCILE_ORIGINAL_OPERATION_NO_WRITES");
+    assert.equal(f.calls.length, 1); assert.equal(f.writes.length, 16);
+    assert.equal(result.stops!.unknownOrUnverifiedIds.length, 1);
 });
