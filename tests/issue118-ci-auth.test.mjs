@@ -30,7 +30,7 @@ const publicKey = 'pk_test_' + Buffer.from(ciIdentity.clerkDomain + '$').toStrin
 const diagnosticEnv = () => ({ ...env(), ISSUE118_APPLY: undefined, ISSUE118_TEST_CLERK_SECRET_KEY: undefined,
     ISSUE118_DIAGNOSTIC_MODE: 'OIDC_TARGET_ONLY' });
 
-test('OIDC predicate mirror matches unchanged live validator, never returns URL parts or exceptions', () => {
+test('OIDC predicate mirror matches candidate validator, never returns URL parts or exceptions', () => {
     const base = 'https://run-actions-synthetic.actions.githubusercontent.com/only/idtoken?api-version=2.0';
     for (const value of [undefined, '', 'not a URL', base, base.replace('https:', 'http:'),
         base.replace('run-actions-synthetic.actions.githubusercontent.com', 'actions.githubusercontent.com'),
@@ -142,11 +142,43 @@ test('local JWT deny guard requires all exact claims/time but does not claim sig
     for (const body of [null, [], 'synthetic']) assert.throws(() => assertOidcClaims(jwt(body)), code('OIDC_CLAIMS_INVALID'));
 });
 
-test('OIDC request target refuses credentials, HTTP, suffix spoof and other endpoints', () => {
+test('OIDC request target refuses credentials, HTTP, host suffix spoof, ports and fragments', () => {
     assert.equal(new URL(oidcRequestUrl(env().ACTIONS_ID_TOKEN_REQUEST_URL)).searchParams.get('audience'), ciIdentity.audience);
     for (const url of ['https://actions.githubusercontent.com.attacker.invalid/idtoken', 'http://run.actions.githubusercontent.com/idtoken',
-        'https://user:fake@run.actions.githubusercontent.com/idtoken', 'https://run.actions.githubusercontent.com/other',
+        'https://user:fake@run.actions.githubusercontent.com/idtoken', 'https://run.actions.githubusercontent.com/idtoken#fragment',
         'https://run.actions.githubusercontent.com:123/idtoken']) assert.throws(() => oidcRequestUrl(url), code('OIDC_REQUEST_TARGET_REFUSED'));
+});
+
+test('candidate accepts opaque and suspicious same-host paths; this is an explicit destination-path expansion', () => {
+    for (const path of ['/', '/other', '/idToken', '/idtoken/', '/admin/delete', '/a/../anything',
+        '//other.invalid/path', '/%2e%2e/other', '/path?next=https%3A%2F%2Fevil.invalid%2F']) {
+        const value = 'https://run.actions.githubusercontent.com' + path;
+        const url = new URL(oidcRequestUrl(value));
+        assert.equal(url.origin, 'https://run.actions.githubusercontent.com');
+        assert.equal(url.searchParams.get('audience'), ciIdentity.audience);
+        assert.equal(inspectOidcRequestTarget(value).guardAccepts, true);
+    }
+    for (const value of ['https://evil.invalid/anything', 'https://actions.githubusercontent.com/anything',
+        'https://run.actions.githubusercontent.com.evil.invalid/anything', 'http://run.actions.githubusercontent.com/anything',
+        'https://u:p@run.actions.githubusercontent.com/anything', 'https://run.actions.githubusercontent.com:444/anything',
+        'https://run.actions.githubusercontent.com/anything#fragment'])
+        assert.throws(() => oidcRequestUrl(value), code('OIDC_REQUEST_TARGET_REFUSED'));
+});
+
+test('candidate still sends one request only, never Clerk key, and rejects redirect or wrong claims after sending', async () => {
+    for (const redirected of [true, false]) {
+        let calls = 0;
+        const configuration = { ...env(), ACTIONS_ID_TOKEN_REQUEST_URL: 'https://run.actions.githubusercontent.com/unrelated?next=https://evil.invalid/' };
+        await assert.rejects(createCiAccess(configuration, async (url, options) => {
+            calls++;
+            assert.equal(new URL(url).origin, 'https://run.actions.githubusercontent.com');
+            assert.equal(options.redirect, 'error'); assert.ok(options.signal instanceof AbortSignal);
+            assert.deepEqual(options.headers, { Authorization: 'bearer SYNTHETIC_REQUEST_CREDENTIAL' });
+            assert.ok(!JSON.stringify(options).includes(syntheticSecret));
+            return redirected ? { ok: false } : response({ value: jwt({ ...claims(), ref: 'wrong' }) });
+        }), code(redirected ? 'OIDC_REQUEST_FAILED' : 'OIDC_CLAIMS_REFUSED'));
+        assert.equal(calls, 1); // A wrong-claims response cannot undo transmission to this allowed-host path.
+    }
 });
 
 test('one OIDC fetch uses redirect error and bounded signal; raw errors never leave boundary', async () => {

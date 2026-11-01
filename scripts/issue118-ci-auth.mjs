@@ -43,12 +43,12 @@ export function oidcRequestUrl(value) {
     let url;
     try { url = new URL(value); } catch { fail('OIDC_REQUEST_TARGET_REFUSED'); }
     if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash ||
-        !url.hostname.endsWith('.actions.githubusercontent.com') || !url.pathname.endsWith('/idtoken')) fail('OIDC_REQUEST_TARGET_REFUSED');
+        !url.hostname.endsWith('.actions.githubusercontent.com')) fail('OIDC_REQUEST_TARGET_REFUSED');
     url.searchParams.set('audience', ciIdentity.audience);
     return url.href;
 }
 // Predicate-only observation. Never return input, host, path, query, token or an exception.
-// The live validator above is deliberately unchanged; tests require predicate parity.
+// Local candidate: only the opaque path restriction is removed; tests require predicate parity.
 export function inspectOidcRequestTarget(value) {
     const result = { present: typeof value === 'string' && value.length > 0, parseable: false,
         https: false, hostAllowed: false, pathAllowed: false, userinfoAbsent: false,
@@ -59,7 +59,7 @@ export function inspectOidcRequestTarget(value) {
         result.parseable = true;
         result.https = url.protocol === 'https:';
         result.hostAllowed = url.hostname.endsWith('.actions.githubusercontent.com');
-        result.pathAllowed = url.pathname.endsWith('/idtoken');
+        result.pathAllowed = true; // Any parsed path; all origin/credential/fragment guards still apply.
         result.userinfoAbsent = !url.username && !url.password;
         result.portAbsent = !url.port;
         result.fragmentAbsent = !url.hash;
