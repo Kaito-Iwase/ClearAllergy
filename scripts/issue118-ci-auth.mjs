@@ -1,5 +1,6 @@
 // Test infrastructure only. Importing this module performs no I/O or authentication.
-import { routePreviewRequest, protectedPreviewFetch, previewOrigin } from './issue118-preview-transport.mjs';
+import { routePreviewRequest, protectedPreviewFetch, previewOrigin, transportObservation,
+    transportException, observeTransport } from './issue118-preview-transport.mjs';
 
 export const ciIdentity = Object.freeze({
     repository: 'Kaito-Iwase/ClearAllergy', repositoryId: '1144262510',
@@ -80,7 +81,7 @@ async function jsonOnce(fetcher, url, options, code) {
         return await response.json();
     } catch { fail(code); } // No provider message, response body, header, URL or stack leaves this boundary.
 }
-export async function createCiAccess(env, fetcher = fetch, onStage = () => {}) {
+export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, observers = {}) {
     onStage('CI_ENV_VALIDATE');
     assertCiEnvironment(env);
     onStage('OIDC_TARGET_VALIDATE');
@@ -97,29 +98,73 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}) {
     let authenticationAttempted = false;
     let sessionCreationAttempted = false;
     let ticketRequests = 0;
-    const backend = (path, method, body, code) => jsonOnce(fetcher, 'https://api.clerk.com/v1/' + path,
+    const progress = Object.fromEntries(['loginNavigationStarted', 'loginNavigationCompleted', 'clerkLoaded',
+        'frontendMatched', 'ownerLookupStarted', 'ownerMatched', 'testingTokenRequestStarted', 'testingTokenReceived',
+        'signInTokenRequestStarted', 'signInTokenReceived', 'sessionCreationAttempted', 'activationAcknowledged',
+        'adminNavigationStarted', 'adminNavigationCompleted'].map(key => [key, false]));
+    const transportObserver = observation => observeTransport(observers.transport || (() => {}), observation);
+    const mark = key => {
+        progress[key] = true;
+        try { observers.authentication?.({ ...progress }); } catch { fail('AUTH_DIAGNOSTIC_FAILED'); }
+    };
+    const backend = (path, method, body, code) => jsonOnce(async (url, options) => {
+        const flags = { targetValidated: true, backendRequest: true, fetchStarted: true };
+        let status = null, stage = 'FETCH';
+        try {
+            const response = await fetcher(url, options);
+            flags.responseObserved = true; stage = 'STATUS'; status = response.status;
+            transportObserver(transportObservation('CLERK', method, status, 'NONE', flags));
+            return response;
+        } catch (error) {
+            transportObserver(transportObservation('CLERK', method, status, transportException(error, stage), flags));
+            throw error; // jsonOnce below converts this to its fixed code; never publishes the exception.
+        }
+    }, 'https://api.clerk.com/v1/' + path,
         { method, headers: { Authorization: `Bearer ${env.ISSUE118_TEST_CLERK_SECRET_KEY}`, 'Content-Type': 'application/json' },
             ...(body ? { body: JSON.stringify(body) } : {}) }, code);
     return {
         token,
         read: (api, url) => protectedPreviewFetch(api, url, {}, token()),
         async route(route) {
+            let role = 'OTHER', method = 'OTHER', status = null, stage = 'TARGET', delegated = false;
+            const flags = {};
             try {
-                const url = new URL(route.request().url());
+                const request = route.request();
+                const url = new URL(request.url());
+                role = url.origin === previewOrigin ? 'APP' : url.origin === 'https://' + ciIdentity.clerkDomain ? 'CLERK' : 'OTHER';
+                method = typeof request.method === 'function' ? request.method() : 'OTHER';
                 if (url.username || url.password) fail('CI_EXTERNAL_TARGET_REFUSED');
-                if (url.origin === previewOrigin) return await routePreviewRequest(route, token());
+                flags.targetValidated = true;
+                if (url.origin === previewOrigin) {
+                    stage = 'TOKEN'; const value = token(); flags.tokenValidated = true;
+                    delegated = true;
+                    return await routePreviewRequest(route, value, transportObserver);
+                }
                 if (url.origin === 'https://' + ciIdentity.clerkDomain || url.origin === 'https://wtqdbklmg3bbqk4s.public.blob.vercel-storage.com') {
+                    stage = 'HEADERS';
                     const headers = await route.request().allHeaders();
+                    flags.headersRead = true;
                     for (const key of Object.keys(headers)) if (key.toLowerCase() === 'x-vercel-trusted-oidc-idp-token') delete headers[key];
                     if (url.hostname === ciIdentity.clerkDomain && testingToken && url.pathname.startsWith('/v1/')) url.searchParams.set('__clerk_testing_token', testingToken);
                     if (url.hostname === ciIdentity.clerkDomain && url.pathname === '/v1/client/sign_ins' && route.request().method() === 'POST' && ++ticketRequests > 1) fail('CLERK_TICKET_RETRY_REFUSED');
+                    stage = 'FETCH'; flags.fetchStarted = true;
                     const response = await route.fetch({ url: url.href, headers, maxRedirects: 0, maxRetries: 0, timeout: 20000 });
-                    if (response.status() >= 300 && response.status() < 400) fail('CI_EXTERNAL_REDIRECT_REFUSED');
-                    return await route.fulfill({ response });
+                    flags.responseObserved = true; stage = 'STATUS'; status = response.status();
+                    if (status >= 300 && status < 400) { flags.redirectRejected = true; fail('CI_EXTERNAL_REDIRECT_REFUSED'); }
+                    stage = 'FULFILL'; flags.fulfillStarted = true;
+                    const result = await route.fulfill({ response });
+                    transportObserver(transportObservation(role, method, status, 'NONE', flags));
+                    return result;
                 }
-                return await route.abort('blockedbyclient');
-            } catch {
-                try { await route.abort('blockedbyclient'); } catch { /* fixed failure, no provider text */ }
+                stage = 'ABORT'; flags.abortAttempted = true;
+                const result = await route.abort('blockedbyclient'); flags.abortCompleted = true;
+                transportObserver(transportObservation(role, method, status, 'POLICY_REFUSED', flags));
+                return result;
+            } catch (error) {
+                flags.abortAttempted = true;
+                try { await route.abort('blockedbyclient'); flags.abortCompleted = true; } catch { /* fixed failure, no provider text */ }
+                if (!delegated) transportObserver(transportObservation(role, method, status,
+                    flags.abortCompleted ? transportException(error, stage) : 'ABORT_EXCEPTION', flags));
                 fail('CI_ROUTE_FAILED');
             }
         },
@@ -127,19 +172,28 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}) {
             if (authenticationAttempted) fail('CI_AUTH_RETRY_REFUSED');
             authenticationAttempted = true;
             try {
+                mark('loginNavigationStarted');
                 await page.goto(previewOrigin + '/admin/login');
+                mark('loginNavigationCompleted');
                 await page.waitForFunction(() => Boolean(window.Clerk?.loaded));
+                mark('clerkLoaded');
                 assertClerkPublishableKey(await page.evaluate(() => window.Clerk.publishableKey));
+                mark('frontendMatched');
                 // Existing fixed user lookup before creating any token/session; no email search or account creation.
+                mark('ownerLookupStarted');
                 const user = await backend('users/' + ciIdentity.ownerId, 'GET', undefined, 'CLERK_OWNER_LOOKUP_FAILED');
                 if (user.id !== ciIdentity.ownerId || !user.email_addresses?.some(email => email.email_address === ciIdentity.ownerEmail)) fail('CLERK_OWNER_REFUSED');
+                mark('ownerMatched'); mark('testingTokenRequestStarted');
                 const testing = await backend('testing_tokens', 'POST', {}, 'CLERK_TESTING_TOKEN_FAILED');
                 if (typeof testing.token !== 'string' || !testing.token) fail('CLERK_TESTING_TOKEN_FAILED');
                 testingToken = testing.token;
+                mark('testingTokenReceived'); mark('signInTokenRequestStarted');
                 const ticket = await backend('sign_in_tokens', 'POST', { user_id: ciIdentity.ownerId, expires_in_seconds: 120 }, 'CLERK_SIGNIN_TOKEN_FAILED');
                 if (typeof ticket.token !== 'string' || !ticket.token) fail('CLERK_SIGNIN_TOKEN_FAILED');
+                mark('signInTokenReceived');
                 // A provider session can exist even when this evaluate/activation acknowledgement is lost.
                 sessionCreationAttempted = true;
+                mark('sessionCreationAttempted');
                 const owner = await page.evaluate(async ticketValue => {
                     const result = await window.Clerk.client.signIn.create({ strategy: 'ticket', ticket: ticketValue });
                     if (result.status !== 'complete' || !result.createdSessionId) throw Error('TICKET_NOT_COMPLETE');
@@ -148,7 +202,9 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}) {
                 }, ticket.token);
                 if (owner !== ciIdentity.ownerId) fail('CLERK_SESSION_OWNER_REFUSED');
                 authenticated = true;
+                mark('activationAcknowledged'); mark('adminNavigationStarted');
                 await page.goto(previewOrigin + '/admin/shop');
+                mark('adminNavigationCompleted');
             } catch { fail('CI_AUTHENTICATION_FAILED'); }
         },
         async signOut(page) {
@@ -171,5 +227,6 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}) {
             } catch { testingToken = undefined; return 'SIGNOUT_UNVERIFIED'; }
         },
         isAuthenticated: () => authenticated,
+        authenticationProgress: () => ({ ...progress }),
     };
 }

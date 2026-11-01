@@ -6,6 +6,16 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCiAccess, assertCiEnvironment } from "./issue118-ci-auth.mjs";
+import { transportObservation } from "./issue118-preview-transport.mjs";
+
+export function recordTransportDiagnostic(report, observation) {
+    const safe = transportObservation(observation.originRole, observation.method, observation.status,
+        observation.exception, observation.stages);
+    const events = report.transportDiagnostics ??= [];
+    if (events.length < 64) events.push(safe); else report.transportDiagnosticsTruncated = true;
+    if ((safe.exception !== 'NONE' && safe.exception !== 'POLICY_REFUSED') || safe.status >= 400)
+        report.firstTransportFailure ??= safe;
+}
 
 const fixedErrors = new Set(["DIALOG_TIMEOUT", "DIALOG_HANDLER_FAILED", "WRITE_RESULT_UNCERTAIN",
     "CI_AUTHENTICATION_FAILED", "CI_TRANSPORT_HELD", "CI_IDENTITY_REFUSED", "CI_AMBIENT_CONFIGURATION_REFUSED",
@@ -248,7 +258,13 @@ export async function runLive() {
     try {
         save();
         const setupStage = stage => { report.stage = stage; (report.setupStages ??= []).push(stage); save(); };
-        if (ciMode) ciAccess = await createCiAccess(process.env, fetch, setupStage);
+        if (ciMode) ciAccess = await createCiAccess(process.env, fetch, setupStage, {
+            authentication: progress => { report.authenticationProgress = progress; save(); },
+            transport: observation => {
+                recordTransportDiagnostic(report, observation);
+                save();
+            },
+        });
         browser = await browserSetupStage("BROWSER_LAUNCH", () => chromium.launch({ headless: ciMode, ...(ciMode ? { channel: "chromium" } : {}) }), setupStage);
         context = await browserSetupStage("BROWSER_CONTEXT", () => browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false, serviceWorkers: "block" }), setupStage);
         const ciRoute = async route => {
@@ -385,6 +401,7 @@ export async function runLive() {
         report.cleanupStopAttempted = cleanupAttempted;
         report.phase = phase;
         if (ledger.held) report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No further write/cleanup/retry. Read-only reconciliation must establish the original operation outcome, creationOperationId/name, current API/DB state and audit history; otherwise keep HOLD.";
+        if (ciAccess) report.authenticationProgress = ciAccess.authenticationProgress();
         if (ciAccess && page) report.authenticationCleanup = await ciAccess.signOut(page);
         const closes = await Promise.allSettled([context?.close(), browser?.close()]);
         report.browserClose = closes.every(result => result.status === "fulfilled") ? "CONFIRMED" : "UNVERIFIED";

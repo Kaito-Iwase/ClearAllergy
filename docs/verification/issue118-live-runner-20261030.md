@@ -127,3 +127,14 @@ run 41223541368 は OIDC_TARGET_VALIDATE / OIDC_REQUEST_TARGET_REFUSED、要求�
 診断dispatchは confirmation=DIAGNOSE_OIDC_TARGET_ONLY、expected_runner_sha=レビュー済み完全SHA、identity_receipt=OIDC_TARGET_ONLY_NO_APP_ACCESS を指定する。最後の値は診断時には読まれず、通常liveには有効なfresh JSON receiptが引き続き必要。HOLDは何も起動しない。出力はissue118-oidc-target-<run id>のresult.jsonのみ。取得先の生URL、hostname/path/query、token、例外は保存しない。条件を緩める判断は診断結果を基に別途行う。
 
 公式GitHub Actions OIDC referenceはrunner提供ACTIONS_ID_TOKEN_REQUEST_URLの利用を記載するが固定host/path形状を保証していない。公式actions/toolkitのoidc-utils.tsもその値を取得して用いる。現行targetガードが実行環境の値を拒否したことは判明したが、存在・parse・protocol・host/path・userinfo・port・fragmentのどの条件かは診断前に断定しない。参照: https://docs.github.com/en/actions/reference/security/oidc / https://github.com/actions/toolkit/blob/main/packages/core/src/oidc-utils.ts
+
+
+## 2026-11-01：認証route診断のローカル候補（実行承認待ち）
+
+run41267624371はOIDC/claimsとブラウザ生成後、CI_AUTHENTICATION / CI_ROUTE_FAILED、menu台帳0・fixtureなし・SESSION_CREATION_NOT_ATTEMPTEDで終了した。旧resultにはrouteのrole/statusや認証substageがなく、Vercel/Clerkのredirect拒否・通常fetch障害・headers/fulfill異常の区別は未確定。一時testing/sign-in tokenはsession作成より前に要求するため、発行有無も旧記録から断定しない。
+
+候補はAPP/CLERK/OTHER、許可method、HTTPstatusまたは固定例外、段階booleanだけを最大64件と最初の異常として保存する。意図したOTHERのPOLICY_REFUSEDは最初の異常には数えない。URL/path/query/header/body/token/生例外は出力しない。認証進行もbooleanだけで、要求開始true/応答受領falseはprovider側発行の可能性が残る。SESSION_CREATION_NOT_ATTEMPTEDをtoken未発行の証明へ読み替えない。既存host/redirect/単発要求/claims/認可/cleanup/unknownwrite条件は不変更。旧runへの遡及証明にはならず、追加live/認証/token/DBを起動しない。
+
+PR CI41266929488 attempt1のfocus即時比較FAILとattempt2PASSは別記録。部品はrequestAnimationFrame内でfocusし、モデル検査はクリック直後のactiveElementを照合する。時相の不一致が候補だが旧証跡にはframe traceがなく根本原因の断定・根治済みとはしない。この候補では当該製品・検査を変更しない。
+
+認証Backend APIも同じ固定CLERK role/method/status分類を使い、backendRequest booleanでbrowser側FAPIと区別する。失敗応答の本文は読まず、fetch例外のmessage/causeも保持しない。FETCH_EXCEPTIONはfetch呼出しがthrowしたことだけを示し、DNS/TLS等の原因確定ではない。

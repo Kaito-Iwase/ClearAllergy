@@ -125,3 +125,5 @@
 Issue118 runnerのCI準備段階・固定エラー分類を変更する場合は、docs/verification/issue118-live-runner-20261030.mdとoffline guard testsを同時に照合する。live成功・失敗の証跡は過去runと後続修正を分ける。
 
 Issue118 OIDC停止診断モードは専用workflow・scripts/check-issue118-oidc-target.mjs・tests/issue118-ci-auth.test.mjsと上記runner運用記録を照合する。通常liveガードを緩めず、Secret非配達・要求前停止を検証する。
+
+Issue118認証/route診断を変更する場合はscripts/issue118-ci-auth.mjs・issue118-preview-transport.mjs・check-issue118-live-t1-browser.mjs、tests/issue118-ci-auth.test.mjs、runner運用記録を照合する。固定分類だけを保存し、認証/transportの制約を変更しない。

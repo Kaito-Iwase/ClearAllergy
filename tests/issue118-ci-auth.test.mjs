@@ -8,7 +8,8 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { assertCiEnvironment, ciIdentity, assertOidcClaims, oidcRequestUrl, inspectOidcRequestTarget, assertClerkPublishableKey, createCiAccess } from '../scripts/issue118-ci-auth.mjs';
 import { oidcTargetDiagnostic } from '../scripts/check-issue118-oidc-target.mjs';
-import { target, classifyLiveError } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { target, classifyLiveError, recordTransportDiagnostic } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { routePreviewRequest, transportObservation } from '../scripts/issue118-preview-transport.mjs';
 
 const syntheticSecret = 'sk_test_SYNTHETIC_NOT_REAL';
 const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_RUN_ATTEMPT: '1',
@@ -29,6 +30,81 @@ const code = expected => error => error.message === expected && !error.cause && 
 const publicKey = 'pk_test_' + Buffer.from(ciIdentity.clerkDomain + '$').toString('base64');
 const diagnosticEnv = () => ({ ...env(), ISSUE118_APPLY: undefined, ISSUE118_TEST_CLERK_SECRET_KEY: undefined,
     ISSUE118_DIAGNOSTIC_MODE: 'OIDC_TARGET_ONLY' });
+
+test('transport report permits enums/status/booleans only and retains first unexpected failure beyond cap', () => {
+    const report = {};
+    recordTransportDiagnostic(report, { originRole: syntheticSecret, method: 'https://u:p@invalid/', status: syntheticSecret,
+        exception: syntheticSecret, stages: { fetchStarted: true, url: syntheticSecret }, url: syntheticSecret });
+    assert.deepEqual(report.transportDiagnostics[0].originRole, 'OTHER');
+    assert.equal(report.transportDiagnostics[0].method, 'OTHER'); assert.equal(report.transportDiagnostics[0].status, null);
+    assert.ok(!JSON.stringify(report).includes('SYNTHETIC')); assert.ok(!JSON.stringify(report).includes('https:'));
+    const capped = {};
+    for (let i = 0; i < 70; i++) recordTransportDiagnostic(capped, transportObservation('OTHER', 'GET', null, 'POLICY_REFUSED'));
+    assert.equal(capped.firstTransportFailure, undefined);
+    recordTransportDiagnostic(capped, transportObservation('APP', 'GET', 302, 'REDIRECT_REFUSED', { redirectRejected: true }));
+    recordTransportDiagnostic(capped, transportObservation('CLERK', 'GET', 503, 'NONE'));
+    assert.equal(capped.transportDiagnostics.length, 64); assert.equal(capped.transportDiagnosticsTruncated, true);
+    assert.equal(capped.firstTransportFailure.originRole, 'APP'); assert.equal(capped.firstTransportFailure.status, 302);
+});
+
+test('APP route diagnostics distinguish redirects, HTTP errors, and fetch/headers/status/fulfill failures without raw errors', async () => {
+    for (const scenario of ['redirect', 'http403', 'fetch', 'headers', 'status', 'fulfill', 'abort']) {
+        const events = []; let fetches = 0, fulfilled = 0;
+        const raw = () => { throw Error(syntheticSecret + ' https://u:p@invalid/private?token=secret'); };
+        const route = { request: () => ({ url: () => target.origin + '/admin/login', method: () => 'GET',
+            allHeaders: async () => { if (scenario === 'headers') raw(); return {}; } }),
+            fetch: async options => { fetches++; assert.equal(options.maxRedirects, 0); assert.equal(options.maxRetries, 0);
+                if (['fetch', 'abort'].includes(scenario)) raw();
+                return { status: () => { if (scenario === 'status') raw(); return scenario === 'redirect' ? 302 : scenario === 'http403' ? 403 : 200; } }; },
+            fulfill: async () => { fulfilled++; if (scenario === 'fulfill') raw(); },
+            abort: async () => { if (scenario === 'abort') raw(); } };
+        if (scenario === 'http403') await routePreviewRequest(route, 'synthetic.payload.signature', value => events.push(value));
+        else await assert.rejects(routePreviewRequest(route, 'synthetic.payload.signature', value => events.push(value)),
+            error => ['PROTECTED_REDIRECT_BLOCKED', 'PROTECTED_TRANSPORT_FAILED', 'PROTECTED_ABORT_FAILED'].includes(error.message));
+        const event = events[0]; assert.equal(event.originRole, 'APP'); assert.equal(event.method, 'GET');
+        const expected = { redirect: 'REDIRECT_REFUSED', http403: 'NONE', fetch: 'FETCH_EXCEPTION', headers: 'HEADERS_EXCEPTION',
+            status: 'STATUS_EXCEPTION', fulfill: 'FULFILL_EXCEPTION', abort: 'ABORT_EXCEPTION' };
+        assert.equal(event.exception, expected[scenario]); assert.ok(!JSON.stringify(events).includes('SYNTHETIC'));
+        assert.equal(fetches, scenario === 'headers' ? 0 : 1);
+        if (scenario === 'redirect') { assert.equal(event.status, 302); assert.equal(fulfilled, 0); assert.equal(event.stages.redirectRejected, true); }
+        if (scenario === 'fetch') assert.equal(event.stages.responseObserved, false);
+        if (scenario === 'status') assert.equal(event.stages.responseObserved, true);
+    }
+});
+
+test('Clerk/OTHER route diagnostics preserve fixed roles and never relax external redirect/header policy', async () => {
+    const events = []; const access = await createCiAccess(env(), async () => response({ value: jwt(claims()) }), () => {},
+        { transport: value => events.push(value) });
+    const route = origin => ({ request: () => ({ url: () => origin + '/v1/client?synthetic-secret', method: () => 'GET',
+        allHeaders: async () => ({ 'x-vercel-trusted-oidc-idp-token': 'synthetic.payload.signature' }) }),
+        fetch: async options => { assert.ok(!Object.hasOwn(options.headers, 'x-vercel-trusted-oidc-idp-token'));
+            assert.equal(options.maxRedirects, 0); assert.equal(options.maxRetries, 0); return { status: () => 307 }; },
+        fulfill: async () => assert.fail('redirect must never fulfill'), abort: async () => {} });
+    await assert.rejects(access.route(route('https://' + ciIdentity.clerkDomain)), code('CI_ROUTE_FAILED'));
+    assert.equal(events[0].originRole, 'CLERK'); assert.equal(events[0].exception, 'REDIRECT_REFUSED'); assert.equal(events[0].status, 307);
+    await access.route(route('https://other.invalid'));
+    assert.equal(events[1].originRole, 'OTHER'); assert.equal(events[1].exception, 'POLICY_REFUSED');
+    assert.ok(!JSON.stringify(events).includes('synthetic-secret')); assert.ok(!JSON.stringify(events).includes('/v1/'));
+});
+
+test('Backend API failures record Clerk role/method/status or fixed fetch class without key or response body', async () => {
+    for (const network of [false, true]) {
+        const events = []; let calls = 0;
+        const access = await createCiAccess(env(), async url => {
+            calls++;
+            if (url.includes('actions.githubusercontent.com')) return response({ value: jwt(claims()) });
+            if (network) throw Error(syntheticSecret + ' private response');
+            return { ok: false, status: 401, json: async () => assert.fail('do not read failed body') };
+        }, () => {}, { transport: value => events.push(value) });
+        const fixture = authFixture();
+        await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        assert.equal(calls, 2); assert.equal(events.length, 1); assert.equal(events[0].originRole, 'CLERK');
+        assert.equal(events[0].method, 'GET'); assert.equal(events[0].stages.backendRequest, true);
+        assert.equal(events[0].status, network ? null : 401); assert.equal(events[0].exception, network ? 'FETCH_EXCEPTION' : 'NONE');
+        assert.equal(access.authenticationProgress().ownerLookupStarted, true); assert.equal(access.authenticationProgress().ownerMatched, false);
+        assert.ok(!JSON.stringify(events).includes('SYNTHETIC')); assert.ok(!JSON.stringify(events).includes('private'));
+    }
+});
 
 test('OIDC predicate mirror matches candidate validator, never returns URL parts or exceptions', () => {
     const base = 'https://run-actions-synthetic.actions.githubusercontent.com/only/idtoken?api-version=2.0';
@@ -246,6 +322,62 @@ function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, 
         evaluate: async (fn, arg) => runInNewContext('(' + fn.toString() + ')(__arg)', { window: { Clerk: clerk }, __arg: arg }) };
     return { calls, visits, page, fetcher, providerSession: () => providerSession, signOutCalls: () => signOutCalls };
 }
+
+test('authentication progress is boolean-only, monotone and distinguishes no token request from unacknowledged issuance', async () => {
+    const navigation = authFixture(); navigation.page.goto = async () => { throw Error(syntheticSecret); };
+    const notStarted = await createCiAccess(env(), navigation.fetcher);
+    await assert.rejects(notStarted.authenticate(navigation.page), code('CI_AUTHENTICATION_FAILED'));
+    assert.equal(notStarted.authenticationProgress().loginNavigationStarted, true);
+    assert.equal(notStarted.authenticationProgress().loginNavigationCompleted, false);
+    assert.equal(notStarted.authenticationProgress().testingTokenRequestStarted, false);
+    assert.equal(navigation.calls.length, 1); // OIDC only; no Backend API.
+    for (const endpoint of ['testing_tokens', 'sign_in_tokens']) {
+        const fixture = authFixture(); let providerIssued = false;
+        const snapshots = [];
+        const fetcher = async (url, options) => {
+            if (url.endsWith('/' + endpoint)) { providerIssued = true; throw Error(syntheticSecret + ' lost acknowledgement'); }
+            return fixture.fetcher(url, options);
+        };
+        const access = await createCiAccess(env(), fetcher, () => {}, { authentication: value => snapshots.push(value) });
+        await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        const progress = access.authenticationProgress();
+        assert.equal(providerIssued, true); assert.equal(progress.ownerMatched, true);
+        assert.equal(progress.testingTokenRequestStarted, true);
+        assert.equal(progress.testingTokenReceived, endpoint === 'sign_in_tokens');
+        assert.equal(progress.signInTokenRequestStarted, endpoint === 'sign_in_tokens');
+        assert.equal(progress.signInTokenReceived, false); assert.equal(progress.sessionCreationAttempted, false);
+        assert.equal(await access.signOut(fixture.page), 'SESSION_CREATION_NOT_ATTEMPTED');
+        assert.ok(snapshots.every(value => Object.values(value).every(flag => typeof flag === 'boolean')));
+        assert.ok(!JSON.stringify(snapshots).includes('SYNTHETIC'));
+    }
+});
+
+test('successful and partial authentication keep existing session cleanup semantics with new progress fields', async () => {
+    for (const failed of [false, true]) {
+        const fixture = authFixture({ setActiveFailure: failed }); const snapshots = [];
+        const access = await createCiAccess(env(), fixture.fetcher, () => {}, { authentication: value => snapshots.push(value) });
+        if (failed) await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        else await access.authenticate(fixture.page);
+        const progress = access.authenticationProgress();
+        assert.equal(progress.testingTokenReceived, true); assert.equal(progress.signInTokenReceived, true);
+        assert.equal(progress.sessionCreationAttempted, true); assert.equal(progress.activationAcknowledged, !failed);
+        assert.equal(progress.adminNavigationCompleted, !failed);
+        progress.ownerMatched = false; assert.equal(access.authenticationProgress().ownerMatched, true);
+        assert.equal(await access.signOut(fixture.page), failed ? 'SIGNOUT_UNVERIFIED' : 'SIGNOUT_CONFIRMED');
+        assert.ok(!JSON.stringify(snapshots).includes('SYNTHETIC'));
+    }
+});
+
+test('diagnostic observer failures cannot leak raw exceptions or be mistaken for successful authentication', async () => {
+    const fixture = authFixture();
+    const access = await createCiAccess(env(), fixture.fetcher, () => {}, { authentication: () => { throw Error(syntheticSecret); } });
+    await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+    assert.equal(fixture.calls.length, 1); assert.equal(access.authenticationProgress().testingTokenRequestStarted, false);
+    const route = { request: () => ({ url: () => target.origin, method: () => 'GET', allHeaders: async () => ({}) }),
+        fetch: async () => ({ status: () => 200 }), fulfill: async () => {}, abort: async () => {} };
+    await assert.rejects(routePreviewRequest(route, 'synthetic.payload.signature', () => { throw Error(syntheticSecret); }),
+        code('TRANSPORT_DIAGNOSTIC_FAILED'));
+});
 
 test('official temporary ticket flow is fixed owner A only, no session export, signout separate', async () => {
     const fixture = authFixture(); const access = await createCiAccess(env(), fixture.fetcher);
