@@ -119,3 +119,6 @@
 | 対象 | 仕様・運用 | 実装・設定 | 検証入口 |
 | --- | --- | --- | --- |
 | exact test Previewの帯と専用画像保存、staging検証入口 | [stagingの準備](development.md#staging)。現段階はローカル準備・自動配備抑止。専用DB初期化は検証済み、再INIT禁止 | `app/layout.tsx`、`app/globals.css`、`components/layout/TestEnvironmentBanner.tsx`、`lib/test-preview-environment.ts`、`lib/storage/upload-images.ts`、`lib/storage/image-url-policy.ts`、`.github/workflows/ci.yml`、`vercel.json` | `tests/test-environment-banner.test.ts`（Production/main/他branchの非表示）、`tests/test-preview-blob.test.ts`（専用token・不正設定のfallback拒否）。実外部サービス・配備・画像uploadは別確認 |
+## Issue #118 callback独立比較候補
+
+[候補の範囲と留保](../verification/issue118-server-callback-candidate-20261101.md)、proxy.ts、lib/verification/issue118-callback-diagnostic.mjs、同.d.mts、tests/issue118-server-callback-diagnostic.test.mjsを照合する。既存SDKの例外捕捉やauth代替ではなく、未配備Preview候補の独立した署名・形状比較に限定する。
