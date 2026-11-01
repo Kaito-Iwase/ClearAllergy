@@ -102,6 +102,7 @@ test("応答statusは既知400でもDB非変更を断定せず、後続送信/cl
     const result = await prepareBatchStops(f.input).execute();
     assert.equal(f.calls.length, 1); assert.equal(result.status, "HOLD_NO_FURTHER_DISPATCH");
     assert.equal(result.journal[0].state, "KNOWN_HTTP_NON_SUCCESS"); assert.equal(result.journal[0].httpStatus, 400);
+    assert.equal(result.next, "HOLD_RECONCILE_ORIGINAL_OPERATION_NO_WRITES");
     assert.deepEqual(result.unknownOrUnverifiedIds, ["M01"]);
 });
 
@@ -110,6 +111,7 @@ test("合成commit後に200本文を失うとunknownで停止し、GETや別inst
     const operator = prepareBatchStops(f.input), result = await operator.execute();
     assert.equal(f.model.get("M01")!.isPublished, false); assert.equal(f.calls.length, 1); assert.equal(f.reads, 9);
     assert.equal(result.journal[0].state, "INDETERMINATE"); assert.deepEqual(result.confirmedIds, []);
+    assert.equal(result.next, "HOLD_RECONCILE_ORIGINAL_OPERATION_NO_WRITES");
     assert.deepEqual(result.unknownOrUnverifiedIds, ["M01"]);
     await assert.rejects(operator.execute(), /BATCH_INPUT_REFUSED/);
     assert.equal((await prepareBatchStops(f.input).execute()).status, "RUN_ALREADY_CLAIMED_NO_DISPATCH");
@@ -134,6 +136,7 @@ test("送信callback待ち中の中止はunknownを固定し、遅延成功し�
     const pending = prepareBatchStops({ ...f.input, signal: controller.signal }).execute();
     await sent; controller.abort(); const result = await pending;
     assert.equal(result.status, "HOLD_NO_FURTHER_DISPATCH"); assert.equal(result.journal[0].state, "INDETERMINATE");
+    assert.equal(result.next, "HOLD_RECONCILE_ORIGINAL_OPERATION_NO_WRITES");
     finish(); await Promise.resolve(); await Promise.resolve();
     assert.equal(f.model.get("M01")!.isPublished, false); assert.equal(f.calls.length, 1); assert.equal(f.reads, 9);
     assert.deepEqual(result.confirmedIds, []); assert.equal(result.automaticCleanup, false);

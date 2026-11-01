@@ -121,7 +121,9 @@ export function prepareBatchStops(input: { scenario: "T2" | "T3"; runId: string;
                 journal: structuredClone(journal), evidenceAcknowledged,
                 confirmedIds: journal.filter(r => r.state === "CONFIRMED_RESPONSE_AND_READBACK").map(r => r.key),
                 unknownOrUnverifiedIds: journal.filter(r => r.dispatchCalls > 0 && r.state !== "CONFIRMED_RESPONSE_AND_READBACK").map(r => r.key),
-                next: scenario === "T3" ? "HOLD_LOT_ALLOCATION_NO_REPUBLICATION" : "REVIEW_BEFORE_SEPARATE_PUBLICATION",
+                next: scenario === "T3" ? "HOLD_LOT_ALLOCATION_NO_REPUBLICATION"
+                    : status === "ALL_STOP_RESPONSES_AND_API_READBACKS_CONFIRMED_NOT_LIVE_PASS" ? "REVIEW_BEFORE_SEPARATE_PUBLICATION"
+                        : "HOLD_RECONCILE_ORIGINAL_OPERATION_NO_WRITES",
                 automaticRetry: false, automaticCleanup: false, republication: false,
                 payloadHashes: Object.fromEntries(commands.map(c => [c.key, digest(payloads.expectedByMenu[c.key])])) });
             const record = async (stage: string, command?: StopCommand, httpStatus?: number) => {

@@ -120,7 +120,7 @@ PR #120の`newWriteLedger/beginWrite/holdWrite/confirmWrite`の純粋な状態�
 
 run claimは、8件の作成ID/operationId/版を持つmanifestを原子的に保存し、同じrunの再instance/別processを拒否する呼出し側の責務。単なる常にtrueのcallbackではこの保証にならない。既存の専用出力receiptと排他を使い、pending/unknownを自動解除しない。モジュールのinstanceも一回制限を持つが、永続排他の代替ではない。dispatch intentを保存してからactorを再照合し、元の版で一回だけ送る。原例外・headers・本文・食品テキストは証跡に出さない。
 
-結果はdispatcher未呼出、既知HTTP非成功、未確定応答、既知応答/readback保留、確定応答＋所有者GET照合を区別する。送信callback開始後の例外/本文喪失/中止はunknownへ固定し、GETによる推定・後続送信・再送・cleanupをしない。中止はserver rollbackではなく、遅延commitもあり得る。全件確定後も他4件を含む8件のGET表現を再照合する。通常STOPで食品版/確認版/食品内容を変えず、公開反映pendingはfalseへ丸めず記録する。公開ページ・監査/全DB・実Clerkは`NOT_ATTESTED`で、総合live PASSを返さない。T3の次段は常にロット割当HOLDである。
+結果はdispatcher未呼出、既知HTTP非成功、未確定応答、既知応答/readback保留、確定応答＋所有者GET照合を区別する。送信callback開始後の例外/本文喪失/中止はunknownへ固定し、GETによる推定・後続送信・再送・cleanupをしない。中止はserver rollbackではなく、遅延commitもあり得る。全件確定後も他4件を含む8件のGET表現を再照合する。通常STOPで食品版/確認版/食品内容を変えず、公開反映pendingはfalseへ丸めず記録する。公開ページ・監査/全DB・実Clerkは`NOT_ATTESTED`で、総合live PASSを返さない。T2の未完了結果は次段の案内も元操作照合HOLDへ固定し、T3の次段は常にロット割当HOLDである。
 
 `PayloadPack.expectedByMenu`は、**原本CSVから独立に投影した初期payload**を呼出し側が供給する。`fixturePayload()`は既存SavedMenu DTOから比較形を作る関数であり、実GETを期待値にコピーして原本一致と呼んではいけない。`CALLER_PROJECTED_ORIGINAL`では既知のZIP/recipe/physical-gold hashとのメタデータ一致を要求するが、CSV本文/投影自体を認定しない。今回workspaceに原本本文がなく、原本CSV→初期payload生成は未実装・共有待ち。架空の値で補っていない。
 
