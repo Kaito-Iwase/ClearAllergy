@@ -2,12 +2,184 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, openSync, closeSync, fsyncSync, lstatSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCiAccess, assertCiEnvironment } from "./issue118-ci-auth.mjs";
-import { transportObservation } from "./issue118-preview-transport.mjs";
+import { createCiAccess, assertCiEnvironment, ciIdentity, assertOidcClaims, assertClerkPublishableKey } from "./issue118-ci-auth.mjs";
+import { transportObservation, scopedOidcHeaders, protectedPreviewFetch } from "./issue118-preview-transport.mjs";
 import { closeIsolatedBrowser } from "./issue118-close-browser.mjs";
+
+// Callable bridge for the separately scoped T2/T3 run. It deliberately does not
+// change runLive(), --ci-apply, its one-fixture confirmation, auth or workflow.
+// The caller must supply the guarded A/B transport and durable claims; passing
+// T1's action()/click wrapper would duplicate ownership of the send/ledger.
+export function prepareOriginalBatchRun(input) {
+    const { prepareOriginalScenario } = createRequire(import.meta.url)("tsx/cjs/api").require("./issue118-batch-stop.ts", import.meta.url);
+    if (input.managed) {
+        try { return prepareManagedOriginalBatch(input, prepareOriginalScenario); }
+        catch { throw Error("ORIGINAL_MANAGED_PREPARATION_HELD"); }
+    }
+    return prepareOriginalScenario({ ...input, ledgerPort: { newWriteLedger, beginWrite, holdWrite, confirmWrite } });
+}
+
+// Preparation-only orchestration. No CLI, workflow, credential acquisition or
+// authentication entrypoint calls this. Existing A-only authentication is unchanged.
+// A future caller must supply TWO independently authenticated guarded contexts and
+// fresh external owner evidence. No real ownerB is inferred or stored in this code.
+function prepareManagedOriginalBatch(input, prepareOriginalScenario) {
+    const refused = () => { throw Error("ORIGINAL_MANAGED_PREPARATION_HELD"); };
+    const check = value => { if (!value) refused(); };
+    const uuid = value => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    const cfg = input.managed, now = cfg.now || Date.now;
+    check(cfg.mode === "PREPARATION_ONLY" && uuid(input.runId) && typeof cfg.claimDirectory === "string");
+    check(Array.isArray(cfg.actors) && cfg.actors.length === 2);
+    const actors = new Map(cfg.actors.map(a => [a.binding?.owner, { ...a, binding: structuredClone(a.binding) }]));
+    check(actors.size === 2 && actors.has("S1") && actors.has("S2"));
+    const owners = cfg.actors.map(a => structuredClone(a.binding));
+    check(new Set(owners.map(a => a.shopId)).size === 2 && new Set(owners.map(a => a.contextRef)).size === 2
+        && new Set(cfg.actors.map(a => a.context)).size === 2 && new Set(cfg.actors.map(a => a.page)).size === 2
+        && new Set(cfg.actors.map(a => a.access)).size === 2 && new Set(cfg.actors.map(a => a.expectedUserId)).size === 2);
+    for (const actor of actors.values()) {
+        check(/^user_[A-Za-z0-9]+$/.test(actor.expectedUserId || "") && /^c[a-z0-9]+$/.test(actor.binding.shopId)
+            && /^[A-Za-z0-9_-]{1,64}$/.test(actor.binding.contextRef)
+            && typeof actor.access?.read === "function" && typeof actor.access?.token === "function"
+            && typeof actor.context?.request?.fetch === "function" && typeof actor.page?.evaluate === "function"
+            && actor.page.context() === actor.context);
+    }
+    check(actors.get("S1").expectedUserId === ciIdentity.ownerId && actors.get("S1").binding.shopId === target.shop);
+    const evidence = structuredClone(cfg.ownerEvidence), identityReceipt = structuredClone(cfg.identityReceipt);
+    const validate = () => {
+        assertIdentityReceipt(identityReceipt, now());
+        check(Array.isArray(evidence) && evidence.length === 2);
+        for (const [role, actor] of actors) {
+            const entries = evidence.filter(e => e.owner === role), entry = entries[0];
+            const age = now() - Date.parse(entry?.observedUtc);
+            check(entries.length === 1 && entry.clerkUserId === actor.expectedUserId && entry.shopId === actor.binding.shopId
+                && entry.contextRef === actor.binding.contextRef && entry.deployment === target.deployment
+                && entry.source === target.source && entry.origin === target.origin
+                && ["human", "browser_metadata_observer"].includes(entry.verifiedBy)
+                && typeof entry.evidenceReference === "string" && entry.evidenceReference.length > 0
+                && Number.isFinite(age) && age >= 0 && age <= 600000);
+        }
+    };
+    validate();
+    check(uuid(cfg.runIds?.T2) && uuid(cfg.runIds?.T3) && new Set([input.runId, cfg.runIds.T2, cfg.runIds.T3]).size === 3);
+    const batchRunId = input.runId, runIds = structuredClone(cfg.runIds);
+    const operationIds = structuredClone(cfg.operationIds);
+    check(["T2", "T3"].every(s => Object.keys(operationIds?.[s] || {}).length === 8
+        && Array.from({ length: 8 }, (_, i) => "M0" + (i + 1)).every(k => uuid(operationIds[s][k])))
+        && new Set(Object.values(operationIds).flatMap(x => Object.values(x))).size === 16);
+    let used = false, held = false, journal, sequence = 0;
+    const claimDirectory = resolve(cfg.claimDirectory), created = new Map(), observations = [];
+    const claim = (file, data) => {
+        let fd;
+        try { fd = openSync(join(claimDirectory, file + ".json"), "wx", 0o600);
+            writeFileSync(fd, JSON.stringify(data)); fsyncSync(fd); return true;
+        } catch { held = true; return false; } finally { if (fd !== undefined) closeSync(fd); }
+    };
+    const record = async event => {
+        check(/^[A-Z0-9_]+$/.test(event.stage));
+        const safe = { sequence: ++sequence, stage: event.stage,
+            ...(["M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08"].includes(event.key) ? { key: event.key } : {}),
+            ...(/^c[a-z0-9]+$/.test(event.menuId || "") ? { menuId: event.menuId } : {}),
+            ...(Number.isSafeInteger(event.version) && event.version >= 0 ? { version: event.version } : {}),
+            ...(Number.isInteger(event.httpStatus) && event.httpStatus >= 100 && event.httpStatus <= 599 ? { httpStatus: event.httpStatus } : {}) };
+        try { writeFileSync(journal, JSON.stringify(safe) + "\n"); fsyncSync(journal); }
+        catch { held = true; refused(); }
+    };
+    const readProtected = (actor, path) => {
+        validate();
+        return protectedPreviewFetch(actor.context.request, target.origin + path, {}, assertOidcClaims(actor.access.token(), now()));
+    };
+    const verifyActor = async binding => {
+        try {
+            check(!held && !input.signal?.aborted); validate();
+            const actor = actors.get(binding.owner);
+            check(actor && actor.binding.shopId === binding.shopId && actor.binding.contextRef === binding.contextRef
+                && actor.page.context() === actor.context && actor.page.url() === target.origin + "/admin/shop");
+            const identity = await actor.page.evaluate(() => ({ id: window.Clerk?.user?.id, pk: window.Clerk?.publishableKey }));
+            check(identity?.id === actor.expectedUserId); assertClerkPublishableKey(identity.pk);
+            const response = await readProtected(actor, "/api/admin/shop");
+            check(response.status() === 200 && (await response.json())?.shop?.id === binding.shopId);
+            return actor;
+        } catch { held = true; refused(); }
+    };
+    const actorForTarget = t => {
+        const actor = [...actors.values()].find(a => a.binding.shopId === t.shopId && a.binding.contextRef === t.contextRef);
+        check(actor && created.get(t.menuId)?.owner === actor.binding.owner && created.get(t.menuId)?.key === t.key);
+        return actor;
+    };
+    const adapter = scenario => ({
+        claimScenario: async manifest => claim(scenario + "-setup", { runId: manifest.runId, scenario, operationIds: manifest.operationIds }),
+        claimRun: async manifest => claim(scenario + "-stops", { runId: manifest.runId, scenario, fixtures: manifest.fixtures }),
+        assertOwner: verifyActor,
+        assertActor: async t => { await verifyActor(actorForTarget(t).binding); },
+        readOwnMenu: async t => {
+            const actor = await verifyActor(actorForTarget(t).binding);
+            const response = await readProtected(actor, "/api/admin/menus/" + t.menuId);
+            check(response.status() === 200); return { shopId: actor.binding.shopId, menu: (await response.json())?.menu };
+        },
+        dispatch: async command => send(scenario, command),
+        dispatchStop: async command => send(scenario, { ...command, phase: "STOP", owner: actorForTarget(command).binding }),
+        record,
+    });
+    const send = async (scenario, command) => {
+        try {
+            const actor = await verifyActor(command.owner);
+            check(["CREATE", "INITIAL_PUBLISH", "STOP", "CORRECT_PRIVATE", "REPUBLISH"].includes(command.phase));
+            if (command.phase === "CREATE") check(command.method === "POST" && command.path === "/api/admin/menus"
+                && command.body.operationId === operationIds[scenario][command.key] && command.body.isPublished === false);
+            else { check(/^c[a-z0-9]+$/.test(command.menuId || "") && created.get(command.menuId)?.scenario === scenario
+                    && actorForTarget({ ...command, shopId: command.owner.shopId, contextRef: command.owner.contextRef }) === actor);
+                check(command.method === (command.phase === "STOP" ? "POST" : "PUT")
+                    && command.path === `/api/admin/menus/${command.menuId}${command.phase === "STOP" ? "/stop" : ""}`); }
+            check(claim(`${scenario}-${command.key}-${command.phase}`, { scenario, key: command.key, phase: command.phase,
+                ...(command.menuId ? { menuId: command.menuId } : {}) }));
+            await record({ stage: "TRANSPORT_INTENT_DURABLY_CLAIMED", key: command.key, menuId: command.menuId });
+            validate(); check(!held && !input.signal?.aborted);
+            const url = target.origin + command.path, token = assertOidcClaims(actor.access.token(), now());
+            const response = await actor.context.request.fetch(url, { method: command.method, data: command.body,
+                headers: scopedOidcHeaders(url, { "Content-Type": "application/json", Origin: target.origin }, token),
+                maxRedirects: 0, maxRetries: 0, timeout: 20000, failOnStatusCode: false });
+            check(response.status() < 300 || response.status() >= 400);
+            return { status: () => response.status(), json: async () => {
+                const body = await response.json();
+                if (command.phase === "CREATE" && response.status() === 201 && /^c[a-z0-9]+$/.test(body?.id || "")) {
+                    check(!created.has(body.id) && ![target.anchor, "cmvs4x86o000vwn0w93c8ttez", "cmvs4x8wt000xwn0wj6gwdih1",
+                        "cmvs4x986000zwn0wer2ymhow", "cmvuy8d4z0003jw07e9fobsdm", "cmvuzlqhf0003l308lem3uwck"].includes(body.id));
+                    created.set(body.id, { key: command.key, owner: command.owner.owner, scenario });
+                }
+                return body;
+            } };
+        } catch { held = true; refused(); }
+    };
+    return { async execute() {
+        check(!used); used = true;
+        const results = []; let report;
+        try {
+            validate(); for (const owner of owners) await verifyActor(owner);
+            mkdirSync(claimDirectory, { recursive: true }); check(lstatSync(claimDirectory).isDirectory() && !lstatSync(claimDirectory).isSymbolicLink());
+            check(claim("managed-run", { runId: batchRunId, scenarios: ["T2", "T3"], runIds }));
+            journal = openSync(join(claimDirectory, "events.jsonl"), "wx", 0o600);
+            for (const scenario of ["T2", "T3"]) {
+                const result = await prepareOriginalScenario({ scenario, runId: runIds[scenario], owners, operationIds: operationIds[scenario],
+                    adapter: adapter(scenario), signal: input.signal, ledgerPort: { newWriteLedger, beginWrite, holdWrite, confirmWrite } }).execute();
+                results.push(result);
+                const expected = scenario === "T2" ? "SCENARIO_APP_RESPONSES_CONFIRMED_NOT_LIVE_PASS" : "SCENARIO_STOP_CONFIRMED_LOT_HOLD_NOT_LIVE_PASS";
+                if (held || result.status !== expected) refused();
+            }
+            report = { status: "MANAGED_ADAPTER_SEQUENCE_CONFIRMED_NOT_LIVE_PASS", results, observations, t4: "NOT_PREPARED_REUSE_PORT_DOCUMENTED",
+                authentication: "CALLER_CONTEXTS_NOT_INDEPENDENTLY_ATTESTED", independentDatabase: "NOT_ATTESTED", automaticCleanup: false };
+        } catch { report = { status: "MANAGED_HOLD_NO_FURTHER_WRITES", results, observations, automaticCleanup: false, automaticRetry: false }; }
+        finally {
+            if (journal !== undefined) {
+                try { closeSync(journal); } catch { held = true; }
+            }
+        }
+        if (held) report.status = "MANAGED_HOLD_NO_FURTHER_WRITES";
+        return report;
+    } };
+}
 
 export function recordTransportDiagnostic(report, observation) {
     const safe = transportObservation(observation.originRole, observation.method, observation.status,

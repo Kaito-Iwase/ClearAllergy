@@ -164,3 +164,19 @@ contextのCookie jarはorigin単位で通常の送受信を行うが、読取/ex
 ## 初回documentだけのhandshake例外
 
 分類後に別途承認した[限定handshake](issue118-initial-handshake-candidate-20261101.md)を通常CI認証の最初のdocumentにだけ適用する。既存の新規nonpersistent context・global headerなし・claims検証済みtoken()を維持し、OIDCはappだけへ送る。固定SDKの順序で最大3転送/4 GET、各fetchの自動redirect/retryは0。API writeや後続navigationのredirect禁止は変更しない。initialHandshakeの固定stage/HTTP status/count/booleanを結果へ保存し、HOLD/証跡保存不明ではClerk Backend API前に停止する。document-readyを認証やsession失効確認に読み替えない。
+
+## 原本T2/T3の呼出し接続（未有効化のmanaged候補）
+
+既存入口の`prepareOriginalBatchRun(input)`は、原本から投影する`prepareOriginalScenario`へ既存の4つの純粋ledger関数を直接注入する。新規のCLIや認証経路は持たず、`runLive`、`--ci-apply`、workflow、従来のT1一件用承認は変えない。TS読込みは既存依存`tsx/cjs/api`を使い、この関数を呼ぶときだけ行う。
+
+純粋adapterを注入する従来形に加え、`input.managed`を渡すと、一度だけのT2→独立T3を準備する。`mode: PREPARATION_ONLY`、親run UUID、別のT2/T3 run UUID、16個の異なるoperation UUID、freshな固定配備receipt、A/B別のowner evidence・context/page/access、task/CI所有の永続claimDirectoryが必要。Bの実IDはコードに補完しない。現在のCI authはA固定で、B認証・UI送信・無人live起動は未実装のまま。既存`runLive`・CLI・workflowはmanaged入口を呼ばない。
+
+送信ごとに固定target、fresh owner evidence、context結合、管理画面URL、Clerk userと既存Development公開鍵guard、所有店舗GETを再照合する。GETは既存`protectedPreviewFetch`、唯一のwrite senderは固定API pathだけに既存OIDC header/claims guardを適用する。自動redirect/retryは0。T1の送信も行う`action()`は注入しない。取得した201 IDだけをowner/scenarioに結び、既存保護IDやscenario越境を拒否する。
+
+同じclaimDirectoryを再利用し、親run、各scenario setup/STOP、各操作を`wx`作成+`fsync`で永続claimする。安全なJSONLを送信前にfsyncし、失敗はHOLD。claimやjournalは自動で消さず、新directoryへ移すことで再試行を回避しない。プロセス再起動後も既存claimがあれば拒否する。通常の合成testだけは自分が作成した一時fixture directoryを終了時に削除する。これは実fixture/監査履歴のcleanupとは別。
+
+原本8件の非公開作成→初回公開→T2四件/T3二件STOPまでを一連で呼び、T2だけ原本E21/E23の乳CONTAINS非公開訂正→保存済み食品版の取得→別再公開へ進む。T3はロット割当HOLDで終わる。201実IDは後のreadback失敗前に保持し、unknown/不一致/中止で後続write・再送・自動cleanupをしない。独立SQL、公開ページ/API、既知状態の明示cleanupは別に必要で、結果は実サービス総合PASSを返さない。
+
+`tests/issue118-original-entry.test.ts`はこの既存入口から原本投影/既存ledgerへ至るT2/T3の合成完遂と作成応答喪失を検査する。HTTP/Clerk/DB/Blob/秘密値は使わず、実認証やUI実行の証拠ではない。既存の`.test.ts` globに含め、workflowは変更しない。
+
+T4の再利用元はPR119 `3e494a30766b054963fefd220846849e330206f4` の`prepareT4Observation({context,fixture,assertReadTarget,readPublicApi,evidenceLevel})`。baselineはSTOP前、`afterExternalChange()`はSTOP確定・API readback後、最後に`close()`で所有ページの終了を別確認する。page routeは非対象をfallbackし、既存context保護を通す。実装済み観測器を新たに複製しない。今回のmanaged接続はT2/T3までで、T4観測器の呼出し自体は未配線（結果にも`NOT_PREPARED_REUSE_PORT_DOCUMENTED`）。原本T4・公開伝播・戻る・通信断の実試験成功には数えない。全体test/CIや原本投影の合成成功も実サービス総合PASSではない。
