@@ -60,3 +60,30 @@ PR毎のtimeoutは現行CIの25分を基準とし、追加検査の時間・失�
 | T4の既開タブ/戻る/取得失敗 | 既存の公開API500/404、snapshot整合、旧Phase 2の低忠実度viewer、旧Previewでの実タブ観測を分離して再利用。モデルの旧表示を再びPASSさせるだけのテストは増やさない | 現Preview/Nextのcache・bfcache・戻る時のGET有無・訂正到達。実request記録と障害注入が必要 |
 
 既存`publication` browserモードが同じscriptを呼ぶため追加CI workflowは不要。実Nextへauth doubleを通したE2Eや、サービス全体の通信断を追加したという意味ではない。独立したT2/T3/無信号・B店舗と、M06を含む4件のCSV比較も残る。ownerの最終runner SHA・対象アプリSHA・新fixture・独立SQLの結果を照合してから合流し、模擬検査の成功でこれらを埋めない。追加した負例が失敗した場合は製品仕様を緩めず、FAILを保持して判断する。
+
+## 2026-11-01：別ownerのDB境界と元設計の採点集合
+
+基点はPR #119の`87db3bc8d5f7ccca3f01263ce45cefef75dee084`。最新mainを直接照合した値は`7d7d3ceb02dc58cc45b2daa3784855be70e882f7`で、食品・認可の製品コードを取り込む変更ではない。認証担当のPR #120と画像修正PR #121のファイル・workflowは編集しない。
+
+### 今回追加する検査
+
+- `scripts/check-owned-menu-database.ts`の既存使い捨てPostgreSQL検査へ、別々のUser/Shopを持つA/Bを追加する。Clerkの本人IDだけをテスト内で切り替え、双方の自店舗GETが200になる正例と、相手メニューへのGET/PUT/DELETE/STOP/別公開が404になる負例を同じ実DBで検査する。公開済みの架空2件・品目・食品確認/公開記録・成功監査・無関係sentinelの不変を照合する。過去の「他店への移動/削除との競合」検査は残す。これは実Clerk cookie・middleware・別ブラウザsessionの証明ではない。
+- `scripts/issue118-stop-oracle.ts`と`tests/issue118-stop-oracle.test.ts`は、元のPhase 1の集合採点だけをコード化する。M06を含むT2の4件、T3の2件、別owner分担、結果不明を成功集合から除く処理、分母0のN/A、無信号と通常STOPの分離、全停止の過剰分を固定する。採点関数は観測の真正性を認定せず、総合PASS・実サービス検証済みという値を返さない。
+
+出典は2026-10-29作成の`ClearAllergy-Issue118-検証設計.md`の「台本と期待行動」「採点、分子・分母」「比較上の追加制約」をLibraryから再読したもの。元のZIP `ClearAllergy-Issue118-Phase0-1.zip`も所在を確認したが、この実行環境では公式転送helperがmaterialize機能を利用できず、CSVの実バイト取得・hash照合は未完了。今回の集合転記を原本56行・カード全文の完全復元や、CのCSV実行成功とは扱わない。採点者専用のgoldを操作者へ渡してはいけない。
+
+既存CIは`npm test`で新しい`.test.ts`を、既存owned-menu DB stepで追加DB検査を呼ぶ。workflowの追加・権限変更は不要。ローカルDocker CLIはあるがdaemon未起動のため、ローカル実DBの実行は未実施。ローカルの合成/単体結果と、同SHAで後続CIが実行するPostgreSQL結果を別に記録する。
+
+### 実試験へ合流するときに残る条件
+
+| 対象 | 元設計に対応するfixtureと観測 | 実行前に必要なもの・未証明の境界 |
+| --- | --- | --- |
+| B店舗の権限 | S1/S2の別owner・別context。本人の自店取得と相手の対象拒否を分け、各fixtureの前後を比較 | 既存Development ClerkのB本人IDと所有shopの照合receipt。今回のIDダブルDB検査で実sessionを代用しない。新account/keyを自動作成しない |
+| T2 | S1のM01/M02、S2のM05/M06を担当別にSTOPし、他4件を維持。4件を真値分母にする | 元レシピ・E21/E23・初期CSVの原本とhash、実ID対応表、両ownerの実認証。gold既知のAIによる指定4件停止と、操作者の影響発見を別集計 |
+| T3 | S1 M01・S2 M05。新ロットの乳含有は既知、各皿の旧新割当は不明。STOP後に保留し、再公開しない | E31/E32と旧新在庫の元fixture。単一切替日・一律MAYへの置換・ロットモデル追加を正解にしない。食品判定を製品側で変更しない |
+| T4 | M02。新規API、fresh page、既開tab、戻る、再取得失敗を別々に記録 | 実Previewで各request開始/完了と表示を対応付ける。API404とpageのnotFound（streamingでは200の場合あり）を分離。戻るのGET有無とbfcacheを区別し、Playwrightの戻る試験だけでbfcache実証としない |
+| 画像 | 専用架空画像、uploadと後続menu/shop保存、失敗時のFile/入力保持とBlob残存を分ける | 実Clerk/専用Blobの確認と対象アプリSHA。現在の固定Preview `6293d5a`はPR #121の修正検証対象ではない。失敗/結果不明で再upload・削除・cleanupを自動再送しない |
+| 通信失敗 | 送信前の遮断と、応答取得後にブラウザへの返却を抑止する条件を区別。原要求・API・独立DBを対応付ける | 1対象/1要求の注入許可と観測方法。模擬HTTPのabortを実サービスの未送信/確定後喪失へ読み替えず、unknownのまま再送しない |
+| 対照 | C_PRICE=M04、食品不変C_STOP=M07、C_SILENTの現物影響M08と観測必要STOPなし | ケースごとに独立初期値を使う。通常完遂2機会と有信号8件・無信号1件を分離。人の初見理解・所要時間・A/B/Cの優位性は未承認の人試験へ昇格しない |
+
+いずれも初期fixtureを既存stagingのメニューへ上書きしない。新専用fixtureの所有・target/source SHA・現在値を確定し、履歴を残した非公開化と独立SQLの結果を揃えてから実試験の完了を判定する。今回の変更は実サービスでのfixture実行を開始するものではない。
