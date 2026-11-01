@@ -353,8 +353,13 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
                 } finally { serviceActive = false; }
             },
             // This does not clear held/clientUnknown and never exposes deletion.
-            observeKnownBlob: readExactObject => source.observeKnownBlob({
-                assertScope: () => verifyActor(actor.binding, true), readExactObject }),
+            async observeKnownBlob(readExactObject) {
+                try {
+                    const result = await source.observeKnownBlob({ assertScope: () => verifyActor(actor.binding, true), readExactObject });
+                    if (result.stage !== "EXACT_KNOWN_OBJECT_BYTES_MATCH") held = true;
+                    return { ...result, managedHeld: held };
+                } catch { held = true; refused(); }
+            },
         };
     };
     return { prepareServiceObservation, async execute() {

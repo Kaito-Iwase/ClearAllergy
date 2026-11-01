@@ -187,7 +187,7 @@ T4は原本M02の800円/29状態を別fixtureへ投影し、非公開作成→�
 
 同じmanaged objectの`execute()`が確定した後だけ、`prepareServiceObservation(config)`で1論理操作を準備できる。同時probeを許さず、unknownでrun全体をHOLDする。再利用元の`scripts/issue118-service-observer.ts`と対応testはPR119 `0ca5a48758b19434c45cbbd592c686478363d520` のbyte不変コピー（提供patch SHA256 `937f6e6075cbb1867d11e6448a74ebd78dab23ffaf69b5de80e26d5e83f4483d`）。新しい実行CLIやworkflow権限は追加しない。
 
-current-run 201台帳とownerに結び、固定method/path/body hashと既存論理claimで通常配達/送信前遮断/上流応答後返却抑止を区別する。logical claimはfault modeをキーに含めない。routeのrequest frame→指定page→選択actor contextと、固定作成/編集URLを送信前に照合する。管理画面guard用pageと操作UI pageは同じactor context内で分ける。唯一の`route.fetch`はOIDCを固定appだけへ送り、redirect/retryは0。CREATE201の有効IDは相関header検査より先にledger・私有receiptへ残し、相関不明でも失わない。正常時もUI・所有APIを別照合し、上流200だけをDB成功にしない。
+current-run 201台帳とownerに結び、固定method/path/body hashと既存論理claimで通常配達/送信前遮断/上流応答後返却抑止を区別する。logical claimはfault modeをキーに含めない。routeのrequest frame→指定page→選択actor contextと、固定作成/編集URLを送信前に照合する。管理画面guard用pageと操作UI pageは同じactor context内で分ける。唯一の`route.fetch`はOIDCを固定appだけへ送り、redirect/retryは0。CREATE201の有効IDは相関header検査より先にledger・私有receiptへ残し、相関不明でも失わない。正常時もUI・所有APIを別照合し、上流200だけをDB成功にしない。サービス側のAPI照合範囲はID/版、STOP非公開、upload時の既存menu不変、CREATE名/非公開であり、全入力保存・独立SQL・画像表示の実証は別に必要。
 
 Blobは既存の専用originだけを許可し、acknowledged objectのURLを私有claimDirectoryへ記録する。public log/artifactにはURLやheader/body/認証値を出さない。`observeKnownBlob`は1回だけ既知1URLのcredential-free読取adapterを使い、unknownを解除しない。wrapperは削除methodを公開せず既定RETAIN。新しいBlobキーは不要。現在runの新shop証跡がないためSHOP_SAVE/SHOP_UPLOADは拒否する。必要なら別途、明示承認されたshop対象・現在値・復元条件・所有対応を先に固定する。
 

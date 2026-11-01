@@ -392,3 +392,13 @@ test("Aを確認してもB由来request frame/contextのCookieを使った送信
         assert.equal(c.calls.forward, 0); assert.equal(c.calls.abort, 1); assert.equal(f.arms.SERVICE.menus.size, 0);
     });
 });
+
+test("通常uploadの応答が既知でもBlob bytes読取不一致はmanaged全体をHOLDし、次の保存を許さない", async () => withClaims(async directory => {
+    const f = managedFixture(directory), run = prepareOriginalBatchRun(f.input); await run.execute();
+    const c = serviceCase(f, "DELIVER", "MENU_UPLOAD"), probe = run.prepareServiceObservation(c.input);
+    assert.equal((await probe.execute()).status, "SERVICE_DELIVERED_AND_OWN_API_CONFIRMED_NOT_LIVE_PASS");
+    const got = await probe.observeKnownBlob(async () => ({ status: 200, sha256: "0".repeat(64), bytes: 68, contentType: "image/png" }));
+    assert.equal(got.stage, "OBJECT_READ_UNVERIFIED"); assert.equal(got.managedHeld, true);
+    assert.throws(() => run.prepareServiceObservation(serviceCase(f, "DELIVER").input));
+    assert.equal(c.calls.forward, 1); assert.equal(c.calls.abort, 0);
+}));
