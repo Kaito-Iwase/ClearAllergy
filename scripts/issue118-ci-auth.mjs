@@ -1,6 +1,7 @@
 // Test infrastructure only. Importing this module performs no I/O or authentication.
 import { routePreviewRequest, protectedPreviewFetch, previewOrigin, transportObservation,
     transportException, observeTransport } from './issue118-preview-transport.mjs';
+import { createInitialHandshakeCandidate } from './issue118-initial-handshake-candidate.mjs';
 
 export const ciIdentity = Object.freeze({
     repository: 'Kaito-Iwase/ClearAllergy', repositoryId: '1144262510',
@@ -98,6 +99,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     let authenticationAttempted = false;
     let sessionCreationAttempted = false;
     let ticketRequests = 0;
+    let initialHandshake, initialPage, initialDocumentWindow = false, handshakeObservationFailed = false, routeHeld = false;
     const progress = Object.fromEntries(['loginNavigationStarted', 'loginNavigationCompleted', 'clerkLoaded',
         'frontendMatched', 'ownerLookupStarted', 'ownerMatched', 'testingTokenRequestStarted', 'testingTokenReceived',
         'signInTokenRequestStarted', 'signInTokenReceived', 'sessionCreationAttempted', 'activationAcknowledged',
@@ -108,6 +110,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
         try { observers.authentication?.({ ...progress }); } catch { fail('AUTH_DIAGNOSTIC_FAILED'); }
     };
     const backend = (path, method, body, code) => jsonOnce(async (url, options) => {
+        if (routeHeld) fail('CI_TRANSPORT_HELD');
         const flags = { targetValidated: true, backendRequest: true, fetchStarted: true };
         let status = null, stage = 'FETCH';
         try {
@@ -126,7 +129,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
         token,
         read: (api, url) => protectedPreviewFetch(api, url, {}, token()),
         async route(route) {
-            let role = 'OTHER', method = 'OTHER', status = null, stage = 'TARGET', delegated = false;
+            let role = 'OTHER', method = 'OTHER', status = null, stage = 'TARGET', delegated = false, handshakeDelegated = false;
             const flags = {};
             try {
                 const request = route.request();
@@ -135,6 +138,16 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 method = typeof request.method === 'function' ? request.method() : 'OTHER';
                 if (url.username || url.password) fail('CI_EXTERNAL_TARGET_REFUSED');
                 flags.targetValidated = true;
+                if (initialDocumentWindow && request.isNavigationRequest() && request.resourceType() === 'document' &&
+                    request.frame() === initialPage.mainFrame()) {
+                    delegated = true; handshakeDelegated = true; stage = 'INITIAL_HANDSHAKE';
+                    try { return await initialHandshake.run(route); }
+                    finally {
+                        initialDocumentWindow = false;
+                        try { observers.handshake?.(initialHandshake.diagnostics()); }
+                        catch { handshakeObservationFailed = true; fail('AUTH_DIAGNOSTIC_FAILED'); }
+                    }
+                }
                 if (url.origin === previewOrigin) {
                     stage = 'TOKEN'; const value = token(); flags.tokenValidated = true;
                     delegated = true;
@@ -161,8 +174,11 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 transportObserver(transportObservation(role, method, status, 'POLICY_REFUSED', flags));
                 return result;
             } catch (error) {
-                flags.abortAttempted = true;
-                try { await route.abort('blockedbyclient'); flags.abortCompleted = true; } catch { /* fixed failure, no provider text */ }
+                routeHeld = true;
+                if (!handshakeDelegated || !initialHandshake.diagnostics().held) {
+                    flags.abortAttempted = true;
+                    try { await route.abort('blockedbyclient'); flags.abortCompleted = true; } catch { /* fixed failure, no provider text */ }
+                }
                 if (!delegated) transportObserver(transportObservation(role, method, status,
                     flags.abortCompleted ? transportException(error, stage) : 'ABORT_EXCEPTION', flags));
                 fail('CI_ROUTE_FAILED');
@@ -172,8 +188,14 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
             if (authenticationAttempted) fail('CI_AUTH_RETRY_REFUSED');
             authenticationAttempted = true;
             try {
+                if (routeHeld) fail('CI_TRANSPORT_HELD');
+                initialPage = page; initialHandshake = createInitialHandshakeCandidate(page, token);
+                initialDocumentWindow = true;
                 mark('loginNavigationStarted');
                 await page.goto(previewOrigin + '/admin/login');
+                initialDocumentWindow = false;
+                if (!initialHandshake.diagnostics().complete || initialHandshake.diagnostics().held || handshakeObservationFailed)
+                    fail('CI_INITIAL_HANDSHAKE_HELD');
                 mark('loginNavigationCompleted');
                 await page.waitForFunction(() => Boolean(window.Clerk?.loaded));
                 mark('clerkLoaded');
@@ -191,6 +213,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 const ticket = await backend('sign_in_tokens', 'POST', { user_id: ciIdentity.ownerId, expires_in_seconds: 120 }, 'CLERK_SIGNIN_TOKEN_FAILED');
                 if (typeof ticket.token !== 'string' || !ticket.token) fail('CLERK_SIGNIN_TOKEN_FAILED');
                 mark('signInTokenReceived');
+                if (routeHeld) fail('CI_TRANSPORT_HELD');
                 // A provider session can exist even when this evaluate/activation acknowledgement is lost.
                 sessionCreationAttempted = true;
                 mark('sessionCreationAttempted');
@@ -206,6 +229,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 await page.goto(previewOrigin + '/admin/shop');
                 mark('adminNavigationCompleted');
             } catch { fail('CI_AUTHENTICATION_FAILED'); }
+            finally { initialDocumentWindow = false; }
         },
         async signOut(page) {
             if (!authenticationAttempted) return 'NOT_STARTED';
@@ -228,5 +252,6 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
         },
         isAuthenticated: () => authenticated,
         authenticationProgress: () => ({ ...progress }),
+        handshakeProgress: () => initialHandshake ? initialHandshake.diagnostics() : { stage: 'NOT_STARTED', complete: false, held: false },
     };
 }

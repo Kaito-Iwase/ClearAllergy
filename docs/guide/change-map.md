@@ -131,3 +131,5 @@ Issue118認証/route診断を変更する場合はscripts/issue118-ci-auth.mjs�
 保存済み公開のfocus検査はscripts/check-saved-publication-browser.mjsと上記運用記録を照合する。既存requestAnimationFrame後の同一対象へのfocusを標準toBeFocusedで待ち、未focus・別対象・期限超過のFAILを維持する。製品動作の変更とは区別する。
 
 Issue118初回redirect停止診断はscripts/check-issue118-preview-redirect.mjs・issue118-redirect-location.mjs、tests/issue118-redirect-diagnostic.test.mjs、専用workflowとrunner運用記録を照合する。Secret配達なし、単発固定GET・manual redirect、全分岐でfollow/Clerk/fixture前停止を維持する。通常liveの認証経路とは分ける。
+
+初回handshake例外は[限定設計](../verification/issue118-initial-handshake-candidate-20261101.md)、scripts/issue118-initial-handshake-candidate.mjs・issue118-ci-auth.mjs、同名testとrunner receiptを照合する。初回main-frame documentだけの固定SDK経路であり、通常API/後続navigationのredirect禁止は維持する。

@@ -150,3 +150,7 @@ Secretはこのstepへ渡さず、Clerk Secret/DB資格情報やAPPLYが渡さ�
 3xxの場合だけLocationを一時parseし、同じapp/configured Clerk/既知Vercel/otherとparse・HTTPS・userinfoなし・default port・fragmentなし等のbooleanへ変換する。configured Clerkは固定期待instance origin、既知Vercelはhttps://vercel.com完全一致。近似hostを含めない。全結果stopBeforeFollow=trueで、origin一致でも追従許可にはしない。URL/path/query/header/body/token/生例外は出力しない。Locationの値を取得するのはこの承認済みruntime処理内だけで、手元へ原文を回収しない。
 
 非3xxでも本文やClerkを読まず停止する。completed/exit0は分類処理の完了だけを表し、HTTP200・Vercel信頼・認証・T1成功の保証ではない。Node fetchは先のbrowser route.fetchとクライアントが異なるため、その診断GETでの観測として区別する。転送先originだけでも、307を発行した主体や正当なhandshakeまで確定したことにはならない。追加followや実T1は別の判断を必要とする。
+
+## 初回documentだけのhandshake例外
+
+分類後に別途承認した[限定handshake](issue118-initial-handshake-candidate-20261101.md)を通常CI認証の最初のdocumentにだけ適用する。既存の新規nonpersistent context・global headerなし・claims検証済みtoken()を維持し、OIDCはappだけへ送る。固定SDKの順序で最大3転送/4 GET、各fetchの自動redirect/retryは0。API writeや後続navigationのredirect禁止は変更しない。initialHandshakeの固定stage/HTTP status/count/booleanを結果へ保存し、HOLD/証跡保存不明ではClerk Backend API前に停止する。document-readyを認証やsession失効確認に読み替えない。

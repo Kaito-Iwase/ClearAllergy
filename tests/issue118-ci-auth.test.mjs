@@ -31,6 +31,70 @@ const publicKey = 'pk_test_' + Buffer.from(ciIdentity.clerkDomain + '$').toStrin
 const diagnosticEnv = () => ({ ...env(), ISSUE118_APPLY: undefined, ISSUE118_TEST_CLERK_SECRET_KEY: undefined,
     ISSUE118_DIAGNOSTIC_MODE: 'OIDC_TARGET_ONLY' });
 
+// Unit-only page adapter: the old auth model must acknowledge the initial document
+// route too. This uses a fake API response, not a live browser/authentication.
+const wiredPages = new WeakMap();
+function wireAuthPage(access, page) {
+    if (!wiredPages.has(page)) {
+        const frame = {}, visits = [], originalGoto = page.goto;
+        const state = { access, requests: [], responses: [], fulfills: 0, aborts: 0 };
+        page.mainFrame = () => frame;
+        page.context = () => ({ request: { fetch: async (url, options) => {
+            state.requests.push({ url, options });
+            return state.responses.shift() || { status: () => 200, headers: () => ({}) };
+        } } });
+        page.goto = async url => {
+            visits.push(url);
+            if (url === target.origin + '/admin/login') try { await state.access.route({
+                request: () => ({ url: () => url, method: () => 'GET', resourceType: () => 'document',
+                    isNavigationRequest: () => true, frame: () => frame }),
+                fulfill: async () => { state.fulfills++; }, abort: async () => { state.aborts++; },
+            }); } catch (error) { if (!state.swallowRouteError) throw error; }
+            return originalGoto?.(url);
+        };
+        wiredPages.set(page, state);
+    }
+    wiredPages.get(page).access = access;
+    return wiredPages.get(page);
+}
+const authenticate = (access, page) => { wireAuthPage(access, page); return access.authenticate(page); };
+
+test('wired initial handshake reaches auth only after exact four-GET exchange; later document redirects stay refused', async () => {
+    const fixture = authFixture(); const reports = [];
+    const access = await createCiAccess(env(), fixture.fetcher, () => {}, { handshake: r => reports.push(r) });
+    const model = wireAuthPage(access, fixture.page);
+    const outbound = new URL('https://' + ciIdentity.clerkDomain + '/v1/client/handshake');
+    for (const [k,v] of Object.entries({redirect_url:target.origin+'/admin/login',__clerk_api_version:'2026-05-12',
+        suffixed_cookies:'true',__clerk_hs_reason:'dev-browser-missing',format:'nonce'})) outbound.searchParams.set(k,v);
+    const r = (status,location) => ({status:()=>status,headers:()=>({location})});
+    model.responses.push(r(307,outbound.href),r(302,target.origin+'/admin/login?__clerk_handshake_nonce=SYNTHETIC_NONCE'),
+        r(307,target.origin+'/admin/login'),r(200));
+    await access.authenticate(fixture.page);
+    assert.equal(model.requests.length,4);assert.equal(model.fulfills,1);assert.equal(access.isAuthenticated(),true);
+    assert.equal(access.handshakeProgress().complete,true);assert.equal(reports.length,1);
+    assert.ok(!JSON.stringify(reports).includes('SYNTHETIC_NONCE'));
+    assert.ok(!Object.keys(model.requests[1].options.headers).some(k=>k.toLowerCase().includes('vercel')));
+    let fetches=0;
+    await assert.rejects(access.route({request:()=>({url:()=>target.origin+'/admin/shop',method:()=>'GET',
+        resourceType:()=>'document',isNavigationRequest:()=>true,frame:()=>fixture.page.mainFrame(),allHeaders:async()=>({})}),
+        fetch:async()=>{fetches++;return r(307,outbound.href);},fulfill:async()=>assert.fail('No later redirect'),abort:async()=>{}}),code('CI_ROUTE_FAILED'));
+    assert.equal(fetches,1);
+});
+test('wired handshake HOLD or evidence failure prevents Backend API auth and never retries', async () => {
+    for (const observerFailure of [false,true]) {
+        const fixture=authFixture(); const access=await createCiAccess(env(),fixture.fetcher,()=>{},
+            {handshake:()=>{if(observerFailure)throw Error(syntheticSecret);}});
+        const model=wireAuthPage(access,fixture.page);
+        // Production's event handler may absorb the route error after a fulfilled
+        // document; authenticate's explicit completion/evidence gate must still stop.
+        model.swallowRouteError=observerFailure;
+        if(!observerFailure) model.responses.push({status:()=>307,headers:()=>({location:'https://other.invalid/?secret=SYNTHETIC'})});
+        await assert.rejects(access.authenticate(fixture.page),code('CI_AUTHENTICATION_FAILED'));
+        assert.equal(fixture.calls.length,1);assert.equal(access.authenticationProgress().ownerLookupStarted,false);
+        assert.equal(access.authenticationProgress().testingTokenRequestStarted,false);assert.equal(model.requests.length,1);
+    }
+});
+
 test('transport report permits enums/status/booleans only and retains first unexpected failure beyond cap', () => {
     const report = {};
     recordTransportDiagnostic(report, { originRole: syntheticSecret, method: 'https://u:p@invalid/', status: syntheticSecret,
@@ -97,7 +161,7 @@ test('Backend API failures record Clerk role/method/status or fixed fetch class 
             return { ok: false, status: 401, json: async () => assert.fail('do not read failed body') };
         }, () => {}, { transport: value => events.push(value) });
         const fixture = authFixture();
-        await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
         assert.equal(calls, 2); assert.equal(events.length, 1); assert.equal(events[0].originRole, 'CLERK');
         assert.equal(events[0].method, 'GET'); assert.equal(events[0].stages.backendRequest, true);
         assert.equal(events[0].status, network ? null : 401); assert.equal(events[0].exception, network ? 'FETCH_EXCEPTION' : 'NONE');
@@ -285,9 +349,9 @@ test('public frontend must be exact test instance before any Backend API call', 
     let calls = 0;
     const access = await createCiAccess(env(), async () => { calls++; return response({ value: jwt(claims()) }); });
     const page = { goto: async () => {}, waitForFunction: async () => {}, evaluate: async () => 'pk_live_SYNTHETIC' };
-    await assert.rejects(access.authenticate(page), code('CI_AUTHENTICATION_FAILED'));
+    await assert.rejects(authenticate(access, page), code('CI_AUTHENTICATION_FAILED'));
     assert.equal(calls, 1);
-    await assert.rejects(access.authenticate(page), code('CI_AUTH_RETRY_REFUSED'));
+    await assert.rejects(authenticate(access, page), code('CI_AUTH_RETRY_REFUSED'));
 });
 
 function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, backendFailure, signoutFailure = false,
@@ -326,7 +390,7 @@ function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, 
 test('authentication progress is boolean-only, monotone and distinguishes no token request from unacknowledged issuance', async () => {
     const navigation = authFixture(); navigation.page.goto = async () => { throw Error(syntheticSecret); };
     const notStarted = await createCiAccess(env(), navigation.fetcher);
-    await assert.rejects(notStarted.authenticate(navigation.page), code('CI_AUTHENTICATION_FAILED'));
+    await assert.rejects(authenticate(notStarted, navigation.page), code('CI_AUTHENTICATION_FAILED'));
     assert.equal(notStarted.authenticationProgress().loginNavigationStarted, true);
     assert.equal(notStarted.authenticationProgress().loginNavigationCompleted, false);
     assert.equal(notStarted.authenticationProgress().testingTokenRequestStarted, false);
@@ -339,7 +403,7 @@ test('authentication progress is boolean-only, monotone and distinguishes no tok
             return fixture.fetcher(url, options);
         };
         const access = await createCiAccess(env(), fetcher, () => {}, { authentication: value => snapshots.push(value) });
-        await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
         const progress = access.authenticationProgress();
         assert.equal(providerIssued, true); assert.equal(progress.ownerMatched, true);
         assert.equal(progress.testingTokenRequestStarted, true);
@@ -356,8 +420,8 @@ test('successful and partial authentication keep existing session cleanup semant
     for (const failed of [false, true]) {
         const fixture = authFixture({ setActiveFailure: failed }); const snapshots = [];
         const access = await createCiAccess(env(), fixture.fetcher, () => {}, { authentication: value => snapshots.push(value) });
-        if (failed) await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
-        else await access.authenticate(fixture.page);
+        if (failed) await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        else await authenticate(access, fixture.page);
         const progress = access.authenticationProgress();
         assert.equal(progress.testingTokenReceived, true); assert.equal(progress.signInTokenReceived, true);
         assert.equal(progress.sessionCreationAttempted, true); assert.equal(progress.activationAcknowledged, !failed);
@@ -371,7 +435,7 @@ test('successful and partial authentication keep existing session cleanup semant
 test('diagnostic observer failures cannot leak raw exceptions or be mistaken for successful authentication', async () => {
     const fixture = authFixture();
     const access = await createCiAccess(env(), fixture.fetcher, () => {}, { authentication: () => { throw Error(syntheticSecret); } });
-    await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+    await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
     assert.equal(fixture.calls.length, 1); assert.equal(access.authenticationProgress().testingTokenRequestStarted, false);
     const route = { request: () => ({ url: () => target.origin, method: () => 'GET', allHeaders: async () => ({}) }),
         fetch: async () => ({ status: () => 200 }), fulfill: async () => {}, abort: async () => {} };
@@ -381,7 +445,7 @@ test('diagnostic observer failures cannot leak raw exceptions or be mistaken for
 
 test('official temporary ticket flow is fixed owner A only, no session export, signout separate', async () => {
     const fixture = authFixture(); const access = await createCiAccess(env(), fixture.fetcher);
-    await access.authenticate(fixture.page);
+    await authenticate(access, fixture.page);
     assert.equal(access.isAuthenticated(), true);
     assert.deepEqual(fixture.visits, [target.origin + '/admin/login', target.origin + '/admin/shop']);
     assert.equal(fixture.calls.length, 4); // OIDC, fixed-user GET, testing token, one 120s sign-in token.
@@ -392,7 +456,7 @@ test('official temporary ticket flow is fixed owner A only, no session export, s
 test('wrong backend user, failed token issuance and wrong returned session owner fail closed without retry', async () => {
     for (const [options, expectedCalls] of [[{ userId: 'user_other' }, 2], [{ backendFailure: '/testing_tokens' }, 3], [{ backendFailure: '/sign_in_tokens' }, 4], [{ owner: 'user_other' }, 4]]) {
         const fixture = authFixture(options); const access = await createCiAccess(env(), fixture.fetcher);
-        await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
         assert.equal(fixture.calls.length, expectedCalls); assert.equal(access.isAuthenticated(), false);
         assert.ok(!fixture.visits.includes(target.origin + '/admin/shop'));
     }
@@ -400,14 +464,14 @@ test('wrong backend user, failed token issuance and wrong returned session owner
 
 test('signout failure stays unverified; no raw secret-bearing exception is retained', async () => {
     const fixture = authFixture({ signoutFailure: true }); const access = await createCiAccess(env(), fixture.fetcher);
-    await access.authenticate(fixture.page);
+    await authenticate(access, fixture.page);
     assert.equal(await access.signOut(fixture.page), 'SIGNOUT_UNVERIFIED');
 });
 
 test('partial session creation or lost activation is UNVERIFIED even with no current local session', async () => {
     for (const options of [{ setActiveFailure: true }, { createResponseLost: true }, { activationAckLost: true }]) {
         const fixture = authFixture(options); const access = await createCiAccess(env(), fixture.fetcher);
-        await assert.rejects(access.authenticate(fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
         assert.equal(fixture.providerSession(), true); assert.equal(fixture.calls.length, 4);
         assert.equal(await access.signOut(fixture.page), 'SIGNOUT_UNVERIFIED');
         if (options.activationAckLost) {
@@ -415,13 +479,13 @@ test('partial session creation or lost activation is UNVERIFIED even with no cur
         } else {
             assert.equal(fixture.signOutCalls(), 0); assert.equal(fixture.providerSession(), true);
         }
-        await assert.rejects(access.authenticate(fixture.page), code('CI_AUTH_RETRY_REFUSED'));
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTH_RETRY_REFUSED'));
         assert.equal(fixture.calls.length, 4);
     }
 });
 
 test('Clerk/Blob forwarding strips Vercel header and forbids redirects/repeated sign-in POST', async () => {
-    const fixture = authFixture(); const access = await createCiAccess(env(), fixture.fetcher); await access.authenticate(fixture.page);
+    const fixture = authFixture(); const access = await createCiAccess(env(), fixture.fetcher); await authenticate(access, fixture.page);
     let forwarded = 0, aborted = 0; const tokenHeader = 'x-vercel-trusted-oidc-idp-token';
     const route = { request: () => ({ url: () => 'https://' + ciIdentity.clerkDomain + '/v1/client/sign_ins', method: () => 'POST', allHeaders: async () => ({ [tokenHeader]: 'SYNTHETIC_OIDC' }) }),
         fetch: async options => { forwarded++; assert.equal(options.maxRetries, 0); assert.equal(options.maxRedirects, 0); assert.ok(!Object.hasOwn(options.headers, tokenHeader)); assert.equal(new URL(options.url).searchParams.get('__clerk_testing_token'), 'SYNTHETIC_TESTING_TOKEN'); return { status: () => 200 }; },

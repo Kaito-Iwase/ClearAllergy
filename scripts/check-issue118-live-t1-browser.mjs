@@ -260,6 +260,7 @@ export async function runLive() {
         const setupStage = stage => { report.stage = stage; (report.setupStages ??= []).push(stage); save(); };
         if (ciMode) ciAccess = await createCiAccess(process.env, fetch, setupStage, {
             authentication: progress => { report.authenticationProgress = progress; save(); },
+            handshake: progress => { report.initialHandshake = progress; save(); },
             transport: observation => {
                 recordTransportDiagnostic(report, observation);
                 save();
@@ -402,6 +403,7 @@ export async function runLive() {
         report.phase = phase;
         if (ledger.held) report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No further write/cleanup/retry. Read-only reconciliation must establish the original operation outcome, creationOperationId/name, current API/DB state and audit history; otherwise keep HOLD.";
         if (ciAccess) report.authenticationProgress = ciAccess.authenticationProgress();
+        if (ciAccess) report.initialHandshake = ciAccess.handshakeProgress();
         if (ciAccess && page) report.authenticationCleanup = await ciAccess.signOut(page);
         const closes = await Promise.allSettled([context?.close(), browser?.close()]);
         report.browserClose = closes.every(result => result.status === "fulfilled") ? "CONFIRMED" : "UNVERIFIED";
