@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Approve ONE new fictional T1 fixture and private cleanup on the pinned Preview
+        description: Select one explicitly approved operation; diagnostics never authorize fixture writes
         type: choice
-        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED, DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY]
+        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED, DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY, DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY]
         default: HOLD
         required: true
       expected_runner_sha:
@@ -33,7 +33,7 @@ jobs:
       github.ref == 'refs/heads/test/issue118-live-t1-20261030' &&
       github.event_name == 'workflow_dispatch' &&
       github.run_attempt == 1 &&
-      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY') &&
+      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY') &&
       inputs.expected_runner_sha == github.sha
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -50,7 +50,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Check the external receipt before dependency install or secret delivery
-        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY'
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
         env:
           IDENTITY_RECEIPT_JSON: ${{ inputs.identity_receipt }}
           EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
@@ -61,19 +61,20 @@ jobs:
           import { writeFileSync } from 'node:fs';
           import { join } from 'node:path';
           import { assertIdentityReceipt } from './scripts/check-issue118-live-t1-browser.mjs';
-          import { deployedMode, assertDeployedCandidateReceipt } from './scripts/check-issue118-server-callback-candidate.mjs';
+          import { deployedMode, assertDeployedCandidateReceipt, keyClassMode, assertKeyClassReceipt } from './scripts/check-issue118-server-callback-candidate.mjs';
           try {
             const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
             if (!/^[a-f0-9]{40}$/.test(sha) || sha !== process.env.EXPECTED_RUNNER_SHA || sha !== process.env.GITHUB_SHA) throw Error();
             const receipt = JSON.parse(process.env.IDENTITY_RECEIPT_JSON);
-            if (process.env.CONFIRMATION_MODE === deployedMode) assertDeployedCandidateReceipt(receipt);
+            if (process.env.CONFIRMATION_MODE === keyClassMode) assertKeyClassReceipt(receipt);
+            else if (process.env.CONFIRMATION_MODE === deployedMode) assertDeployedCandidateReceipt(receipt);
             else assertIdentityReceipt(receipt);
             writeFileSync(join(process.env.RUNNER_TEMP, 'issue118-identity.json'), JSON.stringify(receipt));
             console.log('IDENTITY_RECEIPT_VALIDATED_NO_AUTH');
           } catch { console.error('IDENTITY_RECEIPT_OR_SHA_REFUSED'); process.exitCode = 1; }
           NODE
       - name: Prepare the existing isolated Playwright version (no app secrets)
-        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY'
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
         env:
           CLEARALLERGY_BROWSER_RUNNER_DIR: ${{ runner.temp }}/issue118-playwright
         run: |
@@ -138,6 +139,24 @@ jobs:
           PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
         run: node scripts/check-issue118-server-callback-candidate.mjs --deployed-diagnostic-only
+      - name: ONE query-free GET; key class booleans only and STOP before any Clerk request
+        if: inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-server-callback-candidate.mjs --key-class-only
+      - name: Retain only 27 boolean key class predicates; no credential values or hashes
+        if: always() && inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-key-class-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-key-class/result.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Retain only the deployed server boolean diagnostic; no callback/cookie/token values
         if: always() && inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY'
         uses: actions/upload-artifact@v5

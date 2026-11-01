@@ -1,6 +1,16 @@
-# Issue118 callback signature/shape-only diagnostic
+# Issue118 pinned server diagnostics
 
-## Fixed deployment and existing modes
+## One-GET key-class mode (new candidate)
+
+`DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY` / `--key-class-only` is bound separately to source `ea9f28b14b7741276115abb8a33b331339526f5e`, Deployment `dpl_DpA39uCzNqcbJgcoUKdfdXNgAzZq`, immutable origin `https://clear-allergy-e2e-9ctj3mff4-kaitoexe00-9350s-projects.vercel.app`. The existing test Project/Preview/exact test/staging configuration and protection remain unchanged. The old three-GET mode and old target below are preserved; they are not selected by this mode.
+
+After exact context/runner SHA/attempt1/fresh receipt checks, one official GitHub OIDC request supplies a short-lived app-only token. A new isolated context request sends exactly one query-free GET `/admin/login`, marked `key-class-only-v1`, with redirects/retries zero. There is no second app GET and no Clerk/callback/JWKS/login/session/fixture/DB/Blob call. Do not deliver the GitHub Clerk Secret in this diagnostic step. Existing workflow triggers, Environment, claims and job permissions are unchanged.
+
+Only the fixed 27 boolean server fields are retained. Reject extra/unknown fields, wrong types, type/presence/prefix/empty/SDK/old-guard contradictions, wrong HTTP status, redirect, missing no-store/content-type or oversized body. Missing/invalid/legacy/short/control-character keys can be classified successfully: a green diagnostic only means the observation completed, never that the key is valid or authentication works. Key-read and SDK classification failures are retained separately and exit1. Context/browser closing remains independent. No key values, exact lengths, hashes, raw headers/body, URLs, provider exceptions or session state are artifacts.
+
+The new app is deployed and Ready, but this runner mode must pass limited review and same-head/PR CI before the approved one-time real GET. A new immutable target is not proof of the previous deployment's effective value or original callback root cause. No automatic retries.
+
+## Existing signature-mode deployment and constraints
 
 App source: `aa92dbba35088f807b8f54a7548556ab4009a37b`, based on 6293d5a. Existing test Project `clear-allergy-e2e` / `prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK`, Preview / exact `test/staging`.
 

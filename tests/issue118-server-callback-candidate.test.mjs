@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { ciIdentity } from '../scripts/issue118-ci-auth.mjs';
 import { initialHandshakeContract as contract } from '../scripts/issue118-initial-handshake-candidate.mjs';
-import { disabledMode, syntheticTarget as target, assertSyntheticCandidateReceipt, simulateServerCallbackCandidate, deployedMode, deployedTarget, diagnoseDeployedServerCallback, assertDeployedCandidateReceipt } from '../scripts/check-issue118-server-callback-candidate.mjs';
+import { disabledMode, syntheticTarget as target, assertSyntheticCandidateReceipt, simulateServerCallbackCandidate, deployedMode, deployedTarget, diagnoseDeployedServerCallback, assertDeployedCandidateReceipt, keyClassMode, keyClassTarget, assertKeyClassReceipt, diagnoseKeyClassOnly } from '../scripts/check-issue118-server-callback-candidate.mjs';
 
 const secret = 'SYNTHETIC_PRIVATE_VALUE_NOT_A_CREDENTIAL';
 const initialNow = Date.now();
@@ -30,8 +30,17 @@ const serverBody = () => ({ stage: 'COMPLETE', code: 'SIGNATURE_AND_SHAPE_ONLY_N
     ...Object.fromEntries(['carrierPresent', 'carrierShape', 'decoded', 'headerTypeAllowed', 'algorithmAllowed', 'kidPresent',
         'jwksAttempted', 'jwksHttpOk', 'jwksParsed', 'kidMatched', 'signatureChecked', 'signatureValid',
         'directiveArray', 'directivesString', 'directiveBounds', 'sessionDirectivePresent', 'devBrowserDirectivePresent'].map(k => [k, true])) });
+const keyClassBody = () => ({
+    keyReadAttempted: true, keyReadCompleted: true, keyPresent: true,
+    typeUndefined: false, typeNull: false, typeString: true, typeNumber: false, typeBoolean: false,
+    typeObject: false, typeFunction: false, typeSymbol: false, typeBigInt: false,
+    nonEmptyString: true, modernTestPrefix: true, legacyTestPrefix: false, productionPrefix: false,
+    publishablePrefix: false, minimumLength16: true, hasCr: false, hasLf: false, hasNul: false,
+    hasOtherAsciiControl: false, trimWouldChange: false, sdkDevelopmentCheckAttempted: true,
+    sdkDevelopmentCheckCompleted: true, sdkDevelopmentClassified: true, existingDiagnosticGuardWouldAllow: true,
+});
 function harness(change = {}) {
-    const pinned = change.live ? deployedTarget : target;
+    const pinned = change.keyClass ? keyClassTarget : change.live ? deployedTarget : target;
     const calls = [], closes = [], oidcCalls = []; let clock = initialNow, seamFailure = false, bodyReads = 0, launched = 0;
     const check = value => { if (!value) { seamFailure = true; throw Error('SYNTHETIC_SEAM_FAILURE'); } };
     const context = { request: { fetch: async (url, options) => {
@@ -39,14 +48,15 @@ function harness(change = {}) {
         check(index <= 2 && options.method === 'GET' && options.maxRedirects === 0 && options.maxRetries === 0 && options.timeout === 20000);
         check(options.headers.Cookie === undefined && options.headers.Authorization === undefined && options.headers.Origin === undefined && options.headers.Referer === undefined);
         check(Boolean(options.headers['x-vercel-trusted-oidc-idp-token']) === (index !== 1));
-        check(Boolean(options.headers['x-issue118-callback-diagnostic']) === (index === 2));
+        check(Boolean(options.headers['x-issue118-callback-diagnostic']) === (change.keyClass || index === 2));
+        if (change.keyClass) check(index === 0 && options.headers['x-issue118-callback-diagnostic'] === 'key-class-only-v1' && !new URL(url).search);
         if (index === 0) check(url === pinned.origin + '/admin/login');
         if (index === 1) check(url === outbound(pinned));
         if (index === 2) check(url === callback(pinned));
         if (change.throwAt === index) throw change.throwObject || Error(secret);
         if (change.hangAt === index) return new Promise(() => {});
         if (index === 1 && change.advance) clock += change.advance;
-        if (index < 2) return { status: () => change.statusAt === index ? 308 : 307,
+        if (!change.keyClass && index < 2) return { status: () => change.statusAt === index ? 308 : 307,
             headers: () => change.headerFailure ? (() => { throw Error(secret); })() :
                 { location: index === 0 ? change.outbound || outbound(pinned) : change.callback || callback(pinned) } };
         return { status: () => change.thirdStatus || 200,
@@ -54,7 +64,7 @@ function harness(change = {}) {
                 ...(change.headers || {}), ...(change.declaredOversize ? { 'content-length': '16385' } : {}) }),
             body: async () => { bodyReads++; if (change.bodyFailure) throw Error(secret);
                 if (change.oversize) return Buffer.alloc(16385);
-                return Buffer.from(change.raw || JSON.stringify(change.body || serverBody())); } };
+                return Buffer.from(change.raw || JSON.stringify(change.body || (change.keyClass ? keyClassBody() : serverBody()))); } };
     } }, close: async () => { closes.push('context'); if (change.contextCloseFailure) throw Error(secret); } };
     const browser = { newContext: async options => { check(JSON.stringify(options) === JSON.stringify({ acceptDownloads: false, serviceWorkers: 'block' }));
         if (change.contextFailure) throw Error(secret); return context; },
@@ -64,12 +74,12 @@ function harness(change = {}) {
             now: () => clock, timeoutMs: change.timeout || 1000,
             browserFactory: async () => { launched++; if (change.launchFailure) throw Error(secret); return browser; } };
         let result;
-        if (change.live) {
-            const liveEnv = { ...e, ISSUE118_DIAGNOSTIC_MODE: deployedMode,
+        if (change.live || change.keyClass) {
+            const liveEnv = { ...e, ISSUE118_DIAGNOSTIC_MODE: change.keyClass ? keyClassMode : deployedMode,
                 ACTIONS_ID_TOKEN_REQUEST_URL: 'https://runner.actions.githubusercontent.com/opaque/path?api-version=2',
                 ACTIONS_ID_TOKEN_REQUEST_TOKEN: secret };
             delete liveEnv.ISSUE118_OFFLINE_SYNTHETIC_ONLY;
-            const liveReceipt = { ...r, ...deployedTarget, syntheticFixtureOnly: false,
+            const liveReceipt = { ...r, ...pinned, syntheticFixtureOnly: false,
                 protection: 'All Deployments', sourceManifestVerified: true, branchSecretScopeVerified: true,
                 verifiedBy: 'cli_metadata_observer', ...(change.receiptChanges || {}) };
             Object.assign(liveEnv, change.envChanges || {});
@@ -81,7 +91,7 @@ function harness(change = {}) {
                 if (change.oidcError) throw Error(secret);
                 return { ok: true, json: async () => ({ value: change.oidc || token(change.claims) }) };
             };
-            result = await diagnoseDeployedServerCallback(liveEnv, liveReceipt, fetcher, seams.browserFactory);
+            result = await (change.keyClass ? diagnoseKeyClassOnly : diagnoseDeployedServerCallback)(liveEnv, liveReceipt, fetcher, seams.browserFactory);
         } else result = await simulateServerCallbackCandidate(e, r, seams);
         assert.equal(seamFailure, false, 'independent fixture assertions must never be swallowed into an expected HOLD');
         assert.doesNotMatch(JSON.stringify(result), /SYNTHETIC_PRIVATE|https:|__clerk|Authorization|Bearer|OFFLINE_SIGNATURE/);
@@ -102,6 +112,76 @@ test('deployed diagnostic is pinned, uses one OIDC request and three GETs, never
     assert.equal(h.oidcCalls.length, 1); assert.equal(r.serverObservation.signatureValid, true);
     assert.equal(r.serverSignatureShapeObserved, true); assert.equal(r.allLocalClosed, true);
     assert.equal(r.ownerReceiptMatched, true); assert.equal(r.liveOwnerVerified, false);
+});
+
+test('key-class mode sends exactly one query-free marked app GET and never Clerk/callback', async () => {
+    const h = harness({ keyClass: true }), r = await h.run();
+    assert.equal(r.completed, true); assert.equal(r.code, 'KEY_CLASS_OBSERVED_NOT_KEY_VALIDITY');
+    assert.equal(h.calls.length, 1); assert.equal(r.requestCount, 1); assert.equal(h.oidcCalls.length, 1);
+    assert.deepEqual(r.keyClassObservation, keyClassBody()); assert.equal(r.stoppedBeforeSecondGet, true);
+    assert.equal(r.clerkSent, false); assert.equal(r.callbackSent, false); assert.equal(r.clerkJsStarted, false);
+    assert.equal(r.allLocalClosed, true); assert.deepEqual(h.closes, ['context', 'browser']);
+});
+test('key-class mode rejects wrong/freshness/source/scope/owner receipt before OIDC', async () => {
+    for (const receiptChanges of [{ source: deployedTarget.source }, { origin: deployedTarget.origin },
+        { deployment: deployedTarget.deployment }, { owner: 'other' }, { shop: 'other' },
+        { environment: 'Production' }, { branch: 'main' }, { protection: 'Standard' },
+        { branchSecretScopeVerified: false }, { sourceManifestVerified: false },
+        { observedUtc: new Date(initialNow - 600001).toISOString() }]) {
+        const h = harness({ keyClass: true, receiptChanges }), r = await h.run();
+        assert.equal(r.code, 'RECEIPT_HELD'); assert.equal(h.oidcCalls.length, 0); assert.equal(h.calls.length, 0);
+    }
+    assert.throws(() => assertKeyClassReceipt(null));
+});
+test('key-class mode context and OIDC failures cannot reach an app or Clerk', async () => {
+    for (const change of [{ envChanges: { GITHUB_RUN_ATTEMPT: '2' } }, { envChanges: { ISSUE118_APPLY: 'true' } },
+        { envChanges: { CLERK_SECRET_KEY: secret } }, { envChanges: { ISSUE118_TEST_CLERK_SECRET_KEY: secret } },
+        { envChanges: { GITHUB_REF: 'refs/heads/main' } }, { envChanges: { ISSUE118_DIAGNOSTIC_MODE: deployedMode } },
+        { envChanges: { ACTIONS_ID_TOKEN_REQUEST_URL: 'https://other.invalid/' } }, { oidcError: true },
+        { claims: { exp: initialNow / 1000 - 1 } }]) {
+        const h = harness({ keyClass: true, ...change }), r = await h.run();
+        assert.equal(r.completed, false); assert.equal(h.calls.length, 0); assert.equal(h.launched, 0);
+    }
+});
+test('key-class mode observes invalid/missing/legacy/short/control conditions without claiming validity', async () => {
+    const modern = keyClassBody();
+    const types = Object.fromEntries(Object.keys(modern).map(k => [k, false]));
+    const cases = [
+        { ...types, keyReadAttempted: true, keyReadCompleted: true, typeUndefined: true },
+        { ...types, keyReadAttempted: true, keyReadCompleted: true, typeNull: true },
+        { ...types, keyReadAttempted: true, keyReadCompleted: true, keyPresent: true, typeObject: true },
+        { ...modern, modernTestPrefix: false, legacyTestPrefix: true, existingDiagnosticGuardWouldAllow: false },
+        { ...modern, minimumLength16: false, existingDiagnosticGuardWouldAllow: false },
+        { ...modern, hasLf: true, trimWouldChange: true, existingDiagnosticGuardWouldAllow: false },
+        { ...modern, modernTestPrefix: false, publishablePrefix: true, sdkDevelopmentClassified: false, existingDiagnosticGuardWouldAllow: false },
+    ];
+    for (const body of cases) {
+        const h = harness({ keyClass: true, body }), r = await h.run();
+        assert.equal(r.completed, true); assert.deepEqual(r.keyClassObservation, body);
+        assert.equal(r.serverSignatureShapeObserved, false); assert.equal(r.liveOwnerVerified, false); assert.equal(h.calls.length, 1);
+    }
+});
+test('key getter or SDK classification failure is retained distinctly, never credential success', async () => {
+    const empty = Object.fromEntries(Object.keys(keyClassBody()).map(k => [k, false]));
+    for (const body of [{ ...empty, keyReadAttempted: true },
+        { ...keyClassBody(), sdkDevelopmentCheckCompleted: false, sdkDevelopmentClassified: false }]) {
+        const h = harness({ keyClass: true, thirdStatus: 409, body }), r = await h.run();
+        assert.equal(r.completed, true); assert.deepEqual(r.keyClassObservation, body); assert.equal(h.calls.length, 1);
+        assert.equal(r.serverSignatureShapeObserved, false);
+    }
+});
+test('key-class mode refuses contradictions/extra values/wrong types/status/body without a second GET', async () => {
+    const b = keyClassBody();
+    for (const change of [{ thirdStatus: 307 }, { thirdStatus: 409 }, { headers: { location: callback(keyClassTarget) } },
+        { body: { ...b, value: secret } }, { body: { ...b, minimumLength16: 22 } }, { body: { ...b, typeObject: true } },
+        { body: { ...b, keyPresent: false } }, { body: { ...b, hasLf: true } },
+        { body: { ...b, nonEmptyString: false } }, { body: { ...b, legacyTestPrefix: true } },
+        { body: { ...b, sdkDevelopmentClassified: false } }, { raw: secret }, { oversize: true },
+        { declaredOversize: true }, { bodyFailure: true }, { throwAt: 0 },
+        { contextCloseFailure: true }, { browserCloseFailure: true }]) {
+        const h = harness({ keyClass: true, ...change }), r = await h.run();
+        assert.equal(r.completed, false); assert.equal(h.calls.length, 1); assert.equal(r.clerkSent, false); assert.equal(r.callbackSent, false);
+    }
 });
 test('deployed diagnostic rejects wrong target, protection, source and owner BEFORE OIDC', async () => {
     for (const receiptChanges of [{ source: '0'.repeat(40) }, { origin: target.origin }, { deployment: 'dpl_OTHER' },
@@ -231,6 +311,12 @@ test('workflow mode cannot reach existing live job and has zero permissions, sec
     const diagnostic = workflow.jobs['live-t1'].steps.find(x => x.run?.includes('--deployed-diagnostic-only'));
     assert.equal(diagnostic.if, `inputs.confirmation == '${deployedMode}'`);
     assert.equal(JSON.stringify(diagnostic).includes('secrets.'), false);
+    const keyDiagnostic = workflow.jobs['live-t1'].steps.find(x => x.run?.endsWith(' --key-class-only'));
+    assert.equal(keyDiagnostic.if, `inputs.confirmation == '${keyClassMode}'`);
+    assert.equal(keyDiagnostic.env.ISSUE118_DIAGNOSTIC_MODE, keyClassMode);
+    assert.doesNotMatch(JSON.stringify(keyDiagnostic), /secrets\.|ISSUE118_APPLY|CLERK_SECRET|--ci-apply/);
+    assert.equal(workflow.jobs['live-t1'].steps.find(x => x.with?.name?.startsWith('issue118-key-class-')).with.path,
+        '${{ runner.temp }}/issue118-key-class/result.json');
     assert.equal(workflow.jobs['live-t1'].steps.find(x => x.env?.ISSUE118_TEST_CLERK_SECRET_KEY).if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
     assert.equal((file.match(/id-token: write/g) || []).length, 1); assert.equal((file.match(/secrets\./g) || []).length, 1);
     assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);

@@ -142,7 +142,7 @@ test('workflow selects callback-only without secret, APPLY or normal live step, 
     assert.doesNotMatch(JSON.stringify(d),/secrets\.|ISSUE118_APPLY|CLERK_SECRET|--ci-apply/);
     const secrets=steps.filter(s=>JSON.stringify(s.env||{}).includes('secrets.'));assert.equal(secrets.length,1);assert.equal(secrets[0].if,"inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
     assert.equal(steps.find(s=>s.name==='Prepare the existing isolated Playwright version (no app secrets)').if,
-        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY'");
+        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'");
     const artifact=steps.find(s=>s.with?.name==='issue118-handshake-callback-${{ github.run_id }}');
     assert.equal(artifact.with.path,'${{ runner.temp }}/issue118-handshake-callback/result.json');
     assert.match(readFileSync(new URL('../scripts/browser-runner.mjs',import.meta.url),'utf8'),/tests\/issue118-handshake-callback.test.mjs/);
