@@ -365,6 +365,96 @@ try {
             } finally { await f.context.close(); }
         }
     });
+    await check("STOP blocked before the fictional backend still reports unknown, preserves input and never retries automatically", async () => {
+        const f = await open({ menu: { isPublished: true, publicationConfirmedFoodVersion: 29 }, acceptDialogs: true,
+            intercept: ({ method, path }) => method === "POST" && path === `/api/admin/menus/${id}/stop` ? { abort: true } : null });
+        try {
+            const description = f.page.getByLabel("説明", { exact: true });
+            await description.fill("送信前遮断でも保持する入力");
+            await f.page.getByRole("button", { name: "公開を停止する", exact: true }).click();
+            await f.page.getByRole("alert").getByText("公開停止の結果を確認できません。最新の公開状態を確認してください。", { exact: true }).waitFor();
+            assert.equal(f.state.isPublished, true);
+            assert.equal(f.state.version, base.version);
+            assert.equal(f.state.foodVersion, base.foodVersion);
+            assert.equal(f.state.publicationConfirmedFoodVersion, 29);
+            assert.deepEqual(f.writes.map(write => [write.method, write.path]), [["POST", `/api/admin/menus/${id}/stop`]]);
+            assert.equal(f.reads, 0);
+            assert.equal(await description.inputValue(), "送信前遮断でも保持する入力");
+            assert.equal(await f.page.getByText(/公開停止を保存しました/).count(), 0);
+        } finally { await f.context.close(); }
+    });
+    await check("successful image upload followed by rejected or unknown menu save retains the File and never claims save success", async () => {
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        const uploaded = "https://fixture.public.blob.vercel-storage.com/menu-images/fixture/unreferenced.png";
+        for (const path of ["/new", "/edit"]) for (const failure of [400, 409, 500, "before-model-write", "after-model-write"]) {
+            let committed = 0;
+            const f = await open({ path, intercept: ({ method, body, path: requestPath, f }) => {
+                if (requestPath === "/api/admin/upload-menu-image") return { body: { url: uploaded } };
+                if (!["POST", "PUT"].includes(method)) return null;
+                if (failure === "after-model-write") {
+                    // This is an intercepted HTTP model, not a real API commit or response-receipt proof.
+                    committed++;
+                    f.state = { ...f.state, ...body, version: base.version + 1, isPublished: false };
+                }
+                return typeof failure === "number" ? { status: failure, body: { error: "架空の保存拒否・障害" } } : { abort: true };
+            } });
+            try {
+                const prefix = path === "/new" ? "new" : "edit";
+                const name = f.page.locator(`#${prefix}-menu-field-1`);
+                const file = f.page.locator(`#${prefix}-menu-field-7`);
+                await name.fill("画像送信後も保持する架空入力");
+                await file.setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                if (path === "/new") await f.page.locator("form").evaluate(form => form.requestSubmit());
+                else await save(f);
+                await f.page.getByRole("alert").waitFor();
+                assert.deepEqual(f.writes.map(write => write.path), ["/api/admin/upload-menu-image", path === "/new" ? "/api/admin/menus" : `/api/admin/menus/${id}`]);
+                assert.equal(f.writes[1].body.imageUrl, uploaded);
+                assert.equal(f.writes[1].body.isPublished, false);
+                assert.ok(f.writes.every(write => !write.body?.publicationAction));
+                assert.equal(await name.inputValue(), "画像送信後も保持する架空入力");
+                assert.equal(await file.evaluate(input => input.files.length), 1);
+                assert.equal(await panel(f).count(), 0);
+                assert.equal(f.reads, 0);
+                assert.equal(f.state.isPublished, false);
+                assert.equal(committed, failure === "after-model-write" ? 1 : 0);
+                assert.equal(f.state.version, base.version + committed);
+                assert.equal(f.state.imageUrl, committed ? uploaded : null);
+                assert.equal(await f.page.getByText(/保存済み内容を公開しました|メニューを登録しました/).count(), 0);
+            } finally { await f.context.close(); }
+        }
+    });
+    await check("explicit retry after known menu validation rejection reuses its acknowledged upload and creation operation", async () => {
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        const uploaded = "https://fixture.public.blob.vercel-storage.com/menu-images/fixture/reusable.png";
+        for (const path of ["/new", "/edit"]) {
+            let attempts = 0;
+            const f = await open({ path, intercept: ({ method, path: requestPath }) => {
+                if (requestPath === "/api/admin/upload-menu-image") return { body: { url: uploaded } };
+                if (["POST", "PUT"].includes(method) && ++attempts === 1) return { status: 400, body: { error: "架空の訂正可能な入力拒否" } };
+                return null;
+            } });
+            try {
+                const prefix = path === "/new" ? "new" : "edit";
+                const submit = () => path === "/new" ? f.page.locator("form").evaluate(form => form.requestSubmit()) : save(f);
+                await f.page.locator(`#${prefix}-menu-field-1`).fill("訂正前の架空入力");
+                await f.page.locator(`#${prefix}-menu-field-7`).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                await submit(); await f.page.getByRole("alert").waitFor();
+                assert.equal(f.writes.length, 2);
+                await f.page.locator(`#${prefix}-menu-field-1`).fill("訂正後の架空入力");
+                await submit(); await panel(f).waitFor();
+                assert.equal(attempts, 2);
+                assert.equal(f.writes.filter(write => write.path === "/api/admin/upload-menu-image").length, 1);
+                assert.equal(f.writes.length, 3);
+                assert.equal(f.writes[1].body.imageUrl, uploaded);
+                assert.equal(f.writes[2].body.imageUrl, uploaded);
+                assert.equal(f.writes[2].body.name, "訂正後の架空入力");
+                if (path === "/new") {
+                    assert.match(f.writes[1].body.operationId, /^[0-9a-f-]{36}$/i);
+                    assert.equal(f.writes[2].body.operationId, f.writes[1].body.operationId);
+                } else assert.equal(f.writes[2].body.expectedVersion, base.version);
+            } finally { await f.context.close(); }
+        }
+    });
     assert.deepEqual(errors, []); assert.deepEqual(external, []);
 } finally {
     const version = browser.version(); await browser.close();
