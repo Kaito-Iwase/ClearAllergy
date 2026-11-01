@@ -1,7 +1,8 @@
 // Evaluator-only arithmetic, not a product rule or an executable service fixture.
 // Transcribed from ClearAllergy-Issue118-検証設計.md (Phase 1, 2026-10-29),
 // sections 台本と期待行動 / 採点、分子・分母 / 比較上の追加制約.
-// The original operator CSV/cards are not bundled here. Never give this gold to
+// Parent later verified the original ZIP/CSV bytes; see phase1Source in
+// issue118-fixture-map.ts. Those operator CSV/cards are not bundled here. Never give this gold to
 // an operator or use synthetic scores as evidence of live STOP/auth/DB success.
 export const scenarioIds = ["T1", "T2", "T3", "T4", "C_PRICE", "C_STOP", "C_SILENT"] as const;
 export type ScenarioId = typeof scenarioIds[number];
