@@ -6,6 +6,7 @@ import { createInitialHandshakeCandidate, initialHandshakeContract as c } from '
 import { routePreviewRequest } from '../scripts/issue118-preview-transport.mjs';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { createClerkClient } from '@clerk/backend';
+import { inspectHandshakeLocation } from '../scripts/issue118-handshake-observation.mjs';
 
 const secret = 'SYNTHETIC_NONCE_OR_JWT_NOT_REAL';
 const jwt = (extra = {}) => 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify({
@@ -150,10 +151,89 @@ test('pinned REAL SDK verifies legacy signature offline before applying directiv
         const valid=await client.authenticateRequest(request(signed));
         assert.match(valid.headers.get('set-cookie'),/synthetic_offline_directive=verified/);
         assert.equal(valid.headers.get('location'),c.appLogin);assert.equal(valid.isAuthenticated,false);
+        // SDK's clean URL is derived from forwarded headers, not the driver's
+        // immutable target constant. Synthetic evidence only, NOT the live cause.
+        const forwarded=new Request(request(signed),{headers:{'Sec-Fetch-Dest':'document','x-forwarded-host':'forwarded.synthetic.invalid','x-forwarded-proto':'https'}});
+        const forwardedResult=await client.authenticateRequest(forwarded);
+        assert.equal(forwardedResult.headers.get('location'),'https://forwarded.synthetic.invalid/admin/login');
+        assert.equal(inspectHandshakeLocation(forwardedResult.headers.get('location'),'APP_CLEAN_TARGET',c,true).samePinnedApp,false);
         const corrupt=data+'.'+(signature[0]==='A'?'B':'A')+signature.slice(1);
         await assert.rejects(client.authenticateRequest(request(corrupt)),/invalid signature/i);
         assert.equal(network,0);
     } finally {globalThis.fetch=originalFetch;}
+});
+
+test('all clean-target predicates are boolean-only and match unchanged acceptance, including relative/empty delimiter cases',async()=>{
+    const entries=[[c.appLogin,true,'exactCleanApp'],[undefined,false,'valueIsString'],['',false,'valuePresent'],
+        ['x'.repeat(16385),false,'lengthAllowed'],[c.appLogin+'\n',false,'controlCharactersAbsent'],['https://[',false,'absoluteParseable'],
+        ['/admin/login',false,'absoluteParseable'],[c.appLogin.replace('https:','http:'),false,'https'],
+        [c.appLogin.replace('https://','https://user:'+secret+'@'),false,'userinfoAbsent'],
+        [c.appLogin.replace('/admin/login',':444/admin/login'),false,'defaultPort'],[c.appLogin+'#'+secret,false,'fragmentAbsent'],
+        ['https://other.invalid/admin/login',false,'samePinnedApp'],[c.appLogin+'/other',false,'pathMatchesLogin'],
+        [c.appLogin+'?unknown_'+secret+'='+secret,false,'queryAbsent'],[c.appLogin+'?',false,'exactCleanApp'],[c.appLogin+'#',false,'exactCleanApp'],
+        [c.appLogin.replace('/admin/login',':443/admin/login'),true,'exactCleanApp']];
+    for(const [value,accepted,flag]of entries){
+        const p=inspectHandshakeLocation(value,'APP_CLEAN_TARGET',c,true);
+        assert.ok(Object.values(p).every(v=>typeof v==='boolean'));assert.doesNotMatch(JSON.stringify(p),/SYNTHETIC|https:|__clerk|unknown_/);
+        assert.equal(p.contractMatches,accepted);assert.equal(p[flag],accepted);
+        const f=fixture([response(307,outbound()),response(307,callback()),response(307,value),response(200)],{}, {allowLegacyCandidate:true});
+        if(accepted){await f.policy.run(f.route);assert.equal(f.calls.length,4);assert.equal(f.fulfills,1);}
+        else await held(f,3);
+        const observed=safeReport(f).locations.APP_CLEAN_TARGET;
+        assert.equal(observed.observed,true);assert.equal(observed.singleLocation,true);assert.equal(observed.contractMatches,accepted);
+        assert.equal(safeReport(f).responses.APP_CALLBACK.expectedForPhase,true);
+    }
+    const relative=inspectHandshakeLocation('/admin/login','APP_CLEAN_TARGET',c,true);
+    assert.equal(relative.relativeWouldResolveExactCleanApp,true);assert.equal(relative.contractMatches,false);
+    const emptyQuery=inspectHandshakeLocation(c.appLogin+'?','APP_CLEAN_TARGET',c,true);
+    assert.equal(emptyQuery.queryAbsent,true);assert.equal(emptyQuery.queryDelimiterPresent,true);assert.equal(emptyQuery.exactCleanApp,false);
+});
+
+test('outbound and both callback carrier observations retain parity; observations never authorize an otherwise refused hop',async()=>{
+    for(const [kind,value,allow,accepted]of [['APP_TO_CLERK',outbound(),true,true],
+        ['APP_TO_CLERK',outbound().replace('format=nonce','format=token'),true,false],
+        ['APP_TO_CLERK',outbound()+'&unknown_'+secret+'=x',true,false],
+        ['CLERK_TO_APP',callback(),true,true],['CLERK_TO_APP',c.appLogin+'?__clerk_handshake=a.b.c',true,true],
+        ['CLERK_TO_APP',c.appLogin+'?__clerk_handshake=a.b.c',false,false],
+        ['CLERK_TO_APP',callback()+'&__clerk_handshake=a.b.c',true,false],['CLERK_TO_APP',callback()+'&__clerk_handshake_nonce=x',true,false],
+        ['CLERK_TO_APP',c.appLogin+'?__clerk_handshake=not-jwt',true,false]]){
+        const p=inspectHandshakeLocation(value,kind,c,allow);
+        assert.ok(Object.values(p).every(v=>typeof v==='boolean'));assert.doesNotMatch(JSON.stringify(p),/SYNTHETIC|https:|__clerk|unknown_/);assert.equal(p.contractMatches,accepted);
+        const responses=kind==='APP_TO_CLERK'?[response(307,value),...happy().slice(1)]:[response(307,outbound()),response(307,value),...happy().slice(2)];
+        const f=fixture(responses,{}, {allowLegacyCandidate:allow});if(accepted)await f.policy.run(f.route);else await held(f,kind==='APP_TO_CLERK'?1:2);
+        assert.equal(safeReport(f).locations[kind].contractMatches,accepted);
+    }
+});
+
+test('missing/duplicate/unreadable Location is distinguished at each hop without another GET or raw exception',async()=>{
+    for(const [index,kind]of [[0,'APP_TO_CLERK'],[1,'CLERK_TO_APP'],[2,'APP_CLEAN_TARGET']]){
+        for(const scenario of ['missing','duplicate','throw']){
+            const responses=happy();responses[index]={status:()=>307,headers:()=>{
+                if(scenario==='throw')throw Error(secret);return scenario==='missing'?{}:{Location:c.appLogin,location:c.appLogin};
+            }};
+            const f=fixture(responses);await held(f,index+1);const p=safeReport(f).locations[kind];
+            assert.equal(p.observed,true);assert.equal(p.headerReadSucceeded,scenario!=='throw');assert.equal(p.singleLocation,false);assert.equal(p.contractMatches,false);
+        }
+    }
+});
+
+test('all response phases, final fulfill, cookie-interface limits and snapshot isolation remain separate observations',async()=>{
+    const f=fixture(happy());await f.policy.run(f.route);const r=safeReport(f);
+    for(const phase of ['APP_INITIAL','CLERK_HANDSHAKE','APP_CALLBACK','APP_CLEAN']){
+        assert.equal(r.responses[phase].expectedForPhase,true);assert.equal(r.responses[phase].statusReadSucceeded,true);
+        assert.ok(Object.values(r.responses[phase]).every(v=>typeof v==='boolean'));
+    }
+    assert.equal(r.finalDocumentFulfilled,true);assert.equal(r.cookieTransfer.contextRequestInterfaceSelected,true);
+    assert.equal(r.cookieTransfer.sameRequestInterfaceForAllGets,true);assert.equal(r.cookieTransfer.cookieContentsObserved,false);
+    assert.equal(r.cookieTransfer.actualCookieDeliveryVerified,false);
+    r.locations.APP_CLEAN_TARGET.exactCleanApp=false;assert.equal(f.policy.diagnostics().locations.APP_CLEAN_TARGET.exactCleanApp,true);
+    for(const index of [0,1,2,3]){
+        const responses=happy();responses[index]={status:()=>{throw Error(secret);}};
+        const broken=fixture(responses);await held(broken,index+1);
+        const p=Object.values(safeReport(broken).responses).at(-1);assert.equal(p.statusReadSucceeded,false);assert.equal(p.expectedForPhase,false);
+    }
+    const failed=fixture(happy(),{}, {fulfillFailure:true});await held(failed,4);
+    assert.equal(safeReport(failed).responses.APP_CLEAN.expectedForPhase,true);assert.equal(safeReport(failed).finalDocumentFulfilled,false);
 });
 test('provider failures and expired OIDC are HOLD, never retry; cookie/provider state is not claimed cleared',async()=>{
     for(const hop of [1,2,3,4]) {const f=fixture(happy(),{}, {networkFailure:hop});await held(f,hop);assert.equal(safeReport(f).lastHttpStatus,null);}

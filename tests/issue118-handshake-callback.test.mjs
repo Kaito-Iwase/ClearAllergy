@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { ciIdentity } from '../scripts/issue118-ci-auth.mjs';
 import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
 import { initialHandshakeContract as contract, createInitialHandshakeCandidate } from '../scripts/issue118-initial-handshake-candidate.mjs';
-import { callbackPredicates, handshakeCallbackDiagnostic } from '../scripts/check-issue118-handshake-callback.mjs';
+import { callbackPredicates, handshakeCallbackDiagnostic, handshakeCleanTargetDiagnostic } from '../scripts/check-issue118-handshake-callback.mjs';
 import { closeIsolatedBrowser } from '../scripts/issue118-close-browser.mjs';
 
 const secret='SYNTHETIC_PRIVATE_VALUE';
@@ -30,16 +30,18 @@ function safe(r){assert.ok(Object.values(r).every(v=>typeof v==='boolean'));asse
 function harness(changes={}){
     const calls=[],closes=[];let oidcCalls=0;
     const context={request:{fetch:async(url,options)=>{
-        calls.push({url,options});assert.ok(calls.length<=2,'A third GET is forbidden');
+        calls.push({url,options});assert.ok(calls.length<=(changes.cleanMode?3:2),'An extra GET is forbidden');
         assert.equal(options.method,'GET');assert.equal(options.maxRedirects,0);assert.equal(options.maxRetries,0);assert.equal(options.timeout,20000);
         assert.equal(options.headers.Cookie,undefined);assert.equal(options.headers.Authorization,undefined);
         if(calls.length===1){assert.equal(url,contract.appLogin);assert.ok(options.headers['x-vercel-trusted-oidc-idp-token']);return changes.first?.()??response(outbound);}
-        assert.equal(url,outbound);assert.equal(options.headers['x-vercel-trusted-oidc-idp-token'],undefined);
-        return changes.second?.()??response(callback);
+        if(calls.length===2){assert.equal(url,outbound);assert.equal(options.headers['x-vercel-trusted-oidc-idp-token'],undefined);
+            return changes.second?.()??response(callback);}
+        assert.ok(options.headers['x-vercel-trusted-oidc-idp-token']);assert.ok(url.startsWith(contract.appLogin+'?'));
+        return changes.third?.()??response(contract.appLogin);
     }},close:async()=>{closes.push('context');if(changes.close)throw Error(secret);}};
     const browser={newContext:async options=>{assert.deepEqual(options,{acceptDownloads:false,serviceWorkers:'block'});if(changes.context)throw Error(secret);return context;},
         close:async()=>{closes.push('browser');}};
-    return {calls,closes,get oidcCalls(){return oidcCalls;},run:async(e=env(),r=receipt())=>handshakeCallbackDiagnostic(e,r,async(u,o)=>{
+    return {calls,closes,get oidcCalls(){return oidcCalls;},run:async(e={...env(),...(changes.cleanMode?{ISSUE118_DIAGNOSTIC_MODE:'HANDSHAKE_CLEAN_TARGET_ONLY'}:{})},r=receipt())=>(changes.cleanMode?handshakeCleanTargetDiagnostic:handshakeCallbackDiagnostic)(e,r,async(u,o)=>{
         oidcCalls++;assert.equal(oidcCalls,1);assert.equal(o.redirect,'error');assert.equal(o.method,'GET');
         if(changes.oidc)throw Error(secret);return oidc();
     },async()=>{if(changes.launch)throw Error(secret);return browser;})};
@@ -140,7 +142,7 @@ test('workflow selects callback-only without secret, APPLY or normal live step, 
     assert.doesNotMatch(JSON.stringify(d),/secrets\.|ISSUE118_APPLY|CLERK_SECRET|--ci-apply/);
     const secrets=steps.filter(s=>JSON.stringify(s.env||{}).includes('secrets.'));assert.equal(secrets.length,1);assert.equal(secrets[0].if,"inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
     assert.equal(steps.find(s=>s.name==='Prepare the existing isolated Playwright version (no app secrets)').if,
-        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY'");
+        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY'");
     const artifact=steps.find(s=>s.with?.name==='issue118-handshake-callback-${{ github.run_id }}');
     assert.equal(artifact.with.path,'${{ runner.temp }}/issue118-handshake-callback/result.json');
     assert.match(readFileSync(new URL('../scripts/browser-runner.mjs',import.meta.url),'utf8'),/tests\/issue118-handshake-callback.test.mjs/);
@@ -167,4 +169,46 @@ test('context close completes before browser close, with independent booleans an
     const none=await closeIsolatedBrowser(undefined,undefined);assert.equal(none.allLocalClosed,true);assert.equal(none.contextCloseConfirmed,false);assert.equal(none.browserCloseConfirmed,false);
     const sync=await closeIsolatedBrowser({close:()=>{throw Error(secret);}},{close:()=>{}},{browserLaunchAttempted:true,contextCreateAttempted:true});safe(sync);
     assert.equal(sync.contextCloseConfirmed,false);assert.equal(sync.browserCloseConfirmed,true);assert.equal(sync.allLocalClosed,false);
+});
+
+test('clean-target mode observes all conditions after at most three GETs and NEVER sends a fourth even for a valid clean target',async()=>{
+    const legacy=contract.appLogin+'?__clerk_handshake=synthetic.payload.signature';
+    for(const value of [contract.appLogin,'/admin/login',contract.appLogin+'?',contract.appLogin+'#',legacy,
+        contract.appLogin+'?unknown_'+secret+'='+secret,'https://other.invalid/admin/login',null,'https://[']){
+        const h=harness({cleanMode:true,second:()=>response(legacy),third:()=>response(value)}),r=await h.run();safe(r);
+        assert.equal(h.calls.length,3);assert.equal(h.oidcCalls,1);assert.equal(r.callbackTargetValidated,true);assert.equal(r.callbackGetSent,true);
+        assert.equal(r.cleanGetSent,false);assert.equal(r.stoppedBeforeCleanGet,true);assert.equal(r.cleanTargetResponseObserved,true);
+        assert.equal(r.clerkAuthenticationStarted,false);assert.equal(r.sessionStarted,false);assert.equal(r.fixtureWriteStarted,false);
+        assert.equal(r.diagnosticCompleted,true);assert.equal(r.localCloseConfirmed,true);
+        assert.equal(r.cleanLocationContractMatches,value===contract.appLogin);
+        if(value==='/admin/login'){assert.equal(r.cleanLocationRelativeWouldResolveExactCleanApp,true);assert.equal(r.cleanLocationAbsoluteParseable,false);}
+        if(value===legacy)assert.equal(r.cleanLocationMatchesOriginalCallback,true);
+        if(typeof value==='string'&&value.includes('unknown_'))assert.equal(r.cleanLocationUnknownQueryPresent,true);
+    }
+});
+
+test('three-GET mode retains header and transport failure predicates, refuses changed context, and stops before unsafe callback',async()=>{
+    for(const third of [()=>({status:()=>307,headers:()=>{throw Error(secret);}}),()=>({status:()=>307,headers:()=>({})}),
+        ()=>({status:()=>307,headers:()=>({Location:contract.appLogin,location:contract.appLogin})})]){
+        const h=harness({cleanMode:true,third}),r=await h.run();safe(r);assert.equal(h.calls.length,3);
+        assert.equal(r.cleanLocationSingleLocation,false);assert.equal(r.cleanLocationContractMatches,false);assert.equal(r.cleanGetSent,false);
+    }
+    for(const change of [{third:()=>{throw Error(secret);}},{third:()=>({status:()=>{throw Error(secret);}})}]){
+        const h=harness({cleanMode:true,...change}),r=await h.run();safe(r);assert.equal(h.calls.length,3);assert.equal(r.diagnosticFailed,true);assert.equal(r.cleanGetSent,false);
+    }
+    const invalid=harness({cleanMode:true,second:()=>response('https://other.invalid/admin/login?__clerk_handshake=a.b.c')});
+    const stopped=await invalid.run();safe(stopped);assert.equal(invalid.calls.length,2);assert.equal(stopped.callbackGetSent,false);assert.equal(stopped.diagnosticFailed,true);
+    const wrong=harness({cleanMode:true}),refused=await wrong.run(env());assert.equal(wrong.oidcCalls,0);assert.equal(refused.diagnosticFailed,true);
+    const key=harness({cleanMode:true}),withKey=await key.run({...env(),ISSUE118_DIAGNOSTIC_MODE:'HANDSHAKE_CLEAN_TARGET_ONLY',ISSUE118_TEST_CLERK_SECRET_KEY:secret});
+    assert.equal(key.oidcCalls,0);assert.equal(withKey.diagnosticFailed,true);
+});
+
+test('workflow clean-target selection never delivers Clerk Secret or chooses live auth; artifacts contain only the fixed boolean result',()=>{
+    const w=createRequire(import.meta.url)('js-yaml').load(readFileSync(new URL('../.github/workflows/issue118-live-e2e.yml',import.meta.url),'utf8'));
+    const steps=w.jobs['live-t1'].steps,d=steps.find(s=>s.run==='node scripts/check-issue118-handshake-callback.mjs --clean-target-only');
+    assert.equal(d.if,"inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY'");
+    assert.equal(d.env.ISSUE118_DIAGNOSTIC_MODE,'HANDSHAKE_CLEAN_TARGET_ONLY');assert.doesNotMatch(JSON.stringify(d),/secrets\.|ISSUE118_APPLY|CLERK_SECRET|--ci-apply/);
+    const secrets=steps.filter(s=>JSON.stringify(s.env||{}).includes('secrets.'));assert.equal(secrets.length,1);assert.equal(secrets[0].if,"inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
+    const a=steps.find(s=>s.with?.name==='issue118-handshake-clean-target-${{ github.run_id }}');
+    assert.equal(a.with.path,'${{ runner.temp }}/issue118-handshake-clean-target/result.json');
 });

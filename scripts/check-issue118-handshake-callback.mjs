@@ -1,4 +1,5 @@
-// Diagnostic only: OIDC + at most APP/Clerk GETs; NEVER sends the callback.
+// Diagnostic only: two-GET callback inspection OR three-GET clean-target inspection.
+// Both stop unconditionally before the next GET; no ClerkJS/Backend auth or fixtures.
 import { createRequire } from 'node:module';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -6,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { oidcRequestUrl, assertOidcClaims } from './issue118-ci-auth.mjs';
 import { assertIdentityReceipt } from './check-issue118-live-t1-browser.mjs';
 import { assertRedirectDiagnosticEnvironment } from './check-issue118-preview-redirect.mjs';
-import { initialHandshakeContract as contract, validateInitialHandshakeTarget } from './issue118-initial-handshake-candidate.mjs';
+import { initialHandshakeContract as contract, validateInitialHandshakeTarget, validateInitialCallbackTarget } from './issue118-initial-handshake-candidate.mjs';
+import { inspectHandshakeLocation } from './issue118-handshake-observation.mjs';
 import { scopedOidcHeaders } from './issue118-preview-transport.mjs';
 import { closeIsolatedBrowser } from './issue118-close-browser.mjs';
 
@@ -49,15 +51,17 @@ export function callbackPredicates(response, base) {
     return p;
 }
 
-export async function handshakeCallbackDiagnostic(env,receipt,fetcher,browserFactory) {
+async function handshakeDiagnostic(env,receipt,fetcher,browserFactory,cleanTargetOnly) {
     const r={contextAccepted:false,receiptAccepted:false,oidcTargetAccepted:false,oidcRequestSent:false,oidcClaimsAccepted:false,
         browserLaunchAttempted:false,browserLaunched:false,contextCreateAttempted:false,contextCreated:false,appGetSent:false,appReplyIs307:false,outboundHandshakeAccepted:false,
         clerkGetSent:false,clerkReplyIs307:false,clerkReplyIsRedirect:false,callbackResponseObserved:false,
-        callbackGetSent:false,stoppedBeforeCallback:true,clerkAuthenticationStarted:false,sessionStarted:false,fixtureWriteStarted:false,
+        callbackGetSent:false,stoppedBeforeCallback:!cleanTargetOnly,cleanGetSent:false,stoppedBeforeCleanGet:true,
+        callbackTargetValidated:false,appCallbackReplyIs307:false,cleanTargetResponseObserved:false,
+        clerkAuthenticationStarted:false,sessionStarted:false,fixtureWriteStarted:false,
         providerStateMayExist:false,diagnosticCompleted:false,diagnosticFailed:false,localCloseConfirmed:false};
     let browser,context;
     try {
-        assertRedirectDiagnosticEnvironment(env,'HANDSHAKE_CALLBACK_ONLY');r.contextAccepted=true;
+        assertRedirectDiagnosticEnvironment(env,cleanTargetOnly?'HANDSHAKE_CLEAN_TARGET_ONLY':'HANDSHAKE_CALLBACK_ONLY');r.contextAccepted=true;
         assertIdentityReceipt(receipt);r.receiptAccepted=true;
         const oidcUrl=oidcRequestUrl(env.ACTIONS_ID_TOKEN_REQUEST_URL);
         if(!env.ACTIONS_ID_TOKEN_REQUEST_TOKEN)throw Error();r.oidcTargetAccepted=true;r.oidcRequestSent=true;
@@ -78,6 +82,21 @@ export async function handshakeCallbackDiagnostic(env,receipt,fetcher,browserFac
         const second=await context.request.fetch(clerkUrl,options(clerkUrl,undefined));
         const status=second.status();r.clerkReplyIs307=status===307;r.clerkReplyIsRedirect=status>=300&&status<400;
         r.callbackResponseObserved=true;Object.assign(r,callbackPredicates(second,clerkUrl));
+        if(cleanTargetOnly){
+            if(![302,303,307].includes(status))throw Error();
+            const entries=Object.entries(second.headers()).filter(([key])=>key.toLowerCase()==='location');
+            if(entries.length!==1)throw Error();
+            const callbackUrl=validateInitialCallbackTarget(entries[0][1],true);r.callbackTargetValidated=true;
+            r.callbackGetSent=true;
+            const third=await context.request.fetch(callbackUrl,options(callbackUrl,assertOidcClaims(token)));
+            r.appCallbackReplyIs307=third.status()===307;r.cleanTargetResponseObserved=true;
+            let values=[];let read=false;
+            try{values=Object.entries(third.headers()).filter(([key])=>key.toLowerCase()==='location');read=true;}catch{/* no raw error */}
+            const predicates={headerReadSucceeded:read,singleLocation:values.length===1,
+                ...inspectHandshakeLocation(values.length===1?values[0][1]:undefined,'APP_CLEAN_TARGET',contract,true,callbackUrl)};
+            for(const [key,value]of Object.entries(predicates))r['cleanLocation'+key[0].toUpperCase()+key.slice(1)]=value;
+            // ALWAYS stop here: no fourth GET, even if every predicate matches.
+        }
         r.diagnosticCompleted=true;
         // Deliberately NO third fetch, even when every callback predicate matches.
     }catch{r.diagnosticFailed=true;}
@@ -88,17 +107,22 @@ export async function handshakeCallbackDiagnostic(env,receipt,fetcher,browserFac
     }
     return r;
 }
+export const handshakeCallbackDiagnostic=(env,receipt,fetcher,browserFactory)=>handshakeDiagnostic(env,receipt,fetcher,browserFactory,false);
+export const handshakeCleanTargetDiagnostic=(env,receipt,fetcher,browserFactory)=>handshakeDiagnostic(env,receipt,fetcher,browserFactory,true);
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
     try{
-        if(process.argv.slice(2).join(' ')!=='--callback-only'||!process.env.RUNNER_TEMP||!process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT)throw Error();
+        const argument=process.argv.slice(2).join(' ');
+        if(!['--callback-only','--clean-target-only'].includes(argument)||!process.env.RUNNER_TEMP||!process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT)throw Error();
         const require=createRequire(import.meta.url);
         const receipt=JSON.parse(readFileSync(process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT,'utf8'));
-        const result=await handshakeCallbackDiagnostic(process.env,receipt,fetch,async()=>{
+        const cleanTargetOnly=argument==='--clean-target-only';
+        const run=cleanTargetOnly?handshakeCleanTargetDiagnostic:handshakeCallbackDiagnostic;
+        const result=await run(process.env,receipt,fetch,async()=>{
             const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
             return chromium.launch({headless:true,channel:'chromium'});
         });
-        const directory=join(process.env.RUNNER_TEMP,'issue118-handshake-callback');mkdirSync(directory,{recursive:false});
+        const directory=join(process.env.RUNNER_TEMP,cleanTargetOnly?'issue118-handshake-clean-target':'issue118-handshake-callback');mkdirSync(directory,{recursive:false});
         writeFileSync(join(directory,'result.json'),JSON.stringify(result,null,2),{flag:'wx'});console.log(JSON.stringify(result));
         if(result.diagnosticFailed||!result.diagnosticCompleted)process.exitCode=1;
     }catch{console.error('HANDSHAKE_CALLBACK_DIAGNOSTIC_REFUSED_NO_RAW_ERROR');process.exitCode=1;}

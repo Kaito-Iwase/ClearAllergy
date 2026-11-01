@@ -2,6 +2,7 @@
 // Requires the runner's newly created nonpersistent page/context with NO global
 // extraHTTPHeaders, imported cookies or storageState. Context.request owns cookies.
 import { previewOrigin, scopedOidcHeaders } from './issue118-preview-transport.mjs';
+import { inspectHandshakeLocation } from './issue118-handshake-observation.mjs';
 
 export const initialHandshakeContract = Object.freeze({
     appLogin: previewOrigin + '/admin/login', clerkOrigin: 'https://one-dolphin-7936.clerk.accounts.dev',
@@ -48,13 +49,22 @@ function callbackUrl(value, allowLegacyCandidate = false) {
     }
     return url.href;
 }
+export { callbackUrl as validateInitialCallbackTarget };
 function cleanUrl(value) {
     const url = safeAbsolute(value);
     if (url.href !== initialHandshakeContract.appLogin) refuse();
     return url.href;
 }
-function locationOnly(response) {
-    const values = Object.entries(response.headers()).filter(([name]) => name.toLowerCase() === 'location');
+function locationOnly(response, kind, report, allowLegacyCandidate, sourceUrl) {
+    let values;
+    try { values = Object.entries(response.headers()).filter(([name]) => name.toLowerCase() === 'location'); }
+    catch {
+        report.locations[kind] = { observed:true, headerReadSucceeded:false, singleLocation:false,
+            ...inspectHandshakeLocation(undefined,kind,initialHandshakeContract,allowLegacyCandidate,sourceUrl) };
+        refuse();
+    }
+    report.locations[kind] = { observed:true, headerReadSucceeded:true, singleLocation:values.length===1,
+        ...inspectHandshakeLocation(values.length===1?values[0][1]:undefined,kind,initialHandshakeContract,allowLegacyCandidate,sourceUrl) };
     if (values.length !== 1) refuse();
     return values[0][1];
 }
@@ -65,9 +75,11 @@ export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { a
     let used = false;
     const report = { stage: 'NOT_STARTED', complete: false, held: false, requests: 0, redirects: 0, lastHttpStatus: null,
         handshakeUsed: false, cookieOrProviderStateMayExist: false, contextDisposalRequired: false,
-        finalDocumentFulfilled: false, abortConfirmed: false, code: 'NOT_STARTED' };
+        finalDocumentFulfilled: false, abortConfirmed: false, code: 'NOT_STARTED', locations:{}, responses:{},
+        cookieTransfer:{ contextRequestInterfaceSelected:false, sameRequestInterfaceForAllGets:false,
+            cookieContentsObserved:false, actualCookieDeliveryVerified:false } };
     return {
-        diagnostics: () => Object.freeze({ ...report }),
+        diagnostics: () => Object.freeze(structuredClone(report)),
         async run(route) {
             try {
                 report.stage = 'INITIAL_DOCUMENT_VALIDATE';
@@ -78,10 +90,12 @@ export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { a
                     cleanUrl(request.url()) !== initialHandshakeContract.appLogin) refuse();
                 // Shared, origin-scoped cookie storage; never read/copy/export cookies.
                 const api = page.context().request;
+                report.cookieTransfer.contextRequestInterfaceSelected=!!api&&typeof api.fetch==='function';
                 let url = initialHandshakeContract.appLogin;
                 const phases = ['APP_INITIAL','CLERK_HANDSHAKE','APP_CALLBACK','APP_CLEAN'];
                 for (let index = 0; index < initialHandshakeContract.maxRequests; index++) {
                     const phase = phases[index]; report.stage = phase + '_FETCH'; report.lastHttpStatus = null;
+                    report.cookieTransfer.sameRequestInterfaceForAllGets=report.cookieTransfer.contextRequestInterfaceSelected;
                     const headers = scopedOidcHeaders(url, { Accept: 'text/html', 'Sec-Fetch-Dest': 'document' },
                         index === 1 ? undefined : getValidatedOidcToken());
                     // No initial headers, Cookie, Authorization, Referer, Origin or bypass
@@ -90,7 +104,13 @@ export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { a
                     const response = await api.fetch(url, { method: 'GET', headers, timeout: 20000,
                         maxRedirects: 0, maxRetries: 0, failOnStatusCode: false });
                     report.stage = phase + '_RESPONSE';
+                    const observed={ observed:true, statusReadSucceeded:false, statusValid:false,
+                        is200:false, is307:false, isAllowedCallbackRedirect:false, expectedForPhase:false };
+                    report.responses[phase]=observed;
                     const status = response.status();
+                    observed.statusReadSucceeded=true;observed.statusValid=Number.isInteger(status)&&status>=100&&status<=599;
+                    observed.is200=status===200;observed.is307=status===307;observed.isAllowedCallbackRedirect=[302,303,307].includes(status);
+                    observed.expectedForPhase=index===0?[200,307].includes(status):index===1?observed.isAllowedCallbackRedirect:index===2?observed.is307:observed.is200;
                     if (Number.isInteger(status) && status >= 100 && status <= 599) report.lastHttpStatus = status;
                     if ((index === 0 || index === 3) && status === 200) {
                         report.stage = 'FINAL_DOCUMENT_FULFILL';
@@ -99,9 +119,9 @@ export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { a
                         report.stage = 'DOCUMENT_READY'; report.code = 'DOCUMENT_READY_AUTH_NOT_VERIFIED';
                         return;
                     }
-                    if (index === 0 && status === 307) { report.stage = 'APP_TO_CLERK_VALIDATE'; url = handshakeUrl(locationOnly(response)); report.handshakeUsed = true; }
-                    else if (index === 1 && [302,303,307].includes(status)) { report.stage = 'CLERK_TO_APP_VALIDATE'; url = callbackUrl(locationOnly(response), allowLegacyCandidate); }
-                    else if (index === 2 && status === 307) { report.stage = 'APP_CLEAN_TARGET_VALIDATE'; url = cleanUrl(locationOnly(response)); }
+                    if (index === 0 && status === 307) { report.stage = 'APP_TO_CLERK_VALIDATE'; url = handshakeUrl(locationOnly(response,'APP_TO_CLERK',report,allowLegacyCandidate)); report.handshakeUsed = true; }
+                    else if (index === 1 && [302,303,307].includes(status)) { report.stage = 'CLERK_TO_APP_VALIDATE'; url = callbackUrl(locationOnly(response,'CLERK_TO_APP',report,allowLegacyCandidate), allowLegacyCandidate); }
+                    else if (index === 2 && status === 307) { report.stage = 'APP_CLEAN_TARGET_VALIDATE'; url = cleanUrl(locationOnly(response,'APP_CLEAN_TARGET',report,allowLegacyCandidate,url)); }
                     else refuse();
                     report.redirects++;
                     if (report.redirects > initialHandshakeContract.maxRedirects) refuse();
