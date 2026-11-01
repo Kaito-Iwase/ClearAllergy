@@ -31,6 +31,8 @@ function handshakeUrl(value) {
         !['true','false'].includes(url.searchParams.get('suffixed_cookies'))) refuse();
     return url.href;
 }
+// The callback-only diagnostic shares the SAME outbound contract, without following a callback.
+export { handshakeUrl as validateInitialHandshakeTarget };
 function callbackUrl(value) {
     const url = safeAbsolute(value);
     if (url.origin !== previewOrigin || url.pathname !== '/admin/login') refuse();

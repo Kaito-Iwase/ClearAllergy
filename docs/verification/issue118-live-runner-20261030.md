@@ -151,6 +151,16 @@ Secretはこのstepへ渡さず、Clerk Secret/DB資格情報やAPPLYが渡さ�
 
 非3xxでも本文やClerkを読まず停止する。completed/exit0は分類処理の完了だけを表し、HTTP200・Vercel信頼・認証・T1成功の保証ではない。Node fetchは先のbrowser route.fetchとクライアントが異なるため、その診断GETでの観測として区別する。転送先originだけでも、307を発行した主体や正当なhandshakeまで確定したことにはならない。追加followや実T1は別の判断を必要とする。
 
+## callback送信前で止まる2 GET診断
+
+`DIAGNOSE_HANDSHAKE_CALLBACK_ONLY` は同じref・Environment・attempt1・完全SHA・fresh配備receiptのガードを使用する。Secret配達と通常T1はskipし、OIDCの要求・claims検査後、新規nonpersistent Chromium contextの `context.request` で固定app/login GETと既存の厳格なSDK契約を通ったClerk handshake GETだけを行う。各GETは自動redirect/retry0、20秒、OIDCはappだけ。page navigation・ClerkJS・Backend API・testing/sign-in token・session作成・fixtureへ進まない。最初の応答や外向き契約が不一致なら2 GET未満で止まる。
+
+Clerk応答のLocationはメモリ内だけでparseし、headerの個数/型/長さ、absolute/relative、scheme/userinfo/port/fragment、固定return origin/path、既知queryの存在/空値/重複、追加query有無をbooleanだけへ変換する。未知query名・値・URL・path・nonce・header/body・生例外は出力しない。`callbackContractMatches` は現在の通常callback guardとの一致を表すだけで、全trueでも第三GETは絶対に送らない。任意db_jwtの不在booleanは契約失敗とは別。診断完了exit0は観測処理の完了であり、認証/T1成功ではない。
+
+contextのCookie jarはorigin単位で通常の送受信を行うが、読取/export/importしない。Clerk側でclient/nonce等が作られ得る。localCloseConfirmedはローカルcontext/browserを閉じた確認で、provider状態の削除/失効ではない。記録先は専用result.json、固定キーのbooleanのみ。通常live経路とcallback許可条件は変更しない。
+
+検査: `node --test tests/issue118-handshake-callback.test.mjs`。合成Location全条件・通常callback guardとの照合・最大2 GET・全条件でcallback停止・例外/Secret不配達を検証する。実サービスのcallback値は保存せず、実実行の結果と合成PASSを区別する。
+
 ## 初回documentだけのhandshake例外
 
 分類後に別途承認した[限定handshake](issue118-initial-handshake-candidate-20261101.md)を通常CI認証の最初のdocumentにだけ適用する。既存の新規nonpersistent context・global headerなし・claims検証済みtoken()を維持し、OIDCはappだけへ送る。固定SDKの順序で最大3転送/4 GET、各fetchの自動redirect/retryは0。API writeや後続navigationのredirect禁止は変更しない。initialHandshakeの固定stage/HTTP status/count/booleanを結果へ保存し、HOLD/証跡保存不明ではClerk Backend API前に停止する。document-readyを認証やsession失効確認に読み替えない。

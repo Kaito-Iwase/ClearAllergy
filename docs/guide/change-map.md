@@ -133,3 +133,5 @@ Issue118認証/route診断を変更する場合はscripts/issue118-ci-auth.mjs�
 Issue118初回redirect停止診断はscripts/check-issue118-preview-redirect.mjs・issue118-redirect-location.mjs、tests/issue118-redirect-diagnostic.test.mjs、専用workflowとrunner運用記録を照合する。Secret配達なし、単発固定GET・manual redirect、全分岐でfollow/Clerk/fixture前停止を維持する。通常liveの認証経路とは分ける。
 
 初回handshake例外は[限定設計](../verification/issue118-initial-handshake-candidate-20261101.md)、scripts/issue118-initial-handshake-candidate.mjs・issue118-ci-auth.mjs、同名testとrunner receiptを照合する。初回main-frame documentだけの固定SDK経路であり、通常API/後続navigationのredirect禁止は維持する。
+
+callback条件の調査は scripts/check-issue118-handshake-callback.mjs と tests/issue118-handshake-callback.test.mjs、専用workflowのDIAGNOSE_HANDSHAKE_CALLBACK_ONLYを照合する。既存SDK外向きguardのまま最大2 GETで停止し、callback送信・認証・fixtureは実行しない。全predicateはbooleanだけであり、正常な認証/T1の証明ではない。

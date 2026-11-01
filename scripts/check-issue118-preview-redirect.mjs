@@ -6,12 +6,13 @@ import { ciIdentity, oidcRequestUrl, assertOidcClaims } from './issue118-ci-auth
 import { target, assertIdentityReceipt } from './check-issue118-live-t1-browser.mjs';
 import { classifyLocationOnly } from './issue118-redirect-location.mjs';
 
-export function assertRedirectDiagnosticEnvironment(env) {
+export function assertRedirectDiagnosticEnvironment(env, expectedMode = 'PREVIEW_REDIRECT_ONLY') {
     if (env.GITHUB_ACTIONS !== 'true' || env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
         env.GITHUB_RUN_ATTEMPT !== '1' || env.GITHUB_REPOSITORY !== ciIdentity.repository ||
         env.GITHUB_REPOSITORY_ID !== ciIdentity.repositoryId || env.GITHUB_REF !== ciIdentity.ref ||
         env.GITHUB_WORKFLOW_REF !== ciIdentity.workflowRef || env.ISSUE118_GITHUB_ENVIRONMENT !== ciIdentity.environment ||
-        env.ISSUE118_DIAGNOSTIC_MODE !== 'PREVIEW_REDIRECT_ONLY' || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA || '') ||
+        !['PREVIEW_REDIRECT_ONLY','HANDSHAKE_CALLBACK_ONLY'].includes(expectedMode) ||
+        env.ISSUE118_DIAGNOSTIC_MODE !== expectedMode || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA || '') ||
         env.GITHUB_SHA !== env.ISSUE118_EXPECTED_RUNNER_SHA || env.ISSUE118_APPLY ||
         env.ACTIONS_STEP_DEBUG === 'true' || env.ACTIONS_RUNNER_DEBUG === 'true') throw Error('DIAGNOSTIC_CONTEXT_REFUSED');
     for (const key of ['ISSUE118_TEST_CLERK_SECRET_KEY', 'CLERK_SECRET_KEY', 'CLERK_API_URL', 'CLERK_FAPI',
