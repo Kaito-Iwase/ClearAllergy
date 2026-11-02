@@ -12,6 +12,10 @@ export const ciIdentity = Object.freeze({
     ownerId: 'user_3LFy4E2hco0VpC63CbjjMjOznIx', ownerEmail: 'ca-owner-a+clerk_test@example.com',
 });
 const fail = code => { throw Error(code); };
+export async function withClerkDeadline(operation,ms=20000) {
+    let timer;try{return await Promise.race([operation,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('CLERK_OPERATION_TIMEOUT')),ms);})]);}
+    finally{clearTimeout(timer);}
+}
 const jwtPart = value => { try { return JSON.parse(Buffer.from(value, 'base64url').toString('utf8')); } catch { fail('OIDC_CLAIMS_INVALID'); } };
 export function assertCiEnvironment(env) {
     if (env.GITHUB_ACTIONS !== 'true' || env.GITHUB_EVENT_NAME !== 'workflow_dispatch' || env.GITHUB_RUN_ATTEMPT !== '1' ||
@@ -98,6 +102,9 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     let authenticated = false;
     let authenticationAttempted = false;
     let sessionCreationAttempted = false;
+    const trackedReadClose=env.ISSUE118_DIAGNOSTIC_MODE==='FIXTURE_READ_CLOSE_ONLY';
+    let sessionRecord,signoutAttempted=false,sessionReads=0;
+    const emitSession=()=>{try{observers.session?.(structuredClone(sessionRecord));}catch{fail('SESSION_DIAGNOSTIC_FAILED');}};
     let ticketRequests = 0;
     let initialHandshake, initialPage, initialDocumentWindow = false, handshakeObservationFailed = false, routeHeld = false;
     const assertTransportOpen = () => { if (routeHeld) fail('CI_TRANSPORT_HELD'); };
@@ -110,8 +117,10 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
         progress[key] = true;
         try { observers.authentication?.({ ...progress }); } catch { fail('AUTH_DIAGNOSTIC_FAILED'); }
     };
-    const backend = (path, method, body, code) => jsonOnce(async (url, options) => {
-        if (routeHeld) fail('CI_TRANSPORT_HELD');
+    const backend = (path, method, body, code,sessionRead=false) => jsonOnce(async (url, options) => {
+        // A HOLD still permits only this exact newly-created session's read-only reconciliation.
+        const ownSessionRead=trackedReadClose&&sessionRead&&method==='GET'&&sessionRecord?.id&&path==='sessions/'+sessionRecord.id;
+        if (routeHeld&&!ownSessionRead) fail('CI_TRANSPORT_HELD');
         const flags = { targetValidated: true, backendRequest: true, fetchStarted: true };
         let status = null, stage = 'FETCH';
         try {
@@ -126,10 +135,20 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     }, 'https://api.clerk.com/v1/' + path,
         { method, headers: { Authorization: `Bearer ${env.ISSUE118_TEST_CLERK_SECRET_KEY}`, 'Content-Type': 'application/json' },
             ...(body ? { body: JSON.stringify(body) } : {}) }, code);
+    const readOwnSession=async code=>{
+        if(!trackedReadClose||!/^sess_[A-Za-z0-9]{1,128}$/.test(sessionRecord?.id||'')||sessionReads>=2)fail('SESSION_READ_REFUSED');
+        sessionReads++;
+        sessionRecord.canonicalReadAttempts=sessionReads;
+        return backend('sessions/'+sessionRecord.id,'GET',undefined,code,true);
+    };
+    const sessionIdentityMatches=data=>data?.id===sessionRecord.id&&data.user_id===ciIdentity.ownerId&&
+        Number.isFinite(data.created_at)&&data.created_at>=Date.parse(sessionRecord.creationAttemptedUtc)-30000&&
+        data.created_at<=Date.now()+30000&&(!sessionRecord.providerCreatedUtc||new Date(data.created_at).toISOString()===sessionRecord.providerCreatedUtc);
     return {
         token,
         read: (api, url) => protectedPreviewFetch(api, url, {}, token()),
-        async route(route) {
+        async route(route,requestObserver,assertRequestBeforeSend=()=>{}) {
+            const routeObserver=observation=>{transportObserver(observation);if(requestObserver)observeTransport(requestObserver,observation);};
             let role = 'OTHER', method = 'OTHER', status = null, stage = 'TARGET', delegated = false, handshakeDelegated = false;
             const flags = {};
             try {
@@ -154,7 +173,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 if (url.origin === previewOrigin) {
                     stage = 'TOKEN'; const value = token(); flags.tokenValidated = true;
                     delegated = true;
-                    return await routePreviewRequest(route, value, transportObserver, () => { assertTransportOpen(); token(); });
+                    return await routePreviewRequest(route, value, routeObserver, () => { assertTransportOpen(); token();assertRequestBeforeSend(); });
                 }
                 if (url.origin === 'https://' + ciIdentity.clerkDomain || url.origin === 'https://wtqdbklmg3bbqk4s.public.blob.vercel-storage.com') {
                     stage = 'HEADERS';
@@ -208,12 +227,12 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                     assertTransportOpen();
                     stage = 'FULFILL'; flags.fulfillStarted = true;
                     const result = await route.fulfill({ response });
-                    transportObserver(transportObservation(role, method, status, 'NONE', flags));
+                    routeObserver(transportObservation(role, method, status, 'NONE', flags));
                     return result;
                 }
                 stage = 'ABORT'; flags.abortAttempted = true;
                 const result = await route.abort('blockedbyclient'); flags.abortCompleted = true;
-                transportObserver(transportObservation(role, method, status, 'POLICY_REFUSED', flags));
+                routeObserver(transportObservation(role, method, status, 'POLICY_REFUSED', flags));
                 return result;
             } catch (error) {
                 routeHeld = true;
@@ -221,7 +240,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                     flags.abortAttempted = true;
                     try { await route.abort('blockedbyclient'); flags.abortCompleted = true; } catch { /* fixed failure, no provider text */ }
                 }
-                if (!delegated) transportObserver(transportObservation(role, method, status,
+                if (!delegated) routeObserver(transportObservation(role, method, status,
                     flags.abortCompleted ? transportException(error, stage) : 'ABORT_EXCEPTION', flags));
                 fail('CI_ROUTE_FAILED');
             }
@@ -259,7 +278,33 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 // A provider session can exist even when this evaluate/activation acknowledgement is lost.
                 sessionCreationAttempted = true;
                 mark('sessionCreationAttempted');
-                const owner = await page.evaluate(async ticketValue => {
+                let owner;
+                if(trackedReadClose) {
+                    sessionRecord={id:null,ownerId:ciIdentity.ownerId,creationAttemptedUtc:new Date().toISOString(),
+                        creationAcknowledgedUtc:null,providerCreatedUtc:null,ownerVerified:false,eligibleForCleanup:false,
+                        providerStatus:'UNKNOWN',frontendSignOutAcknowledged:false,providerTerminationConfirmed:false};emitSession();
+                    onStage('CLERK_TICKET_SESSION_CREATE');
+                    const id=await withClerkDeadline(page.evaluate(async ticketValue=>{
+                        const result=await window.Clerk.client.signIn.create({strategy:'ticket',ticket:ticketValue});
+                        if(result.status!=='complete'||!result.createdSessionId)throw Error('TICKET_NOT_COMPLETE');
+                        return result.createdSessionId;
+                    },ticket.token));
+                    if(typeof id!=='string'||!/^sess_[A-Za-z0-9]{1,128}$/.test(id))fail('SESSION_ID_REFUSED');
+                    sessionRecord.id=id;sessionRecord.creationAcknowledgedUtc=new Date().toISOString();emitSession();
+                    onStage('CLERK_CREATED_SESSION_VERIFY');
+                    const canonical=await readOwnSession('CLERK_CREATED_SESSION_LOOKUP_FAILED');
+                    if(!sessionIdentityMatches(canonical))fail('CLERK_CREATED_SESSION_IDENTITY_REFUSED');
+                    sessionRecord.ownerVerified=true;sessionRecord.eligibleForCleanup=true;
+                    sessionRecord.providerCreatedUtc=new Date(canonical.created_at).toISOString();
+                    sessionRecord.providerStatus=['active','pending'].includes(canonical.status)?canonical.status:'OTHER';emitSession();
+                    if(canonical.status!=='active')fail('CLERK_CREATED_SESSION_NOT_ACTIVE');
+                    onStage('CLERK_SESSION_ACTIVATE');
+                    const active=await withClerkDeadline(page.evaluate(async sessionId=>{
+                        await window.Clerk.setActive({session:sessionId});
+                        return {owner:window.Clerk.user?.id,sessionId:window.Clerk.session?.id};
+                    },id));
+                    if(active?.sessionId!==id)fail('CLERK_ACTIVE_SESSION_REFUSED');owner=active.owner;
+                }else owner = await page.evaluate(async ticketValue => {
                     const result = await window.Clerk.client.signIn.create({ strategy: 'ticket', ticket: ticketValue });
                     if (result.status !== 'complete' || !result.createdSessionId) throw Error('TICKET_NOT_COMPLETE');
                     await window.Clerk.setActive({ session: result.createdSessionId });
@@ -267,15 +312,41 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 }, ticket.token);
                 if (owner !== ciIdentity.ownerId) fail('CLERK_SESSION_OWNER_REFUSED');
                 authenticated = true;
+                if(trackedReadClose){sessionRecord.activationAcknowledgedUtc=new Date().toISOString();emitSession();}
                 mark('activationAcknowledged'); mark('adminNavigationStarted');
                 await page.goto(previewOrigin + '/admin/shop');
                 mark('adminNavigationCompleted');
-            } catch { fail('CI_AUTHENTICATION_FAILED'); }
+            } catch {if(trackedReadClose&&!sessionRecord?.eligibleForCleanup)routeHeld=true;fail('CI_AUTHENTICATION_FAILED'); }
             finally { initialDocumentWindow = false; }
         },
         async signOut(page) {
             if (!authenticationAttempted) return 'NOT_STARTED';
             if (!sessionCreationAttempted) { testingToken = undefined; return 'SESSION_CREATION_NOT_ATTEMPTED'; }
+            if(trackedReadClose) {
+                if(signoutAttempted||!sessionRecord?.eligibleForCleanup)return 'SIGNOUT_UNVERIFIED';
+                const cleanupObservation=()=>{try{emitSession();}catch{sessionRecord.diagnosticObservationFailed=true;}};
+                signoutAttempted=true;sessionRecord.signOutAttemptedUtc=new Date().toISOString();cleanupObservation();
+                try {
+                    const ended=await withClerkDeadline(page.evaluate(async({id,owner})=>{
+                        if(!window.Clerk?.loaded||window.Clerk.user&&window.Clerk.user.id!==owner)throw Error('OWNER_REFUSED');
+                        if(window.Clerk.session&&window.Clerk.session.id!==id)throw Error('SESSION_REFUSED');
+                        await window.Clerk.signOut({sessionId:id});
+                        return window.Clerk.session?.id!==id;
+                    },{id:sessionRecord.id,owner:ciIdentity.ownerId}));
+                    sessionRecord.frontendSignOutAcknowledged=ended===true;
+                }catch {sessionRecord.frontendSignOutAcknowledged=false;}
+                try {
+                    onStage('CLERK_ENDED_SESSION_VERIFY');
+                    const canonical=await readOwnSession('CLERK_ENDED_SESSION_LOOKUP_FAILED');
+                    if(!sessionIdentityMatches(canonical))fail('CLERK_ENDED_SESSION_IDENTITY_REFUSED');
+                    const inactive=['ended','revoked','removed','expired','abandoned','replaced'];
+                    sessionRecord.providerStatus=[...inactive,'active','pending'].includes(canonical.status)?canonical.status:'OTHER';
+                    sessionRecord.terminationObservedUtc=new Date().toISOString();
+                    sessionRecord.providerTerminationConfirmed=inactive.includes(canonical.status);
+                }catch {sessionRecord.providerTerminationConfirmed=false;}
+                authenticated=false;testingToken=undefined;cleanupObservation();
+                return sessionRecord.providerTerminationConfirmed&&!sessionRecord.diagnosticObservationFailed?'SIGNOUT_CONFIRMED':'SIGNOUT_UNVERIFIED';
+            }
             const activationAcknowledged = authenticated;
             try {
                 const outcome = await page.evaluate(async owner => {
@@ -293,6 +364,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
             } catch { testingToken = undefined; return 'SIGNOUT_UNVERIFIED'; }
         },
         isAuthenticated: () => authenticated,
+        sessionObservation:()=>sessionRecord?structuredClone(sessionRecord):null,
         authenticationProgress: () => ({ ...progress }),
         handshakeProgress: () => initialHandshake ? initialHandshake.diagnostics() : { stage: 'NOT_STARTED', complete: false, held: false },
     };

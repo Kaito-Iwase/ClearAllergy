@@ -8,11 +8,31 @@ import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityRe
     claimMutation, protectedApiSnapshot, overallResult, openCreatedEditor, classifyLiveError, browserSetupStage,
     transportLifecycleSnapshot, recordTransportDiagnostic, readCloseRequestAllowed, observeReadCloseFixture,
     readCloseFixtureId, readCloseResult, guardReadCloseRoute, createReadCloseAuthPolicyCandidate,
-    readCloseDirectFetch,createVerifiedReadCloseAuthPolicyCandidate,verifiedReadCloseAction } from "../scripts/check-issue118-live-t1-browser.mjs";
+    readCloseDirectFetch,createVerifiedReadCloseAuthPolicyCandidate,verifiedReadCloseAction,
+    readCloseRequestObservation,observeReadCloseRoute } from "../scripts/check-issue118-live-t1-browser.mjs";
 import { closeIsolatedBrowser } from "../scripts/issue118-close-browser.mjs";
 import { routePreviewRequest } from "../scripts/issue118-preview-transport.mjs";
+import {ciIdentity} from '../scripts/issue118-ci-auth.mjs';
+const readCloseEvidence=()=>({readOnlyApiRequests:[{kind:'SHOP',status:200,responseObserved:true},{kind:'FIXTURE',status:200,responseObserved:true}],
+    sessionIdentity:{id:'sess_Unit12345678901234567890',ownerId:ciIdentity.ownerId,ownerVerified:true,
+        providerTerminationConfirmed:true,frontendSignOutAcknowledged:true,providerCreatedUtc:new Date().toISOString()}});
 
-test('fixed public reference candidate checks receipt and does not alter the live read-close wiring',async()=>{
+test('read-close correlates a particular fetch failure across close phases without recording URL/error values',async()=>{
+    let phase='SIGNOUT',release,started;
+    const ready=new Promise(resolve=>{started=resolve;});
+    const request={url:()=>target.origin+'/admin/shop?private=SYNTHETIC_PRIVATE',method:()=> 'GET',resourceType:()=> 'fetch'};
+    const entry=readCloseRequestObservation(request,7,transportLifecycleSnapshot(phase));
+    const observed=observeReadCloseRoute({request:()=>request,fetch:async()=>{started();return await new Promise((_,reject)=>{release=reject;});}},entry,()=>phase,()=>{});
+    const failed=assert.rejects(observed.fetch({}),/SYNTHETIC_PRIVATE/);await ready;
+    phase='CONTEXT_CLOSE_START';release(Error('SYNTHETIC_PRIVATE https://u:p@private.invalid'));await failed;
+    assert.equal(entry.sequence,7);assert.equal(entry.kind,'SHOP_DOCUMENT');assert.equal(entry.queryPresent,true);
+    assert.equal(entry.fetchAttempted.phase,'SIGNOUT');assert.equal(entry.fetchRejected.phase,'CONTEXT_CLOSE_START');
+    assert.doesNotMatch(JSON.stringify(entry),/SYNTHETIC|https:|private/);
+    const malformed=readCloseRequestObservation({url:()=>{throw Error('SYNTHETIC_PRIVATE');}},'SYNTHETIC_PRIVATE',{phase:'SYNTHETIC_PRIVATE',observedUtc:'SYNTHETIC_PRIVATE'});
+    assert.equal(malformed.sequence,null);assert.doesNotMatch(JSON.stringify(malformed),/SYNTHETIC/);
+});
+
+test('fixed public reference checks receipt and is wired only to the read-close entry',async()=>{
     const receipt={...target,environment:'Preview',status:'Ready',verifiedBy:'human',observedUtc:new Date().toISOString(),evidenceReference:'Synthetic offline control'};
     const policy=createVerifiedReadCloseAuthPolicyCandidate(receipt),ref=verifiedReadCloseAction.reference;
     const make=(url=target.origin+'/admin/login',type='document')=>({url:()=>url,method:()=> 'POST',resourceType:()=>type,
@@ -28,8 +48,8 @@ test('fixed public reference candidate checks receipt and does not alter the liv
         assert.equal((await policy({...script,...change},()=> 'APP_FLOW')).decision,'REFUSE');
     assert.equal((await policy({...make(target.origin+'/_vercel/insights/view')},()=> 'APP_FLOW')).decision,'REFUSE');
     const source=readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs',import.meta.url),'utf8');
-    assert.match(source,/readCloseOnly \? createReadCloseAuthPolicyCandidate\(\) : undefined/);
-    assert.equal((source.match(/createVerifiedReadCloseAuthPolicyCandidate\(/g)||[]).length,1); // definition only, not a live caller
+    assert.match(source,/readCloseOnly \? createVerifiedReadCloseAuthPolicyCandidate\(identityReceipt\) : undefined/);
+    assert.equal((source.match(/createVerifiedReadCloseAuthPolicyCandidate\(/g)||[]).length,2); // definition and one read-close caller
 });
 
 test('candidate identity changes and unknown policy/observer errors never fall back to forwarding',async()=>{
@@ -176,13 +196,17 @@ test('read-close diagnostic restricts app traffic to GET and the two owned API r
     await assert.rejects(observeReadCloseFixture({id:'other'},async()=>assert.fail('wrong shop must not read fixture')));
 });
 test('read-close result never turns transport/closure/mutation uncertainty into diagnostic success', () => {
-    const report={flow:'PASS_READ_ONLY_FIXTURE',cleanup:'NOT_APPLICABLE_READ_ONLY',writes:{held:false,operations:[]},authenticationCleanup:'SIGNOUT_CONFIRMED'};
+    const report={...readCloseEvidence(),flow:'PASS_READ_ONLY_FIXTURE',cleanup:'NOT_APPLICABLE_READ_ONLY',writes:{held:false,operations:[]},authenticationCleanup:'SIGNOUT_CONFIRMED'};
     assert.equal(readCloseResult(report,false,true).status,'READ_CLOSE_DIAGNOSTIC_COMPLETE');
     for (const [change,transport,closed] of [[{},true,true],[{},false,false],[{readOnlyRequestRefused:true},false,true],
         [{firstTransportFailure:{originRole:'APP',method:'GET',status:500,exception:'NONE'}},false,true],
         [{writes:{held:false,operations:[{}]}},false,true],[{authenticationCleanup:'SIGNOUT_UNVERIFIED'},false,true],[{flow:'FAIL'},false,true]])
         assert.equal(readCloseResult({...report,...change},transport,closed).status,'FAIL_OR_INCOMPLETE');
     assert.equal(readCloseResult({...report,writes:{held:true,operations:[]}},false,true).status,'HOLD_UNCERTAIN_WRITE');
+    for(const change of [{readOnlyApiRequests:[]},{readOnlyApiRequests:[report.readOnlyApiRequests[0],report.readOnlyApiRequests[0]]},
+        {sessionIdentity:null},{sessionIdentity:{...report.sessionIdentity,providerTerminationConfirmed:false}},
+        {sessionIdentity:{...report.sessionIdentity,frontendSignOutAcknowledged:false}},{sessionIdentity:{...report.sessionIdentity,ownerId:'other'}}])
+        assert.equal(readCloseResult({...report,...change},false,true).status,'FAIL_OR_INCOMPLETE');
 });
 test('last-registered admin route delegates forbidden POST to read-close refusal with zero forwarding', async () => {
     const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');

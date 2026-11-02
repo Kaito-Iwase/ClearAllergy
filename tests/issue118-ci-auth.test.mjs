@@ -6,9 +6,9 @@ import { join, dirname, resolve, basename } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { assertCiEnvironment, ciIdentity, assertOidcClaims, oidcRequestUrl, inspectOidcRequestTarget, assertClerkPublishableKey, createCiAccess } from '../scripts/issue118-ci-auth.mjs';
+import { assertCiEnvironment, ciIdentity, assertOidcClaims, oidcRequestUrl, inspectOidcRequestTarget, assertClerkPublishableKey, createCiAccess,withClerkDeadline } from '../scripts/issue118-ci-auth.mjs';
 import { oidcTargetDiagnostic } from '../scripts/check-issue118-oidc-target.mjs';
-import { target, classifyLiveError, recordTransportDiagnostic } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { target, classifyLiveError, recordTransportDiagnostic,createReadCloseAuthPolicyCandidate } from '../scripts/check-issue118-live-t1-browser.mjs';
 import { routePreviewRequest, transportObservation } from '../scripts/issue118-preview-transport.mjs';
 
 const syntheticSecret = 'sk_test_SYNTHETIC_NOT_REAL';
@@ -28,6 +28,32 @@ const jwt = body => 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify(body)).t
 const response = body => ({ ok: true, json: async () => body });
 const code = expected => error => error.message === expected && !error.cause && !String(error.stack).includes(syntheticSecret);
 const publicKey = 'pk_test_' + Buffer.from(ciIdentity.clerkDomain + '$').toString('base64');
+test('read-close approved claim cannot send after transport header wait changes phase or receipt validity',async()=>{
+    for(const change of ['PHASE','RECEIPT','NONE']) {
+        let phase='AUTHENTICATION',expired=false,headerCalls=0,release,ready,fetches=0;
+        const started=new Promise(resolve=>{ready=resolve;}),pending=new Promise(resolve=>{release=resolve;});
+        const action='a'.repeat(42),headers={'next-action':action,origin:target.origin,referer:target.origin+'/admin/login',
+            'content-type':'text/plain;charset=UTF-8',accept:'text/x-component'};
+        const request={url:()=>target.origin+'/admin/login',method:()=> 'POST',postData:()=> '[]',
+            allHeaders:async()=>{if(++headerCalls===1)return headers;ready();return await pending;}};
+        const policy=createReadCloseAuthPolicyCandidate({actionReference:action,assertContext:()=>{if(expired)throw Error('EXPIRED_CONTEXT');}});
+        assert.equal((await policy(request,()=>phase)).decision,'ALLOW_PINNED_AUTH_CACHE_ACTION');
+        const access=await createCiAccess(env(),async()=>response({value:jwt(claims())}));
+        const work=access.route({request:()=>request,fetch:async()=>{fetches++;return {status:()=>200};},fulfill:async()=>{},abort:async()=>{}},
+            undefined,()=>policy.assertBeforeSend(request,()=>phase));
+        const checked=change==='NONE'?work:assert.rejects(work,code('CI_ROUTE_FAILED'));
+        await started;if(change==='PHASE')phase='SIGNOUT';if(change==='RECEIPT')expired=true;release(headers);await checked;
+        assert.equal(fetches,change==='NONE'?1:0);
+        assert.equal((await policy({...request,allHeaders:async()=>headers},()=> 'AUTHENTICATION')).decision,'REFUSE');
+        if(change==='NONE')assert.throws(()=>policy.assertBeforeSend(request,()=>phase),{message:'READ_CLOSE_PRE_SEND_REFUSED'});
+    }
+});
+test('Clerk operation deadline does not retry or assume an unresolved session operation failed to commit',async()=>{
+    let completed=false,resolve;
+    const original=new Promise(done=>{resolve=()=>{completed=true;done();};});
+    await assert.rejects(withClerkDeadline(original,5),{message:'CLERK_OPERATION_TIMEOUT'});assert.equal(completed,false);
+    resolve();await original;assert.equal(completed,true);
+});
 const diagnosticEnv = () => ({ ...env(), ISSUE118_APPLY: undefined, ISSUE118_TEST_CLERK_SECRET_KEY: undefined,
     ISSUE118_DIAGNOSTIC_MODE: 'OIDC_TARGET_ONLY' });
 
@@ -416,9 +442,11 @@ test('public frontend must be exact test instance before any Backend API call', 
 });
 
 function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, backendFailure, signoutFailure = false,
-    setActiveFailure = false, createResponseLost = false, activationAckLost = false } = {}) {
+    setActiveFailure = false, createResponseLost = false, activationAckLost = false,sessionOwner=ciIdentity.ownerId,
+    sessionCreatedOffset=0,signoutNoRevoke=false,sessionReadFailsAt=0 } = {}) {
     const calls = []; const visits = [];
-    let providerSession = false; let signOutCalls = 0;
+    let providerSession = false; let signOutCalls = 0,createdAt,sessionReads=0;
+    const sessionId='sess_Unit12345678901234567890';
     const fetcher = async (url, options) => {
         calls.push({ url, method: options.method || 'GET', body: options.body, redirect: options.redirect });
         if (url.includes('actions.githubusercontent.com')) return response({ value: jwt(claims()) });
@@ -428,25 +456,66 @@ function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, 
         if (url.endsWith('/users/' + ciIdentity.ownerId)) return response({ id: userId, email_addresses: [{ email_address: ciIdentity.ownerEmail }] });
         if (url.endsWith('/testing_tokens')) return response({ token: 'SYNTHETIC_TESTING_TOKEN' });
         if (url.endsWith('/sign_in_tokens')) { assert.deepEqual(JSON.parse(options.body), { user_id: ciIdentity.ownerId, expires_in_seconds: 120 }); return response({ token: 'SYNTHETIC_TICKET' }); }
+        if(url.endsWith('/sessions/'+sessionId)) {
+            assert.equal(options.method,'GET');if(++sessionReads===sessionReadFailsAt)throw Error(syntheticSecret);
+            return response({id:sessionId,user_id:sessionOwner,created_at:createdAt,status:providerSession?'active':'revoked',latest_activity:{ip_address:'DO_NOT_RECORD'}});
+        }
         throw Error('unexpected test seam');
     };
     const clerk = { loaded: true, publishableKey: publicKey, user: null, session: null,
         client: { signIn: { create: async value => {
-            assert.deepEqual({ ...value }, { strategy: 'ticket', ticket: 'SYNTHETIC_TICKET' }); providerSession = true;
+            assert.deepEqual({ ...value }, { strategy: 'ticket', ticket: 'SYNTHETIC_TICKET' }); providerSession = true;createdAt=Date.now()+sessionCreatedOffset;
             if (createResponseLost) throw Error('lost create response ' + syntheticSecret);
-            return { status: 'complete', createdSessionId: 'SYNTHETIC_SESSION' };
+            return { status: 'complete', createdSessionId: sessionId };
         } } },
         setActive: async ({ session }) => {
-            assert.equal(session, 'SYNTHETIC_SESSION');
+            assert.equal(session, sessionId);
             if (setActiveFailure) throw Error('activation failure ' + syntheticSecret);
             clerk.user = { id: owner }; clerk.session = { id: session };
             if (activationAckLost) throw Error('lost activation acknowledgement ' + syntheticSecret);
         },
-        signOut: async () => { signOutCalls++; if (signoutFailure) throw Error(syntheticSecret); clerk.user = null; clerk.session = null; providerSession = false; } };
+        signOut: async options => { if(options)assert.equal(options.sessionId,sessionId);signOutCalls++; if (signoutFailure) throw Error(syntheticSecret); clerk.user = null; clerk.session = null; if(!signoutNoRevoke)providerSession = false; } };
     const page = { goto: async url => visits.push(url), waitForFunction: async () => {},
         evaluate: async (fn, arg) => runInNewContext('(' + fn.toString() + ')(__arg)', { window: { Clerk: clerk }, __arg: arg }) };
     return { calls, visits, page, fetcher, providerSession: () => providerSession, signOutCalls: () => signOutCalls };
 }
+
+test('read-close records its exact created session before activation and confirms only its provider termination',async()=>{
+    const fixture=authFixture(),sessions=[];
+    const access=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},fixture.fetcher,()=>{},
+        {session:entry=>sessions.push(entry)});
+    await authenticate(access,fixture.page);
+    assert.ok(sessions.some(x=>x.id&&x.ownerVerified===false));
+    const created=access.sessionObservation();assert.equal(created.ownerVerified,true);assert.equal(created.eligibleForCleanup,true);
+    assert.ok(Number.isFinite(Date.parse(created.providerCreatedUtc)));assert.equal(created.canonicalReadAttempts,1);
+    assert.equal(await access.signOut(fixture.page),'SIGNOUT_CONFIRMED');
+    const ended=access.sessionObservation();assert.equal(ended.id,created.id);assert.equal(ended.providerCreatedUtc,created.providerCreatedUtc);
+    assert.equal(ended.providerStatus,'revoked');assert.equal(ended.providerTerminationConfirmed,true);assert.equal(ended.canonicalReadAttempts,2);
+    assert.equal(fixture.signOutCalls(),1);assert.equal(fixture.providerSession(),false);
+    assert.equal(await access.signOut(fixture.page),'SIGNOUT_UNVERIFIED');assert.equal(fixture.signOutCalls(),1);
+    assert.doesNotMatch(JSON.stringify(sessions),/DO_NOT_RECORD|SYNTHETIC_TICKET|SYNTHETIC_TESTING_TOKEN|sk_test_/);
+    const lookups=fixture.calls.filter(x=>x.url.includes('/sessions/'));assert.equal(lookups.length,2);
+    assert.ok(lookups.every(x=>x.url==='https://api.clerk.com/v1/sessions/'+created.id&&x.method==='GET'));
+});
+test('read-close partial activation can terminate only a recorded owned session; unknown creation or identity holds',async()=>{
+    for(const options of [{setActiveFailure:true},{activationAckLost:true},{createResponseLost:true},
+        {sessionOwner:'user_other'},{sessionCreatedOffset:-60000}]) {
+        const f=authFixture(options),a=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},f.fetcher);
+        await assert.rejects(authenticate(a,f.page),code('CI_AUTHENTICATION_FAILED'));
+        const eligible=!!a.sessionObservation()?.eligibleForCleanup;
+        assert.equal(await a.signOut(f.page),eligible?'SIGNOUT_CONFIRMED':'SIGNOUT_UNVERIFIED');
+        assert.equal(f.signOutCalls(),eligible?1:0);
+        const count=f.calls.length;await assert.rejects(a.authenticate(f.page),code('CI_AUTH_RETRY_REFUSED'));assert.equal(f.calls.length,count);
+    }
+});
+test('read-close local signout success, network failure or failed reconciliation cannot fake provider termination',async()=>{
+    for(const options of [{signoutNoRevoke:true},{signoutFailure:true},{sessionReadFailsAt:2}]) {
+        const f=authFixture(options),a=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},f.fetcher);
+        await authenticate(a,f.page);assert.equal(await a.signOut(f.page),'SIGNOUT_UNVERIFIED');
+        assert.equal(a.sessionObservation().providerTerminationConfirmed,false);assert.equal(f.signOutCalls(),1);
+        assert.equal(a.sessionObservation().canonicalReadAttempts,2);
+    }
+});
 
 test('synthetic main-frame SDK UI/JS canonical transfer is bounded and copies no browser credentials into its second GET', async () => {
     const origin='https://'+ciIdentity.clerkDomain;

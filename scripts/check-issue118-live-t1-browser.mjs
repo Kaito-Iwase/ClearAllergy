@@ -580,7 +580,7 @@ export const verifiedReadCloseAction = Object.freeze({
     callerChunk:'/_next/static/immutable/chunks/1yxbpkao8jjq-.js',callerSha256:'22f889779049694ab8497801e8286d170f1101edbad60f9d61d06335458a50a7',
     factoryChunk:'/_next/static/immutable/chunks/44xcerwlley0q.js',factorySha256:'a070e193cc6aa2af93f87b93c668ae7fa6039f396007a82104ba7b228d7850ac',
 });
-// Local candidate only: the live read-close entry below still passes NO policy.
+// Dedicated read-close only; the mutation-bearing T1 entry does not use this policy.
 // Provenance: caller41895 -> getters95187 -> CJS35326 ->21413 -> React64893;
 // callServer95187 ->32120 -> Next48658. No environment/CLI action-ID override.
 export function createVerifiedReadCloseAuthPolicyCandidate(receipt) {
@@ -594,8 +594,8 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
     const telemetry = new Set((Array.isArray(telemetryPaths) ? telemetryPaths : []).filter(path => typeof path === 'string' &&
         /^\/(?:_vercel\/insights|[A-Za-z0-9_-]{8,64})\/(?:view|event)$/.test(path)));
     const scripts=new Set((Array.isArray(telemetryScripts)?telemetryScripts:[]).filter(path=>path==='/_vercel/insights/script.js'));
-    let actionUsed = false;
-    return async (request, getPhase) => {
+    let actionUsed = false;const approvedRequests=new WeakSet(),sentRequests=new WeakSet();
+    const policy=async (request, getPhase) => {
         const names = ['isApp', 'isPost', 'authPhase', 'exactLoginTarget', 'authAuditApi', 'menuApi',
             'queryPresent', 'legacyTelemetryShape', 'pinnedTelemetry', 'headersRead', 'nextActionPresent',
             'nextActionPinned', 'originMatches', 'refererMatches', 'plainTextUtf8', 'acceptsRsc', 'bodyInspected',
@@ -651,11 +651,22 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             assertContext();
             observation.inspectionComplete = true;
             if (observation.nextActionPinned && observation.emptyArguments && observation.actionUnused && observation.authPhase) {
-                actionUsed = true; result.decision = 'ALLOW_PINNED_AUTH_CACHE_ACTION';
+                actionUsed = true;approvedRequests.add(request);result.decision = 'ALLOW_PINNED_AUTH_CACHE_ACTION';
             }
         } catch { /* Unknown inputs/provider failures are REFUSE; no values or raw exceptions escape. */ }
         return result;
     };
+    // Revalidate this already claimed request immediately before the transport's
+    // fetch, after its separate asynchronous allHeaders(). Never acquire a new claim.
+    policy.assertBeforeSend=(request,getPhase)=>{
+        assertContext();
+        if(approvedRequests.has(request)) {
+            if(sentRequests.has(request)||request.method()!=='POST'||getPhase()!=='AUTHENTICATION'||request.url()!==target.origin+'/admin/login'||request.postData()!=='[]')
+                throw Error('READ_CLOSE_PRE_SEND_REFUSED');
+            sentRequests.add(request);
+        }else if(request.method()!=='GET'||!readCloseRequestAllowed('GET',request.url()))throw Error('READ_CLOSE_PRE_SEND_REFUSED');
+    };
+    return policy;
 }
 export function readCloseRequestAllowed(method, rawUrl) {
     try {
@@ -673,7 +684,7 @@ export async function guardReadCloseRoute(route, onAppRefused, onOtherBlocked, c
     if(candidate) {
         try {
             const inspected=await candidate.policy(request,candidate.getPhase);
-            candidate.observe?.(inspected.observation);
+            candidate.observe?.(inspected.observation,inspected.decision);
             if(inspected.decision==='ALLOW_PINNED_AUTH_CACHE_ACTION'||inspected.decision==='USE_EXISTING_TRANSPORT')return true;
             if(inspected.decision==='SUPPRESS_PINNED_TELEMETRY_SCRIPT') {
                 await route.fulfill({status:200,contentType:'application/javascript',body:''});return false;
@@ -702,10 +713,37 @@ export async function observeReadCloseFixture(shop, read) {
 }
 export function readCloseResult(report, transportFailed, closed) {
     if (report.writes?.held) return { status: 'HOLD_UNCERTAIN_WRITE', exit: 2 };
+    const reads=report.readOnlyApiRequests,session=report.sessionIdentity;
+    const readsConfirmed=Array.isArray(reads)&&reads.length===2&&new Set(reads.map(r=>r.kind)).size===2&&
+        reads.every(r=>['SHOP','FIXTURE'].includes(r.kind)&&r.status===200&&r.responseObserved===true);
+    const sessionConfirmed=session&&/^sess_[A-Za-z0-9]{1,128}$/.test(session.id||'')&&session.ownerId===ciIdentity.ownerId&&
+        session.ownerVerified===true&&session.providerTerminationConfirmed===true&&session.frontendSignOutAcknowledged===true&&
+        !session.diagnosticObservationFailed&&Number.isFinite(Date.parse(session.providerCreatedUtc));
     const complete = report.flow === 'PASS_READ_ONLY_FIXTURE' && report.cleanup === 'NOT_APPLICABLE_READ_ONLY'
         && report.writes?.operations?.length === 0 && report.authenticationCleanup === 'SIGNOUT_CONFIRMED'
-        && closed === true && !transportFailed && !report.firstTransportFailure && !report.readOnlyRequestRefused;
+        && readsConfirmed&&sessionConfirmed&&closed === true && !transportFailed && !report.firstTransportFailure && !report.readOnlyRequestRefused;
     return { status: complete ? 'READ_CLOSE_DIAGNOSTIC_COMPLETE' : 'FAIL_OR_INCOMPLETE', exit: complete ? 0 : 1 };
+}
+export function readCloseRequestObservation(request,sequence,lifecycle) {
+    const out={sequence:Number.isSafeInteger(sequence)&&sequence>0?sequence:null,
+        started:transportLifecycleSnapshot(lifecycle?.phase,lifecycle?.observedUtc),pending:true,originRole:'OTHER',method:'OTHER',kind:'OTHER',resourceType:'other',queryPresent:false};
+    try {
+        const url=new URL(request.url());out.originRole=url.origin===target.origin?'APP':url.origin==='https://'+ciIdentity.clerkDomain?'CLERK':'OTHER';
+        out.method=transportObservation(out.originRole,request.method(),null,'NONE').method;out.queryPresent=!!url.search;
+        const type=request.resourceType();if(['document','script','xhr','fetch','stylesheet','font','image'].includes(type))out.resourceType=type;
+        out.kind=out.originRole==='CLERK'?'CLERK':out.originRole!=='APP'?'OTHER':url.pathname==='/admin/login'?'LOGIN':
+            url.pathname==='/admin/shop'?'SHOP_DOCUMENT':url.pathname==='/api/admin/shop'?'SHOP_API':
+            url.pathname==='/api/admin/menus/'+readCloseFixtureId?'FIXTURE_API':url.pathname.startsWith('/_next/static/')?'APP_STATIC':'APP_OTHER';
+    }catch {out.metadataReadFailed=true;}
+    return out;
+}
+export function observeReadCloseRoute(route,entry,getPhase,save) {
+    const stamp=key=>{entry[key]=transportLifecycleSnapshot(getPhase());save();};
+    return {request:()=>route.request(),
+        fetch:async options=>{stamp('fetchAttempted');try{const response=await route.fetch(options);stamp('fetchReturned');return response;}
+            catch(error){stamp('fetchRejected');throw error;}},
+        fulfill:async options=>{stamp('fulfillAttempted');const result=await route.fulfill(options);stamp('fulfillReturned');return result;},
+        abort:async code=>{stamp('abortAttempted');const result=await route.abort(code);stamp('abortReturned');return result;}};
 }
 
 export async function openCreatedEditor(page, origin, id) {
@@ -780,10 +818,11 @@ export async function runLive() {
     const mutationCounts = new Map();
     const ledger = newWriteLedger(); report.writes = ledger;
     const requestOperations = new WeakMap();
+    const readCloseRequestEntries=new WeakMap();
     let activeOperation;
     let ciAccess;
     let ciTransportFailed = false;
-    const readCloseRefusalInspector = readCloseOnly ? createReadCloseAuthPolicyCandidate() : undefined;
+    const readClosePolicy = readCloseOnly ? createVerifiedReadCloseAuthPolicyCandidate(identityReceipt) : undefined;
     let lifecyclePhase = 'SETUP', routeSequence = 0;
     const markLifecycle = code => {
         lifecyclePhase = code;
@@ -799,8 +838,18 @@ export async function runLive() {
         assert.equal(menu.id, id);
         return menu;
     };
-    const readRequest = url => ciAccess ? readCloseOnly ? readCloseDirectFetch(context.request, url, ciAccess.token()) : ciAccess.read(context.request, url)
-        : context.request.get(url, { timeout: 20000 });
+    const readRequest = async url => {
+        if(ciAccess&&readCloseOnly) {
+            assertIdentityReceipt(identityReceipt);
+            const kind=url===target.origin+'/api/admin/shop'?'SHOP':url===target.origin+'/api/admin/menus/'+readCloseFixtureId?'FIXTURE':null;
+            if(!kind)throw Error('READ_ONLY_DIRECT_TARGET_REFUSED');
+            const records=report.readOnlyApiRequests??=[];if(records.some(r=>r.kind===kind))throw Error('READ_ONLY_DUPLICATE_GET_REFUSED');
+            const entry={kind,startedUtc:new Date().toISOString(),status:null,responseObserved:false};records.push(entry);save();
+            const response=await readCloseDirectFetch(context.request,url,ciAccess.token());
+            entry.status=response.status();entry.responseObserved=true;entry.responseObservedUtc=new Date().toISOString();save();return response;
+        }
+        return ciAccess?ciAccess.read(context.request,url):context.request.get(url,{timeout:20000});
+    };
     const action = async (nextPhase, method, path, click) => {
         if (readCloseOnly) throw Error('READ_ONLY_MUTATION_REFUSED');
         assertIdentityReceipt(identityReceipt);
@@ -835,6 +884,7 @@ export async function runLive() {
         const setupStage = stage => { report.stage = stage; (report.setupStages ??= []).push(stage); save(); };
         if (ciMode) ciAccess = await createCiAccess(process.env, fetch, setupStage, {
             authentication: progress => { report.authenticationProgress = progress; save(); },
+            session: progress => { report.sessionIdentity=progress;save(); },
             handshake: progress => { report.initialHandshake = progress; save(); },
             frontendRedirect: observation => { report.frontendRedirect ??= observation; save(); },
             scriptTransfer: observation => { const events = report.clerkScriptTransfers ??= [];
@@ -850,34 +900,47 @@ export async function runLive() {
         context = await browserSetupStage("BROWSER_CONTEXT", () => browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false, serviceWorkers: "block" }), setupStage);
         const ciRoute = async route => {
             const sequence = ++routeSequence, started = transportLifecycleSnapshot(lifecyclePhase);
+            let entry;
             try {
-                if (readCloseOnly && !readCloseRequestAllowed(route.request().method(), route.request().url()) &&
-                    new URL(route.request().url()).origin === target.origin && !report.readOnlyRefusalClassification) {
-                    const inspected = await readCloseRefusalInspector(route.request(), () => lifecyclePhase);
-                    report.readOnlyRefusalClassification ??= { sequence, ...transportLifecycleSnapshot(lifecyclePhase), predicates: inspected.observation };
-                    // Observation only: no pin is supplied and this decision never grants forwarding.
+                if(readCloseOnly) {
+                    const request=route.request();entry=readCloseRequestObservation(request,sequence,started);readCloseRequestEntries.set(request,entry);
+                    const entries=report.readCloseRoutes??=[];if(entries.length<128)entries.push(entry);else report.lifecycleIncomplete=true;
                 }
                 if (readCloseOnly && !await guardReadCloseRoute(route,
                     () => { report.readOnlyRequestRefused = true; },
-                    () => { report.readOnlyOtherRequestsBlocked = (report.readOnlyOtherRequestsBlocked || 0) + 1; })) {
+                    () => { report.readOnlyOtherRequestsBlocked = (report.readOnlyOtherRequestsBlocked || 0) + 1; },
+                    {policy:readClosePolicy,getPhase:()=>lifecyclePhase,observe:(predicates,decision)=>{
+                        const events=report.readClosePolicyObservations??=[];
+                        if(events.length<128)events.push({sequence,...transportLifecycleSnapshot(lifecyclePhase),predicates,decision});
+                        else report.readClosePolicyObservationsTruncated=true;
+                        save();
+                    }})) {
                     save(); return;
                 }
-                await ciAccess.route(route);
+                await ciAccess.route(entry?observeReadCloseRoute(route,entry,()=>lifecyclePhase,save):route,entry?observation=>{
+                    const events=entry.transport??=[];
+                    if(events.length<4)events.push({...transportLifecycleSnapshot(lifecyclePhase),
+                        ...transportObservation(observation.originRole,observation.method,observation.status,observation.exception,observation.stages)});
+                    else report.lifecycleIncomplete=true;save();
+                }:undefined,readCloseOnly?()=>readClosePolicy.assertBeforeSend(route.request(),()=>lifecyclePhase):undefined);
             }
             catch {
+                if(entry)entry.handlerFailed=true;
                 report.firstRouteHandlerFailure ??= { sequence, started, observed: transportLifecycleSnapshot(lifecyclePhase) };
                 ciTransportFailed = true; report.transportError = "CI_ROUTE_FAILED";
                 if (activeOperation) holdWrite(ledger, activeOperation, "TRANSPORT_RESULT_UNCONFIRMED");
                 save();
             }
+            finally{if(entry){entry.pending=false;entry.finished=transportLifecycleSnapshot(lifecyclePhase);save();}}
         };
         if (ciAccess) await context.route("**/*", ciRoute);
         context.on("response", response => {
+            const entry=readCloseRequestEntries.get(response.request());if(entry){entry.browserResponse={...transportLifecycleSnapshot(lifecyclePhase),status:transportObservation(entry.originRole,entry.method,response.status(),'NONE').status};save();}
             const op = requestOperations.get(response.request());
             if (op) { op.responseHeadersObserved = true; op.observedHttpStatus = response.status(); save(); }
         });
-        context.on("requestfinished", request => { const op = requestOperations.get(request); if (op) { op.transportFinished = true; save(); } });
-        context.on("requestfailed", request => { const op = requestOperations.get(request); if (op) { op.transportFailed = true; save(); } });
+        context.on("requestfinished", request => { const entry=readCloseRequestEntries.get(request);if(entry){entry.browserFinished=transportLifecycleSnapshot(lifecyclePhase);save();}const op = requestOperations.get(request); if (op) { op.transportFinished = true; save(); } });
+        context.on("requestfailed", request => { const entry=readCloseRequestEntries.get(request);if(entry){let failure='OTHER_FAILURE';try{const text=request.failure()?.errorText;if(text==='net::ERR_ABORTED')failure='ERR_ABORTED';else if(text==='net::ERR_FAILED')failure='ERR_FAILED';}catch{report.lifecycleIncomplete=true;}entry.browserFailed={...transportLifecycleSnapshot(lifecyclePhase),failure};save();}const op = requestOperations.get(request); if (op) { op.transportFailed = true; save(); } });
         await context.route("**/api/admin/**", async route => {
             if (readCloseOnly) return ciRoute(route); // Last-registered admin handler must not bypass the common refusal record.
             const request = route.request();
@@ -1028,9 +1091,11 @@ export async function runLive() {
         if (ciAccess && page) {
             markLifecycle('SIGNOUT');
             report.authenticationCleanup = await ciAccess.signOut(page);
+            if(readCloseOnly)report.sessionIdentity=ciAccess.sessionObservation();
             markLifecycle('SIGNOUT_FINISHED');
         }
         report.localClose = await closeIsolatedBrowser(context, browser, { browserLaunchAttempted, contextCreateAttempted }, markLifecycle);
+        if(readCloseOnly){report.pendingReadCloseRoutes=(report.readCloseRoutes||[]).filter(r=>r.pending).length;if(report.pendingReadCloseRoutes)ciTransportFailed=true;}
         markLifecycle('LOCAL_CLOSE_FINISHED');
         report.browserClose = report.localClose.allLocalClosed ? "CONFIRMED" : "UNVERIFIED";
         const closureComplete = report.browserClose === 'CONFIRMED' && !report.localClose.lifecycleObservationFailed && !report.lifecycleIncomplete;
