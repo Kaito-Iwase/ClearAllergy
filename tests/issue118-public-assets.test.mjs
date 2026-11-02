@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { assertPublicAssetPath, assetMode, loginAssetMode, inspectDeploymentAssets, inspectPublicCode,readLoginAssetDocument,sourceLockMatches } from '../scripts/check-issue118-public-assets.mjs';
+import { assertPublicAssetPath, assetMode, loginAssetMode, inspectDeploymentAssets, inspectPublicCode,readLoginAssetDocument,sourceLockMatches,observedCandidateAsset } from '../scripts/check-issue118-public-assets.mjs';
 import { initialHandshakeContract as contract } from '../scripts/issue118-initial-handshake-candidate.mjs';
 import { ciIdentity } from '../scripts/issue118-ci-auth.mjs';
 import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
@@ -77,6 +77,24 @@ test('locked SWC minified import and const aliases resolve by lexical binding; u
         `unknownFactory("${action}",x,y,"invalidateCacheAction")`]) {
         const r=inspectPublicCode(source);assert.deepEqual(r.actionReferences,[]);assert.equal(r.actionCandidates.length,1);assert.equal(r.actionCandidates[0].confirmed,false);
     }
+});
+test('bundled candidate provenance emits local shapes only and never confirms a module-like export',()=>{
+    const source=`globalThis.RUNTIME.push([123,e=>{function f(){};e.s(["createServerReference",()=>f]);},456,e=>{var t=e.i(123);const a=t;(0,a.createServerReference)("${action}",x,void 0,y,"invalidateCacheAction");}]);`;
+    const r=inspectPublicCode(source),p=r.actionCandidates[0].localProvenance;
+    assert.deepEqual(r.actionReferences,[]);assert.equal(r.actionCandidates[0].confirmed,false);
+    assert.deepEqual(p,{calleeShape:'PROPERTY',knownFactoryProperty:true,aliasHops:2,declarationKind:'VARIABLE',
+        initializerShape:'MEMBER_CALL',providerModuleId:123,sameChunkModuleShapes:1,sameChunkKnownExport:true});
+    for(const changed of [source.replace('e.i(123)','e.i(999)'),source.replace('e.s([','function nested(e){e.s([').replace('()=>f]);','()=>f]);}'),
+        source.replace('"createServerReference"','"'+secret+'"')]) {
+        const x=inspectPublicCode(changed);assert.equal(x.actionCandidates[0].localProvenance.sameChunkKnownExport,false);
+        assert.deepEqual(x.actionReferences,[]);assert.doesNotMatch(JSON.stringify(x),/SYNTHETIC/);
+    }
+});
+test('previously observed candidate bytes are pinned before static interpretation',async()=>{
+    let calls=0;const r=await inspectDeploymentAssets(env(),receipt(),async()=>{
+        calls++;return calls===1?issued():calls===2?response(`<script src="${observedCandidateAsset.path}"></script>`,'text/html'):response('/* different bytes */');
+    });
+    assert.equal(calls,3);assert.equal(r.completed,false);assert.equal(r.code,'APP_BODY_HELD');assert.equal(r.actionCandidates.length,0);stopped(r);
 });
 function loginTransportFixture(options={}) {
     const frame={},calls=[],rendered=[];let handler,contextClosed=false,browserClosed=false,bodyReads=0;

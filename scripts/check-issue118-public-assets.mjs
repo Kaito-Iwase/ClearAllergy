@@ -13,6 +13,8 @@ import { closeIsolatedBrowser } from './issue118-close-browser.mjs';
 export const assetMode = 'PUBLIC_ASSETS_ONLY';
 export const loginAssetMode = 'LOGIN_PUBLIC_ASSETS_ONLY';
 export const sourceLockSha256 = '2efea34912a5c27d59c1675fa2cd3c6600a445ba2bd920de2a937258cb0a015c';
+export const observedCandidateAsset = Object.freeze({path:'/_next/static/immutable/chunks/1yxbpkao8jjq-.js',
+    sha256:'22f889779049694ab8497801e8286d170f1101edbad60f9d61d06335458a50a7'});
 // Git stores LF while Windows checkouts can contain CRLF. Normalize only that
 // checkout transformation; whitespace/content changes still fail the source pin.
 export function sourceLockMatches(bytes) {
@@ -156,6 +158,53 @@ export function inspectPublicCode(text, html = false) {
             }
             return ts.isVariableDeclaration(d)&&!!d.initializer&&!!(d.parent.flags&ts.NodeFlags.Const)&&knownFactory(d.initializer,seen);
         };
+        // Observation only, never promotes a bundled call to an executable pin.
+        // Emit fixed shapes/numeric module IDs, not unknown identifier/string text.
+        const localProvenance = input => {
+            const out={calleeShape:'OTHER',knownFactoryProperty:false,aliasHops:0,declarationKind:'NONE',
+                initializerShape:'NONE',providerModuleId:null,sameChunkModuleShapes:0,sameChunkKnownExport:false};
+            let node=unwrap(input);const seen=new Set();
+            out.calleeShape=ts.isPropertyAccessExpression(node)?'PROPERTY':ts.isIdentifier(node)?'IDENTIFIER':'OTHER';
+            if(ts.isPropertyAccessExpression(node)) {out.knownFactoryProperty=node.name.text==='createServerReference';node=unwrap(node.expression);}
+            while(ts.isIdentifier(node)&&!seen.has(node)&&seen.size<5) {
+                seen.add(node);const ds=symbol(node)?.declarations||[];if(ds.length!==1)break;const d=ds[0];
+                out.declarationKind=ts.isVariableDeclaration(d)?'VARIABLE':ts.isParameter(d)?'PARAMETER':
+                    ts.isImportSpecifier(d)||ts.isNamespaceImport(d)?'IMPORT':'OTHER';
+                if(!ts.isVariableDeclaration(d)||!d.initializer)break;node=unwrap(d.initializer);out.aliasHops++;
+                if(ts.isIdentifier(node))continue;
+                if(ts.isCallExpression(node)) {
+                    const call=unwrap(node.expression);out.initializerShape=ts.isPropertyAccessExpression(call)?'MEMBER_CALL':
+                        ts.isIdentifier(call)?'IDENTIFIER_CALL':'OTHER_CALL';
+                    if(node.arguments.length===1&&ts.isNumericLiteral(node.arguments[0])) {
+                        const id=Number(node.arguments[0].text);
+                        if(Number.isSafeInteger(id)&&id>=0&&id<=2147483647)out.providerModuleId=id;
+                    }
+                }else out.initializerShape=ts.isPropertyAccessExpression(node)?'PROPERTY':'OTHER';
+                break;
+            }
+            if(out.providerModuleId!==null) {
+                const scan = current => {
+                    if(ts.isArrayLiteralExpression(current))for(let i=0;i<current.elements.length-1;i++) {
+                        const id=current.elements[i],fn=current.elements[i+1];
+                        if(!ts.isNumericLiteral(id)||Number(id.text)!==out.providerModuleId||
+                            (!ts.isArrowFunction(fn)&&!ts.isFunctionExpression(fn)))continue;
+                        out.sameChunkModuleShapes++;const parameter=fn.parameters[0]?.name;
+                        const contextSymbol=parameter&&ts.isIdentifier(parameter)?symbol(parameter):null;
+                        const exports = child => {
+                            if(contextSymbol&&ts.isCallExpression(child)&&ts.isPropertyAccessExpression(child.expression)&&
+                                child.expression.name.text==='s'&&symbol(child.expression.expression)===contextSymbol&&
+                                child.arguments.length===1&&ts.isArrayLiteralExpression(child.arguments[0])) {
+                                const es=child.arguments[0].elements;
+                                for(let n=0;n<es.length;n+=2)if(ts.isStringLiteral(es[n])&&es[n].text==='createServerReference')out.sameChunkKnownExport=true;
+                            }
+                            ts.forEachChild(child,exports);
+                        };exports(fn.body);
+                    }
+                    ts.forEachChild(current,scan);
+                };scan(ast);
+            }
+            return out;
+        };
         const visit = node => {
             if(ts.isStringLiteral(node)&&node.text.includes('static/')&&/\.js(?:[?#]|$)/.test(node.text))reference({value:node.text});
             if (ts.isCallExpression(node)) {
@@ -164,7 +213,8 @@ export function inspectPublicCode(text, html = false) {
                     const nameIndex=args.findIndex((a,i)=>i>0&&ts.isStringLiteral(a)&&a.text==='invalidateCacheAction');
                     if(nameIndex>=0) {
                         const factoryRecognized=knownFactory(node.expression),confirmed=factoryRecognized&&args.length===5&&nameIndex===4;
-                        const candidate={reference:args[0].text,argCount:args.length,nameArgumentIndex:nameIndex,factoryRecognized,confirmed};
+                        const candidate={reference:args[0].text,argCount:args.length,nameArgumentIndex:nameIndex,factoryRecognized,confirmed,
+                            localProvenance:localProvenance(node.expression)};
                         candidates.set(JSON.stringify(candidate),candidate);if(candidates.size>16)held();
                         if(confirmed)actions.add(args[0].text);
                     }
@@ -272,6 +322,7 @@ export async function inspectDeploymentAssets(env, receipt, fetcher = fetch, log
             result.stage = 'APP_BODY';
             const remainingBytes = maxTotalBytes - totalBytes; if (remainingBytes <= 0) held();
             const body = await readLimited(asset, Math.min(remainingBytes, path === documentPath ? 1024 * 1024 : 2 * 1024 * 1024));
+            if(path===observedCandidateAsset.path&&createHash('sha256').update(body.text).digest('hex')!==observedCandidateAsset.sha256)held();
             totalBytes += body.bytes; if (totalBytes > maxTotalBytes) held();
             const observation = inspectPublicCode(body.text, path === documentPath);
             result.publicAssets.push({ path, bytes: body.bytes, sha256: login&&path===documentPath?null:createHash('sha256').update(body.text).digest('hex'),
