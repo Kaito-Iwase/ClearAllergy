@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { assertPublicAssetPath, assetMode, inspectDeploymentAssets, inspectPublicCode } from '../scripts/check-issue118-public-assets.mjs';
+import { createRequire } from 'node:module';
+import { assertPublicAssetPath, assetMode, loginAssetMode, inspectDeploymentAssets, inspectPublicCode,readLoginAssetDocument } from '../scripts/check-issue118-public-assets.mjs';
+import { initialHandshakeContract as contract } from '../scripts/issue118-initial-handshake-candidate.mjs';
 import { ciIdentity } from '../scripts/issue118-ci-auth.mjs';
 import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
 const secret = 'SYNTHETIC_SECRET_NOT_REAL';
@@ -35,7 +37,7 @@ test('asset paths reject origin, traversal, encoding, query, fragments, arbitrar
         '/_next/server/server-reference-manifest.js','/_next/static/a.json','/_next/static/a.js.map']) assert.throws(() => assertPublicAssetPath(path));
 });
 test('extract only literal public chunk dependencies and exact named reference factory; do not execute code', () => {
-    const text = `"static/chunks/a.js";"/_next/static/chunks/a.js";"https://other.test/evil.js";` +
+    const text = `import* as r from "private-next-rsc-action-client-wrapper";"static/chunks/a.js";"/_next/static/chunks/a.js";"https://other.test/evil.js";` +
         `(0,r.createServerReference)("${action}",r.callServer,void 0,r.findSourceMapURL,"invalidateCacheAction");` +
         `"${'b'.repeat(42)}";"invalidateCacheAction";throw "${secret}";`;
     const r = inspectPublicCode(text); assert.deepEqual(r.paths, ['/_next/static/chunks/a.js']);
@@ -50,6 +52,94 @@ test('extract only literal public chunk dependencies and exact named reference f
     assert.deepEqual(inspectPublicCode('const x={scriptSrc:"/known/script.js",viewEndpoint:"/known/view"}').telemetryBindings,
         [{field:'scriptSrc',path:'/known/script.js'},{field:'viewEndpoint',path:'/known/view'}]);
 });
+test('locked SWC minified import and const aliases resolve by lexical binding; unresolved aliases stay candidates only',()=>{
+    // Shape produced by local Next16.4.1 SWC minify(module/compress/mangle=true)
+    // from synthetic code. This is not a deployed action ID or compiled bundle.
+    const compiled=`import{createServerReference as a,callServer as e,findSourceMapURL as t}from"private-next-rsc-action-client-wrapper";export const invalidateCacheAction=a("${action}",e,void 0,t,"invalidateCacheAction");`;
+    assert.deepEqual(inspectPublicCode(compiled).actionReferences,[action]);
+    assert.deepEqual(inspectPublicCode(`import* as ns from "private-next-rsc-action-client-wrapper";const alias=ns;alias.createServerReference("${action}",x,void 0,y,"invalidateCacheAction");`).actionReferences,[action]);
+    assert.deepEqual(inspectPublicCode(`import{createServerReference as a}from"private-next-rsc-action-client-wrapper";const b=a;const c=b;c("${action}",x,void 0,y,"invalidateCacheAction");`).actionReferences,[action]);
+    for(const source of [`function f(a){a("${action}",x,void 0,y,"invalidateCacheAction")}`,
+        `import{createServerReference as a}from"other-module";a("${action}",x,void 0,y,"invalidateCacheAction");`,
+        `import{createServerReference as a}from"private-next-rsc-action-client-wrapper";function f(a){a("${action}",x,void 0,y,"invalidateCacheAction")}`,
+        `import* as ns from "other-module";ns.createServerReference("${action}",x,void 0,y,"invalidateCacheAction");`,
+        `import* as ns from "private-next-rsc-action-client-wrapper";function f(ns){ns.createServerReference("${action}",x,void 0,y,"invalidateCacheAction")}`,
+        `obj.createServerReference("${action}",x,void 0,y,"invalidateCacheAction");`,
+        `createServerReference("${action}",x,void 0,y,"invalidateCacheAction");`,
+        `unknownFactory("${action}",x,y,"invalidateCacheAction")`]) {
+        const r=inspectPublicCode(source);assert.deepEqual(r.actionReferences,[]);assert.equal(r.actionCandidates.length,1);assert.equal(r.actionCandidates[0].confirmed,false);
+    }
+});
+function loginTransportFixture(options={}) {
+    const frame={},calls=[],rendered=[];let handler,contextClosed=false,browserClosed=false,bodyReads=0;
+    const outbound=new URL(contract.clerkOrigin+contract.clerkPath);
+    for(const [k,v] of Object.entries({redirect_url:contract.appLogin,__clerk_api_version:contract.apiVersion,suffixed_cookies:'true',__clerk_hs_reason:contract.reason,format:contract.format}))outbound.searchParams.set(k,v);
+    const replies=[{status:307,location:outbound.href},{status:307,location:contract.appLogin+'?__clerk_handshake=synthetic.payload.signature'},
+        {status:307,location:'/admin/login'},{status:200}];
+    const context={request:{fetch:async(url,settings)=>{
+        calls.push({url,settings});assert.equal(settings.method,'GET');assert.equal(settings.maxRedirects,0);assert.equal(settings.maxRetries,0);
+        if(new URL(url).origin===contract.clerkOrigin)assert.equal(settings.headers['x-vercel-trusted-oidc-idp-token'],undefined);
+        else assert.ok(settings.headers['x-vercel-trusted-oidc-idp-token']);
+        assert.equal(settings.headers.Cookie,undefined);assert.equal(settings.headers.Authorization,undefined);
+        if(options.failAt===calls.length)throw Error(secret);const reply=replies[calls.length-1];assert.ok(reply);
+        return {status:()=>reply.status,headers:()=>reply.location?{location:reply.location}:{'content-type':options.mime||'text/html'},
+            body:async()=>{bodyReads++;return Buffer.from(options.oversize?'x'.repeat(1024*1024+1):identityHtml+'<script>throw "'+secret+'"</script>');}};
+    }},newPage:async()=>page,close:async()=>{contextClosed=true;if(options.contextCloseFails)throw Error(secret);},
+        cookies:()=>assert.fail('No cookie inspection'),storageState:()=>assert.fail('No state export')};
+    const page={context:()=>context,mainFrame:()=>frame,route:async(pattern,cb)=>{assert.equal(pattern,'**/*');handler=cb;},
+        goto:async(url)=>{assert.equal(url,contract.appLogin);const request={url:()=>url,method:()=> 'GET',resourceType:()=> 'document',isNavigationRequest:()=>true,frame:()=>frame};
+            await handler({request:()=>request,fulfill:async payload=>{rendered.push(payload);},abort:async()=>{}});
+            if(options.extraRequest)await handler({abort:()=>{if(options.extraAbortFails)throw Error(secret);return Promise.resolve();}});
+        }};
+    const browser={newContext:async config=>{assert.deepEqual(config,{acceptDownloads:false,serviceWorkers:'block'});return context;},close:async()=>{browserClosed=true;}};
+    return {calls,rendered,browserFactory:async()=>browser,get contextClosed(){return contextClosed;},get browserClosed(){return browserClosed;},get bodyReads(){return bodyReads;}};
+}
+test('login assets reuse bounded handshake with empty plaintext fulfillment; no remote script or auth executes',async()=>{
+    const f=loginTransportFixture(),r=await readLoginAssetDocument(()=>jwt(claims()),f.browserFactory);
+    assert.equal(r.diagnostics.held,false);assert.equal(r.diagnostics.handshake.requests,4);assert.equal(f.calls.length,4);
+    assert.equal(r.diagnostics.allLocalClosed,true);assert.equal(f.contextClosed,true);assert.equal(f.browserClosed,true);
+    assert.equal(f.rendered.length,1);assert.equal(f.rendered[0].body,'');assert.match(f.rendered[0].headers['content-type'],/^text\/plain/);
+    assert.equal(f.rendered[0].headers['content-security-policy'],"default-src 'none'; script-src 'none'; connect-src 'none'");
+    assert.equal(r.diagnostics.clerkAuthenticationStarted,false);assert.equal(r.diagnostics.sessionStarted,false);
+    assert.doesNotMatch(JSON.stringify(r.diagnostics),/SYNTHETIC|synthetic.payload|https:/);
+});
+test('real isolated renderer receives empty plaintext, never the inspected HTML or a remote script',
+    {skip:!process.env.PLAYWRIGHT_MODULE_PATH},async()=>{
+    const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH);
+    const realBrowser=await chromium.launch({headless:true,channel:'chromium'});
+    let rendered,actualContext,actualPage;
+    try {
+        const f=loginTransportFixture();
+        const syntheticBrowser=await f.browserFactory(),syntheticContext=await syntheticBrowser.newContext({acceptDownloads:false,serviceWorkers:'block'});
+        const r=await readLoginAssetDocument(()=>jwt(claims()),async()=>({newContext:async config=>{
+            actualContext=await realBrowser.newContext(config);actualPage=await actualContext.newPage();
+            const wrapper={request:syntheticContext.request,newPage:async()=>({context:()=>wrapper,mainFrame:()=>actualPage.mainFrame(),
+                route:(...args)=>actualPage.route(...args),goto:(...args)=>actualPage.goto(...args)}),close:async()=>{
+                rendered=await actualPage.evaluate(()=>({text:document.body.innerText,scripts:document.scripts.length,
+                    sentinelExecuted:globalThis.__issue118AssetSentinel===true}));await actualContext.close();
+            }};return wrapper;
+        },close:()=>realBrowser.close()}));
+        assert.equal(r.diagnostics.held,false);assert.equal(r.diagnostics.allLocalClosed,true);assert.equal(f.calls.length,4);
+        assert.deepEqual(rendered,{text:'',scripts:0,sentinelExecuted:false});
+    }finally{await realBrowser.close();}
+});
+test('handshake/closure/extra-route/type/oversize failures remain held and never return a document',async()=>{
+    for(const options of [{failAt:2},{contextCloseFails:true},{extraRequest:true},{extraRequest:true,extraAbortFails:true},{mime:'application/json'},{oversize:true}]) {
+        const f=loginTransportFixture(options),r=await readLoginAssetDocument(()=>jwt(claims()),f.browserFactory);
+        assert.equal(r.diagnostics.held,true);assert.equal(r.response,null);assert.equal(f.browserClosed,true);assert.equal(f.contextClosed,true);
+        assert.doesNotMatch(JSON.stringify(r.diagnostics),/SYNTHETIC|synthetic.payload|https:/);
+        if(options.mime)assert.equal(f.bodyReads,0);
+    }
+});
+test('login graph starts only through guarded reader, omits HTML hash and never invokes backend auth',async()=>{
+    let calls=0,readerCalls=0;const r=await inspectDeploymentAssets({...env(),ISSUE118_DIAGNOSTIC_MODE:loginAssetMode},receipt(),async(url)=>{
+        calls++;if(calls===1)return issued();assert.equal(url,target.origin+'/_next/static/chunks/a.js');return response('/* static only */');
+    },async supplier=>{readerCalls++;assert.ok(supplier());return {diagnostics:{held:false,allLocalClosed:true,handshake:{requests:4,handshakeUsed:true}},
+        response:response('<script src="/_next/static/chunks/a.js"></script>','text/html')};});
+    assert.equal(r.completed,true);assert.equal(readerCalls,1);assert.equal(calls,2);assert.equal(r.appGetCount,4);assert.equal(r.clerkHandshakeGetCount,1);
+    assert.equal(r.publicAssets[0].path,'/admin/login');assert.equal(r.publicAssets[0].sha256,null);
+    assert.equal(r.clerkAuthenticationStarted,false);assert.equal(r.sessionStarted,false);assert.equal(r.fixtureWriteStarted,false);
+});
 test('one OIDC request then fixed app GET graph only, deduplicated and no cookies or redirects', async () => {
     const calls = []; const r = await inspectDeploymentAssets(env(), receipt(), async (url, options) => {
         calls.push({ url, options }); if (calls.length === 1) return issued();
@@ -58,7 +148,7 @@ test('one OIDC request then fixed app GET graph only, deduplicated and no cookie
         assert.ok(options.headers['x-vercel-trusted-oidc-idp-token']);
         if (url === target.origin + '/') return response('<script src="/_next/static/chunks/a.js"></script>', 'text/html');
         assert.equal(url, target.origin + '/_next/static/chunks/a.js');
-        return response(`"static/chunks/a.js";(0,r.createServerReference)("${action}",r.callServer,void 0,r.findSourceMapURL,"invalidateCacheAction");`);
+        return response(`import* as r from "private-next-rsc-action-client-wrapper";"static/chunks/a.js";(0,r.createServerReference)("${action}",r.callServer,void 0,r.findSourceMapURL,"invalidateCacheAction");`);
     });
     assert.equal(calls.length, 3); assert.equal(r.appGetCount, 2); assert.equal(r.completed, true);
     assert.equal(r.code, 'PUBLIC_ACTION_REFERENCE_OBSERVED'); assert.equal(r.publicAssets.length, 2);
