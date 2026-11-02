@@ -583,20 +583,30 @@ export const verifiedReadCloseAction = Object.freeze({
 // Dedicated read-close only; the mutation-bearing T1 entry does not use this policy.
 // Provenance: caller41895 -> getters95187 -> CJS35326 ->21413 -> React64893;
 // callServer95187 ->32120 -> Next48658. No environment/CLI action-ID override.
-export function createVerifiedReadCloseAuthPolicyCandidate(receipt) {
+export function assertReadCloseSignoutReady(report) {
+    const reads=report.readOnlyApiRequests,session=report.sessionIdentity;
+    assert.equal(report.flow,'PASS_READ_ONLY_FIXTURE');
+    assert.ok(!report.writes?.held&&report.writes?.operations?.length===0);
+    assert.ok(Array.isArray(reads)&&reads.length===2&&new Set(reads.map(r=>r.kind)).size===2&&
+        reads.every(r=>['SHOP','FIXTURE'].includes(r.kind)&&r.status===200&&r.responseObserved===true));
+    assert.ok(session?.ownerId===ciIdentity.ownerId&&session.ownerVerified===true&&session.eligibleForCleanup===true&&
+        /^sess_[A-Za-z0-9]{1,128}$/.test(session.id||'')&&Number.isFinite(Date.parse(session.providerCreatedUtc)));
+    assert.equal(report.authenticationProgress?.activationAcknowledged,true);
+}
+export function createVerifiedReadCloseAuthPolicyCandidate(receipt,assertSignoutReady=()=>{throw Error('SIGNOUT_CONTEXT_UNVERIFIED');}) {
     const fixedReceipt=structuredClone(receipt);assertIdentityReceipt(fixedReceipt);
     assert.equal(target.source,verifiedReadCloseAction.source);assert.equal(target.deployment,verifiedReadCloseAction.deployment);
     return createReadCloseAuthPolicyCandidate({actionReference:verifiedReadCloseAction.reference,
-        telemetryScripts:['/_vercel/insights/script.js'],assertContext:()=>assertIdentityReceipt(fixedReceipt)});
+        telemetryScripts:['/_vercel/insights/script.js'],assertContext:()=>assertIdentityReceipt(fixedReceipt),assertSignoutReady});
 }
-const readClosePredicateNames = ['isApp', 'isPost', 'authPhase', 'exactLoginTarget', 'exactShopTarget', 'authAuditApi', 'menuApi',
+const readClosePredicateNames = ['isApp', 'isPost', 'authPhase', 'signoutPhase', 'signoutReady', 'exactLoginTarget', 'exactShopTarget', 'authAuditApi', 'menuApi',
     'queryPresent', 'legacyTelemetryShape', 'pinnedTelemetry', 'headersRead', 'nextActionPresent',
-    'nextActionPinned', 'originMatches', 'refererMatches', 'plainTextUtf8', 'acceptsRsc', 'bodyInspected',
-    'emptyArguments', 'actionUnused', 'inspectionComplete','pinnedTelemetryScript','isScript'];
+    'nextActionPinned', 'originMatches', 'refererMatches', 'refererShopMatches', 'plainTextUtf8', 'acceptsRsc', 'bodyInspected',
+    'emptyArguments', 'actionUnused', 'signoutActionUnused', 'inspectionComplete','pinnedTelemetryScript','isScript'];
 export function recordReadClosePolicy(report,entry,predicates,decision,phase) {
     const safe={sequence:entry?.sequence??null,...transportLifecycleSnapshot(phase),
         predicates:Object.fromEntries(readClosePredicateNames.map(k=>[k,predicates?.[k]===true])),
-        decision:['REFUSE','USE_EXISTING_TRANSPORT','ALLOW_PINNED_AUTH_CACHE_ACTION','SUPPRESS_PINNED_TELEMETRY_SCRIPT','SUPPRESS_PINNED_TELEMETRY'].includes(decision)?decision:'REFUSE'};
+        decision:['REFUSE','USE_EXISTING_TRANSPORT','ALLOW_PINNED_AUTH_CACHE_ACTION','ALLOW_PINNED_SIGNOUT_CACHE_ACTION','SUPPRESS_PINNED_TELEMETRY_SCRIPT','SUPPRESS_PINNED_TELEMETRY'].includes(decision)?decision:'REFUSE'};
     if(entry)entry.policy=safe;
     const events=report.readClosePolicyObservations??=[];
     if(events.length<128)events.push(safe);else report.readClosePolicyObservationsTruncated=true;
@@ -612,12 +622,12 @@ export function recordReadCloseHandlerFailure(report,entry,phase,error) {
     report.firstRouteHandlerFailure??={sequence:entry?.sequence??null,started:entry?.started,
         observed:transportLifecycleSnapshot(phase),code,request:entry};
 }
-export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryPaths = [],telemetryScripts=[],assertContext=()=>{} } = {}) {
+export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryPaths = [],telemetryScripts=[],assertContext=()=>{},assertSignoutReady } = {}) {
     const actionPinned = typeof actionReference === 'string' && /^[a-f0-9]{40,128}$/.test(actionReference);
     const telemetry = new Set((Array.isArray(telemetryPaths) ? telemetryPaths : []).filter(path => typeof path === 'string' &&
         /^\/(?:_vercel\/insights|[A-Za-z0-9_-]{8,64})\/(?:view|event)$/.test(path)));
     const scripts=new Set((Array.isArray(telemetryScripts)?telemetryScripts:[]).filter(path=>path==='/_vercel/insights/script.js'));
-    let actionUsed = false;const approvedRequests=new WeakSet(),sentRequests=new WeakSet();
+    let actionUsed = false,signoutActionUsed=false;const approvedRequests=new WeakMap(),sentRequests=new WeakSet();
     const policy=async (request, getPhase) => {
         const observation = Object.fromEntries(readClosePredicateNames.map(name => [name, false]));
         const result = { decision: 'REFUSE', observation };
@@ -626,6 +636,7 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             const raw = request.url(), url = new URL(raw), method = request.method();
             observation.isApp = url.origin === target.origin;
             observation.isPost = method === 'POST'; observation.authPhase = getPhase() === 'AUTHENTICATION';
+            observation.signoutPhase=getPhase()==='SIGNOUT';
             observation.queryPresent = !!url.search || raw.includes('?');
             observation.exactLoginTarget = raw === target.origin + '/admin/login';
             observation.exactShopTarget = raw === target.origin + '/admin/shop';
@@ -664,15 +675,23 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             observation.nextActionPinned = actionPinned && action === actionReference;
             observation.originMatches = header('origin') === target.origin;
             observation.refererMatches = header('referer') === target.origin + '/admin/login';
+            observation.refererShopMatches = header('referer') === target.origin + '/admin/shop';
             observation.plainTextUtf8 = typeof contentType === 'string' && contentType.toLowerCase().replaceAll(' ', '') === 'text/plain;charset=utf-8';
             observation.acceptsRsc = header('accept') === 'text/x-component';
             const body = request.postData(); observation.bodyInspected = true; observation.emptyArguments = body === '[]';
             observation.actionUnused = !actionUsed; observation.authPhase = getPhase() === 'AUTHENTICATION';
+            observation.signoutActionUnused=!signoutActionUsed;observation.signoutPhase=getPhase()==='SIGNOUT';
             assertContext();
             observation.inspectionComplete = true;
             if (observation.exactLoginTarget && observation.nextActionPresent && observation.originMatches && observation.refererMatches &&
                 observation.plainTextUtf8 && observation.acceptsRsc && observation.nextActionPinned && observation.emptyArguments && observation.actionUnused && observation.authPhase) {
-                actionUsed = true;approvedRequests.add(request);result.decision = 'ALLOW_PINNED_AUTH_CACHE_ACTION';
+                actionUsed = true;approvedRequests.set(request,{phase:'AUTHENTICATION',url:target.origin+'/admin/login'});result.decision = 'ALLOW_PINNED_AUTH_CACHE_ACTION';
+            }else if(observation.signoutPhase&&observation.exactShopTarget&&observation.nextActionPinned&&observation.originMatches&&
+                observation.refererShopMatches&&observation.plainTextUtf8&&observation.acceptsRsc&&observation.emptyArguments&&
+                actionUsed&&observation.signoutActionUnused&&typeof assertSignoutReady==='function'){
+                assertSignoutReady();observation.signoutReady=true;
+                if(getPhase()!=='SIGNOUT')return result;
+                signoutActionUsed=true;approvedRequests.set(request,{phase:'SIGNOUT',url:target.origin+'/admin/shop'});result.decision='ALLOW_PINNED_SIGNOUT_CACHE_ACTION';
             }
         } catch { /* Unknown inputs/provider failures are REFUSE; no values or raw exceptions escape. */ }
         return result;
@@ -682,7 +701,9 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
     policy.assertBeforeSend=(request,getPhase)=>{
         assertContext();
         if(approvedRequests.has(request)) {
-            if(sentRequests.has(request)||request.method()!=='POST'||getPhase()!=='AUTHENTICATION'||request.url()!==target.origin+'/admin/login'||request.postData()!=='[]')
+            const grant=approvedRequests.get(request);
+            if(grant.phase==='SIGNOUT')assertSignoutReady();
+            if(sentRequests.has(request)||request.method()!=='POST'||getPhase()!==grant.phase||request.url()!==grant.url||request.postData()!=='[]')
                 throw Error('READ_CLOSE_PRE_SEND_REFUSED');
             sentRequests.add(request);
         }else if(request.method()!=='GET'||!readCloseRequestAllowed('GET',request.url()))throw Error('READ_CLOSE_PRE_SEND_REFUSED');
@@ -706,7 +727,7 @@ export async function guardReadCloseRoute(route, onAppRefused, onOtherBlocked, c
         try {
             const inspected=await candidate.policy(request,candidate.getPhase);
             candidate.observe?.(inspected.observation,inspected.decision);
-            if(inspected.decision==='ALLOW_PINNED_AUTH_CACHE_ACTION'||inspected.decision==='USE_EXISTING_TRANSPORT')return true;
+            if(inspected.decision==='ALLOW_PINNED_AUTH_CACHE_ACTION'||inspected.decision==='ALLOW_PINNED_SIGNOUT_CACHE_ACTION'||inspected.decision==='USE_EXISTING_TRANSPORT')return true;
             if(inspected.decision==='SUPPRESS_PINNED_TELEMETRY_SCRIPT') {
                 await route.fulfill({status:200,contentType:'application/javascript',body:''});return false;
             }
@@ -843,7 +864,7 @@ export async function runLive() {
     let activeOperation;
     let ciAccess;
     let ciTransportFailed = false;
-    const readClosePolicy = readCloseOnly ? createVerifiedReadCloseAuthPolicyCandidate(identityReceipt) : undefined;
+    const readClosePolicy = readCloseOnly ? createVerifiedReadCloseAuthPolicyCandidate(identityReceipt,()=>assertReadCloseSignoutReady(report)) : undefined;
     let lifecyclePhase = 'SETUP', routeSequence = 0;
     const markLifecycle = code => {
         lifecyclePhase = code;

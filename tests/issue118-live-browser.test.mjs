@@ -9,7 +9,7 @@ import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityRe
     transportLifecycleSnapshot, recordTransportDiagnostic, readCloseRequestAllowed, observeReadCloseFixture,
     readCloseFixtureId, readCloseResult, guardReadCloseRoute, createReadCloseAuthPolicyCandidate,
     readCloseDirectFetch,createVerifiedReadCloseAuthPolicyCandidate,verifiedReadCloseAction,
-    readCloseRequestObservation,observeReadCloseRoute,recordReadClosePolicy,recordReadCloseHandlerFailure } from "../scripts/check-issue118-live-t1-browser.mjs";
+    readCloseRequestObservation,observeReadCloseRoute,recordReadClosePolicy,recordReadCloseHandlerFailure,assertReadCloseSignoutReady } from "../scripts/check-issue118-live-t1-browser.mjs";
 import { closeIsolatedBrowser } from "../scripts/issue118-close-browser.mjs";
 import { routePreviewRequest } from "../scripts/issue118-preview-transport.mjs";
 import {ciIdentity} from '../scripts/issue118-ci-auth.mjs';
@@ -124,8 +124,40 @@ test('fixed public reference checks receipt and is wired only to the read-close 
         assert.equal((await policy({...script,...change},()=> 'APP_FLOW')).decision,'REFUSE');
     assert.equal((await policy({...make(target.origin+'/_vercel/insights/view')},()=> 'APP_FLOW')).decision,'REFUSE');
     const source=readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs',import.meta.url),'utf8');
-    assert.match(source,/readCloseOnly \? createVerifiedReadCloseAuthPolicyCandidate\(identityReceipt\) : undefined/);
+    assert.match(source,/readCloseOnly \? createVerifiedReadCloseAuthPolicyCandidate\(identityReceipt,\(\)=>assertReadCloseSignoutReady\(report\)\) : undefined/);
     assert.equal((source.match(/createVerifiedReadCloseAuthPolicyCandidate\(/g)||[]).length,2); // definition and one read-close caller
+});
+
+test('observed SIGNOUT cache action requires completed fixed reads, exact shop referer, owner session and a separate single claim',async()=>{
+    const evidence=()=>({...readCloseEvidence(),flow:'PASS_READ_ONLY_FIXTURE',writes:{held:false,operations:[]},
+        authenticationProgress:{activationAcknowledged:true},sessionIdentity:{...readCloseEvidence().sessionIdentity,eligibleForCleanup:true}});
+    const make=(phase='AUTHENTICATION',changes={})=>({url:()=>target.origin+(phase==='SIGNOUT'?'/admin/shop':'/admin/login'),method:()=> 'POST',
+        allHeaders:async()=>({'next-action':verifiedReadCloseAction.reference,origin:target.origin,referer:target.origin+(phase==='SIGNOUT'?'/admin/shop':'/admin/login'),
+            'content-type':'text/plain;charset=UTF-8',accept:'text/x-component'}),postData:()=> '[]',...changes});
+    let report=evidence();const fresh=()=>createReadCloseAuthPolicyCandidate({actionReference:verifiedReadCloseAction.reference,assertSignoutReady:()=>assertReadCloseSignoutReady(report)});
+    const policy=fresh();assert.equal((await policy(make('SIGNOUT'),()=> 'SIGNOUT')).decision,'REFUSE');
+    const activate=make();assert.equal((await policy(activate,()=> 'AUTHENTICATION')).decision,'ALLOW_PINNED_AUTH_CACHE_ACTION');policy.assertBeforeSend(activate,()=> 'AUTHENTICATION');
+    const signout=make('SIGNOUT');const allowed=await policy(signout,()=> 'SIGNOUT');
+    assert.equal(allowed.decision,'ALLOW_PINNED_SIGNOUT_CACHE_ACTION');assert.equal(allowed.observation.refererShopMatches,true);
+    policy.assertBeforeSend(signout,()=> 'SIGNOUT');assert.throws(()=>policy.assertBeforeSend(signout,()=> 'SIGNOUT'));
+    assert.equal((await policy(make('SIGNOUT'),()=> 'SIGNOUT')).decision,'REFUSE');
+    for(const mutate of [r=>{r.flow='FAIL';},r=>{r.writes.held=true;},r=>{r.writes.operations.push({});},
+        r=>{r.readOnlyApiRequests.pop();},r=>{r.readOnlyApiRequests[1].kind='SHOP';},r=>{r.readOnlyApiRequests[1].status=500;},
+        r=>{r.sessionIdentity.ownerId='other';},r=>{r.sessionIdentity.ownerVerified=false;},r=>{r.sessionIdentity.eligibleForCleanup=false;},
+        r=>{r.sessionIdentity.providerCreatedUtc='invalid';},r=>{r.authenticationProgress.activationAcknowledged=false;}]){
+        report=evidence();mutate(report);const p=fresh();await p(make(),()=> 'AUTHENTICATION');assert.equal((await p(make('SIGNOUT'),()=> 'SIGNOUT')).decision,'REFUSE');
+    }
+    report=evidence();
+    for(const changes of [{url:()=>target.origin+'/admin/login'},{url:()=>target.origin+'/admin/shop?x'},
+        {url:()=>target.origin+'/api/admin/auth/login'},{url:()=>target.origin+'/api/admin/menus'},
+        {postData:()=> '["SYNTHETIC_SECRET"]'},
+        {allHeaders:async()=>({...await make('SIGNOUT').allHeaders(),referer:target.origin+'/admin/login'})},
+        {allHeaders:async()=>({...await make('SIGNOUT').allHeaders(),'next-action':'f'.repeat(40)})}]){
+        const p=fresh();await p(make(),()=> 'AUTHENTICATION');const result=await p(make('SIGNOUT',changes),()=> 'SIGNOUT');
+        assert.equal(result.decision,'REFUSE');assert.doesNotMatch(JSON.stringify(result),/SYNTHETIC_SECRET/);
+    }
+    const p=fresh();await p(make(),()=> 'AUTHENTICATION');const req=make('SIGNOUT');await p(req,()=> 'SIGNOUT');
+    report.sessionIdentity.ownerVerified=false;assert.throws(()=>p.assertBeforeSend(req,()=> 'SIGNOUT'));
 });
 
 test('candidate identity changes and unknown policy/observer errors never fall back to forwarding',async()=>{
@@ -141,7 +173,7 @@ test('candidate identity changes and unknown policy/observer errors never fall b
     assert.equal(aborted,2);assert.equal(refused,2);
 });
 
-test('real browser transport runs the installed Clerk activation/read/signout hooks with one pinned POST and no signout POST',async()=>{
+test('real browser transport runs fixed Clerk hooks for both next-version branches with phase-specific pinned action claims',async()=>{
     const require=createRequire(import.meta.url),ts=require('typescript');
     const provider=readFileSync(new URL('../node_modules/@clerk/nextjs/dist/esm/app-router/client/ClerkProvider.js',import.meta.url),'utf8');
     assert.equal(createHash('sha256').update(provider).digest('hex'),'a129f276e9ef2490ca228397f14a16e55bdb43d34939b7eb5d535946683b6f67');
@@ -152,10 +184,12 @@ test('real browser transport runs the installed Clerk activation/read/signout ho
     const rsc=require('next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.production.js');
     const body=await rsc.encodeReply([]);assert.equal(body,'[]');
     const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright'),browser=await chromium.launch({headless:true,channel:'chromium'});
+    try{for(const nextVersion of ['16.4.1','']){
     const context=await browser.newContext({serviceWorkers:'block'});
     let phase='AUTHENTICATION',forwards=[],refused=0,suppressed=0;
     const receipt={...target,environment:'Preview',status:'Ready',verifiedBy:'human',observedUtc:new Date().toISOString(),evidenceReference:'Synthetic offline browser control'};
-    const policy=createVerifiedReadCloseAuthPolicyCandidate(receipt);
+    let readsComplete=false;
+    const policy=createVerifiedReadCloseAuthPolicyCandidate(receipt,()=>{assert.equal(readsComplete,true);});
     await context.route('**/*',async route=>{
         try {
             if(!await guardReadCloseRoute(route,()=>{refused++;},()=>{}, {policy,getPhase:()=>phase})) {suppressed++;return;}
@@ -163,17 +197,17 @@ test('real browser transport runs the installed Clerk activation/read/signout ho
             if(url.origin!==target.origin) {
                 await route.fulfill({status:200,headers:{'access-control-allow-origin':target.origin,'access-control-allow-methods':'DELETE, OPTIONS'},body:'{}'});return;
             }
-            if(request.method()==='POST') {assert.equal(request.postData(),body);await route.fulfill({status:200,contentType:'text/x-component',body:'0:null\n'});return;}
+            if(request.method()==='POST') {policy.assertBeforeSend(request,()=>phase);assert.equal(request.postData(),body);await route.fulfill({status:200,contentType:'text/x-component',body:'0:null\n'});return;}
             await route.fulfill({status:200,contentType:url.pathname.startsWith('/api/')?'application/json':'text/html',
                 body:url.pathname.startsWith('/api/')?'{}':'<link rel="icon" href="data:,">offline hook fixture'});
         }catch { /* Fixed refusal is counted; never forward after a policy error. */ }
     });
     try {
         const page=await context.newPage();await page.goto(target.origin+'/admin/login');
-        await page.addScriptTag({content:`window.next={version:'16.4.1'};const __internal_invokeMiddlewareOnAuthStateChange=true;
+        await page.addScriptTag({content:`window.next={version:${JSON.stringify(nextVersion)}};const __internal_invokeMiddlewareOnAuthStateChange=true;
             window.__fixtureRefreshes=[];
             const router={refresh:()=>{window.__fixtureRefreshes.push(fetch(location.href).then(r=>{if(!r.ok)throw Error('REFRESH_FAILED');}));}};
-            const invalidateCacheAction=()=>fetch('/admin/login',{method:'POST',headers:{'next-action':${JSON.stringify(verifiedReadCloseAction.reference)},accept:'text/x-component'},body:${JSON.stringify(body)}}).then(r=>{if(!r.ok)throw Error('ACTION_FAILED');});
+            const invalidateCacheAction=()=>fetch(location.pathname,{method:'POST',headers:{'next-action':${JSON.stringify(verifiedReadCloseAction.reference)},accept:'text/x-component'},body:${JSON.stringify(body)}}).then(r=>{if(!r.ok)throw Error('ACTION_FAILED');});
             ${hooks.__internal_onBeforeSetActive};${hooks.__internal_onAfterSetActive};`});
         await page.evaluate(async()=>{let timer;try{await Promise.race([
             (async()=>{await window.__internal_onBeforeSetActive('sign-in');if(window.__internal_onAfterSetActive()!==undefined)throw Error('REFRESH_MUST_BE_VOID');await Promise.all(window.__fixtureRefreshes);})(),
@@ -182,7 +216,7 @@ test('real browser transport runs the installed Clerk activation/read/signout ho
         phase='APP_FLOW';await page.evaluate(()=>history.pushState({},'', '/admin/shop'));
         await page.evaluate(async id=>{for(const path of ['/api/admin/shop','/api/admin/menus/'+id]){const r=await fetch(path);if(!r.ok)throw Error('READ_FAILED');}},readCloseFixtureId);
         await page.addScriptTag({url:target.origin+'/_vercel/insights/script.js'});
-        phase='SIGNOUT';await page.evaluate(async()=>{
+        readsComplete=true;phase='SIGNOUT';await page.evaluate(async()=>{
             await window.__internal_onBeforeSetActive('sign-out');
             await fetch('https://one-dolphin-7936.clerk.accounts.dev/v1/client/sessions/synthetic/revoke',{method:'DELETE'});
             if(window.__internal_onAfterSetActive()!==undefined)throw Error('REFRESH_MUST_BE_VOID');
@@ -191,7 +225,8 @@ test('real browser transport runs the installed Clerk activation/read/signout ho
         await page.evaluate(()=>Promise.all(window.__fixtureRefreshes));
         assert.equal(await page.evaluate(()=>window.__fixtureRefreshes.length),2);
         assert.equal(refused,0);assert.equal(suppressed,1);
-        assert.deepEqual(forwards.filter(x=>x.method==='POST'),[{phase:'AUTHENTICATION',method:'POST',path:'/admin/login'}]);
+        assert.deepEqual(forwards.filter(x=>x.method==='POST'),[{phase:'AUTHENTICATION',method:'POST',path:'/admin/login'},
+            ...(nextVersion?[]:[{phase:'SIGNOUT',method:'POST',path:'/admin/shop'}])]);
         assert.equal(forwards.filter(x=>x.phase==='APP_FLOW'&&x.path.startsWith('/api/')).length,2);
         assert.ok(forwards.some(x=>x.phase==='SIGNOUT'&&x.method==='DELETE'));
         assert.ok(forwards.some(x=>x.phase==='SIGNOUT'&&x.method==='GET'&&x.path==='/admin/shop'));
@@ -199,7 +234,8 @@ test('real browser transport runs the installed Clerk activation/read/signout ho
         for(const path of ['/api/admin/menus','/api/admin/auth/login','/admin/login'])
             assert.equal(await page.evaluate(async path=>{try{await fetch(path,{method:'POST',body:'[]'});return true;}catch{return false;}},path),false);
         assert.equal(forwards.length,before);assert.equal(refused,3);
-    }finally{await context.close();await browser.close();}
+    }finally{await context.close();}
+    }}finally{await browser.close();}
 });
 
 test('unwired auth POST candidate needs exact pinned action, clean target, empty args and live auth phase; permits one call only', async () => {
