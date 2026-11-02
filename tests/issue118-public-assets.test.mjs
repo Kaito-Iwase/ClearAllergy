@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { assertPublicAssetPath, assetMode, loginAssetMode, inspectDeploymentAssets, inspectPublicCode,readLoginAssetDocument } from '../scripts/check-issue118-public-assets.mjs';
+import { assertPublicAssetPath, assetMode, loginAssetMode, inspectDeploymentAssets, inspectPublicCode,readLoginAssetDocument,sourceLockMatches } from '../scripts/check-issue118-public-assets.mjs';
 import { initialHandshakeContract as contract } from '../scripts/issue118-initial-handshake-candidate.mjs';
 import { ciIdentity } from '../scripts/issue118-ci-auth.mjs';
 import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
@@ -24,6 +24,14 @@ const issued = data => ({ ok: true, json: async () => ({ value: jwt(data || clai
 const identityHtml='<title>ClearAllergy</title><link rel="icon" href="/images/clearallergy-mark-small.svg">';
 const response = (text, type = 'application/javascript', status = 200) => new Response((type==='text/html'?identityHtml:'')+text, { status, headers: { 'content-type': type } });
 const action = '00' + 'a'.repeat(40);
+test('source lock accepts Git LF and checkout CRLF only; content and malformed UTF8 fail',()=>{
+    const lf=readFileSync(new URL('../package-lock.json',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+    assert.equal(sourceLockMatches(Buffer.from(lf)),true);
+    assert.equal(sourceLockMatches(Buffer.from(lf.replace(/\n/g,'\r\n'))),true);
+    for(const changed of [lf+' ','\uFEFF'+lf,lf.replace('lockfileVersion','changedVersion'),lf.replace(/\n/,'\r')])
+        assert.equal(sourceLockMatches(Buffer.from(changed)),false);
+    assert.throws(()=>sourceLockMatches(Buffer.from([0xff])));
+});
 function stopped(r) {
     for (const key of ['redirectFollowed','clerkStarted','sessionStarted','browserStarted','fixtureWriteStarted','responseBodiesRetained']) assert.equal(r[key], false);
     assert.doesNotMatch(JSON.stringify(r), /SYNTHETIC|Authorization|bearer|sk_test_|Cookie/);

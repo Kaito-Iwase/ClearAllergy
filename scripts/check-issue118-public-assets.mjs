@@ -12,7 +12,13 @@ import { closeIsolatedBrowser } from './issue118-close-browser.mjs';
 
 export const assetMode = 'PUBLIC_ASSETS_ONLY';
 export const loginAssetMode = 'LOGIN_PUBLIC_ASSETS_ONLY';
-export const sourceLockSha256 = '4ea5af215223cdf2759effb0ba4a61d68bfb5276a0ff6cb40aaf24788e9e9dd0';
+export const sourceLockSha256 = '2efea34912a5c27d59c1675fa2cd3c6600a445ba2bd920de2a937258cb0a015c';
+// Git stores LF while Windows checkouts can contain CRLF. Normalize only that
+// checkout transformation; whitespace/content changes still fail the source pin.
+export function sourceLockMatches(bytes) {
+    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes).replace(/\r\n/g, '\n');
+    return createHash('sha256').update(text).digest('hex') === sourceLockSha256;
+}
 const maxAssets = 48, maxTotalBytes = 16 * 1024 * 1024;
 const held = () => { throw Error('PUBLIC_ASSETS_HELD'); };
 export function assertPublicAssetPath(path) {
@@ -231,7 +237,7 @@ export async function inspectDeploymentAssets(env, receipt, fetcher = fetch, log
         assertRedirectDiagnosticEnvironment(env, login?loginAssetMode:assetMode);
         if(login&&typeof loginReader!=='function')held();
         result.stage = 'RECEIPT'; assertIdentityReceipt(receipt);
-        result.stage='SOURCE_LOCK';if(createHash('sha256').update(readFileSync(new URL('../package-lock.json',import.meta.url))).digest('hex')!==sourceLockSha256)held();
+        result.stage='SOURCE_LOCK';if(!sourceLockMatches(readFileSync(new URL('../package-lock.json',import.meta.url))))held();
         result.sourceLockMatched=true;
         result.stage = 'OIDC_TARGET'; const oidcUrl = oidcRequestUrl(env.ACTIONS_ID_TOKEN_REQUEST_URL);
         if (!env.ACTIONS_ID_TOKEN_REQUEST_TOKEN) held();
