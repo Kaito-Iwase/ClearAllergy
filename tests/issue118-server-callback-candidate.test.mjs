@@ -360,8 +360,9 @@ test('workflow mode cannot reach existing live job and has zero permissions, sec
     assert.doesNotMatch(JSON.stringify(keyDiagnostic), /secrets\.|ISSUE118_APPLY|CLERK_SECRET|--ci-apply/);
     assert.equal(workflow.jobs['live-t1'].steps.find(x => x.with?.name?.startsWith('issue118-key-class-')).with.path,
         '${{ runner.temp }}/issue118-key-class/result.json');
-    assert.equal(workflow.jobs['live-t1'].steps.find(x => x.env?.ISSUE118_TEST_CLERK_SECRET_KEY).if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
-    assert.equal((file.match(/id-token: write/g) || []).length, 1); assert.equal((file.match(/secrets\./g) || []).length, 1);
+    assert.deepEqual(workflow.jobs['live-t1'].steps.filter(x => x.env?.ISSUE118_TEST_CLERK_SECRET_KEY).map(x=>x.if).sort(),
+        ["inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'", "inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'"].sort());
+    assert.equal((file.match(/id-token: write/g) || []).length, 1); assert.equal((file.match(/secrets\./g) || []).length, 2);
     assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
     const runner = readFileSync(new URL('../scripts/browser-runner.mjs', import.meta.url), 'utf8');
     assert.ok(runner.includes('tests/issue118-server-callback-candidate.test.mjs'));

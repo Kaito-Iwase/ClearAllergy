@@ -3,7 +3,8 @@ import test from 'node:test';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { previewOrigin, scopedOidcHeaders, protectedPreviewFetch, routePreviewRequest, clerkFrontendRedirectObservation, resolveClerkSdkCanonicalScript } from '../scripts/issue118-preview-transport.mjs';
-import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { target, transportLifecycleSnapshot, recordTransportDiagnostic } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { closeIsolatedBrowser } from '../scripts/issue118-close-browser.mjs';
 
 const token = 'synthetic.payload.signature';
 const header = 'x-vercel-trusted-oidc-idp-token';
@@ -194,4 +195,123 @@ test('successful one-hop response remains unmodified and errors never retry', as
     const api = { fetch: async (_url, options) => { calls++; assert.equal(options.maxRedirects, 0); assert.equal(options.maxRetries, 0); return response; } };
     assert.equal(await protectedPreviewFetch(api, previewOrigin, { timeout: 0, maxRetries: 5, maxRedirects: 20 }, token), response);
     assert.equal(calls, 1);
+});
+
+test('real Chromium loopback controls separate normal completion, context interruption and independent socket failure', { timeout: 60000 }, async t => {
+    const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+    const results = [];
+    const category = error => {
+        try {
+            const code = Object.getOwnPropertyDescriptor(error, 'code')?.value;
+            const message = Object.getOwnPropertyDescriptor(error, 'message')?.value;
+            for (const known of ['EACCES','EPERM','ECONNRESET','ECONNREFUSED','ETIMEDOUT','SPAWN_UNKNOWN'])
+                if (code === known || typeof message === 'string' && message.includes(known)) return known;
+        } catch { /* fixed unknown category */ }
+        return 'UNCLASSIFIED_LOCAL_ERROR';
+    };
+    for (const scenario of ['NORMAL', 'CONTEXT_INTERRUPT', 'INDEPENDENT_SOCKET_FAILURE']) {
+        const result = { scenario, stage: 'SERVER_START', status: 'NOT_RUN', loopbackHits: 0,
+            blockedOtherRequests: 0, handlerStarts: 0, navigationCompleted: false, navigationRejected: false };
+        results.push(result);
+        let browser, context, server, phase = 'APP_FLOW', pendingResolve, enteredResolve;
+        let closed = false, browserLaunchAttempted = false, contextCreateAttempted = false;
+        const entered = new Promise(resolve => { enteredResolve = resolve; });
+        const handled = new Promise(resolve => { pendingResolve = resolve; });
+        const report = {};
+        const stages = [];
+        const deadline = async promise => {
+            let timer;
+            try { return await Promise.race([promise, new Promise((_resolve,reject) => { timer=setTimeout(()=>reject(Error('CONTROL_DEADLINE')),10000); })]); }
+            finally { clearTimeout(timer); }
+        };
+        const observeClose = value => { phase = value; stages.push(transportLifecycleSnapshot(value)); };
+        try {
+            server = createServer((req,res) => {
+                result.loopbackHits++;
+                result.serverSawGet = req.method === 'GET';
+                // Only this synthetic marker is sent to loopback. No real OIDC or app request occurs.
+                result.syntheticHeaderPresent = req.headers[header] === token;
+                enteredResolve();
+                if (scenario === 'NORMAL') { result.serverResponseSent = true; res.writeHead(200, {'Content-Type':'text/html'}); res.end('<link rel="icon" href="data:,"><title>offline control</title>'); }
+                else if (scenario === 'INDEPENDENT_SOCKET_FAILURE') { result.serverSocketDestroyed = true; req.socket.destroy(); }
+                else result.serverResponseHeld = true;
+                // CONTEXT_INTERRUPT deliberately leaves one response pending until context.close().
+            });
+            const local = await listen(server);
+            const probeUrl = local + '/offline-readonly-control';
+            result.stage = 'BROWSER_LAUNCH';
+            browserLaunchAttempted = true;
+            browser = await chromium.launch({ headless: true, channel: 'chromium' });
+            contextCreateAttempted = true;
+            context = await browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' });
+            await context.route('**/*', async route => {
+                if (route.request().url() !== probeUrl) { result.blockedOtherRequests++; await route.abort(); return; }
+                result.handlerStarts++;
+                result.requestStarted = transportLifecycleSnapshot(phase);
+                try {
+                    // Real browser route/fetch/fulfill/abort. Only the guard's URL-reading seam maps
+                    // the loopback request to the fixed app identity; network URL remains loopback.
+                    await routePreviewRequest({
+                        request: () => ({ url: () => previewOrigin + '/admin', method: () => route.request().method(),
+                            allHeaders: () => route.request().allHeaders() }),
+                        fetch: async options => { try { return await route.fetch(options); }
+                            catch (error) { result.fetchFailureCategory = category(error); throw error; } },
+                        fulfill: options => route.fulfill(options), abort: code => route.abort(code),
+                    }, token, observation => recordTransportDiagnostic(report, observation, transportLifecycleSnapshot(phase)));
+                    result.handlerOutcome = 'COMPLETED';
+                } catch { result.handlerOutcome = 'FIXED_TRANSPORT_REFUSAL'; }
+                finally { result.handlerObserved = transportLifecycleSnapshot(phase); pendingResolve(); }
+            });
+            const page = await context.newPage();
+            result.stage = 'LOOPBACK_GET';
+            const navigation = page.goto(probeUrl, { waitUntil:'load',timeout:10000 }).then(response => {
+                result.navigationCompleted = true; result.navigationStatus = response.status();
+            }, () => { result.navigationRejected = true; });
+            await deadline(Promise.race([entered, handled]));
+            assert.equal(result.loopbackHits,1); assert.equal(result.serverSawGet,true); assert.equal(result.syntheticHeaderPresent,true);
+            if (scenario === 'CONTEXT_INTERRUPT') {
+                result.stage = 'INTENTIONAL_CONTEXT_CLOSE';
+                result.close = await closeIsolatedBrowser(context,browser,{contextCreateAttempted:true,browserLaunchAttempted:true},observeClose);
+                closed = true;
+                await deadline(handled); await deadline(navigation);
+                assert.ok(report.firstTransportFailure);
+                assert.equal(result.serverResponseHeld,true); assert.equal(result.handlerOutcome,'FIXED_TRANSPORT_REFUSAL');
+                assert.equal(result.navigationRejected,true); assert.equal(report.firstTransportFailure.status,null);
+                assert.equal(report.firstTransportFailure.stages.fetchStarted,true);
+                assert.equal(report.firstTransportFailure.stages.responseObserved,false);
+                assert.ok(['FETCH_EXCEPTION','ABORT_EXCEPTION'].includes(report.firstTransportFailure.exception));
+                assert.ok(['CONTEXT_CLOSE_START','CONTEXT_CLOSE_END','BROWSER_CLOSE_START','BROWSER_CLOSE_END'].includes(report.firstTransportFailure.lifecycle.phase));
+                assert.ok(Date.parse(report.firstTransportFailure.lifecycle.observedUtc) >= Date.parse(stages[0].observedUtc));
+            } else {
+                await deadline(handled); await deadline(navigation);
+                if (scenario === 'NORMAL') {
+                    assert.equal(result.serverResponseSent,true);
+                    assert.equal(result.handlerOutcome,'COMPLETED'); assert.equal(result.navigationCompleted,true); assert.equal(result.navigationStatus,200);
+                    assert.equal(report.firstTransportFailure,undefined);
+                } else {
+                    assert.equal(result.serverSocketDestroyed,true);
+                    assert.equal(result.navigationRejected,true); assert.equal(result.handlerOutcome,'FIXED_TRANSPORT_REFUSAL');
+                    assert.equal(report.firstTransportFailure.exception,'FETCH_EXCEPTION');
+                    assert.equal(report.firstTransportFailure.lifecycle.phase,'APP_FLOW');
+                }
+                result.stage = 'LOCAL_CLOSE';
+                result.close = await closeIsolatedBrowser(context,browser,{contextCreateAttempted:true,browserLaunchAttempted:true},observeClose);
+                closed = true;
+            }
+            assert.equal(result.handlerStarts,1); assert.equal(result.loopbackHits,1); assert.equal(result.blockedOtherRequests,0);
+            assert.equal(result.close.allLocalClosed,true); assert.equal(result.close.lifecycleObservationFailed,false);
+            result.firstTransportFailure = report.firstTransportFailure ?? null;
+            result.closeStages = stages;
+            result.stage = 'COMPLETE'; result.status = 'PASS_OBSERVER_CONTROL';
+        } catch (error) {
+            result.status = 'FAIL_OR_NOT_RUN'; result.infrastructureCategory = category(error);
+            throw Error('OFFLINE_CHROMIUM_CONTROL_FAILED');
+        } finally {
+            if (!closed) result.cleanup = await closeIsolatedBrowser(context,browser,{contextCreateAttempted,browserLaunchAttempted},observeClose);
+            if (server?.listening) await close(server);
+            t.diagnostic(JSON.stringify({ offlineLifecycleControl:result }));
+        }
+    }
+    assert.equal(results.length,3);
+    // These controls validate measurement, not the cause or success of any previous live run.
 });

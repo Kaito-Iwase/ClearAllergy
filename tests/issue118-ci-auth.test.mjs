@@ -628,15 +628,20 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.deepEqual(Object.keys(parsed.jobs), ['live-t1']);
     assert.deepEqual(parsed.jobs['live-t1'].permissions, { contents: 'read', 'id-token': 'write' });
     const secretSteps = parsed.jobs['live-t1'].steps.filter(step => Object.values(step.env || {}).some(value => String(value).includes('secrets.')));
-    assert.equal(secretSteps.length, 1); assert.equal(secretSteps[0].run, 'node scripts/check-issue118-live-t1-browser.mjs --ci-apply');
-    assert.equal(secretSteps[0].if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
+    assert.equal(secretSteps.length, 2);
+    const t1 = secretSteps.find(step => step.run === 'node scripts/check-issue118-live-t1-browser.mjs --ci-apply');
+    assert.equal(t1.if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
+    const readClose = secretSteps.find(step => step.run === 'node scripts/check-issue118-live-t1-browser.mjs --ci-read-close');
+    assert.equal(readClose.if, "inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
+    assert.equal(readClose.env.ISSUE118_DIAGNOSTIC_MODE, 'FIXTURE_READ_CLOSE_ONLY');
+    assert.equal(readClose.env.ISSUE118_TEST_CLERK_SECRET_KEY, t1.env.ISSUE118_TEST_CLERK_SECRET_KEY);
     const diagnostic = parsed.jobs['live-t1'].steps.find(step => step.run === 'node scripts/check-issue118-oidc-target.mjs --diagnose-only');
     assert.equal(diagnostic.if, "inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'");
     assert.ok(!JSON.stringify(diagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(diagnostic.env, 'ISSUE118_APPLY'));
     assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === 'Check the external receipt before dependency install or secret delivery').if,
-        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'");
+        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
     assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === 'Prepare the existing isolated Playwright version (no app secrets)').if,
-        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'");
+        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
     const redirectDiagnostic = parsed.jobs['live-t1'].steps.find(step => step.run === 'node scripts/check-issue118-preview-redirect.mjs --redirect-only');
     assert.equal(redirectDiagnostic.if, "inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'");
     assert.ok(!JSON.stringify(redirectDiagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(redirectDiagnostic.env, 'ISSUE118_APPLY'));
@@ -645,7 +650,7 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.match(yaml, /environment: clearallergy-e2e-test/); assert.match(yaml, /cancel-in-progress: false/);
     assert.match(yaml, /inputs.expected_runner_sha == github.sha/);
     assert.match(parsed.jobs['live-t1'].if, /github\.run_attempt == 1/);
-    assert.equal((yaml.match(/secrets\./g) || []).length, 1);
+    assert.equal((yaml.match(/secrets\./g) || []).length, 2);
     assert.ok(!yaml.includes('DATABASE_URL')); assert.ok(!yaml.includes('DIRECT_URL'));
     assert.ok(!yaml.includes('storageState')); assert.ok(!yaml.includes('continue-on-error'));
     const runner = readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs', import.meta.url), 'utf8');
@@ -655,8 +660,8 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
 });
 
 test('actual CI entry refuses absent context and missing external receipt before browser/auth setup', () => {
-    for (const fakeEnv of [{}, env()]) {
-        const child = spawnSync(process.execPath, ['scripts/check-issue118-live-t1-browser.mjs', '--ci-apply'], {
+    for (const arg of ['--ci-apply', '--ci-read-close']) for (const fakeEnv of [{}, env(), {...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'}]) {
+        const child = spawnSync(process.execPath, ['scripts/check-issue118-live-t1-browser.mjs', arg], {
             env: { SystemRoot: process.env.SystemRoot, ...fakeEnv }, encoding: 'utf8', windowsHide: true,
         });
         assert.equal(child.status, 1);

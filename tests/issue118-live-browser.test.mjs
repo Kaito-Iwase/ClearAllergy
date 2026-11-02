@@ -3,7 +3,108 @@ import test from "node:test";
 import { createRequire } from "node:module";
 import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityReceipt,
     newWriteLedger, beginWrite, holdWrite, confirmWrite, consumeWriteResponse, canCleanup,
-    claimMutation, protectedApiSnapshot, overallResult, openCreatedEditor, classifyLiveError, browserSetupStage } from "../scripts/check-issue118-live-t1-browser.mjs";
+    claimMutation, protectedApiSnapshot, overallResult, openCreatedEditor, classifyLiveError, browserSetupStage,
+    transportLifecycleSnapshot, recordTransportDiagnostic, readCloseRequestAllowed, observeReadCloseFixture,
+    readCloseFixtureId, readCloseResult, guardReadCloseRoute } from "../scripts/check-issue118-live-t1-browser.mjs";
+import { closeIsolatedBrowser } from "../scripts/issue118-close-browser.mjs";
+import { routePreviewRequest } from "../scripts/issue118-preview-transport.mjs";
+
+test('read-close diagnostic restricts app traffic to GET and the two owned API reads', async () => {
+    for (const path of ['/admin/login','/admin/shop','/_next/static/mock.js','/api/admin/shop','/api/admin/menus/'+readCloseFixtureId])
+        assert.equal(readCloseRequestAllowed('GET',target.origin+path),true);
+    for (const method of ['POST','PUT','PATCH','DELETE','OPTIONS','HEAD','get'])
+        for (const path of ['/api/admin/menus','/api/admin/menus/'+readCloseFixtureId+'/stop','/admin/shop'])
+            assert.equal(readCloseRequestAllowed(method,target.origin+path),false);
+    for (const path of ['/api/admin/menus','/api/admin/menus/other','/api/menus/'+readCloseFixtureId,'/api/admin/shop?secret=x'])
+        assert.equal(readCloseRequestAllowed('GET',target.origin+path),false);
+    for (const url of ['https://other.invalid/','https://wtqdbklmg3bbqk4s.public.blob.vercel-storage.com/a',target.origin.replace('https:','http:'),'https://u:p@'+new URL(target.origin).host+'/'])
+        assert.equal(readCloseRequestAllowed('GET',url),false);
+    assert.equal(readCloseRequestAllowed('POST','https://one-dolphin-7936.clerk.accounts.dev/v1/client/sign_ins'),true);
+    const menu={id:readCloseFixtureId,shopId:target.shop,isPublished:false,version:96,foodVersion:87,
+        publicationConfirmedFoodVersion:87,reviewedFoodVersion:null,priceYen:1000,allergens:[{slug:'milk',status:'CONTAINS'}]};
+    const reads=[];
+    assert.equal((await observeReadCloseFixture({id:target.shop},async id=>{reads.push(id);return menu;})).id,readCloseFixtureId);
+    assert.deepEqual(reads,[readCloseFixtureId]);
+    for (const change of [{id:'other'},{shopId:'other'},{isPublished:true},{version:97},{foodVersion:88},{priceYen:1001},{reviewedFoodVersion:87}])
+        await assert.rejects(observeReadCloseFixture({id:target.shop},async()=>({...menu,...change})));
+    await assert.rejects(observeReadCloseFixture({id:'other'},async()=>assert.fail('wrong shop must not read fixture')));
+});
+test('read-close result never turns transport/closure/mutation uncertainty into diagnostic success', () => {
+    const report={flow:'PASS_READ_ONLY_FIXTURE',cleanup:'NOT_APPLICABLE_READ_ONLY',writes:{held:false,operations:[]},authenticationCleanup:'SIGNOUT_CONFIRMED'};
+    assert.equal(readCloseResult(report,false,true).status,'READ_CLOSE_DIAGNOSTIC_COMPLETE');
+    for (const [change,transport,closed] of [[{},true,true],[{},false,false],[{readOnlyRequestRefused:true},false,true],
+        [{writes:{held:false,operations:[{}]}},false,true],[{authenticationCleanup:'SIGNOUT_UNVERIFIED'},false,true],[{flow:'FAIL'},false,true]])
+        assert.equal(readCloseResult({...report,...change},transport,closed).status,'FAIL_OR_INCOMPLETE');
+    assert.equal(readCloseResult({...report,writes:{held:true,operations:[]}},false,true).status,'HOLD_UNCERTAIN_WRITE');
+});
+test('last-registered admin route delegates forbidden POST to read-close refusal with zero forwarding', async () => {
+    const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+    const browser=await chromium.launch({headless:true,channel:'chromium'});
+    const context=await browser.newContext({serviceWorkers:'block'});
+    let refused=false, adminStarts=0, mutationForwards=0, postSeen=false;
+    const common=async route=>{
+        try {
+            if(!await guardReadCloseRoute(route,()=>{refused=true;},()=>{}))return;
+            if(route.request().method()!=='GET')mutationForwards++;
+            await route.fulfill({status:200,contentType:'text/html',body:'<link rel="icon" href="data:,">offline read-close control'});
+        } catch { /* The fixed refusal is observed through refused, method and zero forwarding below. */ }
+    };
+    await context.route('**/*',common);
+    await context.route('**/api/admin/**',route=>{adminStarts++;postSeen=route.request().method()==='POST';return common(route);});
+    try {
+        const page=await context.newPage();await page.goto(target.origin+'/offline-read-close-control');
+        await page.evaluate(async()=>{try{await fetch('/api/admin/menus',{method:'POST',body:'synthetic'});}catch{/* expected local abort */}});
+        assert.equal(adminStarts,1);assert.equal(postSeen,true);assert.equal(mutationForwards,0);assert.equal(refused,true);
+        const report={flow:'PASS_READ_ONLY_FIXTURE',cleanup:'NOT_APPLICABLE_READ_ONLY',writes:{held:false,operations:[]},authenticationCleanup:'SIGNOUT_CONFIRMED',readOnlyRequestRefused:refused};
+        assert.equal(readCloseResult(report,false,true).status,'FAIL_OR_INCOMPLETE');
+    }finally{await context.close();await browser.close();}
+});
+
+test('lifecycle observations distinguish active failure from close-time completion without releasing either failure', async () => {
+    for (const duringClose of [false, true]) {
+        let phase = 'APP_FLOW', rejectFetch, fetched;
+        const fetchStarted = new Promise(resolve => { fetched = resolve; });
+        const report = {};
+        const pending = routePreviewRequest({
+            request: () => ({ url: () => target.origin + '/admin', method: () => 'GET', allHeaders: async () => ({}) }),
+            fetch: async () => { fetched(); return new Promise((_resolve, reject) => { rejectFetch = reject; }); },
+            abort: async () => {}, fulfill: async () => assert.fail('failed fetch cannot fulfill'),
+        }, 'synthetic.payload.signature', observation => recordTransportDiagnostic(report, observation, transportLifecycleSnapshot(phase)));
+        const failed = assert.rejects(pending, { message: 'PROTECTED_TRANSPORT_FAILED' });
+        await fetchStarted;
+        if (!duringClose) { rejectFetch(Error('SYNTHETIC_PRIVATE https://u:p@invalid/')); await failed; }
+        const close = await closeIsolatedBrowser({ close: async () => {
+            if (duringClose) { rejectFetch(Error('SYNTHETIC_PRIVATE')); await failed; }
+        } }, { close: async () => {} }, { contextCreateAttempted: true, browserLaunchAttempted: true }, stage => { phase = stage; });
+        assert.equal(report.firstTransportFailure.exception, 'FETCH_EXCEPTION');
+        assert.equal(report.firstTransportFailure.lifecycle.phase, duringClose ? 'CONTEXT_CLOSE_START' : 'APP_FLOW');
+        assert.match(report.firstTransportFailure.lifecycle.observedUtc, /^\d{4}-\d{2}-\d{2}T/);
+        assert.equal(close.allLocalClosed, true); assert.equal(close.lifecycleObservationFailed, false);
+        // This is a synthetic cancellation model, not proof of the real provider's cause.
+        assert.equal(overallResult('PASS_APP_BROWSER_API', 'PRIVATE_VERIFIED', 'PASS_API_REPRESENTATION', false, false).status, 'FAIL_OR_INCOMPLETE');
+        assert.doesNotMatch(JSON.stringify(report), /SYNTHETIC_PRIVATE|https:|u:p/);
+    }
+});
+test('lifecycle metadata stays closed and first failure survives a full diagnostic buffer', () => {
+    const at = '2026-11-02T04:08:11.000Z';
+    assert.deepEqual(transportLifecycleSnapshot('SYNTHETIC_PRIVATE', 'https://u:p@invalid/'), { phase: 'UNKNOWN', observedUtc: null });
+    const report = {};
+    for (let i=0;i<65;i++) recordTransportDiagnostic(report, { originRole:'APP',method:'GET',status:200,exception:'NONE' }, transportLifecycleSnapshot('APP_FLOW', at));
+    recordTransportDiagnostic(report, { originRole:'APP',method:'GET',exception:'FETCH_EXCEPTION' }, transportLifecycleSnapshot('BROWSER_CLOSE_START',at));
+    recordTransportDiagnostic(report, { originRole:'APP',method:'GET',exception:'FETCH_EXCEPTION' }, transportLifecycleSnapshot('LOCAL_CLOSE_FINISHED',at));
+    assert.equal(report.transportDiagnostics.length,64); assert.equal(report.transportDiagnosticsTruncated,true);
+    assert.equal(report.firstTransportFailure.lifecycle.phase,'BROWSER_CLOSE_START');
+    assert.equal(report.firstTransportFailure.lifecycle.observedUtc,at);
+});
+test('lifecycle observer failure cannot prevent either close or prove observation completion', async () => {
+    const order=[];
+    const closed=await closeIsolatedBrowser({close:async()=>{order.push('context');}}, {close:async()=>{order.push('browser');}},
+        {contextCreateAttempted:true,browserLaunchAttempted:true},()=>{throw Error('SYNTHETIC_PRIVATE');});
+    assert.deepEqual(order,['context','browser']);assert.equal(closed.allLocalClosed,true);
+    assert.equal(closed.lifecycleObservationFailed,true);
+    assert.equal(overallResult('PASS_APP_BROWSER_API','PRIVATE_VERIFIED','PASS_API_REPRESENTATION',false,!closed.lifecycleObservationFailed).status,'FAIL_OR_INCOMPLETE');
+    assert.doesNotMatch(JSON.stringify(closed),/SYNTHETIC_PRIVATE/);
+});
 
 test("fixed setup errors remain distinguishable without provider text or getters", async () => {
     for (const code of ["CI_IDENTITY_REFUSED", "CI_AMBIENT_CONFIGURATION_REFUSED", "CI_DEBUG_REFUSED",

@@ -394,9 +394,18 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
     } };
 }
 
-export function recordTransportDiagnostic(report, observation) {
+export function transportLifecycleSnapshot(phase, at = new Date().toISOString()) {
+    const phases = ['SETUP', 'AUTHENTICATION', 'APP_FLOW', 'FLOW_VERIFIED', 'CLEANUP',
+        'PROTECTION_CHECK', 'PROTECTION_CHECK_FINISHED', 'SIGNOUT', 'SIGNOUT_FINISHED',
+        'CONTEXT_CLOSE_START', 'CONTEXT_CLOSE_END', 'BROWSER_CLOSE_START', 'BROWSER_CLOSE_END', 'LOCAL_CLOSE_FINISHED'];
+    return { phase: phases.includes(phase) ? phase : 'UNKNOWN',
+        observedUtc: typeof at === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(at)
+            && Number.isFinite(Date.parse(at)) ? at : null };
+}
+export function recordTransportDiagnostic(report, observation, lifecycle) {
     const safe = transportObservation(observation.originRole, observation.method, observation.status,
         observation.exception, observation.stages);
+    if (lifecycle) safe.lifecycle = transportLifecycleSnapshot(lifecycle.phase, lifecycle.observedUtc);
     const events = report.transportDiagnostics ??= [];
     if (events.length < 64) events.push(safe); else report.transportDiagnosticsTruncated = true;
     if ((safe.exception !== 'NONE' && safe.exception !== 'POLICY_REFUSED') || safe.status >= 400)
@@ -556,6 +565,47 @@ export function state(menu) {
         unknown: menu.allergens.filter(a => a.status === "UNKNOWN").length };
 }
 
+export const readCloseMode = 'FIXTURE_READ_CLOSE_ONLY';
+export const readCloseFixtureId = 'cmvyqm8q30001jh07qly55qtw';
+export function readCloseRequestAllowed(method, rawUrl) {
+    try {
+        const url = new URL(rawUrl);
+        if (url.username || url.password) return false;
+        if (url.origin !== target.origin) return url.origin === 'https://' + ciIdentity.clerkDomain;
+        if (method !== 'GET') return false;
+        if (url.pathname.startsWith('/api/')) return !url.search && !url.hash &&
+            ['/api/admin/shop', '/api/admin/menus/' + readCloseFixtureId].includes(url.pathname);
+        return true; // Static/document GETs remain subject to existing origin/redirect guards.
+    } catch { return false; }
+}
+export async function guardReadCloseRoute(route, onAppRefused, onOtherBlocked) {
+    const request = route.request();
+    if (readCloseRequestAllowed(request.method(), request.url())) return true;
+    let app = false;
+    try { app = new URL(request.url()).origin === target.origin; } catch { /* unknown target is never forwarded */ }
+    if (app) onAppRefused(); else onOtherBlocked();
+    await route.abort('blockedbyclient');
+    if (app) throw Error('READ_ONLY_REQUEST_REFUSED');
+    return false;
+}
+export async function observeReadCloseFixture(shop, read) {
+    assert.equal(shop?.id, target.shop);
+    const menu = await read(readCloseFixtureId);
+    const observed = state(menu);
+    assert.deepEqual(observed, { id: readCloseFixtureId, isPublished: false, version: 96, foodVersion: 87,
+        publicationConfirmedFoodVersion: 87, reviewedFoodVersionObserved: true, reviewedFoodVersion: null,
+        priceYen: 1000, milk: 'CONTAINS', unknown: 0 });
+    if (menu.shopId !== undefined) assert.equal(menu.shopId, target.shop);
+    return observed;
+}
+export function readCloseResult(report, transportFailed, closed) {
+    if (report.writes?.held) return { status: 'HOLD_UNCERTAIN_WRITE', exit: 2 };
+    const complete = report.flow === 'PASS_READ_ONLY_FIXTURE' && report.cleanup === 'NOT_APPLICABLE_READ_ONLY'
+        && report.writes?.operations?.length === 0 && report.authenticationCleanup === 'SIGNOUT_CONFIRMED'
+        && closed === true && !transportFailed && !report.readOnlyRequestRefused;
+    return { status: complete ? 'READ_CLOSE_DIAGNOSTIC_COMPLETE' : 'FAIL_OR_INCOMPLETE', exit: complete ? 0 : 1 };
+}
+
 export async function openCreatedEditor(page, origin, id) {
     assert.match(id, /^c[a-z0-9]+$/);
     const editPath = `/admin/menus/${id}/edit`;
@@ -592,7 +642,9 @@ export async function stopWithDialog(page, name, click, timeout = 20000) {
 }
 
 export async function runLive() {
-    const ciMode = process.argv.slice(2).join(" ") === "--ci-apply";
+    const readCloseOnly = process.argv.slice(2).join(' ') === '--ci-read-close';
+    if (readCloseOnly && process.env.ISSUE118_DIAGNOSTIC_MODE !== readCloseMode) throw Error('READ_CLOSE_MODE_REFUSED');
+    const ciMode = readCloseOnly || process.argv.slice(2).join(" ") === "--ci-apply";
     if (!ciMode && process.argv.slice(2).join(" ") !== "--apply") throw Error("EXPLICIT_APPLY_REQUIRED");
     if (ciMode) assertCiEnvironment(process.env);
     if (process.env.DEBUG || process.env.PWDEBUG || process.env.NODE_OPTIONS) throw Error("DEBUG_OR_PRELOAD_FORBIDDEN");
@@ -610,6 +662,7 @@ export async function runLive() {
         externalIdentityReceiptSha256: createHash("sha256").update(identityBytes).digest("hex"),
         run: randomUUID(), startedUtc: new Date().toISOString(), stage: "LOGIN", phase: "NONE", observations: [], requests: [], status: "RUNNING",
         flow: "NOT_RUN", cleanup: "NOT_REQUIRED_NO_KNOWN_FIXTURE", protection: "NOT_CHECKED" };
+    if (readCloseOnly) report.diagnosticMode = readCloseMode;
     const save = () => writeFileSync(join(output, "result.json"), JSON.stringify(report, null, 2));
     let browser;
     let context;
@@ -628,6 +681,13 @@ export async function runLive() {
     let activeOperation;
     let ciAccess;
     let ciTransportFailed = false;
+    let lifecyclePhase = 'SETUP', routeSequence = 0;
+    const markLifecycle = code => {
+        lifecyclePhase = code;
+        const event = transportLifecycleSnapshot(code);
+        (report.lifecycle ??= []).push(event);
+        if (event.phase === 'UNKNOWN' || !event.observedUtc) report.lifecycleIncomplete = true;
+    };
     const record = (stage, menu) => { report.observations.push({ at: new Date().toISOString(), stage, ...state(menu) }); save(); };
     const read = async id => {
         const response = await readRequest(`${target.origin}/api/admin/menus/${id}`);
@@ -638,6 +698,7 @@ export async function runLive() {
     };
     const readRequest = url => ciAccess ? ciAccess.read(context.request, url) : context.request.get(url, { timeout: 20000 });
     const action = async (nextPhase, method, path, click) => {
+        if (readCloseOnly) throw Error('READ_ONLY_MUTATION_REFUSED');
         assertIdentityReceipt(identityReceipt);
         if (ciTransportFailed) throw Error("CI_TRANSPORT_HELD");
         const op = beginWrite(ledger, nextPhase); activeOperation = op;
@@ -666,6 +727,7 @@ export async function runLive() {
     };
     try {
         save();
+        markLifecycle('AUTHENTICATION');
         const setupStage = stage => { report.stage = stage; (report.setupStages ??= []).push(stage); save(); };
         if (ciMode) ciAccess = await createCiAccess(process.env, fetch, setupStage, {
             authentication: progress => { report.authenticationProgress = progress; save(); },
@@ -674,7 +736,7 @@ export async function runLive() {
             scriptTransfer: observation => { const events = report.clerkScriptTransfers ??= [];
                 if (events.length < 64) events.push(observation); else report.clerkScriptTransfersTruncated = true; save(); },
             transport: observation => {
-                recordTransportDiagnostic(report, observation);
+                recordTransportDiagnostic(report, observation, transportLifecycleSnapshot(lifecyclePhase));
                 save();
             },
         });
@@ -683,8 +745,17 @@ export async function runLive() {
         contextCreateAttempted = true;
         context = await browserSetupStage("BROWSER_CONTEXT", () => browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false, serviceWorkers: "block" }), setupStage);
         const ciRoute = async route => {
-            try { await ciAccess.route(route); }
+            const sequence = ++routeSequence, started = transportLifecycleSnapshot(lifecyclePhase);
+            try {
+                if (readCloseOnly && !await guardReadCloseRoute(route,
+                    () => { report.readOnlyRequestRefused = true; },
+                    () => { report.readOnlyOtherRequestsBlocked = (report.readOnlyOtherRequestsBlocked || 0) + 1; })) {
+                    save(); return;
+                }
+                await ciAccess.route(route);
+            }
             catch {
+                report.firstRouteHandlerFailure ??= { sequence, started, observed: transportLifecycleSnapshot(lifecyclePhase) };
                 ciTransportFailed = true; report.transportError = "CI_ROUTE_FAILED";
                 if (activeOperation) holdWrite(ledger, activeOperation, "TRANSPORT_RESULT_UNCONFIRMED");
                 save();
@@ -698,6 +769,7 @@ export async function runLive() {
         context.on("requestfinished", request => { const op = requestOperations.get(request); if (op) { op.transportFinished = true; save(); } });
         context.on("requestfailed", request => { const op = requestOperations.get(request); if (op) { op.transportFailed = true; save(); } });
         await context.route("**/api/admin/**", async route => {
+            if (readCloseOnly) return ciRoute(route); // Last-registered admin handler must not bypass the common refusal record.
             const request = route.request();
             const url = new URL(request.url());
             if (url.origin !== target.origin || (ledger.held && request.method() !== "GET") || !allowedMutation(request.method(), url.pathname, phase, menuId)) {
@@ -741,9 +813,21 @@ export async function runLive() {
             await page.waitForURL(target.origin + "/admin/shop", { timeout: 15 * 60 * 1000 });
         }
         if (ciTransportFailed) throw Error("CI_TRANSPORT_HELD");
+        markLifecycle('APP_FLOW');
         const own = await readRequest(target.origin + "/api/admin/shop");
         assert.equal(own.status(), 200);
         const shopData = await own.json();
+        if (readCloseOnly) {
+            report.stage = readCloseMode;
+            const observed = await observeReadCloseFixture(shopData.shop, read);
+            report.fixtureId = readCloseFixtureId;
+            report.observations.push({ at: new Date().toISOString(), stage: 'EXISTING_FIXTURE_READ_ONLY', ...observed });
+            report.flow = 'PASS_READ_ONLY_FIXTURE';
+            report.cleanup = 'NOT_APPLICABLE_READ_ONLY';
+            report.protection = 'NOT_APPLICABLE_READ_ONLY';
+            markLifecycle('FLOW_VERIFIED'); save();
+            return; // Finally signs out/closes; the mutation-bearing T1 body is unreachable in this mode.
+        }
         const anchor = await read(target.anchor);
         assertAnchor(shopData.shop, anchor);
         protectedBefore = await Promise.all(protectedIds.map(async id => protectedApiSnapshot(await read(id))));
@@ -791,11 +875,15 @@ export async function runLive() {
         report.publicApiMilk = "CONTAINS"; report.publicPageFixtureHeading = true;
         if (ciTransportFailed) throw Error("CI_TRANSPORT_HELD");
         report.flow = "PASS_APP_BROWSER_API";
+        markLifecycle('FLOW_VERIFIED');
     } catch (error) {
         report.flow = ledger.held ? "HOLD_UNCERTAIN_WRITE" : "FAIL";
         report.errorClass = classifyLiveError(error);
     } finally {
-        if (ledger.held) {
+        markLifecycle('CLEANUP');
+        if (readCloseOnly) {
+            report.cleanup = 'NOT_APPLICABLE_READ_ONLY';
+        } else if (ledger.held) {
             report.cleanup = "HOLD_ORIGINAL_REQUEST_UNCONFIRMED_NO_WRITE";
             report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No automatic cleanup/retry. Reconcile original operation terminal result, creationOperationId/name, current API/DB state and audit history before any further write.";
         } else if (menuId && ciTransportFailed) {
@@ -814,22 +902,31 @@ export async function runLive() {
             } catch { report.cleanup = ledger.held ? "HOLD_ORIGINAL_REQUEST_UNCONFIRMED_NO_WRITE" : "UNVERIFIED_NO_AUTOMATIC_RETRY"; }
         }
         if (context && protectedBefore) {
+            markLifecycle('PROTECTION_CHECK');
             try {
                 report.protectedAfter = await Promise.all(protectedIds.map(async id => protectedApiSnapshot(await read(id))));
                 assert.deepEqual(report.protectedAfter, protectedBefore);
                 report.protection = "PASS_API_REPRESENTATION";
             } catch { report.protection = "FAIL_OR_UNVERIFIED_API_REPRESENTATION"; }
+            markLifecycle('PROTECTION_CHECK_FINISHED');
         }
         report.cleanupStopAttempted = cleanupAttempted;
         report.phase = phase;
         if (ledger.held) report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No further write/cleanup/retry. Read-only reconciliation must establish the original operation outcome, creationOperationId/name, current API/DB state and audit history; otherwise keep HOLD.";
         if (ciAccess) report.authenticationProgress = ciAccess.authenticationProgress();
         if (ciAccess) report.initialHandshake = ciAccess.handshakeProgress();
-        if (ciAccess && page) report.authenticationCleanup = await ciAccess.signOut(page);
-        report.localClose = await closeIsolatedBrowser(context, browser, { browserLaunchAttempted, contextCreateAttempted });
+        if (ciAccess && page) {
+            markLifecycle('SIGNOUT');
+            report.authenticationCleanup = await ciAccess.signOut(page);
+            markLifecycle('SIGNOUT_FINISHED');
+        }
+        report.localClose = await closeIsolatedBrowser(context, browser, { browserLaunchAttempted, contextCreateAttempted }, markLifecycle);
+        markLifecycle('LOCAL_CLOSE_FINISHED');
         report.browserClose = report.localClose.allLocalClosed ? "CONFIRMED" : "UNVERIFIED";
-        const overall = overallResult(report.flow, report.cleanup, report.protection, ledger.held,
-            report.browserClose === "CONFIRMED" && report.authenticationCleanup !== "SIGNOUT_UNVERIFIED" && !ciTransportFailed);
+        const closureComplete = report.browserClose === 'CONFIRMED' && !report.localClose.lifecycleObservationFailed && !report.lifecycleIncomplete;
+        const overall = readCloseOnly ? readCloseResult(report, ciTransportFailed, closureComplete) :
+            overallResult(report.flow, report.cleanup, report.protection, ledger.held,
+                closureComplete && report.authenticationCleanup !== "SIGNOUT_UNVERIFIED" && !ciTransportFailed);
         report.overall = overall.status; report.status = overall.status;
         process.exitCode = overall.exit; save();
         console.log(`ISSUE118_RESULT ${report.overall}; flow=${report.flow}; cleanup=${report.cleanup}`);

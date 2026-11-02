@@ -7,7 +7,7 @@ on:
       confirmation:
         description: Select one explicitly approved operation; diagnostics never authorize fixture writes
         type: choice
-        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED, DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY, DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY]
+        options: [HOLD, DIAGNOSE_FIXTURE_READ_CLOSE_ONLY, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED, DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY, DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY]
         default: HOLD
         required: true
       expected_runner_sha:
@@ -33,7 +33,7 @@ jobs:
       github.ref == 'refs/heads/test/issue118-live-t1-20261030' &&
       github.event_name == 'workflow_dispatch' &&
       github.run_attempt == 1 &&
-      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY') &&
+      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY') &&
       inputs.expected_runner_sha == github.sha
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -50,7 +50,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Check the external receipt before dependency install or secret delivery
-        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
         env:
           IDENTITY_RECEIPT_JSON: ${{ inputs.identity_receipt }}
           EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
@@ -74,7 +74,7 @@ jobs:
           } catch { console.error('IDENTITY_RECEIPT_OR_SHA_REFUSED'); process.exitCode = 1; }
           NODE
       - name: Prepare the existing isolated Playwright version (no app secrets)
-        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
         env:
           CLEARALLERGY_BROWSER_RUNNER_DIR: ${{ runner.temp }}/issue118-playwright
         run: |
@@ -82,6 +82,19 @@ jobs:
           export npm_execpath="$RUNNER_TEMP/issue118-npm/node_modules/npm/bin/npm-cli.js"
           node "$npm_execpath" ci --ignore-scripts --no-audit --no-fund
           node scripts/browser-runner.mjs install --with-deps
+      - name: Existing fixture READ ONLY and termination observation; no T1 or cleanup
+        if: inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_APPLY: 'true'
+          ISSUE118_DIAGNOSTIC_MODE: FIXTURE_READ_CLOSE_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          ISSUE118_TEST_CLERK_SECRET_KEY: ${{ secrets.ISSUE118_TEST_CLERK_SECRET_KEY }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-result
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-live-t1-browser.mjs --ci-read-close
       - name: OIDC target predicates only; stop before any request
         if: inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'
         env:
@@ -163,6 +176,14 @@ jobs:
         with:
           name: issue118-server-callback-${{ github.run_id }}
           path: ${{ runner.temp }}/issue118-server-callback/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only the fixed-schema read-close diagnostic result
+        if: always() && inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-read-close-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-result/result.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Retain only the fixed-schema non-secret result, never browser/session/trace output

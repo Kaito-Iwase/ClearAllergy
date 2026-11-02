@@ -140,9 +140,10 @@ test('workflow selects callback-only without secret, APPLY or normal live step, 
     const d=steps.find(s=>s.run==='node scripts/check-issue118-handshake-callback.mjs --callback-only');
     assert.equal(d.if,"inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY'");assert.equal(d.env.ISSUE118_DIAGNOSTIC_MODE,'HANDSHAKE_CALLBACK_ONLY');
     assert.doesNotMatch(JSON.stringify(d),/secrets\.|ISSUE118_APPLY|CLERK_SECRET|--ci-apply/);
-    const secrets=steps.filter(s=>JSON.stringify(s.env||{}).includes('secrets.'));assert.equal(secrets.length,1);assert.equal(secrets[0].if,"inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
+    const secrets=steps.filter(s=>JSON.stringify(s.env||{}).includes('secrets.'));assert.equal(secrets.length,2);
+    assert.deepEqual(secrets.map(s=>s.if).sort(),["inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'","inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'"].sort());
     assert.equal(steps.find(s=>s.name==='Prepare the existing isolated Playwright version (no app secrets)').if,
-        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'");
+        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
     const artifact=steps.find(s=>s.with?.name==='issue118-handshake-callback-${{ github.run_id }}');
     assert.equal(artifact.with.path,'${{ runner.temp }}/issue118-handshake-callback/result.json');
     assert.match(readFileSync(new URL('../scripts/browser-runner.mjs',import.meta.url),'utf8'),/tests\/issue118-handshake-callback.test.mjs/);
@@ -208,7 +209,8 @@ test('workflow clean-target selection never delivers Clerk Secret or chooses liv
     const steps=w.jobs['live-t1'].steps,d=steps.find(s=>s.run==='node scripts/check-issue118-handshake-callback.mjs --clean-target-only');
     assert.equal(d.if,"inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY'");
     assert.equal(d.env.ISSUE118_DIAGNOSTIC_MODE,'HANDSHAKE_CLEAN_TARGET_ONLY');assert.doesNotMatch(JSON.stringify(d),/secrets\.|ISSUE118_APPLY|CLERK_SECRET|--ci-apply/);
-    const secrets=steps.filter(s=>JSON.stringify(s.env||{}).includes('secrets.'));assert.equal(secrets.length,1);assert.equal(secrets[0].if,"inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
+    const secrets=steps.filter(s=>JSON.stringify(s.env||{}).includes('secrets.'));assert.equal(secrets.length,2);
+    assert.deepEqual(secrets.map(s=>s.if).sort(),["inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'","inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'"].sort());
     const a=steps.find(s=>s.with?.name==='issue118-handshake-clean-target-${{ github.run_id }}');
     assert.equal(a.with.path,'${{ runner.temp }}/issue118-handshake-clean-target/result.json');
 });
