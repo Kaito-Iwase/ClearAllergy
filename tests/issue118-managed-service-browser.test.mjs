@@ -10,7 +10,8 @@ const scope = { runId: uuid, applicationSha: target.source, shopId: 'cshopa', is
 function harness({ mode = 'DELIVER', fault } = {}) {
     const cell = { kind: 'MENU_SAVE', mode, id: 'MENU_SAVE_' + mode };
     const fixture = { menuId: 'cnewfixture', before: { id: 'cnewfixture', priceYen: 800, version: 1 }, priceYen: 801 };
-    const counts = { fetch: 0, abort: 0, fulfill: 0, authorize: 0, consume: 0, fallback: 0, finish: 0, prepare: 0, click: 0 };
+    const counts = { fetch: 0, abort: 0, fulfill: 0, authorize: 0, consume: 0, fallback: 0, finish: 0, prepare: 0,
+        click: 0, fill: 0, fileInput: 0, hydrationWait: 0 };
     let url, handler, saved = false, error = false, closed = false, owned = structuredClone(fixture.before);
     const values = new Map();
     const context = { newPage: async () => page };
@@ -37,7 +38,8 @@ function harness({ mode = 'DELIVER', fault } = {}) {
         fallback: async () => { counts.fallback++; },
     };
     const locator = selector => ({
-        fill: async value => { values.set(selector, value); }, first() { return this; },
+        fill: async value => { counts.fill++; values.set(selector, value); },
+        setInputFiles: async () => { counts.fileInput++; }, first() { return this; },
         getByRole() { return this; },
         click: async () => { counts.click++; void handler(route); },
     });
@@ -45,7 +47,22 @@ function harness({ mode = 'DELIVER', fault } = {}) {
         route: async (_pattern, fn) => { handler = fn; }, locator, getByRole: () => locator('button'),
         evaluate: async (_fn, args) => ({ inputRetained: values.get('#edit-menu-field-2') === String(args.expected), fileRetained: false,
             successDisplayed: saved, followupWrites: 0 }),
-        waitForFunction: async () => { assert.ok(saved || error); },
+        waitForFunction: async (predicate, args, options) => {
+            if (args?.kind === 'SERVICE_OWNER_HYDRATION') {
+                counts.hydrationWait++; assert.equal(options.timeout, 20000);
+                for (const key of ['fill', 'fileInput', 'click', 'fetch']) assert.equal(counts[key], 0);
+                const previous = globalThis.window;
+                try {
+                    globalThis.window = { Clerk: { loaded: fault !== 'hydration-delayed', user: { id:
+                        fault === 'hydration-owner' ? 'user_OTHER' : 'user_3LFy4E2hco0VpC63CbjjMjOznIx' } } };
+                    if (fault === 'hydration-error') throw Error('SYNTHETIC_SECRET');
+                    if (fault === 'hydration-delayed') {
+                        assert.equal(predicate(args), false); await Promise.resolve(); globalThis.window.Clerk.loaded = true;
+                    }
+                    if (!predicate(args)) throw Error('SYNTHETIC_HYDRATION_NOT_CONFIRMED');
+                } finally { if (previous === undefined) delete globalThis.window; else globalThis.window = previous; }
+            } else { assert.ok(saved || error); }
+        },
         close: async () => { if (fault === 'close') throw Error('SYNTHETIC_SECRET'); closed = true; }, isClosed: () => closed,
     };
     const ports = { prepareWriteObservation, prepareCell: async () => { counts.prepare++; return fixture; },
@@ -91,6 +108,19 @@ test('8bf Shop wire projection preserves fields and follows exact hours/budget n
 test('missing runtime integration is NOT_IMPLEMENTED, never a live success', async () => {
     const h = harness(); delete h.ports.prepareCell;
     assert.equal((await h.run()).status, 'NOT_IMPLEMENTED'); assert.equal(h.counts.fetch, 0);
+});
+test('service page waits for delayed fixed S1 hydration before any fill/file/click/network', async () => {
+    const h = harness({ fault: 'hydration-delayed' }), r = await h.run();
+    assert.equal(r.status, 'KNOWN_OBSERVATION'); assert.equal(h.counts.hydrationWait, 1);
+    assert.equal(h.counts.fill, 1); assert.equal(h.counts.click, 1); assert.equal(h.counts.fetch, 1);
+});
+test('unconfirmed or unknown service hydration holds before UI mutation or any send', async () => {
+    for (const fault of ['hydration-owner', 'hydration-error']) for (const kind of ['MENU_SAVE', 'MENU_UPLOAD']) {
+        const h = harness({ fault }), r = await h.run({ kind, mode: 'DELIVER', id: kind + '_DELIVER' });
+        assert.equal(r.status, 'HOLD'); assert.equal(h.counts.hydrationWait, 1);
+        for (const key of ['fill', 'fileInput', 'click', 'fetch', 'authorize', 'consume']) assert.equal(h.counts[key], 0);
+        assert.doesNotMatch(JSON.stringify(r), /SYNTHETIC_SECRET|SYNTHETIC_HYDRATION/);
+    }
 });
 test('actual observer and page seam deliver once with one permission consumption', async () => {
     const h = harness(), r = await h.run();

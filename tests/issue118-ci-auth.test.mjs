@@ -573,6 +573,21 @@ test('read-close partial activation can terminate only a recorded owned session;
         const count=f.calls.length;await assert.rejects(a.authenticate(f.page),code('CI_AUTH_RETRY_REFUSED'));assert.equal(f.calls.length,count);
     }
 });
+test('tracked signout waits for existing-client hydration and a failed wait cannot fake termination',async()=>{
+    for(const blocked of [false,true]){
+        const f=authFixture(),a=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},f.fetcher);
+        await authenticate(a,f.page);let waited=false,evaluated=false;
+        const evaluate=f.page.evaluate.bind(f.page);
+        f.page.waitForFunction=async(_predicate,args,options)=>{
+            assert.equal(args.id,a.sessionObservation().id);assert.equal(args.owner,ciIdentity.ownerId);assert.equal(options.timeout,10000);
+            await Promise.resolve();if(blocked)throw Error(syntheticSecret);waited=true;
+        };
+        f.page.evaluate=async(fn,args)=>{evaluated=true;assert.equal(waited,true);return evaluate(fn,args);};
+        assert.equal(await a.signOut(f.page),blocked?'SIGNOUT_UNVERIFIED':'SIGNOUT_CONFIRMED');
+        assert.equal(evaluated,!blocked);assert.equal(f.signOutCalls(),blocked?0:1);
+        assert.equal(a.sessionObservation().providerTerminationConfirmed,!blocked);
+    }
+});
 test('read-close local signout success, network failure or failed reconciliation cannot fake provider termination',async()=>{
     for(const options of [{signoutNoRevoke:true},{signoutFailure:true},{sessionReadFailsAt:2}]) {
         const f=authFixture(options),a=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},f.fetcher);

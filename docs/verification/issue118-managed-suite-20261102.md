@@ -8,6 +8,7 @@
 - Preview: `dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo`、Project `clear-allergy-e2e`。初回の`dpl_E6BEMYCcuE2u7Ha3WEN42kp5u4Kt`はGET 500を保持し、成功扱いにしない。
 - 実DBは専用Neon `patient-heart-55595249` / `br-flat-wildflower-aoeragrs` / `clearallergy_main19`。DB接続情報をGitHubへ保存しない。
 - 新規メニュー32件、成功メニュー書込み103回、ShopA保存4回、画像5件、一時session7件が上限。失敗・結果不明も台帳から削除しない。
+- 各runのfresh receiptには、先行失敗runを含む実消費数`managedPriorSessionConsumption`を必須で設定する。初回は2件、後続armは1件を加え、合計7件を超える場合は認証前に拒否する。suite内部のsession数と全試験の累計を混同しない。
 - 保護対象の既存メニュー、本番、main、既存設定・権限・キーは変更しない。画像と監査履歴は削除しない。
 
 ## 実行前

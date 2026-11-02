@@ -261,6 +261,12 @@ export function prepareManagedServiceBrowser({ actor, target, scope, image, port
                     const path = shop ? '/admin/shop' : cell.kind === 'MENU_CREATE' ? '/admin/menus/new' : '/admin/menus/' + fixture.menuId + '/edit';
                     await page.goto(target.origin + path, { waitUntil: 'load', timeout: 20000 });
                     check(page.url() === target.origin + path);
+                    // Same existing S1 session only. Navigation completion does
+                    // not establish Clerk client hydration; never fill/submit first.
+                    await bounded(page.waitForFunction(({ kind, expectedOwner }) => kind === 'SERVICE_OWNER_HYDRATION'
+                        && window.Clerk?.loaded === true && window.Clerk?.user?.id === expectedOwner,
+                    { kind: 'SERVICE_OWNER_HYDRATION', expectedOwner: 'user_3LFy4E2hco0VpC63CbjjMjOznIx' }, { timeout: 20000 }), 20000);
+                    check(page.context() === actor.context && page.url() === target.origin + path);
                     if (cell.kind === 'MENU_CREATE') {
                         check(fixture.name?.startsWith('【架空') && fixture.name.includes(scope.runId));
                         await page.locator('#new-menu-field-1').fill(fixture.name);

@@ -343,8 +343,9 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 authenticated = true;
                 if(trackedReadClose){sessionRecord.activationAcknowledgedUtc=new Date().toISOString();emitSession();}
                 mark('activationAcknowledged'); mark('adminNavigationStarted');
-                await page.goto(previewOrigin + '/admin/shop');
+                const navigationResponse=await page.goto(previewOrigin + '/admin/shop');
                 mark('adminNavigationCompleted');
+                return navigationResponse; // Caller may validate this existing GET; never serialize its headers/body.
             } catch {if(trackedReadClose&&!sessionRecord?.eligibleForCleanup)routeHeld=true;fail('CI_AUTHENTICATION_FAILED'); }
             finally { initialDocumentWindow = false; }
         },
@@ -356,6 +357,11 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 const cleanupObservation=()=>{try{emitSession();}catch{sessionRecord.diagnosticObservationFailed=true;}};
                 signoutAttempted=true;sessionRecord.signOutAttemptedUtc=new Date().toISOString();cleanupObservation();
                 try {
+                    // A fresh document can finish navigation before Clerk hydrates.
+                    // Wait for this already-owned client, never activate/sign in again.
+                    await withClerkDeadline(page.waitForFunction(({id,owner})=>!!window.Clerk?.loaded&&
+                        (!window.Clerk.user||window.Clerk.user.id===owner)&&(!window.Clerk.session||window.Clerk.session.id===id),
+                    {id:sessionRecord.id,owner:ownerIdentity.ownerId},{timeout:10000}));
                     const ended=await withClerkDeadline(page.evaluate(async({id,owner})=>{
                         if(!window.Clerk?.loaded||window.Clerk.user&&window.Clerk.user.id!==owner)throw Error('OWNER_REFUSED');
                         if(window.Clerk.session&&window.Clerk.session.id!==id)throw Error('SESSION_REFUSED');

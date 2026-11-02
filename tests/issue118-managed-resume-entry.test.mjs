@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {mkdtempSync,readFileSync,readdirSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve,basename,sep} from 'node:path';
-import {decodeManagedResumeBundle,claimManagedDispatch,target} from '../scripts/check-issue118-live-t1-browser.mjs';
+import {decodeManagedResumeBundle,claimManagedDispatch,assertManagedSessionBudget,target} from '../scripts/check-issue118-live-t1-browser.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const make=value=>{
@@ -15,6 +15,13 @@ const make=value=>{
         evidenceReference:'https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/12345'}};
 };
 const body=()=>({initialSnapshot:{},preparationState:{},checkpointReceipt:{terminalMetadataReceipt:{artifactSha256:'a'.repeat(64),githubRunId:'12345'}},terminalProof:{},nextCellId:null});
+test('global seven-session cap includes previously failed runs; final read-only reconciliation needs no session',()=>{
+    assert.deepEqual(assertManagedSessionBudget({managedPriorSessionConsumption:2},2),{prior:2,reserved:2,maximum:7});
+    assert.equal(assertManagedSessionBudget({managedPriorSessionConsumption:6},1).prior,6);
+    assert.equal(assertManagedSessionBudget({managedPriorSessionConsumption:7},0).reserved,0);
+    for(const [prior,needed] of [[7,1],[6,2],[-1,1],[undefined,2],[8,0],[2,3]])
+        assert.throws(()=>assertManagedSessionBudget({managedPriorSessionConsumption:prior},needed),{message:'MANAGED_GLOBAL_SESSION_BUDGET_REFUSED'});
+});
 test('bounded non-secret checkpoint bytes preserve prep/proof bindings; codec alone does not authorize a session',()=>{
     const value=body();assert.deepEqual(decodeManagedResumeBundle(make(value)),value);
 });

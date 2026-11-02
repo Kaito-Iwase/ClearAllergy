@@ -912,6 +912,76 @@ export async function executeManagedServiceResume({initialSnapshot,preparationSt
 }
 
 // One nonpersistent context per pinned owner. No imported profile/storageState.
+// Read-only gate on an already owned/authenticated page; never logs in, sets a
+// session, mutates data or performs cleanup. No URL/key/identity/body/error values
+// enter this diagnostic. A successful gate is not independent isolation proof.
+export async function verifyManagedOwnedPage({role,page,context,access,navigate=true,navigationResponse,
+    routeFailed=()=>false,record=()=>{},timeoutMs=20000}={}){
+    const r={owner:['S1','S2'].includes(role)?role:'UNKNOWN',stage:'INPUT',failureStage:null,code:'HOLD',verified:false,
+        contextMatched:false,navigationAttempted:false,navigationCompleted:false,http200:false,fixedPageMatched:false,
+        hydrationWaitAttempted:false,hydrationWaitCompleted:false,hydrationSnapshotObserved:false,
+        clerkLoaded:false,frontendOwnerMatched:false,publishableKeyChecked:false,publishableKeyMatched:false,
+        ownApiReadAttempted:false,ownApiHttp200:false,ownShopMatched:false,routeHealthy:false,
+        observerFailed:false,cleanupAttempted:false};
+    const emit=async()=>{try{await record(structuredClone(r));}catch{r.observerFailed=true;throw Error('MANAGED_PAGE_OBSERVER_HELD');}};
+    const stage=async code=>{r.stage=code;await emit();};
+    const bound=async operation=>{
+        let timer;
+        try{return await Promise.race([Promise.resolve().then(operation),new Promise((_,reject)=>{
+            timer=setTimeout(()=>reject(Error('MANAGED_PAGE_TIMEOUT')),timeoutMs);
+        })]);}finally{clearTimeout(timer);}
+    };
+    const snapshot=async identity=>{
+        const view=await bound(()=>page.evaluate(expected=>({loaded:window.Clerk?.loaded===true,
+            ownerMatched:window.Clerk?.user?.id===expected,pk:window.Clerk?.publishableKey}),identity.ownerId));
+        r.hydrationSnapshotObserved=true;r.clerkLoaded=view?.loaded===true;r.frontendOwnerMatched=view?.ownerMatched===true;
+        return view;
+    };
+    try{
+        assert.ok(['S1','S2'].includes(role)&&Number.isInteger(timeoutMs)&&timeoutMs>=1&&timeoutMs<=30000);
+        const identity=managedActorIdentity[role];
+        assert.ok(page&&context&&typeof page.waitForFunction==='function'&&typeof access?.read==='function');
+        r.contextMatched=page.context()===context;assert.equal(r.contextMatched,true);
+        let response=navigationResponse;
+        if(navigate){await stage('NAVIGATION');r.navigationAttempted=true;
+            response=await bound(()=>page.goto(target.origin+'/admin/shop',{waitUntil:'domcontentloaded',timeout:timeoutMs}));
+            r.navigationCompleted=true;
+        }
+        await stage('HTTP');r.http200=response?.status()===200;assert.equal(r.http200,true);
+        await stage('PAGE_URL');r.fixedPageMatched=page.url()===target.origin+'/admin/shop';assert.equal(r.fixedPageMatched,true);
+        await stage('HYDRATION_WAIT');r.hydrationWaitAttempted=true;
+        try{
+            await bound(()=>page.waitForFunction(expected=>window.Clerk?.loaded===true&&window.Clerk?.user?.id===expected,
+                identity.ownerId,{timeout:timeoutMs}));r.hydrationWaitCompleted=true;
+        }catch(error){
+            // Read only fixed predicates after a failed wait; an observation
+            // failure must not replace the original HYDRATION_WAIT failure.
+            try{await snapshot(identity);}catch{ /* snapshotObserved remains false */ }
+            let name,message;try{name=Object.getOwnPropertyDescriptor(error??{},'name')?.value;
+                message=Object.getOwnPropertyDescriptor(error??{},'message')?.value;}catch{ /* unknown fixed classification */ }
+            r.code=name==='TimeoutError'||message==='MANAGED_PAGE_TIMEOUT'?'HYDRATION_TIMEOUT_HELD':'HYDRATION_EXCEPTION_HELD';
+            throw Error('MANAGED_PAGE_HYDRATION_HELD');
+        }
+        await stage('FRONTEND_IDENTITY');const frontend=await snapshot(identity);
+        assert.equal(r.clerkLoaded,true);assert.equal(r.frontendOwnerMatched,true);
+        // Navigation or an owner change during hydration cannot pass the gate.
+        r.fixedPageMatched=page.url()===target.origin+'/admin/shop';assert.equal(r.fixedPageMatched,true);
+        await stage('PUBLISHABLE_KEY');r.publishableKeyChecked=true;assertClerkPublishableKey(frontend.pk);r.publishableKeyMatched=true;
+        await stage('OWN_API_STATUS');r.ownApiReadAttempted=true;
+        const own=await bound(()=>access.read(context.request,target.origin+'/api/admin/shop'));
+        r.ownApiHttp200=own?.status()===200;assert.equal(r.ownApiHttp200,true);
+        await stage('OWN_API_SHOP');const body=await bound(()=>own.json());
+        r.ownShopMatched=body?.shop?.id===identity.shopId;assert.equal(r.ownShopMatched,true);
+        await stage('ROUTE_HEALTH');r.routeHealthy=routeFailed()===false;assert.equal(r.routeHealthy,true);
+        r.stage='VERIFIED';r.code='OWNER_PAGE_AND_OWN_API_VERIFIED';r.verified=true;await emit();return r;
+    }catch{
+        r.verified=false;r.failureStage??=r.stage;
+        if(r.code==='HOLD'||r.code==='OWNER_PAGE_AND_OWN_API_VERIFIED')r.code=r.observerFailed?'DIAGNOSTIC_OBSERVER_HELD':'OWNER_PAGE_GATE_HELD';
+        try{await emit();}catch{ /* returned fixed diagnostics remain available to caller */ }
+        return r;
+    }
+}
+
 export async function openManagedOwnedActor({role,chromium,env,identityReceipt,record=()=>{}}){
     assert.equal(liveTargetPinsVerified,true);assert.ok(['S1','S2'].includes(role));assertIdentityReceipt(identityReceipt);
     assert.equal(env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
@@ -939,11 +1009,10 @@ export async function openManagedOwnedActor({role,chromium,env,identityReceipt,r
         page=await context.newPage();page.setDefaultTimeout(20000);
         const {readT1KeyClassPreflight,assertT1KeyClassReady}=await import('./check-issue118-server-callback-candidate.mjs');
         observation.keyClass=await readT1KeyClassPreflight(context.request,access.token());assertT1KeyClassReady(observation.keyClass);emit();
-        await access.authenticate(page);assert.equal(routeFailed,false);
-        const response=await page.goto(target.origin+'/admin/shop');assert.equal(response?.status(),200);assert.equal(page.url(),target.origin+'/admin/shop');
-        const frontend=await page.evaluate(()=>({id:window.Clerk?.user?.id,pk:window.Clerk?.publishableKey}));
-        assert.equal(frontend.id,identity.ownerId);assertClerkPublishableKey(frontend.pk);
-        const own=await access.read(context.request,target.origin+'/api/admin/shop');assert.equal(own.status(),200);assert.equal((await own.json())?.shop?.id,identity.shopId);
+        const navigationResponse=await access.authenticate(page);assert.equal(routeFailed,false);
+        observation.ownerPageGate=await verifyManagedOwnedPage({role,page,context,access,navigate:false,navigationResponse,routeFailed:()=>routeFailed,
+            record:gate=>{observation.ownerPageGate=gate;emit();}});
+        assert.equal(observation.ownerPageGate.verified,true);
         observation.gateVerified=true;phase='APP_FLOW';observation.stage='OWNER_AND_SHOP_VERIFIED';emit();
         return {owner:role,expectedUserId:identity.ownerId,binding:{owner:role,shopId:identity.shopId,contextRef:'managed_'+role},
             page,context,browser,access,observation,lifecycle:{browser,tracker,onStage:stages},
@@ -951,7 +1020,8 @@ export async function openManagedOwnedActor({role,chromium,env,identityReceipt,r
             finalize:async()=>{const result=await finalizeOwnedCiActor({access,page,context,browser,expectedOwnerId:identity.ownerId,
                 drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot(),attempts:{browserLaunchAttempted:true,contextCreateAttempted:true},onStage:stages});
                 observation.finalization=result;emit();return result;}};
-    }catch{observation.stage='ACTOR_GATE_HELD';
+    }catch{observation.failureStage??=observation.ownerPageGate?.failureStage??observation.stage;observation.stage='ACTOR_GATE_HELD';
+        try{await emit();}catch{observation.diagnosticPersistenceFailed=true;}
         observation.finalization=access&&page?await finalizeOwnedCiActor({access,page,context,browser,expectedOwnerId:identity.ownerId,
             drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot(),attempts:{browserLaunchAttempted:!!browser,contextCreateAttempted:!!context},onStage:stages})
             :await closeIsolatedBrowser(context,browser,{browserLaunchAttempted:!!browser,contextCreateAttempted:!!context});
@@ -1428,6 +1498,15 @@ export function claimManagedDispatch({directory,checkpointKey,runnerSha,now=new 
     finally{if(fd!==undefined)closeSync(fd);}
 }
 
+// External single-dispatcher ledger supplies prior consumption, including failed
+// runs whose sessions were later terminated. Per-suite counts never refund it.
+export function assertManagedSessionBudget(receipt,needed){
+    const prior=receipt?.managedPriorSessionConsumption;
+    if(!Number.isSafeInteger(prior)||prior<0||prior>7||!Number.isSafeInteger(needed)||needed<0||needed>2||prior+needed>7)
+        throw Error('MANAGED_GLOBAL_SESSION_BUDGET_REFUSED');
+    return {prior,reserved:needed,maximum:7};
+}
+
 export function decodeManagedResumeBundle(receipt){
     try{
         const encoded=receipt?.managedResumeBundle;
@@ -1456,8 +1535,10 @@ export async function runManagedServiceArm(){
     assert.ok(!process.env.DEBUG&&!process.env.PWDEBUG&&!process.env.NODE_OPTIONS);
     const receipt=JSON.parse(readFileSync(process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT,'utf8'));assertIdentityReceipt(receipt);
     const bundle=decodeManagedResumeBundle(receipt);
+    const budget=assertManagedSessionBudget(receipt,bundle.nextCellId===null?0:1);
     const output=resolve(process.env.CLEARALLERGY_BROWSER_OUTPUT);mkdirSync(dirname(output),{recursive:true});mkdirSync(output,{recursive:false});
     const report={target,startedUtc:new Date().toISOString(),operation:'MANAGED_SERVICE_ARM',status:'HOLD_NOT_STARTED',
+        sessionBudget:budget,
         dbObservation:'Independent READ ONLY proof supplied as an externally verified checkpoint; new arm SQL remains separate',events:[]};
     const save=()=>writeFileSync(join(output,'result.json'),JSON.stringify(report,null,2));
     let actor;
@@ -1501,6 +1582,7 @@ export async function runLive() {
     const identityBytes = readFileSync(process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT);
     const identityReceipt = JSON.parse(identityBytes.toString("utf8"));
     assertIdentityReceipt(identityReceipt);
+    if(managedMode)assertManagedSessionBudget(identityReceipt,2);
     const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
     const output = resolve(process.env.CLEARALLERGY_BROWSER_OUTPUT || join(".agent-runs", `issue118-live-${randomUUID()}`));
     mkdirSync(dirname(output), { recursive: true });
@@ -1512,6 +1594,7 @@ export async function runLive() {
         run: randomUUID(), startedUtc: new Date().toISOString(), stage: "LOGIN", phase: "NONE", observations: [], requests: [], status: "RUNNING",
         flow: "NOT_RUN", cleanup: "NOT_REQUIRED_NO_KNOWN_FIXTURE", protection: "NOT_CHECKED" };
     if (readCloseOnly) report.diagnosticMode = readCloseMode;
+    if(managedMode)report.sessionBudget=assertManagedSessionBudget(identityReceipt,2);
     const save = () => writeFileSync(join(output, "result.json"), JSON.stringify(report, null, 2));
     let browser;
     let context;
@@ -1785,7 +1868,10 @@ export async function runLive() {
             report.protectedAfter=await Promise.all(protectedIds.map(async id=>protectedApiSnapshot(await read(id))));
             assert.deepEqual(report.protectedAfter,protectedBefore);report.protection='PASS_API_REPRESENTATION';
             const viewerDrain=await ciRouteLifecycle.drain();assert.equal(viewerDrain.status,'QUIET_CONFIRMED');assert.equal(viewerDrain.pending,0);
-            await viewer.close();await page.goto(target.origin+'/admin/shop');
+            await viewer.close();const managedNavigation=await page.goto(target.origin+'/admin/shop');
+            const managedAGate=await verifyManagedOwnedPage({role:'S1',page,context,access:ciAccess,navigate:false,
+                navigationResponse:managedNavigation,routeFailed:()=>ciTransportFailed,record:value=>{report.managedAGate=value;save();}});
+            assert.equal(managedAGate.verified,true);
             const a={owner:'S1',expectedUserId:ciIdentity.ownerId,binding:{owner:'S1',shopId:target.shop,contextRef:'managed_S1'},
                 page,context,browser,access:ciAccess,lifecycle:{browser,tracker:ciRouteLifecycle,onStage:markLifecycle},
                 routeFailed:()=>ciTransportFailed};
@@ -1842,6 +1928,7 @@ export async function runLive() {
         if (ciAccess) report.initialHandshake = ciAccess.handshakeProgress();
         if(managedB){try{report.managedActorBFinalization=await managedB.finalize();if(!report.managedActorBFinalization.complete)ciTransportFailed=true;}
             catch{report.managedActorBFinalization={complete:false,status:'FINALIZATION_EXCEPTION'};ciTransportFailed=true;}}
+        if(report.managedActorB?.finalization?.complete===false){ciTransportFailed=true;report.managedBTerminationUnverified=true;}
         if(ciAccess&&page){
             const finalized=await finalizeOwnedCiActor({access:ciAccess,page,context,browser,expectedOwnerId:ciIdentity.ownerId,
                 drainRoutes:()=>ciRouteLifecycle.drain(),readRouteState:()=>ciRouteLifecycle.snapshot(),attempts:{browserLaunchAttempted,contextCreateAttempted},onStage:markLifecycle});
