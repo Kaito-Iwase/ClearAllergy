@@ -12,6 +12,8 @@ import { closeIsolatedBrowser } from './issue118-close-browser.mjs';
 
 export const assetMode = 'PUBLIC_ASSETS_ONLY';
 export const loginAssetMode = 'LOGIN_PUBLIC_ASSETS_ONLY';
+export const publicCodeMode = 'PINNED_PUBLIC_CODE_ONLY';
+export const publicCodePins=JSON.parse(readFileSync(new URL('./issue118-public-code-pins.json',import.meta.url),'utf8').replace(/^\uFEFF/,''));
 export const sourceLockSha256 = '2efea34912a5c27d59c1675fa2cd3c6600a445ba2bd920de2a937258cb0a015c';
 export const observedCandidateAsset = Object.freeze({path:'/_next/static/immutable/chunks/1yxbpkao8jjq-.js',
     sha256:'22f889779049694ab8497801e8286d170f1101edbad60f9d61d06335458a50a7'});
@@ -288,15 +290,22 @@ export async function readLoginAssetDocument(getToken,browserFactory) {
         if(!r.allLocalClosed||r.extraBrowserRequestsBlocked||r.routeAbortFailed)r.held=true;}
     return {diagnostics:r,response:!r.held&&bytes?new Response(bytes,{headers:{'content-type':type}}):null};
 }
-export async function inspectDeploymentAssets(env, receipt, fetcher = fetch, loginReader) {
+export async function inspectDeploymentAssets(env, receipt, fetcher = fetch, loginReader, codePins = publicCodePins) {
     const result = { stage: 'CONTEXT', code: 'PUBLIC_ASSETS_INCOMPLETE', completed: false,
         deployment: target.deployment, source: target.source, origin: target.origin,
         oidcRequestSent: false, appGetCount: 0, redirectFollowed: false,
         clerkStarted: false, sessionStarted: false, browserStarted: false, fixtureWriteStarted: false,
         responseBodiesRetained: false, publicAssets: [], actionReferences: [],actionCandidates:[], telemetryBindings: [] };
     try {
-        const login=env.ISSUE118_DIAGNOSTIC_MODE===loginAssetMode,documentPath=login?'/admin/login':'/';
-        assertRedirectDiagnosticEnvironment(env, login?loginAssetMode:assetMode);
+        const login=env.ISSUE118_DIAGNOSTIC_MODE===loginAssetMode,codeOnly=env.ISSUE118_DIAGNOSTIC_MODE===publicCodeMode,
+            documentPath=codeOnly?null:login?'/admin/login':'/';
+        assertRedirectDiagnosticEnvironment(env, codeOnly?publicCodeMode:login?loginAssetMode:assetMode);
+        const pins=new Map();
+        if(codeOnly) {
+            if(codePins.source!==target.source||codePins.deployment!==target.deployment||!Array.isArray(codePins.assets)||!codePins.assets.length||codePins.assets.length>maxAssets)held();
+            for(const p of codePins.assets) {assertPublicAssetPath(p.path);if(pins.has(p.path)||!/^[a-f0-9]{64}$/.test(p.sha256))held();pins.set(p.path,p.sha256);}
+            result.publicCode=[];
+        }
         if(login&&typeof loginReader!=='function')held();
         result.stage = 'RECEIPT'; assertIdentityReceipt(receipt);
         result.stage='SOURCE_LOCK';if(!sourceLockMatches(readFileSync(new URL('../package-lock.json',import.meta.url))))held();
@@ -308,10 +317,11 @@ export async function inspectDeploymentAssets(env, receipt, fetcher = fetch, log
             headers: { Authorization: `bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` }, signal: AbortSignal.timeout(20000) });
         if (!response.ok) held();
         result.stage = 'OIDC_CLAIMS'; const token = assertOidcClaims((await response.json()).value);
-        const queue = [documentPath], seen = new Set(); let totalBytes = 0;
+        const queue = codeOnly?[...pins.keys()]:[documentPath], seen = new Set(); let totalBytes = 0;
         for (let i = 0; i < queue.length; i++) {
             const path = queue[i]; if (seen.has(path)) continue;
             result.stage = 'APP_TARGET'; if (path !== documentPath) assertPublicAssetPath(path);
+            if(codeOnly&&!pins.has(path))held();
             if (seen.size >= maxAssets + 1) held();
             assertIdentityReceipt(receipt); assertOidcClaims(token); seen.add(path);
             let asset;
@@ -334,6 +344,8 @@ export async function inspectDeploymentAssets(env, receipt, fetcher = fetch, log
             result.stage = 'APP_BODY';
             const remainingBytes = maxTotalBytes - totalBytes; if (remainingBytes <= 0) held();
             const body = await readLimited(asset, Math.min(remainingBytes, path === documentPath ? 1024 * 1024 : 2 * 1024 * 1024));
+            const bodyHash=createHash('sha256').update(body.text).digest('hex');
+            if(codeOnly) {if(bodyHash!==pins.get(path))held();result.publicCode.push({path,sha256:bodyHash,text:body.text});result.responseBodiesRetained=true;}
             if(path===observedCandidateAsset.path&&createHash('sha256').update(body.text).digest('hex')!==observedCandidateAsset.sha256)held();
             totalBytes += body.bytes; if (totalBytes > maxTotalBytes) held();
             const observation = inspectPublicCode(body.text, path === documentPath);
@@ -350,7 +362,10 @@ export async function inspectDeploymentAssets(env, receipt, fetcher = fetch, log
             for (const reference of observation.actionReferences) result.actionReferences.push({ path, reference, export: 'invalidateCacheAction' });
             for (const candidate of observation.actionCandidates)result.actionCandidates.push({path,...candidate});
             for (const binding of observation.telemetryBindings) result.telemetryBindings.push({ assetPath: path, ...binding });
-            for (const dependency of observation.paths) if (!seen.has(dependency) && !queue.includes(dependency)) queue.push(dependency);
+            for (const dependency of observation.paths) if (!seen.has(dependency) && !queue.includes(dependency)) {
+                if(codeOnly) {result.unfetchedDependencyCount=(result.unfetchedDependencyCount||0)+1;continue;}
+                queue.push(dependency);
+            }
             if (queue.length > maxAssets + 1) held();
         }
         result.stage = 'STOP_PUBLIC_ASSETS_ONLY'; result.completed = true;
@@ -362,7 +377,9 @@ export async function inspectDeploymentAssets(env, receipt, fetcher = fetch, log
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     try {
         const login=process.argv.slice(2).join(' ')==='--login-public-assets-only';
-        if ((!login&&(process.argv.slice(2).join(' ') !== '--public-assets-only'||process.env.ISSUE118_DIAGNOSTIC_MODE!==assetMode)) ||
+        const codeOnly=process.argv.slice(2).join(' ')==='--pinned-public-code-only';
+        if ((!login&&!codeOnly&&(process.argv.slice(2).join(' ') !== '--public-assets-only'||process.env.ISSUE118_DIAGNOSTIC_MODE!==assetMode)) ||
+            (codeOnly&&process.env.ISSUE118_DIAGNOSTIC_MODE!==publicCodeMode)||
             (login&&process.env.ISSUE118_DIAGNOSTIC_MODE!==loginAssetMode)||!process.env.RUNNER_TEMP ||
             !process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT) held();
         const receipt = JSON.parse(readFileSync(process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT, 'utf8'));
@@ -371,8 +388,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
             return chromium.launch({headless:true,channel:'chromium'});
         }):undefined;
         const result = await inspectDeploymentAssets(process.env, receipt,fetch,reader);
-        const directory = join(process.env.RUNNER_TEMP, login?'issue118-login-public-assets':'issue118-public-assets'); mkdirSync(directory, { recursive: false });
+        const directory = join(process.env.RUNNER_TEMP, codeOnly?'issue118-pinned-public-code':login?'issue118-login-public-assets':'issue118-public-assets'); mkdirSync(directory, { recursive: false });
         writeFileSync(join(directory, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx' });
-        console.log(JSON.stringify(result)); if (!result.completed) process.exitCode = 1;
+        const safeLog={...result};delete safeLog.publicCode;console.log(JSON.stringify(safeLog)); if (!result.completed) process.exitCode = 1;
     } catch { console.error('PUBLIC_ASSETS_REFUSED_NO_RAW_ERROR'); process.exitCode = 1; }
 }

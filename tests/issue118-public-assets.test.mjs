@@ -5,6 +5,8 @@ import { createRequire } from 'node:module';
 import { assertPublicAssetPath, assetMode, loginAssetMode, inspectDeploymentAssets, inspectPublicCode,readLoginAssetDocument,sourceLockMatches,observedCandidateAsset } from '../scripts/check-issue118-public-assets.mjs';
 import { initialHandshakeContract as contract } from '../scripts/issue118-initial-handshake-candidate.mjs';
 import { ciIdentity } from '../scripts/issue118-ci-auth.mjs';
+import { createHash } from 'node:crypto';
+import { publicCodeMode,publicCodePins } from '../scripts/check-issue118-public-assets.mjs';
 import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
 const secret = 'SYNTHETIC_SECRET_NOT_REAL';
 const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_RUN_ATTEMPT: '1',
@@ -36,6 +38,27 @@ function stopped(r) {
     for (const key of ['redirectFollowed','clerkStarted','sessionStarted','browserStarted','fixtureWriteStarted','responseBodiesRetained']) assert.equal(r[key], false);
     assert.doesNotMatch(JSON.stringify(r), /SYNTHETIC|Authorization|bearer|sk_test_|Cookie/);
 }
+test('pinned code snapshot retains only verified static JS; no document handshake or credential forwarding',async()=>{
+    const text='/* synthetic public code, no credentials */',path='/_next/static/chunks/code.js';
+    const pins={source:target.source,deployment:target.deployment,assets:[{path,sha256:createHash('sha256').update(text).digest('hex')}]};
+    let calls=0;const r=await inspectDeploymentAssets({...env(),ISSUE118_DIAGNOSTIC_MODE:publicCodeMode},receipt(),async(url,opts)=>{
+        if(++calls===1)return issued();assert.equal(url,target.origin+path);assert.equal(opts.method,'GET');assert.equal(opts.redirect,'error');
+        assert.equal(opts.headers.Cookie,undefined);assert.equal(opts.headers.Authorization,undefined);return response(text);
+    },()=>assert.fail('No browser reader'),pins);
+    assert.equal(r.completed,true);assert.equal(calls,2);assert.deepEqual(r.publicCode,[{path,sha256:pins.assets[0].sha256,text}]);
+    for(const key of ['clerkStarted','sessionStarted','browserStarted','fixtureWriteStarted'])assert.equal(r[key],false);
+    assert.equal(publicCodePins.assets.length,20);assert.ok(publicCodePins.assets.every(x=>/^\/_next\/static\//.test(x.path)&&/^[a-f0-9]{64}$/.test(x.sha256)));
+    for(const bad of [{...pins,source:'b'.repeat(40)},{...pins,assets:[{path:'/admin/login',sha256:'a'.repeat(64)}]},
+        {...pins,assets:[pins.assets[0],pins.assets[0]]}]) {
+        let n=0;const held=await inspectDeploymentAssets({...env(),ISSUE118_DIAGNOSTIC_MODE:publicCodeMode},receipt(),()=>{n++;throw Error(secret);},undefined,bad);
+        assert.equal(n,0);assert.equal(held.completed,false);
+    }
+    let n=0;const mismatch=await inspectDeploymentAssets({...env(),ISSUE118_DIAGNOSTIC_MODE:publicCodeMode},receipt(),async()=>++n===1?issued():response(secret),undefined,pins);
+    assert.equal(mismatch.completed,false);assert.deepEqual(mismatch.publicCode,[]);assert.doesNotMatch(JSON.stringify(mismatch),/SYNTHETIC/);
+    const workflow=readFileSync(new URL('../.github/workflows/issue118-live-e2e.yml',import.meta.url),'utf8');
+    const block=workflow.split('- name: Byte-pinned public JS snapshot only')[1]?.split('\n      - name:')[0];
+    assert.ok(block);assert.doesNotMatch(block,/secrets\.|PLAYWRIGHT|ISSUE118_APPLY/);
+});
 test('asset paths reject origin, traversal, encoding, query, fragments, arbitrary app/API paths', () => {
     assert.equal(assertPublicAssetPath('/_next/static/chunks/abc.js'), '/_next/static/chunks/abc.js');
     assert.equal(assertPublicAssetPath('/_next/static/build-id/_buildManifest.js'),'/_next/static/build-id/_buildManifest.js');
