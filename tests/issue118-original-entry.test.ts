@@ -13,6 +13,20 @@ import { target } from "../scripts/check-issue118-live-t1-browser.mjs";
 import { createHash } from "node:crypto";
 
 const runId = "88888888-8888-4888-8888-888888888888";
+test('live managed send boundary precedes all 49 sends and cleanup appends 14 distinct STOPs after execute closes its journal',async()=>withClaims(async directory=>{
+    const f=managedFixture(directory),authorized:string[]=[],created:string[]=[];
+    const input={...f.input,managed:{...f.input.managed,mode:'APPROVED_MANAGED_LIVE',sendBoundary:{
+        authorize:async({id}:{id:string})=>{assert.equal(authorized.includes(id),false);authorized.push(id);return {id,allowedForward:true};},
+        consumeSendPermission:()=>{},
+        recordCreated:async({id}:{id:string})=>{assert.equal(created.includes(id),false);created.push(id);},
+    }}};
+    const run=prepareOriginalBatchRun(input),result=await run.execute();assert.equal(result.status,'MANAGED_ADAPTER_SEQUENCE_CONFIRMED_NOT_LIVE_PASS');
+    assert.equal(authorized.length,49);assert.equal(created.length,17);const cleaned=await run.cleanupKnownPrivate();
+    assert.equal(cleaned.unknownWrite,false);assert.equal(cleaned.verifiedPrivateIds.length,17);assert.equal(authorized.length,63);
+    assert.equal(f.calls.length,63);assert.ok(cleaned.final.every((m:{isPublished:boolean})=>m.isPublished===false));
+    const before=f.calls.length;await assert.rejects(run.cleanupKnownPrivate());assert.equal(f.calls.length,before);
+    assert.match(readFileSync(join(directory,'events.jsonl'),'utf8'),/FINAL_PRIVATE_HISTORY_RETAINED/);
+}));
 function fakeEntry(scenario: "T2" | "T3", fixtureRunId = runId, idOffset = 0) {
     const owners = [{ owner: "S1" as const, shopId: "cshopa", contextRef: "A" }, { owner: "S2" as const, shopId: "cshopb", contextRef: "B" }];
     const keys = Object.keys(menuOwners) as MenuId[], menus = new Map<MenuId, SavedMenu>(), sends: string[] = [];

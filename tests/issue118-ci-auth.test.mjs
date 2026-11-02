@@ -28,6 +28,42 @@ const jwt = body => 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify(body)).t
 const response = body => ({ ok: true, json: async () => body });
 const code = expected => error => error.message === expected && !error.cause && !String(error.stack).includes(syntheticSecret);
 const publicKey = 'pk_test_' + Buffer.from(ciIdentity.clerkDomain + '$').toString('base64');
+test('same-job OIDC renewal is single-flight, preserves claims and stops at a finite issuance budget',async t=>{
+    let clock=Date.now(),calls=0;t.mock.method(Date,'now',()=>clock);
+    const a=await createCiAccess(env(),async()=>{calls++;return response({value:jwt(claims())});});
+    assert.equal(calls,1);await a.ensureToken();assert.equal(calls,1);
+    for(let i=0;i<5;i++){clock+=241000;await Promise.all([a.ensureToken(),a.ensureToken()]);}
+    assert.equal(calls,6);assert.deepEqual(a.oidcLifecycle(),{issuances:6,renewalFailed:false,maximumIssuances:6});
+    clock+=241000;await assert.rejects(a.ensureToken(),code('OIDC_RENEWAL_LIMIT'));assert.equal(calls,6);
+    await assert.rejects(a.ensureToken(),code('OIDC_RENEWAL_HELD'));assert.equal(calls,6);
+});
+test('failed, nonadvanced or changed-claim OIDC renewal never retries or sends an app request',async t=>{
+    for(const bad of ['THROW','SAME','WRONG_REF']){
+        let clock=Date.now(),calls=0,appCalls=0;t.mock.method(Date,'now',()=>clock);const old=claims();
+        const a=await createCiAccess(env(),async()=>{if(++calls===1)return response({value:jwt(old)});
+            if(bad==='THROW')throw Error(syntheticSecret);return response({value:jwt(bad==='SAME'?old:{...claims(),ref:'refs/heads/main'})});});
+        clock+=241000;
+        const api={fetch:async()=>{appCalls++;assert.fail('No app request after failed renewal');}};
+        await assert.rejects(a.read(api,target.origin+'/api/admin/shop'),code('OIDC_RENEWAL_HELD'));
+        await assert.rejects(a.read(api,target.origin+'/api/admin/shop'),code('OIDC_RENEWAL_HELD'));
+        assert.equal(calls,2);assert.equal(appCalls,0);assert.equal(a.oidcLifecycle().renewalFailed,true);t.mock.restoreAll();
+    }
+});
+test('OIDC renewal failure while another route waits for headers prevents its old-token APP fetch',async t=>{
+    let clock=Date.now(),calls=0,fetches=0,aborts=0,release,started;
+    t.mock.method(Date,'now',()=>clock);
+    const ready=new Promise(resolve=>{started=resolve;}),waiting=new Promise(resolve=>{release=resolve;});
+    const a=await createCiAccess(env(),async()=>{if(++calls===1)return response({value:jwt(claims())});throw Error(syntheticSecret);});
+    clock+=230000;
+    const route={request:()=>({url:()=>target.origin+'/admin/shop',method:()=> 'GET',allHeaders:async()=>{started();await waiting;return {};}}),
+        fetch:async()=>{fetches++;return {status:()=>200};},fulfill:async()=>{},abort:async()=>{aborts++;}};
+    const work=assert.rejects(a.route(route),code('CI_ROUTE_FAILED'));await ready;clock+=11000;
+    await assert.rejects(a.ensureToken(),code('OIDC_RENEWAL_HELD'));release();await work;
+    assert.equal(fetches,0);assert.equal(aborts,1);assert.equal(calls,2);
+    assert.throws(()=>a.token(),code('OIDC_RENEWAL_HELD'));
+    let clerkForwards=0;await assert.rejects(a.route({request:()=>({url:()=> 'https://'+ciIdentity.clerkDomain+'/v1/client',method:()=> 'POST'}),
+        fetch:async()=>{clerkForwards++;},abort:async()=>{}}),code('CI_ROUTE_FAILED'));assert.equal(clerkForwards,0);
+});
 test('read-close approved claim cannot send after transport header wait changes phase or receipt validity',async()=>{
     for(const change of ['PHASE','RECEIPT','NONE']) {
         let phase='AUTHENTICATION',expired=false,headerCalls=0,release,ready,fetches=0;
@@ -420,14 +456,14 @@ test('one OIDC fetch uses redirect error and bounded signal; raw errors never le
     assert.equal(failures, 1);
 });
 
-test('expired OIDC is not silently refreshed or sent to the Preview', async t => {
+test('expired OIDC cannot be sent; a nonadvanced renewal is held without an app request', async t => {
     const now = Date.now();
     const issued = { ...claims(), exp: Math.floor(now / 1000) + 20 };
     let tokenCalls = 0, previewCalls = 0;
     const access = await createCiAccess(env(), async () => { tokenCalls++; return response({ value: jwt(issued) }); });
     t.mock.method(Date, 'now', () => now + 30000);
-    await assert.rejects(async () => access.read({ fetch: async () => { previewCalls++; } }, target.origin + '/api/admin/shop'), code('OIDC_TIME_REFUSED'));
-    assert.equal(tokenCalls, 1); assert.equal(previewCalls, 0);
+    await assert.rejects(async () => access.read({ fetch: async () => { previewCalls++; } }, target.origin + '/api/admin/shop'), code('OIDC_RENEWAL_HELD'));
+    assert.equal(tokenCalls, 2); assert.equal(previewCalls, 0);
 });
 
 test('public frontend must be exact test instance before any Backend API call', async () => {
@@ -714,7 +750,7 @@ test('readonly API interface refuses mutation before transport, provider URL/sec
     const access = await createCiAccess(env(), async () => response({ value: jwt(claims()) }));
     await assert.rejects(access.read({ fetch: async () => { throw Error(syntheticSecret); } }, target.origin + '/api/admin/shop'), code('PROTECTED_TRANSPORT_FAILED'));
     let calls = 0;
-    await assert.rejects(access.read({ fetch: async () => { calls++; } }, 'https://other.invalid/'), code('API_TARGET_REFUSED'));
+    await assert.rejects(access.read({ fetch: async () => { calls++; } }, 'https://other.invalid/'), code('CI_READ_TARGET_REFUSED'));
     assert.equal(calls, 0);
 });
 
@@ -726,10 +762,15 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.deepEqual(Object.keys(parsed.jobs), ['live-t1']);
     assert.deepEqual(parsed.jobs['live-t1'].permissions, { contents: 'read', 'id-token': 'write' });
     const secretSteps = parsed.jobs['live-t1'].steps.filter(step => Object.values(step.env || {}).some(value => String(value).includes('secrets.')));
-    assert.equal(secretSteps.length, 2);
+    assert.equal(secretSteps.length, 3);
     const t1 = secretSteps.find(step => step.run === 'node scripts/check-issue118-live-t1-browser.mjs --ci-apply');
     assert.equal(t1.if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
     const readClose = secretSteps.find(step => step.run === 'node scripts/check-issue118-live-t1-browser.mjs --ci-read-close');
+    const managed=secretSteps.find(step=>step.run==='node scripts/check-issue118-live-t1-browser.mjs --ci-managed');
+    assert.equal(managed.if,"(inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM')");
+    assert.equal(managed.env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
+    assert.equal(managed.env.ISSUE118_SESSION_LIFECYCLE,'TRACKED_OWNER_SESSION');
+    assert.equal(managed.env.ISSUE118_TEST_CLERK_SECRET_KEY,t1.env.ISSUE118_TEST_CLERK_SECRET_KEY);
     assert.equal(readClose.if, "inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
     assert.equal(readClose.env.ISSUE118_DIAGNOSTIC_MODE, 'FIXTURE_READ_CLOSE_ONLY');
     assert.equal(readClose.env.ISSUE118_TEST_CLERK_SECRET_KEY, t1.env.ISSUE118_TEST_CLERK_SECRET_KEY);
@@ -737,9 +778,9 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.equal(diagnostic.if, "inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'");
     assert.ok(!JSON.stringify(diagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(diagnostic.env, 'ISSUE118_APPLY'));
     assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === 'Check the external receipt before dependency install or secret delivery').if,
-        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY' || inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'");
+        "(inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM')) || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY' || inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'");
     assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === 'Prepare the existing isolated Playwright version (no app secrets)').if,
-        "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
+        "(inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM')) || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
     const redirectDiagnostic = parsed.jobs['live-t1'].steps.find(step => step.run === 'node scripts/check-issue118-preview-redirect.mjs --redirect-only');
     assert.equal(redirectDiagnostic.if, "inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'");
     assert.ok(!JSON.stringify(redirectDiagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(redirectDiagnostic.env, 'ISSUE118_APPLY'));
@@ -748,7 +789,7 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.match(yaml, /environment: clearallergy-e2e-test/); assert.match(yaml, /cancel-in-progress: false/);
     assert.match(yaml, /inputs.expected_runner_sha == github.sha/);
     assert.match(parsed.jobs['live-t1'].if, /github\.run_attempt == 1/);
-    assert.equal((yaml.match(/secrets\./g) || []).length, 2);
+    assert.equal((yaml.match(/secrets\./g) || []).length, 3);
     assert.ok(!yaml.includes('DATABASE_URL')); assert.ok(!yaml.includes('DIRECT_URL'));
     assert.ok(!yaml.includes('storageState')); assert.ok(!yaml.includes('continue-on-error'));
     const runner = readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs', import.meta.url), 'utf8');
@@ -758,7 +799,7 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
 });
 
 test('actual CI entry refuses absent context and missing external receipt before browser/auth setup', () => {
-    for (const arg of ['--ci-apply', '--ci-read-close']) for (const fakeEnv of [{}, env(), {...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'}]) {
+    for (const arg of ['--ci-apply', '--ci-read-close','--ci-managed']) for (const fakeEnv of [{}, env(), {...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'}]) {
         const child = spawnSync(process.execPath, ['scripts/check-issue118-live-t1-browser.mjs', arg], {
             env: { SystemRoot: process.env.SystemRoot, ...fakeEnv }, encoding: 'utf8', windowsHide: true,
         });

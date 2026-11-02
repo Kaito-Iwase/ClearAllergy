@@ -176,7 +176,7 @@ test('read-close correlates a particular fetch failure across close phases witho
     assert.equal(malformed.sequence,null);assert.doesNotMatch(JSON.stringify(malformed),/SYNTHETIC/);
 });
 
-test('fixed public reference checks receipt and is wired only to the read-close entry',async()=>{
+test('fixed public reference checks receipt and shared CI auth preserves the stricter read-close boundary',async()=>{
     const receipt={...target,environment:'Preview',status:'Ready',verifiedBy:'human',observedUtc:new Date().toISOString(),evidenceReference:'Synthetic offline control'};
     const policy=createVerifiedReadCloseAuthPolicyCandidate(receipt),ref=verifiedReadCloseAction.reference;
     const make=(url=target.origin+'/admin/login',type='document')=>({url:()=>url,method:()=> 'POST',resourceType:()=>type,
@@ -192,8 +192,9 @@ test('fixed public reference checks receipt and is wired only to the read-close 
         assert.equal((await policy({...script,...change},()=> 'APP_FLOW')).decision,'REFUSE');
     assert.equal((await policy({...make(target.origin+'/_vercel/insights/view')},()=> 'APP_FLOW')).decision,'REFUSE');
     const source=readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs',import.meta.url),'utf8');
-    assert.match(source,/readCloseOnly \? createVerifiedReadCloseAuthPolicyCandidate\(identityReceipt,\(\)=>assertReadCloseSignoutReady\(report\)\) : undefined/);
-    assert.equal((source.match(/createVerifiedReadCloseAuthPolicyCandidate\(/g)||[]).length,2); // definition and one read-close caller
+    assert.match(source,/const readClosePolicy = ciMode \? createVerifiedReadCloseAuthPolicyCandidate\(identityReceipt/);
+    assert.match(source,/if\(readCloseOnly\)return assertReadCloseSignoutReady\(report\)/);
+    assert.equal((source.match(/createVerifiedReadCloseAuthPolicyCandidate\(/g)||[]).length,3); // definition, independently owned actor and shared CI caller
 });
 
 test('observed SIGNOUT cache action requires completed fixed reads, exact shop referer, owner session and a separate single claim',async()=>{

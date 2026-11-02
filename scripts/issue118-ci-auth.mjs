@@ -102,9 +102,28 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     onStage('OIDC_REQUEST');
     const issued = await jsonOnce(fetcher, requestUrl, { headers: { Authorization: `bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` } }, 'OIDC_REQUEST_FAILED');
     onStage('OIDC_CLAIMS_VALIDATE');
-    const oidc = assertOidcClaims(issued.value);
+    let oidc = assertOidcClaims(issued.value);
     onStage('CI_ACCESS_READY');
-    const token = () => assertOidcClaims(oidc);
+    const token = () => {if(oidcRenewalFailed)fail('OIDC_RENEWAL_HELD');return assertOidcClaims(oidc);};
+    let oidcIssuances=1,oidcRenewal,oidcRenewalFailed=false;
+    // Same job/ref/audience and runner-provided issuer URL only. Each issuance
+    // is one GET, never a retry. A failed/unknown issuance latches the adapter.
+    const ensureToken=async()=>{
+        if(oidcRenewalFailed)fail('OIDC_RENEWAL_HELD');
+        const previous=jwtPart(oidc.split('.')[1]);
+        if(previous.exp>Date.now()/1000+60)return token();
+        if(!oidcRenewal){
+            if(oidcIssuances>=6){oidcRenewalFailed=true;fail('OIDC_RENEWAL_LIMIT');}
+            oidcRenewal=(async()=>{assertCiEnvironment(env);oidcIssuances++;
+                const next=await jsonOnce(fetcher,requestUrl,{headers:{Authorization:`bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}`}},'OIDC_RENEWAL_FAILED');
+                const verified=assertOidcClaims(next.value),claims=jwtPart(verified.split('.')[1]);
+                if(claims.exp<=previous.exp||claims.iat<previous.iat)fail('OIDC_RENEWAL_NOT_ADVANCED');
+                oidc=verified;
+            })();
+        }
+        try{await oidcRenewal;oidcRenewal=undefined;return token();}
+        catch{oidcRenewalFailed=true;fail('OIDC_RENEWAL_HELD');}
+    };
     let testingToken;
     let authenticated = false;
     let authenticationAttempted = false;
@@ -114,7 +133,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     const emitSession=()=>{try{observers.session?.(structuredClone(sessionRecord));}catch{fail('SESSION_DIAGNOSTIC_FAILED');}};
     let ticketRequests = 0;
     let initialHandshake, initialPage, initialDocumentWindow = false, handshakeObservationFailed = false, routeHeld = false;
-    const assertTransportOpen = () => { if (routeHeld) fail('CI_TRANSPORT_HELD'); };
+    const assertTransportOpen = () => { if (routeHeld||oidcRenewalFailed) fail('CI_TRANSPORT_HELD'); };
     const progress = Object.fromEntries(['loginNavigationStarted', 'loginNavigationCompleted', 'clerkLoaded',
         'frontendMatched', 'ownerLookupStarted', 'ownerMatched', 'testingTokenRequestStarted', 'testingTokenReceived',
         'signInTokenRequestStarted', 'signInTokenReceived', 'sessionCreationAttempted', 'activationAcknowledged',
@@ -127,7 +146,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     const backend = (path, method, body, code,sessionRead=false) => jsonOnce(async (url, options) => {
         // A HOLD still permits only this exact newly-created session's read-only reconciliation.
         const ownSessionRead=trackedReadClose&&sessionRead&&method==='GET'&&sessionRecord?.id&&path==='sessions/'+sessionRecord.id;
-        if (routeHeld&&!ownSessionRead) fail('CI_TRANSPORT_HELD');
+        if ((routeHeld||oidcRenewalFailed)&&!ownSessionRead) fail('CI_TRANSPORT_HELD');
         const flags = { targetValidated: true, backendRequest: true, fetchStarted: true };
         let status = null, stage = 'FETCH';
         try {
@@ -152,16 +171,18 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
         Number.isFinite(data.created_at)&&data.created_at>=Date.parse(sessionRecord.creationAttemptedUtc)-30000&&
         data.created_at<=Date.now()+30000&&(!sessionRecord.providerCreatedUtc||new Date(data.created_at).toISOString()===sessionRecord.providerCreatedUtc);
     return {
-        token,
+        token,ensureToken,
+        oidcLifecycle:()=>({issuances:oidcIssuances,renewalFailed:oidcRenewalFailed,maximumIssuances:6}),
         sessionLifecycleMode:()=>trackedReadClose?'TRACKED_OWNER_SESSION':'LEGACY_UNTRACKED',
-        read: (api, url) => protectedPreviewFetch(api, url, {}, token()),
+        read: async (api, url) => {const parsed=new URL(url);if(parsed.origin!==previewOrigin||parsed.username||parsed.password)fail('CI_READ_TARGET_REFUSED');
+            await ensureToken();return protectedPreviewFetch(api, url, {}, token());},
         async route(route,requestObserver,assertRequestBeforeSend=()=>{}) {
             const routeObserver=observation=>{transportObserver(observation);if(requestObserver)observeTransport(requestObserver,observation);};
             let role = 'OTHER', method = 'OTHER', status = null, stage = 'TARGET', delegated = false, handshakeDelegated = false;
             const flags = {};
             try {
                 // A refused request latches the whole context before SDK/browser retries can send again.
-                if (routeHeld) fail('CI_TRANSPORT_HELD');
+                assertTransportOpen();
                 const request = route.request();
                 const url = new URL(request.url());
                 role = url.origin === previewOrigin ? 'APP' : url.origin === 'https://' + ciIdentity.clerkDomain ? 'CLERK' : 'OTHER';
@@ -179,7 +200,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                     }
                 }
                 if (url.origin === previewOrigin) {
-                    stage = 'TOKEN'; const value = token(); flags.tokenValidated = true;
+                    stage = 'TOKEN';await ensureToken();assertTransportOpen();const value = token(); flags.tokenValidated = true;
                     delegated = true;
                     return await routePreviewRequest(route, value, routeObserver, () => { assertTransportOpen(); token();assertRequestBeforeSend(); });
                 }
@@ -244,7 +265,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 return result;
             } catch (error) {
                 routeHeld = true;
-                if (!handshakeDelegated || !initialHandshake.diagnostics().held) {
+                if (!delegated || (handshakeDelegated && !initialHandshake.diagnostics().held)) {
                     flags.abortAttempted = true;
                     try { await route.abort('blockedbyclient'); flags.abortCompleted = true; } catch { /* fixed failure, no provider text */ }
                 }

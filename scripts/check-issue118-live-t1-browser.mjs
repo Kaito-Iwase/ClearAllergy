@@ -5,7 +5,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync, openSync, closeSync, fsyncSync, lstatSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCiAccess, assertCiEnvironment, ciIdentity, assertOidcClaims, assertClerkPublishableKey } from "./issue118-ci-auth.mjs";
+import { gunzipSync } from 'node:zlib';
+import { createCiAccess, assertCiEnvironment, ciIdentity, managedActorIdentity, assertOidcClaims, assertClerkPublishableKey } from "./issue118-ci-auth.mjs";
 import { transportObservation, scopedOidcHeaders, protectedPreviewFetch } from "./issue118-preview-transport.mjs";
 import { closeIsolatedBrowser,finalizeOwnedCiActor,ownedCiActorBoundary } from "./issue118-close-browser.mjs";
 import { prepareT4Observation } from "./issue118-t4-observer.mjs";
@@ -33,7 +34,8 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
     const check = value => { if (!value) refused(); };
     const uuid = value => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
     const cfg = input.managed, now = cfg.now || Date.now;
-    check(cfg.mode === "PREPARATION_ONLY" && uuid(input.runId) && typeof cfg.claimDirectory === "string");
+    check(["PREPARATION_ONLY", "APPROVED_MANAGED_LIVE"].includes(cfg.mode) && uuid(input.runId) && typeof cfg.claimDirectory === "string");
+    if (cfg.mode === "APPROVED_MANAGED_LIVE") check(typeof cfg.sendBoundary?.authorize === "function" && typeof cfg.sendBoundary?.recordCreated === "function" && typeof cfg.sendBoundary?.consumeSendPermission === "function");
     check(Array.isArray(cfg.actors) && cfg.actors.length === 2);
     const actors = new Map(cfg.actors.map(a => [a.binding?.owner, { ...a, binding: structuredClone(a.binding) }]));
     check(actors.size === 2 && actors.has("S1") && actors.has("S2"));
@@ -77,7 +79,7 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
         && Array.from({ length: 8 }, (_, i) => "M0" + (i + 1)).every(k => uuid(operationIds[s][k])))
         && Object.keys(operationIds).length === 3 && Object.keys(operationIds.T4 || {}).length === 1 && uuid(operationIds.T4.M02)
         && new Set(Object.values(operationIds).flatMap(x => Object.values(x))).size === 17);
-    let used = false, held = false, journal, sequence = 0, managedReady = false, serviceActive = false,finalizationStarted=false;
+    let used = false, held = false, journal, sequence = 0, managedReady = false, serviceActive = false,finalizationStarted=false,cleanupStarted=false;
     const claimDirectory = resolve(cfg.claimDirectory), created = new Map(), observations = [];
     const claim = (file, data) => {
         let fd;
@@ -87,16 +89,24 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
     };
     const record = async event => {
         check(/^[A-Z0-9_]+$/.test(event.stage));
-        const safe = { sequence: ++sequence, stage: event.stage,
+        const safe = { sequence: ++sequence, stage: event.stage, observedUtc: new Date(now()).toISOString(),
             ...(["M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08"].includes(event.key) ? { key: event.key } : {}),
             ...(/^c[a-z0-9]+$/.test(event.menuId || "") ? { menuId: event.menuId } : {}),
             ...(Number.isSafeInteger(event.version) && event.version >= 0 ? { version: event.version } : {}),
-            ...(Number.isInteger(event.httpStatus) && event.httpStatus >= 100 && event.httpStatus <= 599 ? { httpStatus: event.httpStatus } : {}) };
-        try { writeFileSync(journal, JSON.stringify(safe) + "\n"); fsyncSync(journal); }
-        catch { held = true; refused(); }
+            ...(Number.isInteger(event.httpStatus) && event.httpStatus >= 100 && event.httpStatus <= 599 ? { httpStatus: event.httpStatus } : {}),
+            ...(uuid(event.requestId) ? { requestId: event.requestId } : {}) };
+        let fd=journal,append=false;
+        try {
+            if(fd===undefined){check(JSON.parse(readFileSync(join(claimDirectory,"managed-run.json"),"utf8")).runId===batchRunId);
+                check(lstatSync(join(claimDirectory,"events.jsonl")).isFile()&&!lstatSync(join(claimDirectory,"events.jsonl")).isSymbolicLink());
+                fd=openSync(join(claimDirectory,"events.jsonl"),'a');append=true;}
+            writeFileSync(fd, JSON.stringify(safe) + "\n"); fsyncSync(fd);
+        }catch { held = true; refused(); }
+        finally{if(append&&fd!==undefined)closeSync(fd);}
     };
-    const readProtected = (actor, path) => {
+    const readProtected = async (actor, path) => {
         validate();
+        if(actor.access.ensureToken)await actor.access.ensureToken();validate();
         return protectedPreviewFetch(actor.context.request, target.origin + path, {}, assertOidcClaims(actor.access.token(), now()));
     };
     const verifyActor = async (binding, readOnlyReconciliation = false) => {
@@ -134,31 +144,40 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
     const send = async (scenario, command) => {
         try {
             const actor = await verifyActor(command.owner);
-            check(["CREATE", "INITIAL_PUBLISH", "STOP", "CORRECT_PRIVATE", "REPUBLISH"].includes(command.phase));
+            check(["CREATE", "INITIAL_PUBLISH", "STOP", "CORRECT_PRIVATE", "REPUBLISH", "CLEANUP"].includes(command.phase));
             if (command.phase === "CREATE") check(command.method === "POST" && command.path === "/api/admin/menus"
                 && command.body.operationId === operationIds[scenario][command.key] && command.body.isPublished === false);
             else { check(/^c[a-z0-9]+$/.test(command.menuId || "") && created.get(command.menuId)?.scenario === scenario
                     && actorForTarget({ ...command, shopId: command.owner.shopId, contextRef: command.owner.contextRef }) === actor);
-                check(command.method === (command.phase === "STOP" ? "POST" : "PUT")
-                    && command.path === `/api/admin/menus/${command.menuId}${command.phase === "STOP" ? "/stop" : ""}`); }
+                check(command.method === (["STOP", "CLEANUP"].includes(command.phase) ? "POST" : "PUT")
+                    && command.path === `/api/admin/menus/${command.menuId}${["STOP", "CLEANUP"].includes(command.phase) ? "/stop" : ""}`); }
             check(claim(`${scenario}-${command.key}-${command.phase}`, { scenario, key: command.key, phase: command.phase,
                 ...(command.menuId ? { menuId: command.menuId } : {}) }));
             await record({ stage: "TRANSPORT_INTENT_DURABLY_CLAIMED", key: command.key, menuId: command.menuId });
             validate(); check(!held && !input.signal?.aborted);
+            const resource={method:command.method,path:command.path,shopId:actor.binding.shopId,purpose:'CORE',
+                ...(command.phase==='CREATE'?{creationOperationId:command.body.operationId}:{menuId:command.menuId,beforeVersion:command.body.expectedVersion})};
+            const permit = cfg.sendBoundary ? await cfg.sendBoundary.authorize({id:`${scenario}_${command.key}_${command.phase}`,
+                kind:command.phase === "CREATE" ? "MENU_CREATE" : "MENU_WRITE", owner:actor.binding.owner,resource}) : undefined;
+            check(cfg.mode !== "APPROVED_MANAGED_LIVE" || permit?.allowedForward === true);
             const url = target.origin + command.path, token = assertOidcClaims(actor.access.token(), now());
+            if(cfg.sendBoundary?.consumeSendPermission)cfg.sendBoundary.consumeSendPermission({id:permit.id,resource});
             const response = await actor.context.request.fetch(url, { method: command.method, data: command.body,
                 headers: scopedOidcHeaders(url, { "Content-Type": "application/json", Origin: target.origin }, token),
                 maxRedirects: 0, maxRetries: 0, timeout: 20000, failOnStatusCode: false });
             check(response.status() < 300 || response.status() >= 400);
+            const requestId = response.headers?.()["x-request-id"];
+            await record({stage:"TRANSPORT_STATUS_" + command.phase,key:command.key,menuId:command.menuId,httpStatus:response.status(),requestId});
             return { status: () => response.status(), json: async () => {
                 const body = await response.json();
                 if (command.phase === "CREATE" && response.status() === 201 && /^c[a-z0-9]+$/.test(body?.id || "")) {
+                    if (cfg.sendBoundary) await cfg.sendBoundary.recordCreated({operationId:permit.id,id:body.id});
                     check(!created.has(body.id) && ![target.anchor, "cmvs4x86o000vwn0w93c8ttez", "cmvs4x8wt000xwn0wj6gwdih1",
                         "cmvs4x986000zwn0wer2ymhow", "cmvuy8d4z0003jw07e9fobsdm", "cmvuzlqhf0003l308lem3uwck"].includes(body.id));
                     created.set(body.id, { key: command.key, owner: command.owner.owner, scenario });
                 }
                 return body;
-            } };
+            }, headerValue: async key => key.toLowerCase() === "x-request-id" ? requestId : null };
         } catch { held = true; refused(); }
     };
     const runT4 = async () => {
@@ -362,7 +381,29 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
             },
         };
     };
-    return { prepareServiceObservation, async finalizeActors(){
+    return { prepareServiceObservation,
+    createdFixtures:()=>[...created].map(([menuId,data])=>({menuId,...data})),
+    async cleanupKnownPrivate(){
+        check(managedReady&&!held&&!serviceActive&&!finalizationStarted&&!cleanupStarted);cleanupStarted=true;const verifiedPrivateIds=[],final=[];
+        try {
+            for(const [menuId,data] of created){
+                check(["T2","T3","T4"].includes(data.scenario));const actor=actors.get(data.owner);
+                await verifyActor(actor.binding);const response=await readProtected(actor,"/api/admin/menus/"+menuId);
+                check(response.status()===200);const before=(await response.json())?.menu;check(before?.id===menuId);
+                let after=before;
+                if(before.isPublished){const ledger=newWriteLedger(),op=beginWrite(ledger,"CLEANUP");op.state="IN_FLIGHT";
+                    const changed=await send(data.scenario,{key:data.key,owner:actor.binding,menuId,phase:"CLEANUP",method:"POST",
+                        path:`/api/admin/menus/${menuId}/stop`,body:{expectedVersion:before.version}});
+                    const parsed=await consumeWriteResponse(ledger,op,changed,menuId);confirmWrite(ledger,op);
+                    const read=await readProtected(actor,"/api/admin/menus/"+menuId);check(read.status()===200);after=(await read.json())?.menu;
+                    check(after?.id===menuId&&after.version===parsed.menu.version&&after.version>before.version&&after.foodVersion===before.foodVersion);
+                }
+                check(after.isPublished===false);verifiedPrivateIds.push(menuId);final.push(state(after));
+                await record({stage:"FINAL_PRIVATE_HISTORY_RETAINED",key:data.key,menuId,version:after.version});
+            }
+            return {verifiedPrivateIds,final,unknownWrite:false};
+        }catch{held=true;refused();}
+    },async finalizeActors(){
         check(!finalizationStarted&&!serviceActive);finalizationStarted=true;managedReady=false;
         const list=[...actors.values()];
         if(list.some(a=>!a.lifecycle?.browser||typeof a.lifecycle?.tracker?.drain!=='function'||typeof a.lifecycle?.tracker?.snapshot!=='function'||!ownedCiActorBoundary({access:a.access,page:a.page,
@@ -400,12 +441,521 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
         finally {
             if (journal !== undefined) {
                 try { closeSync(journal); } catch { held = true; }
+                journal=undefined;
             }
         }
         if (held) report.status = "MANAGED_HOLD_NO_FURTHER_WRITES";
         managedReady = !held && report.status === "MANAGED_ADAPTER_SEQUENCE_CONFIRMED_NOT_LIVE_PASS";
         return report;
     } };
+}
+
+// Existing managed transport adapter. It never authenticates or opens a browser.
+// The caller supplies the two already verified, tracked owned actors.
+export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1FixtureId,record=()=>{},operation='CORE',checkpointFixtures=[]}) {
+    const roles=new Map(actors.map(a=>[a.binding.owner,a]));
+    assert.ok(['CORE','SERVICE_ARM'].includes(operation));assert.equal(roles.size,operation==='CORE'?2:1);assert.ok(roles.has('S1')&&(operation==='SERVICE_ARM'||roles.has('S2')));
+    for(const [role,a] of roles){assert.equal(a.expectedUserId,managedActorIdentity[role].ownerId);assert.equal(a.binding.shopId,managedActorIdentity[role].shopId);}
+    const source=createRequire(import.meta.url)('tsx/cjs/api').require('./issue118-batch-stop.ts',import.meta.url);
+    const schemas=createRequire(import.meta.url)('tsx/cjs/api').require('../features/admin/menus/schemas/menu-response.ts',import.meta.url);
+    const known=new Map([[t1FixtureId,{id:t1FixtureId,owner:'S1'}]]),operations=[];
+    const serviceIds=new Set(),knownObjects=new Map();
+    if(operation==='SERVICE_ARM')for(const f of checkpointFixtures){assert.match(f.id,/^c[a-z0-9]+$/);assert.ok(['S1','S2'].includes(f.owner));known.set(f.id,{...f});}
+    let boundary,managed,batchResult,held=false;
+    const requireOpen=()=>assert.equal(held,false);
+    const event=value=>{record({...value,observedUtc:new Date().toISOString()});};
+    const claim=(name,value)=>{let fd;try{assert.match(name,/^[A-Za-z0-9_-]{1,160}$/);mkdirSync(claimDirectory,{recursive:true});
+        fd=openSync(join(claimDirectory,name+'.json'),'wx',0o600);writeFileSync(fd,JSON.stringify(value));fsyncSync(fd);return true;
+    }catch{held=true;return false;}finally{if(fd!==undefined)closeSync(fd);}};
+    const actor=role=>{requireOpen();const a=roles.get(role);assert.ok(a);return a;};
+    const verify=async role=>{const a=actor(role);const identity=await a.page.evaluate(()=>({id:window.Clerk?.user?.id,pk:window.Clerk?.publishableKey}));
+        assert.equal(identity.id,a.expectedUserId);assertClerkPublishableKey(identity.pk);const r=await a.access.read(a.context.request,target.origin+'/api/admin/shop');
+        assert.equal(r.status(),200);assert.equal((await r.json())?.shop?.id,a.binding.shopId);return a;};
+    const read=async(id,role)=>{assert.match(id,/^c[a-z0-9]+$/);assert.equal(known.get(id)?.owner,role);const a=await verify(role);
+        const r=await a.access.read(a.context.request,target.origin+'/api/admin/menus/'+id);assert.equal(r.status(),200);
+        const m=schemas.savedMenuResponseSchema.parse(await r.json()).menu;assert.equal(m.id,id);return m;};
+    const write=async(id,role,phase,method,path,body,scope)=>{
+        requireOpen();const a=await verify(role);assert.ok(boundary);const creation=phase==='CREATE';
+        if(scope){assert.equal(role,'S1');assert.ok(['SETUP_CREATE','SETUP_PUBLISH','FOLLOWUP_PUBLISH','CLEANUP'].includes(scope.purpose));
+            assert.match(scope.cellId,/^(MENU_CREATE|MENU_SAVE|STOP|MENU_UPLOAD|SHOP_SAVE|SHOP_UPLOAD)_(DELIVER|BLOCK_BEFORE_FORWARD|WITHHOLD_AFTER_RESPONSE)$/);
+            assert.ok(Object.keys(scope).every(k=>['cellId','purpose','evidence'].includes(k)));if(!creation)assert.ok(serviceIds.has(body.__menuId));}
+        if(creation){assert.equal(method,'POST');assert.equal(path,'/api/admin/menus');assert.equal(body.isPublished,false);assert.match(body.operationId,/^[0-9a-f-]{36}$/);}
+        else {assert.ok(['PUBLISH','SAVE','STOP'].includes(phase));assert.equal(method,phase==='STOP'?'POST':'PUT');
+            assert.ok(Number.isSafeInteger(body.expectedVersion)&&body.expectedVersion>=0);assert.equal(known.get(body.__menuId)?.owner,role);assert.equal(path,`/api/admin/menus/${body.__menuId}${phase==='STOP'?'/stop':''}`);}
+        const data={...body};delete data.__menuId;
+        const resource={method,path,shopId:a.binding.shopId,purpose:scope?.purpose||'CORE',...(scope?.evidence?{evidence:structuredClone(scope.evidence)}:{}),
+            ...(creation?{creationOperationId:data.operationId}:{menuId:body.__menuId,beforeVersion:data.expectedVersion})};
+        const permit=await boundary.authorize({id,kind:creation?'MENU_CREATE':'MENU_WRITE',owner:role,resource,...(scope?{cellId:scope.cellId,mode:'DELIVER'}:{})});
+        assert.equal(permit.allowedForward,true);const op={id,owner:role,phase,state:'INTENT',startedUtc:new Date().toISOString(),...(creation?{creationOperationId:data.operationId}:{menuId:body.__menuId})};operations.push(op);event({stage:'SUITE_WRITE_INTENT',operation:id,owner:role,phase});
+        try {const url=target.origin+path;op.state='REQUEST_SENT';boundary.consumeSendPermission({id:permit.id,resource});const r=await a.context.request.fetch(url,{method,data,
+            headers:scopedOidcHeaders(url,{'Content-Type':'application/json',Origin:target.origin},assertOidcClaims(a.access.token())),
+            maxRedirects:0,maxRetries:0,timeout:20000,failOnStatusCode:false});op.status=r.status();
+            const requestId=r.headers()['x-request-id'];if(typeof requestId==='string'&&/^[0-9a-f-]{36}$/i.test(requestId))op.requestId=requestId;
+            const raw=await r.json();if(creation&&r.status()===201&&/^c[a-z0-9]+$/.test(raw?.id||'')){
+                op.menuId=raw.id;assert.ok(!known.has(raw.id)&&![target.anchor,readCloseFixtureId,'cmvs4x86o000vwn0w93c8ttez','cmvs4x8wt000xwn0wj6gwdih1','cmvs4x986000zwn0wer2ymhow','cmvuy8d4z0003jw07e9fobsdm','cmvuzlqhf0003l308lem3uwck'].includes(raw.id));
+                known.set(raw.id,{id:raw.id,owner:role});if(scope)serviceIds.add(raw.id);await boundary.recordCreated({operationId:permit.id,id:raw.id});event({stage:'SUITE_CREATED_ID',operation:id,owner:role,menuId:raw.id});}
+            assert.equal(r.status(),creation?201:200);
+            if(creation)schemas.menuCreateResponseSchema.parse(raw);
+            else if(phase==='STOP'){assert.equal(raw?.ok,true);assert.equal(raw?.menu?.id,body.__menuId);
+                assert.equal(raw.menu.isPublished,false);assert.ok(Number.isSafeInteger(raw.menu.version)&&raw.menu.version>=0);}
+            else schemas.menuSaveResponseSchema.parse(raw);
+            op.state='RESPONSE_CONFIRMED';op.acknowledgedUtc=new Date().toISOString();event({stage:'SUITE_WRITE_CONFIRMED',...op});
+            const menu=await read(creation?raw.id:body.__menuId,role);
+            if(phase==='STOP'){assert.equal(menu.id,raw.menu.id);assert.equal(menu.version,raw.menu.version);assert.equal(menu.isPublished,false);}
+            if(creation){assert.equal(menu.name,data.name);assert.equal(menu.isPublished,false);assert.deepEqual(source.fixturePayload(menu),source.fixturePayload({...data,allergens:Object.entries(data.allergenStatusBySlug).map(([slug,status])=>({slug,status}))}));}
+            return {raw,menu};
+        }catch{held=true;op.state='HOLD_NO_FURTHER_WRITES';event({stage:'SUITE_WRITE_HELD',operation:id,owner:role,phase,...(op.menuId?{menuId:op.menuId}:{})});throw Error('MANAGED_BROWSER_PORT_HELD');}
+    };
+    const cleanup=async(id,role,key)=>{const before=await read(id,role);if(before.isPublished){const {menu:after}=await write(key,role,'STOP','POST',`/api/admin/menus/${id}/stop`,{__menuId:id,expectedVersion:before.version});
+        assert.equal(after.isPublished,false);assert.equal(after.foodVersion,before.foodVersion);}assert.equal((await read(id,role)).isPublished,false);};
+    const ports={
+        claimSuite:async value=>claim('suite',value),claimOperation:async value=>claim('operation-'+value.id,value),
+        async installSendGuard(value){assert.equal(boundary,undefined);boundary=value;if(batchInput)batchInput.managed.sendBoundary=value;
+            return {beforeSend:true,remove:async()=>{assert.equal(boundary,value);boundary=undefined;return true;}};},
+        prepareBatch(input){managed=prepareOriginalBatchRun(input);return {execute:async()=>{batchResult=await managed.execute();
+            for(const f of managed.createdFixtures())known.set(f.menuId,{id:f.menuId,owner:f.owner,key:f.key,scenario:f.scenario});return batchResult;}};},
+        async runControls(){
+            const cases=[['PRICE','M04','S1'],['STOP','M07','S2'],['SILENT','M08','S2']];const measured={};
+            for(const [kind,key,role] of cases){const runId=randomUUID(),payload=source.projectOriginalPayloads(runId).expectedByMenu[key];
+                const created=await write('CONTROL_'+kind+'_CREATE',role,'CREATE','POST','/api/admin/menus',{...payload,isPublished:false,operationId:randomUUID()});
+                const id=created.menu.id;const published=(await write('CONTROL_'+kind+'_PUBLISH',role,'PUBLISH','PUT',`/api/admin/menus/${id}`,{__menuId:id,expectedVersion:created.menu.version,publicationAction:'publish'})).menu;
+                assert.equal(published.isPublished,true);const food=published.foodVersion;
+                if(kind==='PRICE'){const changed=(await write('CONTROL_PRICE_ONLY',role,'SAVE','PUT',`/api/admin/menus/${id}`,{__menuId:id,expectedVersion:published.version,priceYen:801})).menu;
+                    assert.equal(changed.priceYen,801);assert.equal(changed.foodVersion,food);assert.equal(changed.isPublished,true);measured.priceFoodVersionUnchanged=true;}
+                if(kind==='STOP'){await cleanup(id,role,'CONTROL_STOP_ONLY');assert.equal((await read(id,role)).foodVersion,food);measured.stopFoodVersionUnchanged=true;}
+                if(kind==='SILENT'){const after=await read(id,role);assert.equal(after.isPublished,true);assert.equal(after.version,published.version);measured.noSignalAutomaticStops=0;measured.noSignalRequiredStopDenominator=0;}
+                if(kind!=='STOP')await cleanup(id,role,'CONTROL_'+kind+'_FINAL_PRIVATE');
+            }
+            return measured;
+        },
+        async runDenials({authorize,fixtures}){
+            for(const f of fixtures)if(!known.has(f.id))known.set(f.id,f);
+            const sample=role=>fixtures.find(f=>f.owner===role&&f.id!==t1FixtureId);
+            let crossOwnerRefusals=0,staleVersionConflicts=0;
+            for(const caller of ['S1','S2']){const owner=caller==='S1'?'S2':'S1',f=sample(owner);assert.ok(f);const before=await read(f.id,owner);
+                for(const [label,method,suffix,data] of [['GET','GET','',undefined],['SAVE','PUT','',{expectedVersion:before.version,priceYen:802}],
+                    ['STOP','POST','/stop',{expectedVersion:before.version}],['PUBLISH','PUT','',{expectedVersion:before.version,publicationAction:'publish'}]]){
+                    const resource={method,path:'/api/admin/menus/'+f.id+suffix,menuId:f.id,shopId:roles.get(owner).binding.shopId,
+                        purpose:'CROSS_OWNER_'+({SAVE:'EDIT',GET:'GET',STOP:'STOP',PUBLISH:'PUBLISH'})[label],...(method==='GET'?{}:{beforeVersion:before.version})};
+                    const permit=await authorize({id:'DENIAL_'+caller+'_'+label,kind:'DENIAL',owner:caller,resource});const a=await verify(caller),url=target.origin+resource.path;
+                    boundary.consumeSendPermission({id:permit.id,resource});
+                    const r=await a.context.request.fetch(url,{method,...(data?{data}:{}),headers:scopedOidcHeaders(url,{'Content-Type':'application/json',Origin:target.origin},assertOidcClaims(a.access.token())),maxRedirects:0,maxRetries:0,timeout:20000,failOnStatusCode:false});
+                    assert.equal(r.status(),404);assert.deepEqual(await read(f.id,owner),before);crossOwnerRefusals++;event({stage:'CROSS_OWNER_REFUSED',owner:caller,menuId:f.id,status:404,operation:label});
+                }
+            }
+            for(const role of ['S1','S2']){const f=[...known.values()].find(f=>f.owner===role&&f.scenario==='T3'&&['M01','M05'].includes(f.key));assert.ok(f);
+                const before=await read(f.id,role);assert.equal(before.isPublished,false);assert.ok(before.version>0);
+                const resource={method:'PUT',path:'/api/admin/menus/'+f.id,menuId:f.id,shopId:roles.get(role).binding.shopId,purpose:'STALE_EDIT',beforeVersion:before.version-1};
+                const permit=await authorize({id:'STALE_'+role,kind:'DENIAL',owner:role,resource});
+                const a=await verify(role),url=target.origin+'/api/admin/menus/'+f.id;
+                boundary.consumeSendPermission({id:permit.id,resource});
+                const r=await a.context.request.fetch(url,{method:'PUT',data:{expectedVersion:before.version-1,priceYen:803},headers:scopedOidcHeaders(url,{'Content-Type':'application/json',Origin:target.origin},assertOidcClaims(a.access.token())),maxRedirects:0,maxRetries:0,timeout:20000,failOnStatusCode:false});
+                assert.equal(r.status(),409);assert.deepEqual(await read(f.id,role),before);staleVersionConflicts++;event({stage:'STOP_STALE_VERSION_REFUSED',owner:role,menuId:f.id,status:409});
+            }
+            return {crossOwnerRefusals,staleVersionConflicts,routeContractChecked:true,ownerStateUnchanged:true,historyObservation:'PENDING_INDEPENDENT_SQL'};
+        },
+        async cleanupKnownPrivate({fixtures}){requireOpen();const batch=await managed.cleanupKnownPrivate();assert.equal(batch.unknownWrite,false);
+            const ids=[];for(const f of fixtures){assert.equal((await read(f.id,f.owner)).isPublished,false);ids.push(f.id);}return {verifiedPrivateIds:ids,unknownWrite:false};},
+    };
+    const canonical=value=>JSON.stringify(value,(_key,v)=>v&&typeof v==='object'&&!Array.isArray(v)
+        ?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+    const sha=value=>createHash('sha256').update(value).digest('hex');
+    const serviceGuard=async action=>{try{requireOpen();assert.ok(boundary);return await action();}
+        catch{held=true;throw Error('MANAGED_SERVICE_API_HELD');}};
+    const requireServiceId=id=>{assert.match(id,/^c[a-z0-9]+$/);assert.ok(serviceIds.has(id));assert.equal(known.get(id)?.owner,'S1');};
+    const validNewId=id=>{assert.match(id,/^c[a-z0-9]+$/);assert.ok(!known.has(id)&&![target.anchor,readCloseFixtureId,
+        'cmvs4x86o000vwn0w93c8ttez','cmvs4x8wt000xwn0wj6gwdih1','cmvs4x986000zwn0wer2ymhow',
+        'cmvuy8d4z0003jw07e9fobsdm','cmvuzlqhf0003l308lem3uwck'].includes(id));};
+    const blobUrl=(url,kind)=>{const parsed=new URL(url);assert.equal(parsed.href,url);
+        assert.equal(parsed.origin,'https://wtqdbklmg3bbqk4s.public.blob.vercel-storage.com');
+        assert.ok(!parsed.username&&!parsed.password&&!parsed.port&&!parsed.search&&!parsed.hash&&!parsed.pathname.includes('%'));
+        const prefix=kind==='menu'?`/menu-images/${target.shop}/`:`/shops/${target.shop}/`;
+        assert.ok(parsed.pathname.startsWith(prefix));const filename=parsed.pathname.slice(prefix.length);
+        assert.match(filename,kind==='menu'?/^[A-Za-z0-9_-]+\.(?:jpe?g|png|webp|gif|avif)$/i:/^cover-[A-Za-z0-9_-]+\.(?:jpe?g|png|webp|gif|avif)$/i);return parsed;};
+    const shopSchemas=createRequire(import.meta.url)('tsx/cjs/api').require('../features/admin/shop/schemas/shop-response.ts',import.meta.url);
+    const readShop=()=>serviceGuard(async()=>{const a=await verify('S1'),r=await a.access.read(a.context.request,target.origin+'/api/admin/shop');
+        assert.equal(r.status(),200);const shop=shopSchemas.shopResponseSchema.parse(await r.json()).shop;assert.equal(shop.id,target.shop);return shop;});
+    const readMenu=id=>serviceGuard(async()=>{requireServiceId(id);return read(id,'S1');});
+    const readCreationBaseline=()=>serviceGuard(async()=>{const a=await verify('S1'),r=await a.access.read(a.context.request,target.origin+'/api/admin/menus');
+        assert.equal(r.status(),200);const body=await r.json();assert.ok(Array.isArray(body?.menus)&&body.menus.length<=1000);
+        const menus=body.menus.map(m=>{assert.match(m.id,/^c[a-z0-9]+$/);assert.ok(Number.isSafeInteger(m.version)&&m.version>=0);
+            assert.equal(typeof m.name,'string');assert.equal(typeof m.isPublished,'boolean');assert.ok(Number.isFinite(Date.parse(m.updatedAt)));
+            return {id:m.id,name:m.name,version:m.version,isPublished:m.isPublished,updatedAt:m.updatedAt};});
+        assert.equal(new Set(menus.map(m=>m.id)).size,menus.length);return {menus:menus.sort((a,b)=>a.id.localeCompare(b.id))};});
+    const observeKnownBlob=ref=>serviceGuard(async()=>{
+        assert.ok(ref&&['menu','shop'].includes(ref.kind));const parsed=blobUrl(ref.url,ref.kind);assert.equal(parsed.pathname,'/'+ref.pathname);
+        assert.equal(ref.objectSha256,sha(ref.url));assert.match(ref.requestId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        const prior=knownObjects.get(ref.url);if(prior){assert.equal(prior.requestId,ref.requestId);return {...prior.observation};}
+        const a=await verify('S1'),r=await a.context.request.fetch(ref.url,{method:'GET',maxRedirects:0,maxRetries:0,timeout:20000,failOnStatusCode:false});
+        assert.equal(r.status(),200);const length=r.headers?.()['content-length'];if(length!==undefined)assert.equal(Number(length),1904984);
+        const bytes=await r.body();assert.ok(Buffer.isBuffer(bytes));assert.equal(bytes.length,1904984);
+        const hash=sha(bytes);assert.equal(hash,'0dd35a26a11cd90536b1610ce8d5d04bd6933b456602264d53f209a58e83add6');
+        const observation={status:200,sha256:hash,bytes:bytes.length};knownObjects.set(ref.url,{requestId:ref.requestId,observation});
+        event({stage:'SERVICE_KNOWN_BLOB_BYTES_VERIFIED',objectSha256:ref.objectSha256});return {...observation};});
+    const registerCreated=({menuId,operationId})=>serviceGuard(async()=>{
+        validNewId(menuId);assert.match(operationId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        known.set(menuId,{id:menuId,owner:'S1',creationOperationId:operationId});serviceIds.add(menuId);
+        assert.equal(claim('service-created-'+menuId,{menuId,operationId}),true);return true;});
+    const serviceApi={readMenu,readShop,readCreationBaseline,registerCreated,observeKnownBlob,
+        verifyActor:actor=>serviceGuard(async()=>{const a=await verify('S1');if(actor){assert.equal(actor.context,a.context);assert.equal(actor.page,a.page);}return true;}),
+        readOwner:({kind,menuId})=>kind==='MENU_CREATE'&&!menuId?readCreationBaseline():kind.startsWith('SHOP')?readShop():readMenu(menuId),
+        claimPrivate:ref=>serviceGuard(async()=>{
+            if(ref.stage==='CREATED_201_BEFORE_CORRELATION')return registerCreated({menuId:ref.menuId,operationId:ref.operationId});
+            assert.equal(ref.stage,'KNOWN_RUN_BLOB_RETAIN');await observeKnownBlob(ref);
+            assert.equal(claim('service-blob-'+ref.objectSha256,{kind:ref.kind,pathname:ref.pathname,objectSha256:ref.objectSha256,requestId:ref.requestId}),true);return true;}),
+        createMenu:({id,cellId,purpose,payload})=>serviceGuard(async()=>{
+            assert.equal(purpose,'SETUP_CREATE');const {menu}=await write(id,'S1','CREATE','POST','/api/admin/menus',payload,{cellId,purpose});return menu;}),
+        menuWrite:({id,cellId,purpose,menuId,publicationAction,evidence})=>serviceGuard(async()=>{
+            requireServiceId(menuId);assert.ok(['publish','stop'].includes(publicationAction));const before=await readMenu(menuId);
+            assert.equal(before.isPublished,publicationAction==='stop');
+            assert.ok(evidence&&['knownOutcome','ownerStateMatches','freshVersion'].every(k=>evidence[k]===true));
+            const stopping=publicationAction==='stop';const {menu}=await write(id,'S1',stopping?'STOP':'PUBLISH',stopping?'POST':'PUT',
+                `/api/admin/menus/${menuId}${stopping?'/stop':''}`,{__menuId:menuId,expectedVersion:before.version,...(!stopping?{publicationAction:'publish'}:{})},
+                {cellId,purpose,evidence});assert.equal(menu.foodVersion,before.foodVersion);assert.equal(menu.version,before.version+1);
+            assert.deepEqual(source.fixturePayload(menu),source.fixturePayload(before));assert.equal(menu.isPublished,!stopping);return menu;}),
+        verifyPublicImage:({menuId,url})=>serviceGuard(async()=>{
+            requireServiceId(menuId);blobUrl(url,'menu');assert.ok(knownObjects.has(url));const own=await readMenu(menuId);
+            assert.equal(own.isPublished,true);assert.equal(own.imageUrl,url);const a=await verify('S1');
+            const r=await a.access.read(a.context.request,target.origin+'/api/menus/'+menuId);assert.equal(r.status(),200);const body=await r.json();
+            assert.equal(body?.menu?.id,menuId);assert.equal(body.menu.shopId,target.shop);assert.equal(body.menu.imageUrl,url);return true;}),
+        shopWrite:input=>serviceGuard(async()=>{
+            const {id,cellId,purpose,sourceClaimId,before,values,expectedOwnAfter,evidence}=input;
+            assert.ok(['RESTORE','RESTORE_PRIOR_SHOP'].includes(purpose));assert.ok(values&&Object.keys(values).length===2&&Object.keys(values).every(k=>['note','coverImageUrl'].includes(k)));
+            assert.ok(values.note===null||typeof values.note==='string');assert.ok(values.coverImageUrl===null||typeof values.coverImageUrl==='string');
+            if(values.coverImageUrl!==null)blobUrl(values.coverImageUrl,'shop');
+            const expected=shopSchemas.shopResponseSchema.parse({shop:expectedOwnAfter}).shop;
+            assert.equal(expected.id,target.shop);assert.deepEqual(before,expected);const fresh=await readShop();assert.equal(sha(canonical(fresh)),sha(canonical(expected)));
+            const proof=['knownOutcome','ownerStateMatches','freshUpdatedAt','ownChangeMatches','noConcurrentChange',...(purpose==='RESTORE_PRIOR_SHOP'?['independentTerminalVerified']:[])];
+            assert.ok(evidence&&proof.every(k=>evidence[k]===true));
+            const {expectedServiceShopPayload}=await import('./issue118-managed-service-browser.mjs');const data=expectedServiceShopPayload(fresh,values);
+            const resource={method:'PUT',path:'/api/admin/shop',shopId:target.shop,purpose,beforeUpdatedAt:fresh.updatedAt,evidence:structuredClone(evidence),
+                ...(sourceClaimId?{sourceClaimId}:{})};assert.ok(boundary);const a=await verify('S1');
+            const permit=await boundary.authorize({id,kind:'SHOP_WRITE',owner:'S1',mode:'DELIVER',resource,...(cellId?{cellId}:{})});assert.equal(permit.allowedForward,true);
+            const op={id,owner:'S1',phase:purpose,state:'INTENT',startedUtc:new Date().toISOString()};operations.push(op);
+            const url=target.origin+resource.path;boundary.consumeSendPermission({id:permit.id,resource});op.state='REQUEST_SENT';
+            try{const r=await a.context.request.fetch(url,{method:'PUT',data,headers:scopedOidcHeaders(url,{'Content-Type':'application/json',Origin:target.origin},assertOidcClaims(a.access.token())),
+                maxRedirects:0,maxRetries:0,timeout:20000,failOnStatusCode:false});assert.equal(r.status(),200);
+                const parsed=shopSchemas.parseShopSaveResponse(await r.json(),target.shop,fresh.updatedAt);assert.ok(parsed);const after=await readShop();assert.deepEqual(after,parsed.shop);
+                const stable=shop=>{const copy={...shop};delete copy.note;delete copy.coverImageUrl;delete copy.updatedAt;return copy;};assert.deepEqual(stable(after),stable(fresh));
+                assert.equal(after.note??'',(values.note??'').trim());assert.equal(after.coverImageUrl,values.coverImageUrl);op.state='RESPONSE_CONFIRMED';
+                event({stage:'SERVICE_SHOP_RESTORE_CONFIRMED',operation:id});return after;
+            }catch{op.state='HOLD_NO_FURTHER_WRITES';throw Error('MANAGED_SERVICE_SHOP_HELD');}
+        }),
+    };
+    return {ports,serviceApi,snapshot:()=>({held,operations:structuredClone(operations),fixtures:[...known.values()],batch:batchResult}),assertOpen:requireOpen};
+}
+
+// One callable first-arm continuation. The root owns actor authentication/finalization;
+// this function closes only service-created pages. Factories are injectable for offline
+// orchestration tests and are explicitly labelled in the returned evidence.
+export async function executeManagedContinuation({actors,t1,identityReceipt,claimDirectory,image,
+    record=()=>{},outputRecord=()=>{},signal,dependencies={}}={}) {
+    let suite,runtime,serviceBrowser,stage='PREFLIGHT',continuationStatus='HOLD_CONTINUATION_NOT_STARTED',injected=false;
+    const preparationState={},preexisting=new Set();
+    let browserAdapterClose={ownedPageClosed:true,routesDrained:false,notStarted:true};
+    const safeRecord=value=>{
+        const event={stage:/^[A-Z0-9_]{1,100}$/.test(value?.stage||'')?value.stage:'CONTINUATION_OBSERVATION'};
+        for(const key of ['owner','phase','state'])if(typeof value?.[key]==='string'&&/^[A-Z0-9_]{1,100}$/.test(value[key]))event[key]=value[key];
+        for(const key of ['menuId'])if(/^c[a-z0-9]+$/.test(value?.[key]||''))event[key]=value[key];
+        for(const key of ['operation','requestId'])if(typeof value?.[key]==='string'&&/^[A-Za-z0-9_-]{1,160}$/.test(value[key]))event[key]=value[key];
+        for(const key of ['objectSha256'])if(/^[a-f0-9]{64}$/.test(value?.[key]||''))event[key]=value[key];
+        for(const key of ['status','httpStatus'])if(Number.isInteger(value?.[key])&&value[key]>=100&&value[key]<=599)event[key]=value[key];
+        for(const key of ['observedUtc','startedUtc','acknowledgedUtc'])if(typeof value?.[key]==='string'&&/^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(value[key])&&Number.isFinite(Date.parse(value[key])))event[key]=value[key];
+        record(event);
+    };
+    let actorA;
+    try {
+        assert.ok(!signal?.aborted&&Array.isArray(actors)&&actors.length===2&&typeof claimDirectory==='string'&&claimDirectory.length>0
+            &&typeof record==='function'&&typeof outputRecord==='function');
+        assert.ok(dependencies&&typeof dependencies==='object');
+        assert.ok(Object.keys(dependencies).every(k=>['createRuntimePorts','createSuite','prepareServiceBrowser','createServicePreparation'].includes(k)));
+        injected=Object.keys(dependencies).length>0;
+        assertIdentityReceipt(identityReceipt);
+        assert.equal(t1?.flow,'PASS_APP_BROWSER_API');assert.equal(t1.cleanup,'PRIVATE_VERIFIED');assert.equal(t1.protection,'PASS_API_REPRESENTATION');
+        assert.equal(t1.unknownWrite,false);assert.match(t1.fixtureId,/^c[a-z0-9]+$/);assert.equal(t1.menuWrites,6);assert.equal(t1.sessions,2);
+        const serviceModule=await import('./issue118-managed-service-browser.mjs');
+        const suiteModule=await import('./issue118-managed-suite.mjs');
+        for(const key of ['source','deployment','origin'])assert.equal(serviceModule.serviceBrowserApplication[key],target[key]);
+        assert.ok(Buffer.isBuffer(image?.buffer));assert.equal(image.buffer.length,serviceModule.serviceBrowserImage.bytes);
+        assert.equal(createHash('sha256').update(image.buffer).digest('hex'),serviceModule.serviceBrowserImage.sha256);
+        const roleMap=new Map(actors.map(a=>[a.binding?.owner,a]));assert.equal(roleMap.size,2);assert.ok(roleMap.has('S1')&&roleMap.has('S2'));
+        for(const key of ['context','page','access'])assert.equal(new Set(actors.map(a=>a[key])).size,2);
+        assert.equal(new Set(actors.map(a=>a.lifecycle?.browser)).size,2);
+        stage='OWNERS_VERIFY';
+        const ownerEvidence=[];
+        for(const role of ['S1','S2']){
+            const a=roleMap.get(role),identity=managedActorIdentity[role],tracker=a.lifecycle?.tracker;
+            assert.equal(a.expectedUserId,identity.ownerId);assert.equal(a.binding.shopId,identity.shopId);
+            assert.match(a.binding.contextRef,/^[A-Za-z0-9_-]{1,64}$/);
+            assert.ok(ownedCiActorBoundary({access:a.access,page:a.page,context:a.context,browser:a.lifecycle?.browser,
+                expectedOwnerId:identity.ownerId,drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot()},true));
+            assert.equal(a.page.isClosed(),false);assert.equal(a.page.url(),target.origin+'/admin/shop');
+            const frontend=await a.page.evaluate(()=>({id:window.Clerk?.user?.id,pk:window.Clerk?.publishableKey}));
+            assert.equal(frontend.id,identity.ownerId);assertClerkPublishableKey(frontend.pk);
+            const response=await a.access.read(a.context.request,target.origin+'/api/admin/shop');
+            assert.equal(response.status(),200);assert.equal((await response.json())?.shop?.id,identity.shopId);
+            assert.ok(!a.routeFailed?.());
+            ownerEvidence.push({owner:role,clerkUserId:identity.ownerId,shopId:identity.shopId,contextRef:a.binding.contextRef,
+                deployment:target.deployment,source:target.source,origin:target.origin,observedUtc:new Date().toISOString(),
+                verifiedBy:'browser_metadata_observer',evidenceReference:'CONTINUATION_TRACKED_ACTOR_FRONTEND_AND_OWN_SHOP_API'});
+            safeRecord({stage:'CONTINUATION_OWNER_VERIFIED',owner:role});
+        }
+        actorA=roleMap.get('S1');for(const page of actorA.context.pages())preexisting.add(page);
+        stage='FACTORIES';
+        const suiteId=randomUUID(),keys=Array.from({length:8},(_,i)=>'M0'+(i+1));
+        const batchInput={runId:suiteId,signal,managed:{mode:'APPROVED_MANAGED_LIVE',claimDirectory,
+            actors,identityReceipt:structuredClone(identityReceipt),ownerEvidence,finalizeActors:false,t4EvidenceLevel:'APP_BROWSER_READS_ONLY',
+            runIds:{T2:randomUUID(),T3:randomUUID(),T4:randomUUID()},operationIds:{
+                T2:Object.fromEntries(keys.map(key=>[key,randomUUID()])),T3:Object.fromEntries(keys.map(key=>[key,randomUUID()])),T4:{M02:randomUUID()}}}};
+        runtime=(dependencies.createRuntimePorts||createManagedRuntimePorts)({actors,batchInput,claimDirectory,t1FixtureId:t1.fixtureId,record:safeRecord});
+        const api=runtime.serviceApi;
+        for(const name of ['readMenu','readShop','readCreationBaseline','createMenu','menuWrite','shopWrite','observeKnownBlob',
+            'verifyPublicImage','verifyActor','readOwner','claimPrivate'])assert.equal(typeof api?.[name],'function');
+        const ts=createRequire(import.meta.url)('tsx/cjs/api');
+        const {projectOriginalPayloads}=ts.require('./issue118-batch-stop.ts',import.meta.url);
+        const {ALLERGEN_MASTER}=ts.require('../lib/constants/allergen-master.ts',import.meta.url);
+        const preparation=(dependencies.createServicePreparation||serviceModule.createManagedServicePreparation)({api,state:preparationState,
+            runId:suiteId,menuTemplate:projectOriginalPayloads(suiteId).expectedByMenu.M04,allergens:ALLERGEN_MASTER,shopId:target.shop});
+        for(const name of ['prepareCell','finishCell','recordSetupObject','retainHeldCell'])assert.equal(typeof preparation[name],'function');
+        const {prepareWriteObservation}=ts.require('./issue118-service-observer.ts',import.meta.url);
+        const scope={runId:suiteId,applicationSha:target.source,shopId:target.shop,
+            isolationReceiptSha256:createHash('sha256').update(JSON.stringify(identityReceipt)).digest('hex')};
+        serviceBrowser=(dependencies.prepareServiceBrowser||serviceModule.prepareManagedServiceBrowser)({actor:{...actorA,owner:'S1'},target,scope,image,
+            ports:{prepareCell:preparation.prepareCell,finishCell:preparation.finishCell,recordSetupObject:preparation.recordSetupObject,
+                retainHeldCell:preparation.retainHeldCell,verifyActor:async(a,expected)=>{
+                    assert.equal(a.context,actorA.context);for(const key of ['source','deployment','origin'])assert.equal(expected[key],target[key]);
+                    assert.equal(await api.verifyActor(a),true);
+                },readOwner:value=>api.readOwner(value),claimPrivate:value=>api.claimPrivate(value),emit:safeRecord,
+                oidcHeaders:(url,headers,token)=>scopedOidcHeaders(url,headers,assertOidcClaims(token)),prepareWriteObservation}});
+        assert.equal(typeof serviceBrowser.runServiceCell,'function');assert.equal(typeof serviceBrowser.close,'function');
+        const ports={...runtime.ports,runServiceCell:value=>serviceBrowser.runServiceCell(value),prepareServiceActor:async({existingActor,permit})=>{
+            assert.equal(existingActor,true);assert.equal(permit,null);assert.equal(actorA.page.isClosed(),false);
+            assert.equal(await api.verifyActor(actorA),true);const routes=actorA.lifecycle.tracker.snapshot();
+            assert.equal(routes.pending,0);assert.equal(routes.started,routes.settled);
+            return {owner:'S1',identityVerified:true,separateFromClosedActors:true};
+        }};
+        suite=(dependencies.createSuite||suiteModule.prepareManagedSuite)({suiteId,batchInput,t1,ports,signal});
+        stage='CORE';safeRecord({stage:'CONTINUATION_CORE_START'});
+        const core=await suite.executeCore();
+        if(core.status==='CORE_COMPLETE_SUITE_INCOMPLETE'&&core.arms?.[0]?.status==='CORE_API_SEQUENCE_COMPLETE'){
+            assert.ok(!signal?.aborted);stage='FIRST_SERVICE_ARM';safeRecord({stage:'CONTINUATION_FIRST_SERVICE_ARM_START'});
+            const order=['MENU_CREATE','MENU_SAVE','STOP','MENU_UPLOAD','SHOP_UPLOAD','SHOP_SAVE'];
+            await suite.executeServiceArm({armId:'SERVICE_ARM_1',cellIds:[...order.map(k=>k+'_DELIVER'),...order.map(k=>k+'_BLOCK_BEFORE_FORWARD'),
+                'MENU_CREATE_WITHHOLD_AFTER_RESPONSE']});
+        }
+        continuationStatus='RETURNED_SUITE_STATE';
+    }catch{continuationStatus='HOLD_CONTINUATION_'+stage;}
+    finally{
+        if(serviceBrowser){
+            try{
+                browserAdapterClose=await serviceBrowser.close();
+                const routes=actorA.lifecycle.tracker.snapshot();
+                browserAdapterClose={...browserAdapterClose,preexistingPagesPreserved:[...preexisting].every(p=>!p.isClosed()),
+                    ownedPagesClosed:actorA.context.pages().every(p=>preexisting.has(p)||p.isClosed()),
+                    pendingRequests:routes.pending,started:routes.started,settled:routes.settled};
+                if(browserAdapterClose.ownedPageClosed!==true||browserAdapterClose.routesDrained!==true
+                    ||!browserAdapterClose.preexistingPagesPreserved||!browserAdapterClose.ownedPagesClosed
+                    ||routes.pending!==0||routes.started!==routes.settled)continuationStatus='HOLD_SERVICE_PAGE_CLOSE_UNVERIFIED';
+            }catch{browserAdapterClose={ownedPageClosed:false,routesDrained:false};continuationStatus='HOLD_SERVICE_PAGE_CLOSE_UNVERIFIED';}
+        }
+    }
+    let suiteSnapshot={status:'HOLD_CONTINUATION_NOT_STARTED',livePass:false,automaticRetry:false,automaticCleanup:false},runtimeSnapshot={held:true},savedPreparation={};
+    try{if(suite)suiteSnapshot=suite.snapshot();if(runtime)runtimeSnapshot=runtime.snapshot();savedPreparation=structuredClone(preparationState);}
+    catch{continuationStatus='HOLD_SNAPSHOT_UNVERIFIED';}
+    const result={suiteSnapshot,runtimeSnapshot:{...runtimeSnapshot,continuationStatus,stoppedStage:stage,
+        continuationEvidence:injected?'INJECTED_FACTORY_TEST':'OWNED_ACTOR_PORTS'},preparationState:savedPreparation,browserAdapterClose};
+    try{await outputRecord(structuredClone(result));}catch{result.runtimeSnapshot.continuationStatus='HOLD_CHECKPOINT_WRITE_UNVERIFIED';}
+    return result;
+}
+
+// Resume one independently reconciled terminal arm. Authentication remains lazy;
+// actorHandle is private to the caller and must never be included in an artifact.
+export async function executeManagedServiceResume({initialSnapshot,preparationState,checkpointReceipt,terminalProof,nextCellId,
+    claimDirectory,identityReceipt,image,actorFactory,verifyCheckpoint,record=()=>{},outputRecord=()=>{},signal,dependencies={}}={}) {
+    let suite,runtime,preparation,serviceBrowser,actorHandle,boundary,runtimeGuard,actorAttempted=false;
+    let stage='PREFLIGHT',resumeStatus='HOLD_RESUME_PREFLIGHT',savedState={},restoredInput,attested=false,injected=false;
+    const preexisting=new Set();
+    let browserAdapterClose={ownedPageClosed:true,routesDrained:true,notStarted:true};
+    const hash=value=>createHash('sha256').update(value).digest('hex');
+    const canonical=value=>JSON.stringify(value,(_key,v)=>v&&typeof v==='object'&&!Array.isArray(v)
+        ?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+    const exact=(object,keys)=>assert.ok(object&&Object.keys(object).length===keys.length&&keys.every(k=>Object.hasOwn(object,k)));
+    const emit=value=>{const event={stage:/^[A-Z0-9_]{1,100}$/.test(value?.stage||'')?value.stage:'RESUME_OBSERVATION'};
+        for(const key of ['owner','phase','state','operation','requestId'])if(typeof value?.[key]==='string'&&/^[A-Za-z0-9_-]{1,160}$/.test(value[key]))event[key]=value[key];
+        if(/^c[a-z0-9]+$/.test(value?.menuId||''))event.menuId=value.menuId;
+        if(/^[a-f0-9]{64}$/.test(value?.objectSha256||''))event.objectSha256=value.objectSha256;
+        for(const key of ['status','httpStatus'])if(Number.isInteger(value?.[key])&&value[key]>=100&&value[key]<=599)event[key]=value[key];
+        record(event);};
+    const durableClaim=value=>{let fd;try{
+        assert.match(value.id,/^[A-Za-z0-9_-]{1,128}$/);mkdirSync(claimDirectory,{recursive:true});
+        fd=openSync(join(claimDirectory,'operation-'+value.id+'.json'),'wx',0o600);
+        writeFileSync(fd,JSON.stringify(value));fsyncSync(fd);return true;
+    }catch{return false;}finally{if(fd!==undefined)closeSync(fd);}};
+    try {
+        assert.ok(!signal?.aborted&&typeof verifyCheckpoint==='function'&&typeof record==='function'&&typeof outputRecord==='function');
+        assert.ok(typeof claimDirectory==='string'&&claimDirectory.length>0);
+        assert.ok(dependencies&&typeof dependencies==='object'&&Object.keys(dependencies).every(k=>
+            ['createRuntimePorts','createSuite','prepareServiceBrowser','createServicePreparation'].includes(k)));
+        injected=Object.keys(dependencies).length>0;
+        assertIdentityReceipt(identityReceipt);
+        // Clone caller data before any await; a later mutation cannot change the attested operation set.
+        restoredInput=structuredClone(initialSnapshot);savedState=structuredClone(preparationState);
+        const receipt=structuredClone(checkpointReceipt),proof=structuredClone(terminalProof);
+        const terminal=restoredInput.arms.at(-1),suiteId=restoredInput.suiteId;
+        assert.match(suiteId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        assert.equal(restoredInput.applicationSha,target.source);assert.equal(restoredInput.status,'HOLD_NO_FURTHER_WRITES');
+        assert.equal(terminal.zone,'SERVICE');assert.equal(terminal.status,'HOLD');assert.equal(terminal.terminalVerified,false);
+        assert.equal(savedState.version,1);assert.equal(savedState.runId,suiteId);assert.ok(savedState.cells&&typeof savedState.cells==='object');
+        const sequence=['MENU_CREATE','MENU_SAVE','STOP','MENU_UPLOAD','SHOP_SAVE','SHOP_UPLOAD'].map(k=>k+'_WITHHOLD_AFTER_RESPONSE');
+        const previous=sequence.indexOf(terminal.currentCell);assert.ok(previous>=0);
+        if(nextCellId===null){assert.equal(previous,5);assert.equal(restoredInput.service.length,18);
+            assert.ok(restoredInput.service.every(c=>['OBSERVED_NOT_INDEPENDENTLY_ATTESTED','NO_FORWARD_PROVEN_CLIENT_UNKNOWN','HOLD'].includes(c.status)));
+        }else{assert.equal(nextCellId,sequence[previous+1]);assert.equal(typeof actorFactory,'function');
+            assert.equal(restoredInput.service.find(c=>c.id===nextCellId)?.status,'NOT_RUN');}
+        const bindings=terminal.operationIds.map(id=>{const claim=restoredInput.claims.find(c=>c.id===id);assert.ok(claim);
+            return {operationId:id,kind:claim.kind,mode:claim.mode,owner:claim.owner,resource:structuredClone(claim.resource)};});
+        const resourcesSha256=hash(canonical(bindings));
+        exact(receipt,['snapshotSha256','applicationSha','suiteId','terminalArmId','resourcesSha256','terminalMetadataReceipt']);
+        assert.equal(receipt.snapshotSha256,hash(JSON.stringify(restoredInput)));assert.equal(receipt.applicationSha,target.source);
+        assert.equal(receipt.suiteId,suiteId);assert.equal(receipt.terminalArmId,terminal.id);assert.equal(receipt.resourcesSha256,resourcesSha256);
+        const metadata=receipt.terminalMetadataReceipt;
+        exact(metadata,['verifiedBy','evidenceReference','observedUtc','githubRunId','status','authSessionsClosed','pendingRequests','artifactSha256']);
+        assert.equal(metadata.verifiedBy,'cli_metadata_observer');assert.ok(typeof metadata.evidenceReference==='string'&&metadata.evidenceReference.length>0&&metadata.evidenceReference.length<=512);
+        assert.match(metadata.githubRunId,/^[0-9]{1,30}$/);assert.equal(metadata.status,'completed');assert.equal(metadata.authSessionsClosed,true);
+        assert.equal(metadata.pendingRequests,0);assert.match(metadata.artifactSha256,/^[a-f0-9]{64}$/);
+        assert.match(metadata.observedUtc,/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+        const age=Date.now()-Date.parse(metadata.observedUtc);assert.ok(Number.isFinite(age)&&age>=0&&age<=3600000);
+        exact(proof,['source','originalTerminal','unknownResolved','sessionsClosed','pendingRequests','operationIds','resourcesSha256']);
+        assert.equal(proof.source,'INDEPENDENT_READ_ONLY');assert.equal(proof.originalTerminal,true);assert.equal(proof.unknownResolved,true);
+        assert.equal(proof.sessionsClosed,true);assert.equal(proof.pendingRequests,0);assert.equal(proof.resourcesSha256,resourcesSha256);
+        assert.ok(Array.isArray(proof.operationIds)&&proof.operationIds.length===terminal.operationIds.length
+            &&new Set(proof.operationIds).size===proof.operationIds.length&&proof.operationIds.every(id=>terminal.operationIds.includes(id)));
+        const serviceModule=await import('./issue118-managed-service-browser.mjs'),suiteModule=await import('./issue118-managed-suite.mjs');
+        for(const key of ['source','deployment','origin'])assert.equal(serviceModule.serviceBrowserApplication[key],target[key]);
+        if(nextCellId!==null){assert.ok(Buffer.isBuffer(image?.buffer));assert.equal(image.buffer.length,serviceModule.serviceBrowserImage.bytes);
+            assert.equal(hash(image.buffer),serviceModule.serviceBrowserImage.sha256);}
+        const ports={
+            claimSuite:async()=>false,claimOperation:async value=>durableClaim(value),
+            verifyCheckpoint:async input=>{attested=await verifyCheckpoint({...input,preparationState:structuredClone(savedState),terminalProof:structuredClone(proof)})===true;return attested;},
+            verifyTerminalReadOnly:async input=>{
+                assert.equal(actorAttempted,false);assert.equal(input.armId,terminal.id);assert.equal(input.resourcesSha256,resourcesSha256);
+                assert.equal(canonical(input.resourceBindings),canonical(bindings));
+                assert.equal(canonical([...input.operationIds].sort()),canonical([...terminal.operationIds].sort()));return structuredClone(proof);
+            },
+            installSendGuard:async value=>{assert.equal(boundary,undefined);boundary=value;
+                return {beforeSend:true,remove:async()=>{try{if(runtimeGuard)assert.equal(await runtimeGuard.remove(),true);
+                    return true;}finally{boundary=undefined;runtimeGuard=undefined;}}};},
+            prepareServiceActor:async({existingActor,permit})=>{
+                assert.equal(existingActor,false);assert.equal(actorAttempted,false);assert.ok(!signal?.aborted&&boundary);
+                assert.ok(permit?.allowedForward===true&&permit.resource?.purpose==='SESSION');
+                const sessionClaim=suite.snapshot().claims.find(c=>c.id===permit.id);
+                assert.equal(sessionClaim?.kind,'SESSION');assert.equal(sessionClaim.owner,'S1');assert.equal(sessionClaim.state,'FORWARD_CONSUMED');
+                actorAttempted=true;stage='ACTOR_FACTORY';actorHandle=await actorFactory({role:'S1',permit});
+                const a=actorHandle,identity=managedActorIdentity.S1,tracker=a.lifecycle?.tracker;
+                assert.equal(a.binding?.owner,'S1');assert.equal(a.expectedUserId,identity.ownerId);assert.equal(a.binding.shopId,identity.shopId);
+                assert.ok(ownedCiActorBoundary({access:a.access,page:a.page,context:a.context,browser:a.lifecycle?.browser,
+                    expectedOwnerId:identity.ownerId,drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot()},true));
+                assert.equal(a.page.isClosed(),false);assert.equal(a.page.url(),target.origin+'/admin/shop');
+                const frontend=await a.page.evaluate(()=>({id:window.Clerk?.user?.id,pk:window.Clerk?.publishableKey}));
+                assert.equal(frontend.id,identity.ownerId);assertClerkPublishableKey(frontend.pk);
+                const own=await a.access.read(a.context.request,target.origin+'/api/admin/shop');assert.equal(own.status(),200);
+                assert.equal((await own.json())?.shop?.id,identity.shopId);assert.ok(!a.routeFailed?.());
+                const routes=tracker.snapshot();assert.equal(routes.pending,0);assert.equal(routes.started,routes.settled);
+                for(const page of a.context.pages())preexisting.add(page);
+                runtime=(dependencies.createRuntimePorts||createManagedRuntimePorts)({operation:'SERVICE_ARM',actors:[a],claimDirectory,
+                    checkpointFixtures:restoredInput.fixtures,t1FixtureId:restoredInput.t1.fixtureId,record:emit});
+                runtimeGuard=await runtime.ports.installSendGuard(boundary);assert.equal(runtimeGuard?.beforeSend,true);
+                const api=runtime.serviceApi;
+                for(const name of ['readMenu','readShop','readCreationBaseline','createMenu','menuWrite','shopWrite','observeKnownBlob',
+                    'verifyPublicImage','verifyActor','readOwner','claimPrivate'])assert.equal(typeof api?.[name],'function');
+                const ts=createRequire(import.meta.url)('tsx/cjs/api');
+                const {projectOriginalPayloads}=ts.require('./issue118-batch-stop.ts',import.meta.url);
+                const {ALLERGEN_MASTER}=ts.require('../lib/constants/allergen-master.ts',import.meta.url);
+                preparation=(dependencies.createServicePreparation||serviceModule.createManagedServicePreparation)({api,state:savedState,runId:suiteId,
+                    menuTemplate:projectOriginalPayloads(suiteId).expectedByMenu.M04,allergens:ALLERGEN_MASTER,shopId:target.shop});
+                for(const name of ['prepareCell','finishCell','recordSetupObject','retainHeldCell','restorePriorShop'])assert.equal(typeof preparation[name],'function');
+                const {prepareWriteObservation}=ts.require('./issue118-service-observer.ts',import.meta.url);
+                serviceBrowser=(dependencies.prepareServiceBrowser||serviceModule.prepareManagedServiceBrowser)({actor:{...a,owner:'S1'},target,
+                    scope:{runId:suiteId,applicationSha:target.source,shopId:target.shop,isolationReceiptSha256:hash(JSON.stringify(identityReceipt))},image,
+                    ports:{prepareCell:preparation.prepareCell,finishCell:preparation.finishCell,recordSetupObject:preparation.recordSetupObject,
+                        retainHeldCell:preparation.retainHeldCell,verifyActor:async(value,expected)=>{
+                            assert.equal(value.context,a.context);for(const key of ['source','deployment','origin'])assert.equal(expected[key],target[key]);
+                            assert.equal(await api.verifyActor(value),true);},readOwner:value=>api.readOwner(value),claimPrivate:value=>api.claimPrivate(value),
+                        emit,oidcHeaders:(url,headers,token)=>scopedOidcHeaders(url,headers,assertOidcClaims(token)),prepareWriteObservation}});
+                assert.equal(typeof serviceBrowser.runServiceCell,'function');assert.equal(typeof serviceBrowser.close,'function');stage='SERVICE_ARM';
+                return {owner:'S1',identityVerified:true,separateFromClosedActors:true};
+            },
+            runServiceCell:async value=>{assert.ok(serviceBrowser&&value.cell.id===nextCellId);return serviceBrowser.runServiceCell(value);},
+            restorePriorShop:async value=>{assert.ok(preparation);return preparation.restorePriorShop({...value,independentTerminalVerified:true});},
+        };
+        stage='CHECKPOINT_AND_TERMINAL';
+        suite=(dependencies.createSuite||suiteModule.prepareManagedSuite)({suiteId,initialSnapshot:restoredInput,checkpointReceipt:receipt,ports,signal});
+        await suite.reconcileTerminalArm(proof);
+        assert.equal(actorAttempted,false);assert.ok(!signal?.aborted);
+        if(nextCellId===null)resumeStatus='TERMINAL_RECONCILED_NO_AUTH';
+        else{stage='SERVICE_ARM';await suite.executeServiceArm({armId:'SERVICE_ARM_'+(restoredInput.arms.filter(a=>a.zone==='SERVICE').length+1),cellIds:[nextCellId]});
+            resumeStatus='RETURNED_SUITE_STATE';}
+    }catch{resumeStatus='HOLD_RESUME_'+stage;}
+    finally{if(serviceBrowser)try{
+        browserAdapterClose=await serviceBrowser.close();const routes=actorHandle.lifecycle.tracker.snapshot();
+        browserAdapterClose={...browserAdapterClose,preexistingPagesPreserved:[...preexisting].every(p=>!p.isClosed()),
+            ownedPagesClosed:actorHandle.context.pages().every(p=>preexisting.has(p)||p.isClosed()),pendingRequests:routes.pending,started:routes.started,settled:routes.settled};
+        if(browserAdapterClose.ownedPageClosed!==true||browserAdapterClose.routesDrained!==true||!browserAdapterClose.preexistingPagesPreserved
+            ||!browserAdapterClose.ownedPagesClosed||routes.pending!==0||routes.started!==routes.settled)resumeStatus='HOLD_SERVICE_PAGE_CLOSE_UNVERIFIED';
+    }catch{browserAdapterClose={ownedPageClosed:false,routesDrained:false};resumeStatus='HOLD_SERVICE_PAGE_CLOSE_UNVERIFIED';}}
+    let suiteSnapshot={status:'HOLD_RESUME_PREFLIGHT',livePass:false,automaticRetry:false,automaticCleanup:false},runtimeSnapshot={held:true};
+    try{if(suite)suiteSnapshot=suite.snapshot();if(runtime)runtimeSnapshot=runtime.snapshot();}catch{resumeStatus='HOLD_RESUME_SNAPSHOT_UNVERIFIED';}
+    const result={suiteSnapshot,runtimeSnapshot:{...runtimeSnapshot,resumeStatus,stoppedStage:stage,
+        resumeEvidence:injected?'INJECTED_FACTORY_TEST':'OWNED_ACTOR_PORTS'},preparationState:attested?savedState:{},browserAdapterClose};
+    try{await outputRecord(structuredClone(result));}catch{result.runtimeSnapshot.resumeStatus='HOLD_CHECKPOINT_WRITE_UNVERIFIED';}
+    return {result,actorHandle};
+}
+
+// One nonpersistent context per pinned owner. No imported profile/storageState.
+export async function openManagedOwnedActor({role,chromium,env,identityReceipt,record=()=>{}}){
+    assert.equal(liveTargetPinsVerified,true);assert.ok(['S1','S2'].includes(role));assertIdentityReceipt(identityReceipt);
+    assert.equal(env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
+    const identity=managedActorIdentity[role],tracker=createCiRouteLifecycleTracker();
+    const observation={owner:role,expectedUserId:identity.ownerId,expectedShopId:identity.shopId,stage:'SETUP',gateVerified:false,sessionIdentity:null};
+    let browser,context,page,access,phase='AUTHENTICATION',routeFailed=false;
+    const emit=()=>record(structuredClone(observation));
+    const setupStage=code=>{observation.stage=code;emit();};
+    const stages=code=>{phase=code;setupStage(code);};
+    const ready=()=>{const s=access.sessionObservation();assert.ok(s?.eligibleForCleanup&&s.ownerVerified);assert.equal(s.ownerId,identity.ownerId);};
+    const policy=createVerifiedReadCloseAuthPolicyCandidate(identityReceipt,ready);
+    try{
+        access=await createCiAccess({...env,ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},fetch,setupStage,
+            {session:s=>{observation.sessionIdentity=s;emit();},authentication:a=>{observation.authentication=a;emit();},
+                transport:t=>{if(t.exception!=='NONE'&&t.exception!=='POLICY_REFUSED')routeFailed=true;},
+                handshake:h=>{observation.handshake=h;emit();}},role);
+        browser=await chromium.launch({headless:true,channel:'chromium'});
+        context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:false,serviceWorkers:'block'});
+        await context.route('**/*',tracker.wrap(async route=>{
+            try{if(!await guardReadCloseRoute(route,()=>{routeFailed=true;},()=>{},
+                {policy,getPhase:()=>phase,observe:()=>{}}))return;
+                await access.route(route,undefined,()=>policy.assertBeforeSend(route.request(),()=>phase));
+            }catch{routeFailed=true;observation.routeFailure=true;emit();}
+        }));
+        page=await context.newPage();page.setDefaultTimeout(20000);
+        const {readT1KeyClassPreflight,assertT1KeyClassReady}=await import('./check-issue118-server-callback-candidate.mjs');
+        observation.keyClass=await readT1KeyClassPreflight(context.request,access.token());assertT1KeyClassReady(observation.keyClass);emit();
+        await access.authenticate(page);assert.equal(routeFailed,false);
+        const response=await page.goto(target.origin+'/admin/shop');assert.equal(response?.status(),200);assert.equal(page.url(),target.origin+'/admin/shop');
+        const frontend=await page.evaluate(()=>({id:window.Clerk?.user?.id,pk:window.Clerk?.publishableKey}));
+        assert.equal(frontend.id,identity.ownerId);assertClerkPublishableKey(frontend.pk);
+        const own=await access.read(context.request,target.origin+'/api/admin/shop');assert.equal(own.status(),200);assert.equal((await own.json())?.shop?.id,identity.shopId);
+        observation.gateVerified=true;phase='APP_FLOW';observation.stage='OWNER_AND_SHOP_VERIFIED';emit();
+        return {owner:role,expectedUserId:identity.ownerId,binding:{owner:role,shopId:identity.shopId,contextRef:'managed_'+role},
+            page,context,browser,access,observation,lifecycle:{browser,tracker,onStage:stages},
+            setPhase:code=>{phase=code;},routeFailed:()=>routeFailed,
+            finalize:async()=>{const result=await finalizeOwnedCiActor({access,page,context,browser,expectedOwnerId:identity.ownerId,
+                drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot(),attempts:{browserLaunchAttempted:true,contextCreateAttempted:true},onStage:stages});
+                observation.finalization=result;emit();return result;}};
+    }catch{observation.stage='ACTOR_GATE_HELD';
+        observation.finalization=access&&page?await finalizeOwnedCiActor({access,page,context,browser,expectedOwnerId:identity.ownerId,
+            drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot(),attempts:{browserLaunchAttempted:!!browser,contextCreateAttempted:!!context},onStage:stages})
+            :await closeIsolatedBrowser(context,browser,{browserLaunchAttempted:!!browser,contextCreateAttempted:!!context});
+        emit();throw Error('MANAGED_ACTOR_GATE_HELD');}
 }
 
 export function transportLifecycleSnapshot(phase, at = new Date().toISOString()) {
@@ -429,7 +979,7 @@ export function recordTransportDiagnostic(report, observation, lifecycle) {
 const fixedErrors = new Set(["DIALOG_TIMEOUT", "DIALOG_HANDLER_FAILED", "WRITE_RESULT_UNCERTAIN",
     "CI_AUTHENTICATION_FAILED", "CI_TRANSPORT_HELD", "CI_IDENTITY_REFUSED", "CI_AMBIENT_CONFIGURATION_REFUSED",
     "CI_DEBUG_REFUSED", "TEST_CLERK_KEY_REQUIRED", "OIDC_REQUEST_TARGET_REFUSED", "OIDC_REQUEST_AUTH_REQUIRED",
-    "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_INVALID", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED",
+    "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_INVALID", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED", "OIDC_RENEWAL_HELD", "OIDC_RENEWAL_LIMIT",
     "BROWSER_LAUNCH_FAILED", "BROWSER_CONTEXT_FAILED", "BROWSER_PAGE_FAILED",
     "T1_KEY_CLASS_READ_HELD", "T1_KEY_CLASS_NOT_READY"]);
 export function classifyLiveError(error) {
@@ -586,18 +1136,18 @@ export async function readCloseDirectFetch(api, url, token) {
         throw Error('READ_ONLY_DIRECT_TARGET_REFUSED');
     return protectedPreviewFetch(api, url, {}, token);
 }
-// Unwired candidate. Pins must come from the reviewed immutable public client build,
+// Pins come from the reviewed immutable public client build,
 // not a CLI/env input or a guessed Server Action/telemetry path. Missing pins grant nothing.
-// The new target is readable for byte verification, but no live auth/write path
-// may start until its compiled action/caller/factory have been verified.
-export const liveTargetPinsVerified = false;
+// Run 41470110878: caller/factory bytes match the independently traced factory
+// chain. This establishes the client action pin, not auth/API/DB success.
+export const liveTargetPinsVerified = true;
 export const verifiedReadCloseAction = Object.freeze({
     source:'8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1',deployment:'dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo',
     reference:'002d5a40d57114e6b57c906dd03491ecf8c46419f0',
     callerChunk:'/_next/static/immutable/chunks/1yxbpkao8jjq-.js',callerSha256:'22f889779049694ab8497801e8286d170f1101edbad60f9d61d06335458a50a7',
     factoryChunk:'/_next/static/immutable/chunks/44xcerwlley0q.js',factorySha256:'a070e193cc6aa2af93f87b93c668ae7fa6039f396007a82104ba7b228d7850ac',
 });
-// Dedicated read-close only; the mutation-bearing T1 entry does not use this policy.
+// Shared auth/termination policy. T1 writes retain their separate single-send ledger.
 // Provenance: caller41895 -> getters95187 -> CJS35326 ->21413 -> React64893;
 // callServer95187 ->32120 -> Next48658. No environment/CLI action-ID override.
 export function assertReadCloseSignoutReady(report) {
@@ -864,11 +1414,86 @@ export async function stopWithDialog(page, name, click, timeout = 20000) {
     } finally { clearTimeout(timer); page.off("dialog", handler); }
 }
 
+// PC-side durable single dispatcher. A failed/uncertain dispatch consumes its
+// checkpoint too: observe the old outcome, never erase this claim and resend.
+export function claimManagedDispatch({directory,checkpointKey,runnerSha,now=new Date().toISOString()}){
+    assert.ok(typeof directory==='string'&&directory.length>0);
+    assert.ok(checkpointKey==='INITIAL_MANAGED_APPROVAL_20261102'||/^[a-f0-9]{64}$/.test(checkpointKey));
+    assert.match(runnerSha,/^[a-f0-9]{40}$/);assert.ok(Number.isFinite(Date.parse(now)));
+    mkdirSync(directory,{recursive:true});assert.ok(lstatSync(directory).isDirectory()&&!lstatSync(directory).isSymbolicLink());
+    const key=createHash('sha256').update(checkpointKey).digest('hex');let fd;
+    const claim={id:randomUUID(),checkpointKey,runnerSha,applicationSha:target.source,deployment:target.deployment,createdUtc:now,state:'PENDING_CONSUMED_NO_RETRY'};
+    try{fd=openSync(join(directory,key+'.json'),'wx',0o600);writeFileSync(fd,JSON.stringify(claim));fsyncSync(fd);return claim;}
+    catch{throw Error('MANAGED_DISPATCH_CHECKPOINT_ALREADY_CLAIMED_OR_UNWRITABLE');}
+    finally{if(fd!==undefined)closeSync(fd);}
+}
+
+export function decodeManagedResumeBundle(receipt){
+    try{
+        const encoded=receipt?.managedResumeBundle;
+        assert.ok(typeof encoded==='string'&&encoded.length>0&&encoded.length<=60000&&/^[A-Za-z0-9_-]+$/.test(encoded));
+        const compressed=Buffer.from(encoded,'base64url');assert.equal(compressed.toString('base64url'),encoded);
+        const bytes=gunzipSync(compressed,{maxOutputLength:262144}),text=bytes.toString('utf8');
+        assert.equal(Buffer.from(text,'utf8').equals(bytes),true);const value=JSON.parse(text);
+        const keys=['initialSnapshot','preparationState','checkpointReceipt','terminalProof','nextCellId'];
+        assert.ok(value&&Object.keys(value).length===keys.length&&keys.every(k=>Object.hasOwn(value,k)));
+        const attestation=receipt.managedCheckpointAttestation;
+        assert.ok(attestation&&Object.keys(attestation).length===5&&['verifiedBy','bundleSha256','artifactSha256','githubRunId','evidenceReference'].every(k=>Object.hasOwn(attestation,k)));
+        assert.equal(attestation?.verifiedBy,'cli_metadata_observer');
+        assert.match(attestation.artifactSha256,/^[a-f0-9]{64}$/);assert.match(attestation.githubRunId,/^[0-9]{1,30}$/);
+        assert.equal(attestation.bundleSha256,createHash('sha256').update(bytes).digest('hex'));
+        assert.equal(attestation.artifactSha256,value.checkpointReceipt?.terminalMetadataReceipt?.artifactSha256);
+        assert.equal(attestation.githubRunId,value.checkpointReceipt?.terminalMetadataReceipt?.githubRunId);
+        assert.equal(attestation.evidenceReference,`https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/${attestation.githubRunId}`);
+        return value;
+    }catch{throw Error('MANAGED_RESUME_BUNDLE_REFUSED');}
+}
+
+export async function runManagedServiceArm(){
+    assert.equal(liveTargetPinsVerified,true);assertCiEnvironment(process.env);
+    assert.equal(process.env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
+    assert.equal(process.env.ISSUE118_MANAGED_OPERATION,'APPROVE_MANAGED_SERVICE_ARM');
+    assert.ok(!process.env.DEBUG&&!process.env.PWDEBUG&&!process.env.NODE_OPTIONS);
+    const receipt=JSON.parse(readFileSync(process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT,'utf8'));assertIdentityReceipt(receipt);
+    const bundle=decodeManagedResumeBundle(receipt);
+    const output=resolve(process.env.CLEARALLERGY_BROWSER_OUTPUT);mkdirSync(dirname(output),{recursive:true});mkdirSync(output,{recursive:false});
+    const report={target,startedUtc:new Date().toISOString(),operation:'MANAGED_SERVICE_ARM',status:'HOLD_NOT_STARTED',
+        dbObservation:'Independent READ ONLY proof supplied as an externally verified checkpoint; new arm SQL remains separate',events:[]};
+    const save=()=>writeFileSync(join(output,'result.json'),JSON.stringify(report,null,2));
+    let actor;
+    try{
+        save();const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+        const run=await executeManagedServiceResume({...bundle,identityReceipt:receipt,claimDirectory:join(output,'managed-claims'),
+            image:{buffer:readFileSync(new URL('../public/images/cion_notxt.png',import.meta.url))},
+            verifyCheckpoint:async({snapshot,preparationState,terminalProof})=>{
+                // This attestation is prepared outside the job from actual completed-run
+                // metadata, downloaded artifact bytes and independent Neon READ ONLY SQL.
+                assert.deepEqual(snapshot,bundle.initialSnapshot);assert.deepEqual(preparationState,bundle.preparationState);
+                assert.deepEqual(terminalProof,bundle.terminalProof);assertIdentityReceipt(receipt);decodeManagedResumeBundle(receipt);return true;
+            },
+            actorFactory:async()=>{actor=await openManagedOwnedActor({role:'S1',chromium,env:process.env,identityReceipt:receipt,
+                record:value=>{report.actor=value;save();}});return actor;},
+            record:value=>{report.events.push(value);save();},outputRecord:value=>{report.managed=value;save();}});
+        assert.equal(run.actorHandle,actor);report.managed=run.result;
+        report.status=run.result.suiteSnapshot?.status==='HOLD_NO_FURTHER_WRITES'?'HOLD_MANAGED_RECONCILIATION_REQUIRED':'INCOMPLETE_INDEPENDENT_DB';
+    }catch{report.status='HOLD_MANAGED_SERVICE_ARM_FAILED';}
+    finally{
+        if(actor){try{report.actorFinalization=await actor.finalize();if(!report.actorFinalization.complete)report.status='HOLD_MANAGED_LIFECYCLE_UNVERIFIED';}
+            catch{report.actorFinalization={complete:false};report.status='HOLD_MANAGED_LIFECYCLE_UNVERIFIED';}}
+        report.finishedUtc=new Date().toISOString();save();process.exitCode=2;
+        console.log('ISSUE118_RESULT '+report.status);
+    }
+}
+
 export async function runLive() {
     if (!liveTargetPinsVerified) throw Error('TARGET_STATIC_VERIFICATION_PENDING');
     const readCloseOnly = process.argv.slice(2).join(' ') === '--ci-read-close';
     if (readCloseOnly && process.env.ISSUE118_DIAGNOSTIC_MODE !== readCloseMode) throw Error('READ_CLOSE_MODE_REFUSED');
-    const ciMode = readCloseOnly || process.argv.slice(2).join(" ") === "--ci-apply";
+    const managedMode = process.argv.slice(2).join(' ') === '--ci-managed';
+    if(managedMode&&process.env.ISSUE118_MANAGED_SCOPE!=='MAX32_103_4_5_7')throw Error('MANAGED_SCOPE_REFUSED');
+    if(managedMode&&process.env.ISSUE118_MANAGED_OPERATION==='APPROVE_MANAGED_SERVICE_ARM')return runManagedServiceArm();
+    if(managedMode&&process.env.ISSUE118_MANAGED_OPERATION!=='APPROVE_MANAGED_SUITE')throw Error('MANAGED_OPERATION_REFUSED');
+    const ciMode = managedMode || readCloseOnly || process.argv.slice(2).join(" ") === "--ci-apply";
     if (!ciMode && process.argv.slice(2).join(" ") !== "--apply") throw Error("EXPLICIT_APPLY_REQUIRED");
     if (ciMode) assertCiEnvironment(process.env);
     if (process.env.DEBUG || process.env.PWDEBUG || process.env.NODE_OPTIONS) throw Error("DEBUG_OR_PRELOAD_FORBIDDEN");
@@ -906,8 +1531,12 @@ export async function runLive() {
     const ciRouteLifecycle=createCiRouteLifecycleTracker();
     let activeOperation;
     let ciAccess;
+    let managedB, managedStarted=false, t1PrivateVerified=false;
     let ciTransportFailed = false;
-    const readClosePolicy = readCloseOnly ? createVerifiedReadCloseAuthPolicyCandidate(identityReceipt,()=>assertReadCloseSignoutReady(report)) : undefined;
+    const readClosePolicy = ciMode ? createVerifiedReadCloseAuthPolicyCandidate(identityReceipt,()=>{
+        if(readCloseOnly)return assertReadCloseSignoutReady(report);
+        const s=ciAccess.sessionObservation();assert.ok(s?.ownerVerified&&s.eligibleForCleanup&&s.ownerId===ciIdentity.ownerId);
+    }) : undefined;
     let lifecyclePhase = 'SETUP', routeSequence = 0;
     const markLifecycle = code => {
         lifecyclePhase = code;
@@ -993,7 +1622,12 @@ export async function runLive() {
                     const counts=report.readCloseRouteCounts??={started:0,settled:0,sampledOut:0};counts.started++;
                     const entries=report.readCloseRoutes??=[];if(entries.length<128)entries.push(entry);else {counts.sampledOut++;report.readCloseRoutesTruncated=true;}
                 }
-                if (readCloseOnly && !await guardReadCloseRoute(route,
+                const authorizedT1Mutation=requestOperations.has(route.request());
+                const routedUrl=new URL(route.request().url());
+                const authorizedFlowRead=!readCloseOnly&&route.request().method()==='GET'&&routedUrl.origin===target.origin&&
+                    !routedUrl.username&&!routedUrl.password&&!routedUrl.search&&!routedUrl.hash&&
+                    ['/api/admin/shop','/api/admin/menus',...(menuId?['/api/admin/menus/'+menuId,'/api/menus/'+menuId]:[])].includes(routedUrl.pathname);
+                if (!authorizedT1Mutation && !authorizedFlowRead && !await guardReadCloseRoute(route,
                     () => { report.readOnlyRequestRefused = true; },
                     () => { report.readOnlyOtherRequestsBlocked = (report.readOnlyOtherRequestsBlocked || 0) + 1; },
                     {policy:readClosePolicy,getPhase:()=>lifecyclePhase,observe:(predicates,decision)=>{
@@ -1007,7 +1641,7 @@ export async function runLive() {
                     if(events.length<4)events.push({...transportLifecycleSnapshot(lifecyclePhase),
                         ...transportObservation(observation.originRole,observation.method,observation.status,observation.exception,observation.stages)});
                     else report.lifecycleIncomplete=true;save();
-                }:undefined,readCloseOnly?()=>readClosePolicy.assertBeforeSend(route.request(),()=>lifecyclePhase):undefined);
+                }:undefined,authorizedT1Mutation||authorizedFlowRead?undefined:()=>readClosePolicy.assertBeforeSend(route.request(),()=>lifecyclePhase));
             }
             catch (error) {
                 if(entry)entry.handlerFailed=true;
@@ -1092,6 +1726,12 @@ export async function runLive() {
         protectedBefore = await Promise.all(protectedIds.map(async id => protectedApiSnapshot(await read(id))));
         report.protectedBefore = protectedBefore;
         report.stage = "TARGET_ANCHOR_VERIFIED"; save();
+        if(managedMode){
+            // Both identities are established before the first fixture write.
+            managedB=await openManagedOwnedActor({role:'S2',chromium,env:process.env,identityReceipt,
+                record:value=>{report.managedActorB=value;save();}});
+            assert.equal(managedB.observation.gateVerified,true);
+        }
         name = `【架空・Issue118 runner】ひよこ豆サラダ ${report.run.slice(0, 8)}`;
         report.fixtureName = name;
         report.specification = "Complete fictional initial dressing: chickpea/rice oil/rice vinegar/salt, listed allergens absent. Signal later adds milk; no real food claim.";
@@ -1135,13 +1775,39 @@ export async function runLive() {
         if (ciTransportFailed) throw Error("CI_TRANSPORT_HELD");
         report.flow = "PASS_APP_BROWSER_API";
         markLifecycle('FLOW_VERIFIED');
+        if(managedMode){
+            // T1 must be terminal/private before its session is reused for the managed core.
+            await page.goto(target.origin+'/admin/menus');
+            cleanupAttempted=true;
+            await action('CLEANUP','POST',`/api/admin/menus/${menuId}/stop`,()=>page.getByRole('button',{name:name+'の公開を停止',exact:true}).click());
+            const final=await read(menuId);assert.equal(final.isPublished,false);assert.equal(final.name,name);
+            record('FINAL_PRIVATE_HISTORY_RETAINED',final);report.cleanup='PRIVATE_VERIFIED';t1PrivateVerified=true;
+            report.protectedAfter=await Promise.all(protectedIds.map(async id=>protectedApiSnapshot(await read(id))));
+            assert.deepEqual(report.protectedAfter,protectedBefore);report.protection='PASS_API_REPRESENTATION';
+            const viewerDrain=await ciRouteLifecycle.drain();assert.equal(viewerDrain.status,'QUIET_CONFIRMED');assert.equal(viewerDrain.pending,0);
+            await viewer.close();await page.goto(target.origin+'/admin/shop');
+            const a={owner:'S1',expectedUserId:ciIdentity.ownerId,binding:{owner:'S1',shopId:target.shop,contextRef:'managed_S1'},
+                page,context,browser,access:ciAccess,lifecycle:{browser,tracker:ciRouteLifecycle,onStage:markLifecycle},
+                routeFailed:()=>ciTransportFailed};
+            managedStarted=true;report.managed={status:'STARTED'};save();
+            report.managed=await executeManagedContinuation({actors:[a,managedB],identityReceipt,
+                t1:{flow:report.flow,cleanup:report.cleanup,protection:report.protection,unknownWrite:false,fixtureId:menuId,menuWrites:6,sessions:2},
+                claimDirectory:join(output,'managed-claims'),
+                image:{buffer:readFileSync(new URL('../public/images/cion_notxt.png',import.meta.url))},
+                record:value=>{(report.managedEvents??=[]).push(value);save();},
+                outputRecord:value=>{report.managed=value;save();}});save();
+        }
     } catch (error) {
-        report.flow = ledger.held ? "HOLD_UNCERTAIN_WRITE" : "FAIL";
+        if(managedStarted)report.managedExecutionError=classifyLiveError(error);
+        else report.flow = ledger.held ? "HOLD_UNCERTAIN_WRITE" : "FAIL";
         report.errorClass = classifyLiveError(error);
     } finally {
         markLifecycle('CLEANUP');
         if (readCloseOnly) {
             report.cleanup = 'NOT_APPLICABLE_READ_ONLY';
+        } else if (managedStarted||t1PrivateVerified) {
+            // A later unknown operation never triggers a second T1 cleanup.
+            report.cleanup=t1PrivateVerified?'PRIVATE_VERIFIED':'UNVERIFIED_NO_AUTOMATIC_RETRY';
         } else if (ledger.held) {
             report.cleanup = "HOLD_ORIGINAL_REQUEST_UNCONFIRMED_NO_WRITE";
             report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No automatic cleanup/retry. Reconcile original operation terminal result, creationOperationId/name, current API/DB state and audit history before any further write.";
@@ -1174,6 +1840,8 @@ export async function runLive() {
         if (ledger.held) report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No further write/cleanup/retry. Read-only reconciliation must establish the original operation outcome, creationOperationId/name, current API/DB state and audit history; otherwise keep HOLD.";
         if (ciAccess) report.authenticationProgress = ciAccess.authenticationProgress();
         if (ciAccess) report.initialHandshake = ciAccess.handshakeProgress();
+        if(managedB){try{report.managedActorBFinalization=await managedB.finalize();if(!report.managedActorBFinalization.complete)ciTransportFailed=true;}
+            catch{report.managedActorBFinalization={complete:false,status:'FINALIZATION_EXCEPTION'};ciTransportFailed=true;}}
         if(ciAccess&&page){
             const finalized=await finalizeOwnedCiActor({access:ciAccess,page,context,browser,expectedOwnerId:ciIdentity.ownerId,
                 drainRoutes:()=>ciRouteLifecycle.drain(),readRouteState:()=>ciRouteLifecycle.snapshot(),attempts:{browserLaunchAttempted,contextCreateAttempted},onStage:markLifecycle});
@@ -1192,8 +1860,12 @@ export async function runLive() {
         const overall = readCloseOnly ? readCloseResult(report, ciTransportFailed, closureComplete) :
             overallResult(report.flow, report.cleanup, report.protection, ledger.held,
                 closureComplete && report.authenticationCleanup !== "SIGNOUT_UNVERIFIED" && !ciTransportFailed);
-        report.overall = overall.status; report.status = overall.status;
-        process.exitCode = overall.exit; save();
+        if(managedMode){
+            report.overall=ledger.held?'HOLD_UNCERTAIN_WRITE':report.managed?.suiteSnapshot?.status==='HOLD_NO_FURTHER_WRITES'?'HOLD_MANAGED_RECONCILIATION_REQUIRED':'HOLD_MANAGED_SUITE_INCOMPLETE';
+            if(!ledger.held&&(!closureComplete||ciTransportFailed||report.authenticationCleanup==='SIGNOUT_UNVERIFIED'))report.overall='HOLD_MANAGED_LIFECYCLE_UNVERIFIED';
+            report.status=report.overall;process.exitCode=2;
+        }else{report.overall = overall.status; report.status = overall.status;process.exitCode = overall.exit;}
+        save();
         console.log(`ISSUE118_RESULT ${report.overall}; flow=${report.flow}; cleanup=${report.cleanup}`);
     }
 }

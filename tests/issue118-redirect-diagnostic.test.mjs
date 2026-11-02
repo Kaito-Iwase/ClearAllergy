@@ -129,8 +129,8 @@ test('workflow diagnostic step receives no Clerk key and cannot select the live 
     const live = w.split('- name: ONE guarded T1;')[1].split('- name: ONE fixed Preview GET;')[0];
     assert.match(live, /if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'/);
     const deps = w.split('- name: Prepare the existing isolated Playwright version')[1].split('- name: OIDC target')[0];
-    assert.match(deps, /if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'/);
-    assert.match(w, /if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' \|\| inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'/);
+    assert.ok(deps.includes("if: (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM'))"));
+    assert.ok(w.includes("if: (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM')) || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'"));
     assert.match(readFileSync(new URL('../scripts/browser-runner.mjs',import.meta.url),'utf8'), /tests\/issue118-redirect-diagnostic.test.mjs/);
 });
 test('CLI refuses absent context with fixed output and no raw filename or exception', () => {
