@@ -13,12 +13,13 @@ const maxAssets = 48, maxTotalBytes = 16 * 1024 * 1024;
 const held = () => { throw Error('PUBLIC_ASSETS_HELD'); };
 export function assertPublicAssetPath(path) {
     if (typeof path !== 'string' || path.length > 240 ||
-        !/^\/_next\/static\/chunks\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.js$/.test(path) ||
+        !/^\/_next\/static\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.js$/.test(path) ||
         path.split('/').some(p => p === '.' || p === '..')) held();
     return path;
 }
 function htmlAssetSources(text) {
     const sources = []; let cursor = 0;
+    const identity={titleCount:0,expectedTitle:false,appIcon:false,vercelTitle:false,protectionTitle:false};
     const decode = value => value.replace(/&(#x[0-9a-f]+|#\d+|amp|quot|apos|lt|gt);/gi, (_, entity) => {
         if (entity[0] !== '#') return ({ amp:'&',quot:'"',apos:"'",lt:'<',gt:'>' })[entity.toLowerCase()];
         const point = entity[1].toLowerCase() === 'x' ? parseInt(entity.slice(2),16) : Number(entity.slice(1));
@@ -49,33 +50,50 @@ function htmlAssetSources(text) {
         }
         if(!closed)held();
         if(selfClosing&&['script','style','textarea','title'].includes(name))held();
+        if(name==='link'&&duplicate)held();
         const rel=(attrs.get('rel')||'').toLowerCase().split(/\s+/);
+        if(name==='link'&&rel.some(r=>['icon','shortcut','apple-touch-icon'].includes(r))&&attrs.has('href')) {
+            const href=decode(attrs.get('href'));if(href==='/images/clearallergy-mark-small.svg'||href===target.origin+'/images/clearallergy-mark-small.svg')identity.appIcon=true;
+        }
         const selected=name==='script'&&attrs.has('src') ? 'src' : name==='link'&&attrs.has('href')&&
             (rel.includes('modulepreload')||(rel.includes('preload')&&(attrs.get('as')||'').toLowerCase()==='script')) ? 'href' : null;
         if(selected) { if(duplicate)held();const raw=attrs.get(selected);sources.push({value:decode(raw),escaped:raw.includes('&'),kind:name==='script'?'scriptSrc':'scriptPreload'}); }
         // Raw-text contents are not HTML tags and never provide asset permission.
         if(!selfClosing&&['script','style','textarea','title'].includes(name)) {
-            const end=new RegExp('</'+name+'\\s*>','gi');end.lastIndex=cursor;const match=end.exec(text);if(!match)held();cursor=end.lastIndex;
+            const end=new RegExp('</'+name+'\\s*>','gi');end.lastIndex=cursor;const match=end.exec(text);if(!match)held();
+            if(name==='title') { identity.titleCount++;const title=decode(text.slice(cursor,match.index)).trim();identity.expectedTitle ||= title==='ClearAllergy';
+                identity.vercelTitle ||= /vercel/i.test(title);identity.protectionTitle ||= /Authentication Required|Vercel Authentication|Log in.*Vercel/i.test(title); }
+            cursor=end.lastIndex;
         }
     }
-    return sources;
+    return {sources,identity};
 }
 export function inspectPublicCode(text, html = false) {
     const paths = new Set(), actions = new Set(), telemetry = new Map();
     const referenceCounts=Object.fromEntries(['scriptSrc','scriptPreload','jsLiteral','htmlEscaped','rootRelative','assetRelative','documentRelative',
         'sameOriginAbsolute','queryless','matchingDpl','duplicate','acceptedUnique','foreignOriginRefused','nonStaticRefused',
-        'otherQueryRefused','unsafeReferenceRefused','htmlMalformed'].map(key=>[key,0]));
+        'otherQueryRefused','unsafeReferenceRefused','htmlMalformed','dotRelative','rootNextStatic','rootNextOther','rootOther',
+        'relativeOther','absoluteHttps','schemeRelative','pathHasStaticSegment','pathHasChunksSegment'].map(key=>[key,0]));
+    let documentIdentity=null;
     const reference = ({value,escaped=false,kind='jsLiteral'}) => {
         referenceCounts[kind]++;if(escaped)referenceCounts.htmlEscaped++;
+        if(value.startsWith('/_next/static/'))referenceCounts.rootNextStatic++;
+        else if(value.startsWith('/_next/'))referenceCounts.rootNextOther++;
+        else if(value.startsWith('/')&&!value.startsWith('//'))referenceCounts.rootOther++;
+        if(value.startsWith('https://'))referenceCounts.absoluteHttps++;
+        if(value.startsWith('//'))referenceCounts.schemeRelative++;
+        if(/(?:^|\/)static\//.test(value))referenceCounts.pathHasStaticSegment++;
+        if(/(?:^|\/)chunks\//.test(value))referenceCounts.pathHasChunksSegment++;
         if(typeof value!=='string'||value.length>1000||/[\u0000-\u0020\u007f\\%#]/.test(value)){referenceCounts.unsafeReferenceRefused++;return;}
         let path;
         if(value.startsWith(target.origin+'/')) { referenceCounts.sameOriginAbsolute++;path=value.slice(target.origin.length); }
         else if(value.startsWith('//')||/^[A-Za-z][\w+.-]*:/.test(value)) { referenceCounts.foreignOriginRefused++;return; }
-        else if(value.startsWith('/_next/static/chunks/')) { referenceCounts.rootRelative++;path=value; }
-        else if(value.startsWith('static/chunks/')) { referenceCounts.assetRelative++;path='/_next/'+value; }
-        else if(value.startsWith('_next/static/chunks/')) { referenceCounts.documentRelative++;path='/'+value; }
-        else { referenceCounts.nonStaticRefused++;return; }
-        if(!path.startsWith('/_next/static/chunks/')) { referenceCounts.nonStaticRefused++;return; }
+        else if(value.startsWith('/_next/static/')) { referenceCounts.rootRelative++;path=value; }
+        else if(value.startsWith('./_next/static/')) { referenceCounts.dotRelative++;path=value.slice(1); }
+        else if(value.startsWith('static/')&&kind==='jsLiteral') { referenceCounts.assetRelative++;path='/_next/'+value; }
+        else if(value.startsWith('_next/static/')) { referenceCounts.documentRelative++;path='/'+value; }
+        else { referenceCounts.nonStaticRefused++;referenceCounts.relativeOther+=!value.startsWith('/')&&!value.includes(':')?1:0;return; }
+        if(!path.startsWith('/_next/static/')) { referenceCounts.nonStaticRefused++;return; }
         const pieces=path.split('?');
         if(pieces.length===1)referenceCounts.queryless++;
         else if(pieces.length===2&&pieces[1]==='dpl='+target.deployment)referenceCounts.matchingDpl++;
@@ -85,7 +103,7 @@ export function inspectPublicCode(text, html = false) {
         try { path=assertPublicAssetPath(pieces[0]); } catch { referenceCounts.unsafeReferenceRefused++;return; }
         if(paths.has(path))referenceCounts.duplicate++;paths.add(path);referenceCounts.acceptedUnique=paths.size;
     };
-    if(html) { try { for(const source of htmlAssetSources(text))reference(source); } catch { referenceCounts.htmlMalformed++; } }
+    if(html) { try { const parsed=htmlAssetSources(text);documentIdentity=parsed.identity;for(const source of parsed.sources)reference(source); } catch { referenceCounts.htmlMalformed++; } }
     if (!html) {
         // Existing locked TypeScript parser, never eval/import the inspected bundle.
         // Comments, string contents and HTML cannot become confirmed factory calls.
@@ -98,7 +116,7 @@ export function inspectPublicCode(text, html = false) {
             return node;
         };
         const visit = node => {
-            if(ts.isStringLiteral(node)&&node.text.includes('static/chunks/')&&/\.js(?:[?#]|$)/.test(node.text))reference({value:node.text});
+            if(ts.isStringLiteral(node)&&node.text.includes('static/')&&/\.js(?:[?#]|$)/.test(node.text))reference({value:node.text});
             if (ts.isCallExpression(node)) {
                 const callee = unwrap(node.expression), args = node.arguments;
                 const namedFactory = (ts.isPropertyAccessExpression(callee) && callee.name.text === 'createServerReference') ||
@@ -116,7 +134,7 @@ export function inspectPublicCode(text, html = false) {
         };
         visit(ast);
     }
-    return { paths: [...paths], actionReferences: [...actions], telemetryBindings: [...telemetry.values()],referenceCounts,
+    return { paths: [...paths], actionReferences: [...actions], telemetryBindings: [...telemetry.values()],referenceCounts,documentIdentity,
         namedActionMarkerPresent: text.includes('invalidateCacheAction'),
         legacyTelemetryScriptLiteral: text.includes('/_vercel/insights/script.js'),
         legacyTelemetryViewLiteral: text.includes('/_vercel/insights/view'),
@@ -169,12 +187,14 @@ export async function inspectDeploymentAssets(env, receipt, fetcher = fetch) {
             const observation = inspectPublicCode(body.text, path === '/');
             result.publicAssets.push({ path, bytes: body.bytes, sha256: createHash('sha256').update(body.text).digest('hex'),
                 referenceCounts:observation.referenceCounts,
+                ...(path==='/'?{documentIdentity:observation.documentIdentity}:{}),
                 namedActionMarkerPresent: observation.namedActionMarkerPresent,
                 legacyTelemetryScriptLiteral: observation.legacyTelemetryScriptLiteral,
                 legacyTelemetryViewLiteral: observation.legacyTelemetryViewLiteral,
                 legacyTelemetryEventLiteral: observation.legacyTelemetryEventLiteral });
             result.stage='APP_REFERENCES';
             if(observation.referenceCounts.otherQueryRefused||observation.referenceCounts.unsafeReferenceRefused||observation.referenceCounts.htmlMalformed)held();
+            if(path==='/') {result.stage='APP_DOCUMENT_IDENTITY';if(observation.documentIdentity?.titleCount!==1||!observation.documentIdentity?.expectedTitle||!observation.documentIdentity?.appIcon)held();}
             for (const reference of observation.actionReferences) result.actionReferences.push({ path, reference, export: 'invalidateCacheAction' });
             for (const binding of observation.telemetryBindings) result.telemetryBindings.push({ assetPath: path, ...binding });
             for (const dependency of observation.paths) if (!seen.has(dependency) && !queue.includes(dependency)) queue.push(dependency);

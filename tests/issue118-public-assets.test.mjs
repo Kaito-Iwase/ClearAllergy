@@ -19,7 +19,8 @@ const claims = () => ({ iss: 'https://token.actions.githubusercontent.com', aud:
     environment: ciIdentity.environment, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300 });
 const jwt = data => 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify(data)).toString('base64url') + '.synthetic';
 const issued = data => ({ ok: true, json: async () => ({ value: jwt(data || claims()) }) });
-const response = (text, type = 'application/javascript', status = 200) => new Response(text, { status, headers: { 'content-type': type } });
+const identityHtml='<title>ClearAllergy</title><link rel="icon" href="/images/clearallergy-mark-small.svg">';
+const response = (text, type = 'application/javascript', status = 200) => new Response((type==='text/html'?identityHtml:'')+text, { status, headers: { 'content-type': type } });
 const action = '00' + 'a'.repeat(40);
 function stopped(r) {
     for (const key of ['redirectFollowed','clerkStarted','sessionStarted','browserStarted','fixtureWriteStarted','responseBodiesRetained']) assert.equal(r[key], false);
@@ -27,9 +28,11 @@ function stopped(r) {
 }
 test('asset paths reject origin, traversal, encoding, query, fragments, arbitrary app/API paths', () => {
     assert.equal(assertPublicAssetPath('/_next/static/chunks/abc.js'), '/_next/static/chunks/abc.js');
+    assert.equal(assertPublicAssetPath('/_next/static/build-id/_buildManifest.js'),'/_next/static/build-id/_buildManifest.js');
     for (const path of ['//other.test/a.js', 'https://other.test/a.js', '/api/admin/shop', '/admin/login',
         '/_next/static/chunks/../a.js', '/_next/static/chunks/%2e%2e/a.js', '/_next/static/chunks/a.js?q=1',
-        '/_next/static/chunks/a.js#x', '/_next/static/chunks/a\\b.js', '/_next/static/chunks/a.js\n']) assert.throws(() => assertPublicAssetPath(path));
+        '/_next/static/chunks/a.js#x', '/_next/static/chunks/a\\b.js', '/_next/static/chunks/a.js\n',
+        '/_next/server/server-reference-manifest.js','/_next/static/a.json','/_next/static/a.js.map']) assert.throws(() => assertPublicAssetPath(path));
 });
 test('extract only literal public chunk dependencies and exact named reference factory; do not execute code', () => {
     const text = `"static/chunks/a.js";"/_next/static/chunks/a.js";"https://other.test/evil.js";` +
@@ -69,7 +72,7 @@ test('HTML structure accepts only pinned dpl, normalizes relative/absolute refer
     const path='/_next/static/chunks/a.js', dpl='?dpl='+target.deployment;
     const html=`<!doctype html><html><head><!-- <script src="/_next/static/chunks/comment.js"></script> -->`+
         `<script async src="${path+dpl}"></script><script src='${target.origin+path+dpl}'></script>`+
-        `<link rel="preload" as="script" href="_next/static/chunks/a.js"><link rel="modulepreload" href="static/chunks/a.js">`+
+        `<link rel="preload" as="script" href="_next/static/chunks/a.js"><link rel="modulepreload" href="./_next/static/chunks/a.js">`+
         `<script src="&#x2f;_next/static/chunks/a.js${dpl}"></script>`+
         `<script>const s="<script src='/_next/static/chunks/inline.js'>";</script>`+
         `<textarea><script src="/_next/static/chunks/textarea.js"></script></textarea>`+
@@ -78,10 +81,32 @@ test('HTML structure accepts only pinned dpl, normalizes relative/absolute refer
     const r=inspectPublicCode(html,true);assert.deepEqual(r.paths,[path]);
     assert.equal(r.referenceCounts.scriptSrc,5);assert.equal(r.referenceCounts.scriptPreload,2);
     assert.equal(r.referenceCounts.matchingDpl,3);assert.equal(r.referenceCounts.queryless,2);
-    assert.equal(r.referenceCounts.sameOriginAbsolute,1);assert.equal(r.referenceCounts.assetRelative,1);
+    assert.equal(r.referenceCounts.sameOriginAbsolute,1);assert.equal(r.referenceCounts.dotRelative,1);
     assert.equal(r.referenceCounts.documentRelative,1);assert.equal(r.referenceCounts.htmlEscaped,1);
     assert.equal(r.referenceCounts.duplicate,4);assert.equal(r.referenceCounts.foreignOriginRefused,1);
     assert.equal(r.referenceCounts.nonStaticRefused,1);assert.equal(r.referenceCounts.htmlMalformed,0);
+});
+test('public static namespace, document identity and unknown source shapes are classified without raw values', async () => {
+    const html=identityHtml+'<script src="/_next/static/build-id/client.js"></script>'+ '<script src="/unknown-script.js"></script>';
+    const parsed=inspectPublicCode(html,true);assert.deepEqual(parsed.paths,['/_next/static/build-id/client.js']);
+    assert.equal(parsed.documentIdentity.expectedTitle,true);assert.equal(parsed.documentIdentity.appIcon,true);
+    assert.equal(parsed.referenceCounts.rootNextStatic,1);assert.equal(parsed.referenceCounts.rootOther,1);
+    assert.equal(parsed.referenceCounts.pathHasChunksSegment,0);assert.equal(parsed.referenceCounts.nonStaticRefused,1);
+    for(const body of ['<title>Authentication Required</title>','<title>Login - Vercel</title>','<title>ClearAllergy</title>']) {
+        let calls=0;const r=await inspectDeploymentAssets(env(),receipt(),async()=>++calls===1?issued():new Response(body+'<script src="/_next/static/chunks/a.js"></script>',{headers:{'content-type':'text/html'}}));
+        assert.equal(calls,2);assert.equal(r.completed,false);assert.equal(r.code,'APP_DOCUMENT_IDENTITY_HELD');
+        assert.equal(r.publicAssets.length,1);stopped(r);
+    }
+    for(const link of ['<link rel="icon" href="/other.svg" href="/images/clearallergy-mark-small.svg">',
+        '<link rel="icon" href="/images/clearallergy-mark-small.svg" href="/other.svg">',
+        '<link rel="stylesheet" rel="icon" href="/images/clearallergy-mark-small.svg">',
+        '<link rel="icon" rel="stylesheet" href="/images/clearallergy-mark-small.svg">']) {
+        let calls=0;const r=await inspectDeploymentAssets(env(),receipt(),async()=>++calls===1?issued():new Response('<title>ClearAllergy</title>'+link+'<script src="/_next/static/chunks/a.js"></script>',{headers:{'content-type':'text/html'}}));
+        assert.equal(calls,2);assert.equal(r.completed,false);assert.equal(r.code,'APP_REFERENCES_HELD');
+        assert.equal(r.publicAssets[0].referenceCounts.htmlMalformed,1);stopped(r);
+    }
+    let calls=0;const duplicateTitle=await inspectDeploymentAssets(env(),receipt(),async()=>++calls===1?issued():response('<title>ClearAllergy</title><script src="/_next/static/chunks/a.js"></script>','text/html'));
+    assert.equal(calls,2);assert.equal(duplicateTitle.code,'APP_DOCUMENT_IDENTITY_HELD');assert.equal(duplicateTitle.publicAssets[0].documentIdentity.titleCount,2);stopped(duplicateTitle);
 });
 test('HTML malformed or duplicate attributes and unsafe/mismatching query forms never authorize GETs', async () => {
     const path='/_next/static/chunks/a.js';
@@ -142,7 +167,7 @@ test('provider exceptions, wrong MIME, invalid UTF8, body and graph limits fail 
 });
 test('remaining total budget stops the stream before decoding or retaining the last oversized chunk', async () => {
     const links=Array.from({length:8},(_,i)=>`<script src="/_next/static/chunks/${i}.js"></script>`).join('');
-    const html=links+' '.repeat(1024*1024-links.length), js='/*'+'x'.repeat(2*1024*1024-4)+'*/';
+    const html=links+' '.repeat(1024*1024-links.length-identityHtml.length), js='/*'+'x'.repeat(2*1024*1024-4)+'*/';
     let calls=0,cancelled=false,reads=0;
     const r=await inspectDeploymentAssets(env(),receipt(),async()=>{
         calls++;if(calls===1)return issued();if(calls===2)return response(html,'text/html');
