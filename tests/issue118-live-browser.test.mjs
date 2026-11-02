@@ -5,9 +5,59 @@ import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityRe
     newWriteLedger, beginWrite, holdWrite, confirmWrite, consumeWriteResponse, canCleanup,
     claimMutation, protectedApiSnapshot, overallResult, openCreatedEditor, classifyLiveError, browserSetupStage,
     transportLifecycleSnapshot, recordTransportDiagnostic, readCloseRequestAllowed, observeReadCloseFixture,
-    readCloseFixtureId, readCloseResult, guardReadCloseRoute } from "../scripts/check-issue118-live-t1-browser.mjs";
+    readCloseFixtureId, readCloseResult, guardReadCloseRoute, createReadCloseAuthPolicyCandidate,
+    readCloseDirectFetch } from "../scripts/check-issue118-live-t1-browser.mjs";
 import { closeIsolatedBrowser } from "../scripts/issue118-close-browser.mjs";
 import { routePreviewRequest } from "../scripts/issue118-preview-transport.mjs";
+
+test('unwired auth POST candidate needs exact pinned action, clean target, empty args and live auth phase; permits one call only', async () => {
+    const action='a'.repeat(40), secret='SYNTHETIC_PRIVATE_VALUE';
+    const make=(changes={})=>({url:()=>target.origin+'/admin/login',method:()=> 'POST',allHeaders:async()=>({
+        'next-action':action,origin:target.origin,referer:target.origin+'/admin/login','content-type':'text/plain;charset=UTF-8',accept:'text/x-component'}),postData:()=> '[]',...changes});
+    const fresh=()=>createReadCloseAuthPolicyCandidate({actionReference:action});
+    const safe=result=>{assert.ok(Object.values(result.observation).every(v=>typeof v==='boolean'));assert.doesNotMatch(JSON.stringify(result),/SYNTHETIC_PRIVATE|https:|next-action|aaaaa/);};
+    const missing=await createReadCloseAuthPolicyCandidate()(make(),()=> 'AUTHENTICATION');safe(missing);assert.equal(missing.decision,'REFUSE');
+    assert.equal((await fresh()(make({url:()=> 'https://one-dolphin-7936.clerk.accounts.dev/v1/client',method:()=> 'DELETE'}),()=> 'SIGNOUT')).decision,'USE_EXISTING_TRANSPORT');
+    assert.equal((await fresh()(make({url:()=> 'https://wtqdbklmg3bbqk4s.public.blob.vercel-storage.com/a'}),()=> 'AUTHENTICATION')).decision,'REFUSE');
+    for(const phase of ['APP_FLOW','SIGNOUT','CONTEXT_CLOSE_START','UNKNOWN'])assert.equal((await fresh()(make(),()=>phase)).decision,'REFUSE');
+    for(const url of [target.origin+'/api/admin/menus',target.origin+'/api/admin/auth/login',target.origin+'/admin/shop',
+        target.origin+'/admin/login?'+secret,target.origin+'/admin/login#x',target.origin+'/admin/a/../login','https://other.invalid/admin/login',
+        'https://u:'+secret+'@'+new URL(target.origin).host+'/admin/login']){
+        const result=await fresh()(make({url:()=>url}),()=> 'AUTHENTICATION');safe(result);assert.equal(result.decision,'REFUSE');
+    }
+    for(const changes of [{method:()=> 'PUT'},{postData:()=> '["'+secret+'"]'},{postData:()=>{throw Error(secret);}},
+        {allHeaders:async()=>{throw Error(secret);}},{allHeaders:async()=>({'next-action':'b'.repeat(40),origin:target.origin,referer:target.origin+'/admin/login','content-type':'text/plain;charset=UTF-8',accept:'text/x-component'})},
+        {allHeaders:async()=>({'next-action':action,'Next-Action':action,origin:target.origin,referer:target.origin+'/admin/login','content-type':'text/plain;charset=UTF-8',accept:'text/x-component'})},
+        {allHeaders:async()=>({'next-action':action,origin:'https://other.invalid',referer:target.origin+'/admin/login','content-type':'text/plain;charset=UTF-8',accept:'text/x-component'})}]){
+        const result=await fresh()(make(changes),()=> 'AUTHENTICATION');safe(result);assert.equal(result.decision,'REFUSE');
+    }
+    let phase='AUTHENTICATION';const changed=await fresh()(make({allHeaders:async()=>{phase='APP_FLOW';return await make().allHeaders();}}),()=>phase);
+    assert.equal(changed.decision,'REFUSE');
+    const candidate=fresh();const concurrent=await Promise.all([candidate(make(),()=> 'AUTHENTICATION'),candidate(make(),()=> 'AUTHENTICATION')]);
+    assert.deepEqual(concurrent.map(r=>r.decision).sort(),['ALLOW_PINNED_AUTH_CACHE_ACTION','REFUSE']);
+    concurrent.forEach(safe);
+});
+test('telemetry is locally suppressible only by an explicit pin; audit API is never a read-equivalent exception', async () => {
+    const path='/_vercel/insights/view';
+    const request=url=>({url:()=>url,method:()=> 'POST',allHeaders:()=>assert.fail('telemetry/audit must not inspect headers'),postData:()=>assert.fail('body is not needed')});
+    const unknown=await createReadCloseAuthPolicyCandidate()(request(target.origin+path),()=> 'AUTHENTICATION');
+    assert.equal(unknown.observation.legacyTelemetryShape,true);assert.equal(unknown.observation.pinnedTelemetry,false);assert.equal(unknown.decision,'REFUSE');
+    const pinned=createReadCloseAuthPolicyCandidate({telemetryPaths:[path,'/api/admin/auth/login']});
+    assert.equal((await pinned(request(target.origin+path),()=> 'SIGNOUT')).decision,'SUPPRESS_PINNED_TELEMETRY');
+    assert.equal((await pinned(request(target.origin+path+'?unknown'),()=> 'AUTHENTICATION')).decision,'REFUSE');
+    const audit=await pinned(request(target.origin+'/api/admin/auth/login'),()=> 'AUTHENTICATION');
+    assert.equal(audit.observation.authAuditApi,true);assert.equal(audit.decision,'REFUSE');
+});
+test('direct read-close API requests cannot bypass the fixed shop/fixture URL restriction', async () => {
+    const calls=[];const api={fetch:async(url,options)=>{calls.push({url,method:options.method});return {status:()=>200};}};
+    const token='synthetic.payload.signature';
+    for(const url of [target.origin+'/api/admin/shop',target.origin+'/api/admin/menus/'+readCloseFixtureId])await readCloseDirectFetch(api,url,token);
+    assert.equal(calls.length,2);assert.ok(calls.every(c=>c.method==='GET'));
+    for(const url of [target.origin+'/api/admin/menus',target.origin+'/api/admin/menus/other',target.origin+'/api/admin/auth/login',
+        target.origin+'/api/admin/shop?x=1',target.origin+'/api/admin/shop#x','https://other.invalid/api/admin/shop'])
+        await assert.rejects(readCloseDirectFetch(api,url,token),{message:'READ_ONLY_DIRECT_TARGET_REFUSED'});
+    assert.equal(calls.length,2);
+});
 
 test('read-close diagnostic restricts app traffic to GET and the two owned API reads', async () => {
     for (const path of ['/admin/login','/admin/shop','/_next/static/mock.js','/api/admin/shop','/api/admin/menus/'+readCloseFixtureId])

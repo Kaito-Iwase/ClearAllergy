@@ -7,7 +7,7 @@ on:
       confirmation:
         description: Select one explicitly approved operation; diagnostics never authorize fixture writes
         type: choice
-        options: [HOLD, DIAGNOSE_FIXTURE_READ_CLOSE_ONLY, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED, DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY, DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY]
+        options: [HOLD, DIAGNOSE_PUBLIC_ASSETS_ONLY, DIAGNOSE_FIXTURE_READ_CLOSE_ONLY, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED, DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY, DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY]
         default: HOLD
         required: true
       expected_runner_sha:
@@ -33,7 +33,7 @@ jobs:
       github.ref == 'refs/heads/test/issue118-live-t1-20261030' &&
       github.event_name == 'workflow_dispatch' &&
       github.run_attempt == 1 &&
-      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY') &&
+      (inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY') &&
       inputs.expected_runner_sha == github.sha
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -50,7 +50,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Check the external receipt before dependency install or secret delivery
-        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY' || inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY'
         env:
           IDENTITY_RECEIPT_JSON: ${{ inputs.identity_receipt }}
           EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
@@ -73,6 +73,19 @@ jobs:
             console.log('IDENTITY_RECEIPT_VALIDATED_NO_AUTH');
           } catch { console.error('IDENTITY_RECEIPT_OR_SHA_REFUSED'); process.exitCode = 1; }
           NODE
+      - name: Install locked parser dependencies only; no browser or app secrets
+        if: inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/issue118-npm" --ignore-scripts --no-audit --no-fund --save-exact npm@11.18.0
+          node "$RUNNER_TEMP/issue118-npm/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts --no-audit --no-fund
+      - name: Fixed Preview public client assets only; no Clerk or browser
+        if: inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: PUBLIC_ASSETS_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+        run: node scripts/check-issue118-public-assets.mjs --public-assets-only
       - name: Prepare the existing isolated Playwright version (no app secrets)
         if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
         env:
@@ -162,6 +175,14 @@ jobs:
           PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
         run: node scripts/check-issue118-server-callback-candidate.mjs --key-class-only
+      - name: Retain extracted public asset references only; never raw HTML, JS or credentials
+        if: always() && inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-public-assets-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-public-assets/result.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Retain only 27 boolean key class predicates; no credential values or hashes
         if: always() && inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
         uses: actions/upload-artifact@v5

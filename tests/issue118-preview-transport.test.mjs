@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { previewOrigin, scopedOidcHeaders, protectedPreviewFetch, routePreviewRequest, clerkFrontendRedirectObservation, resolveClerkSdkCanonicalScript } from '../scripts/issue118-preview-transport.mjs';
-import { target, transportLifecycleSnapshot, recordTransportDiagnostic } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { target, transportLifecycleSnapshot, recordTransportDiagnostic, createReadCloseAuthPolicyCandidate,
+    readCloseDirectFetch, readCloseFixtureId } from '../scripts/check-issue118-live-t1-browser.mjs';
 import { closeIsolatedBrowser } from '../scripts/issue118-close-browser.mjs';
 
 const token = 'synthetic.payload.signature';
@@ -195,6 +197,87 @@ test('successful one-hop response remains unmodified and errors never retry', as
     const api = { fetch: async (_url, options) => { calls++; assert.equal(options.maxRedirects, 0); assert.equal(options.maxRetries, 0); return response; } };
     assert.equal(await protectedPreviewFetch(api, previewOrigin, { timeout: 0, maxRetries: 5, maxRedirects: 20 }, token), response);
     assert.equal(calls, 1);
+});
+
+test('installed Clerk activation/signout hooks exercise real offline POST/refresh transport and fixed direct reads', {timeout:45000}, async t => {
+    const require=createRequire(import.meta.url);
+    const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+    const sdk=readFileSync(new URL('../node_modules/@clerk/nextjs/dist/esm/app-router/client/ClerkProvider.js',import.meta.url),'utf8');
+    const effect=sdk.match(/useSafeLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[\]\);/)?.[1];
+    assert.ok(effect); // Execute this installed hook body, rather than a memory-only setActive mock.
+    const nextVersion=require('next/package.json').version;
+    assert.equal(nextVersion,'16.4.1');
+    assert.equal(JSON.parse(readFileSync(new URL('../node_modules/@clerk/nextjs/package.json',import.meta.url),'utf8')).version,'7.5.13');
+    const emptyArgs=await require('next/dist/compiled/react-server-dom-webpack/client.edge').encodeReply([]);
+    assert.equal(emptyArgs,'[]');
+    const action='a'.repeat(40), telemetryPath='/_vercel/insights/view'; // Synthetic verified-pin fixture, not a deployed identifier.
+    const policy=createReadCloseAuthPolicyCandidate({actionReference:action,telemetryPaths:[telemetryPath]});
+    let phase='AUTHENTICATION', cachePosts=0, documentGets=0, shopReads=0, fixtureReads=0, unexpected=0;
+    let suppressed=0, allowedActions=0, refusedAudit=0, refusedMenu=0, cacheBodyEmpty=false, cacheHeaderMatched=false;
+    const report={};
+    const fixture={id:readCloseFixtureId,shopId:target.shop,isPublished:false,version:96,foodVersion:87,
+        publicationConfirmedFoodVersion:87,reviewedFoodVersion:null,priceYen:1000,allergens:[{slug:'milk',status:'CONTAINS'}]};
+    const server=createServer((req,res)=>{
+        if(req.method==='POST'&&req.url==='/admin/login'){
+            cachePosts++;cacheHeaderMatched=req.headers['next-action']===action;
+            let body='';req.on('data',chunk=>{body+=chunk;});req.on('end',()=>{cacheBodyEmpty=body==='[]';res.writeHead(200);res.end('offline RPC response fixture');});return;
+        }
+        if(req.method==='GET'&&req.url==='/admin/login'){documentGets++;res.writeHead(200,{'Content-Type':'text/html'});res.end('<link rel="icon" href="data:,">offline SDK hooks');return;}
+        if(req.method==='GET'&&req.url==='/api/admin/shop'){shopReads++;res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({shop:{id:target.shop}}));return;}
+        if(req.method==='GET'&&req.url==='/api/admin/menus/'+readCloseFixtureId){fixtureReads++;res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({menu:fixture}));return;}
+        unexpected++;res.writeHead(500);res.end();
+    });
+    const local=await listen(server);
+    let browser,context,closed;
+    const deadline=async promise=>{let timer;try{return await Promise.race([promise,new Promise((_yes,no)=>{timer=setTimeout(()=>no(Error('OFFLINE_LIFECYCLE_DEADLINE')),10000);})]);}finally{clearTimeout(timer);}};
+    try{
+        browser=await chromium.launch({headless:true,channel:'chromium'});context=await browser.newContext({serviceWorkers:'block'});
+        await context.route('**/*',async route=>{
+            const result=await policy(route.request(),()=>phase);
+            if(result.decision==='SUPPRESS_PINNED_TELEMETRY'){suppressed++;await route.fulfill({status:204,body:''});return;}
+            if(result.decision==='REFUSE'){
+                if(result.observation.authAuditApi)refusedAudit++;
+                if(result.observation.menuApi)refusedMenu++;
+                await route.abort('blockedbyclient');return;
+            }
+            if(result.decision==='ALLOW_PINNED_AUTH_CACHE_ACTION')allowedActions++;
+            const url=new URL(route.request().url());
+            assert.equal(url.origin,target.origin);
+            await routePreviewRequest({request:()=>route.request(),
+                fetch:options=>route.fetch({...options,url:local+url.pathname}),
+                fulfill:options=>route.fulfill(options),abort:code=>route.abort(code)},token,
+            observation=>recordTransportDiagnostic(report,observation,transportLifecycleSnapshot(phase)));
+        });
+        const page=await context.newPage();await page.goto(target.origin+'/admin/login');
+        await page.evaluate(({effect,emptyArgs,action,nextVersion})=>{
+            window.next={version:nextVersion};window.offlineRefreshes=[];
+            const invalidateCacheAction=async()=>{const response=await fetch(location.href,{method:'POST',headers:{'Next-Action':action,'Content-Type':'text/plain;charset=UTF-8',Accept:'text/x-component','Next-Router-State-Tree':encodeURIComponent(JSON.stringify(['',{}]))},body:emptyArgs});if(!response.ok)throw Error('OFFLINE_RPC_REFUSED');};
+            const router={refresh:()=>{window.offlineRefreshes.push(fetch(location.href,{headers:{RSC:'1'}}).then(response=>{if(!response.ok)throw Error('OFFLINE_REFRESH_REFUSED');}));}};
+            new Function('invalidateCacheAction','router','__internal_invokeMiddlewareOnAuthStateChange',effect)(invalidateCacheAction,router,true);
+        },{effect,emptyArgs,action,nextVersion});
+        const lifecycle=intent=>deadline(page.evaluate(async intent=>{
+            await window.__internal_onBeforeSetActive(intent);
+            await window.__internal_onAfterSetActive();
+            await Promise.all(window.offlineRefreshes);
+        },intent));
+        await lifecycle('sign-in');assert.equal(cachePosts,1);assert.equal(allowedActions,1);assert.equal(cacheBodyEmpty,true);assert.equal(cacheHeaderMatched,true);
+        phase='APP_FLOW';
+        const direct=[];const mappedApi={fetch:(url,options)=>{direct.push(url);return context.request.fetch(local+new URL(url).pathname,options);}};
+        for(const path of ['/api/admin/shop','/api/admin/menus/'+readCloseFixtureId])assert.equal((await readCloseDirectFetch(mappedApi,target.origin+path,token)).status(),200);
+        await assert.rejects(readCloseDirectFetch(mappedApi,target.origin+'/api/admin/menus/other',token));assert.equal(direct.length,2);
+        await page.evaluate(path=>fetch(path,{method:'POST',body:'synthetic telemetry'}),telemetryPath);
+        phase='SIGNOUT';await lifecycle('sign-out'); // Next16 original hook skips the cache POST, but still refreshes.
+        assert.equal(cachePosts,1);assert.equal(documentGets,3);
+        await page.evaluate(path=>fetch(path,{method:'POST',body:'synthetic telemetry'}),telemetryPath);
+        for(const path of ['/api/admin/auth/login','/api/admin/menus'])await page.evaluate(async path=>{try{await fetch(path,{method:'POST',body:'synthetic'});}catch{/* expected pre-send refusal */}},path);
+        assert.equal(suppressed,2);assert.equal(refusedAudit,1);assert.equal(refusedMenu,1);assert.equal(unexpected,0);
+        assert.equal(shopReads,1);assert.equal(fixtureReads,1);assert.equal(report.firstTransportFailure,undefined);
+        closed=await closeIsolatedBrowser(context,browser,{contextCreateAttempted:true,browserLaunchAttempted:true},value=>{phase=value;});
+        assert.equal(closed.allLocalClosed,true);
+        t.diagnostic(JSON.stringify({sdkHookNetworkFixture:{actualProviderSession:false,actualDeploymentPinsVerified:false,
+            activationCachePosts:cachePosts,signoutAdditionalCachePosts:0,refreshGets:documentGets-1,telemetrySuppressed:suppressed,
+            authAuditForwarded:0,menuWritesForwarded:0,directShopReads:shopReads,directFixtureReads:fixtureReads,allLocalClosed:closed.allLocalClosed}}));
+    }finally{if(!closed)await closeIsolatedBrowser(context,browser,{contextCreateAttempted:!!context,browserLaunchAttempted:!!browser});await close(server);}
 });
 
 test('real Chromium loopback controls separate normal completion, context interruption and independent socket failure', { timeout: 60000 }, async t => {

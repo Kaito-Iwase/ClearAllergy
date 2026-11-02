@@ -567,6 +567,71 @@ export function state(menu) {
 
 export const readCloseMode = 'FIXTURE_READ_CLOSE_ONLY';
 export const readCloseFixtureId = 'cmvyqm8q30001jh07qly55qtw';
+export async function readCloseDirectFetch(api, url, token) {
+    if (![target.origin + '/api/admin/shop', target.origin + '/api/admin/menus/' + readCloseFixtureId].includes(url))
+        throw Error('READ_ONLY_DIRECT_TARGET_REFUSED');
+    return protectedPreviewFetch(api, url, {}, token);
+}
+// Unwired candidate. Pins must come from the reviewed immutable public client build,
+// not a CLI/env input or a guessed Server Action/telemetry path. Missing pins grant nothing.
+export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryPaths = [] } = {}) {
+    const actionPinned = typeof actionReference === 'string' && /^[a-f0-9]{40,128}$/.test(actionReference);
+    const telemetry = new Set((Array.isArray(telemetryPaths) ? telemetryPaths : []).filter(path => typeof path === 'string' &&
+        /^\/(?:_vercel\/insights|[A-Za-z0-9_-]{8,64})\/(?:view|event)$/.test(path)));
+    let actionUsed = false;
+    return async (request, getPhase) => {
+        const names = ['isApp', 'isPost', 'authPhase', 'exactLoginTarget', 'authAuditApi', 'menuApi',
+            'queryPresent', 'legacyTelemetryShape', 'pinnedTelemetry', 'headersRead', 'nextActionPresent',
+            'nextActionPinned', 'originMatches', 'refererMatches', 'plainTextUtf8', 'acceptsRsc', 'bodyInspected',
+            'emptyArguments', 'actionUnused', 'inspectionComplete'];
+        const observation = Object.fromEntries(names.map(name => [name, false]));
+        const result = { decision: 'REFUSE', observation };
+        try {
+            const raw = request.url(), url = new URL(raw), method = request.method();
+            observation.isApp = url.origin === target.origin;
+            observation.isPost = method === 'POST'; observation.authPhase = getPhase() === 'AUTHENTICATION';
+            observation.queryPresent = !!url.search || raw.includes('?');
+            observation.exactLoginTarget = raw === target.origin + '/admin/login';
+            observation.authAuditApi = url.pathname === '/api/admin/auth/login';
+            observation.menuApi = url.pathname.startsWith('/api/admin/menus');
+            observation.legacyTelemetryShape = /^\/_vercel\/insights\/(?:view|event)$/.test(url.pathname);
+            observation.pinnedTelemetry = telemetry.has(url.pathname);
+            if (url.username || url.password || url.hash) return result;
+            if (!observation.isApp) {
+                if (readCloseRequestAllowed(method, raw)) { observation.inspectionComplete = true; result.decision = 'USE_EXISTING_TRANSPORT'; }
+                return result; // Configured Clerk still delegates to its unchanged CI adapter; no other origin is granted.
+            }
+            if (observation.authAuditApi || observation.menuApi && method !== 'GET') return result;
+            if (observation.isPost && observation.pinnedTelemetry && !observation.queryPresent) {
+                observation.inspectionComplete = true; result.decision = 'SUPPRESS_PINNED_TELEMETRY'; return result;
+            }
+            if (readCloseRequestAllowed(method, raw)) {
+                observation.inspectionComplete = true; result.decision = 'USE_EXISTING_TRANSPORT'; return result;
+            }
+            if (!observation.isPost || !observation.authPhase || !observation.exactLoginTarget) return result;
+            const headers = await request.allHeaders(); observation.headersRead = true;
+            const header = name => {
+                const keys = Object.keys(headers).filter(key => key.toLowerCase() === name);
+                return keys.length === 1 ? Object.getOwnPropertyDescriptor(headers, keys[0])?.value : undefined;
+            };
+            const action = header('next-action'), contentType = header('content-type');
+            observation.nextActionPresent = typeof action === 'string' && action.length > 0;
+            observation.nextActionPinned = actionPinned && action === actionReference;
+            observation.originMatches = header('origin') === target.origin;
+            observation.refererMatches = header('referer') === target.origin + '/admin/login';
+            observation.plainTextUtf8 = typeof contentType === 'string' && contentType.toLowerCase().replaceAll(' ', '') === 'text/plain;charset=utf-8';
+            observation.acceptsRsc = header('accept') === 'text/x-component';
+            if (!observation.nextActionPresent || !observation.originMatches || !observation.refererMatches || !observation.plainTextUtf8 || !observation.acceptsRsc) return result;
+            const body = request.postData(); observation.bodyInspected = true; observation.emptyArguments = body === '[]';
+            observation.actionUnused = !actionUsed; observation.authPhase = getPhase() === 'AUTHENTICATION';
+            observation.inspectionComplete = true;
+            if (observation.nextActionPinned && observation.emptyArguments && observation.actionUnused && observation.authPhase) {
+                actionUsed = true; result.decision = 'ALLOW_PINNED_AUTH_CACHE_ACTION';
+            }
+        } catch { /* Unknown inputs/provider failures are REFUSE; no values or raw exceptions escape. */ }
+        return result;
+    };
+}
 export function readCloseRequestAllowed(method, rawUrl) {
     try {
         const url = new URL(rawUrl);
@@ -681,6 +746,7 @@ export async function runLive() {
     let activeOperation;
     let ciAccess;
     let ciTransportFailed = false;
+    const readCloseRefusalInspector = readCloseOnly ? createReadCloseAuthPolicyCandidate() : undefined;
     let lifecyclePhase = 'SETUP', routeSequence = 0;
     const markLifecycle = code => {
         lifecyclePhase = code;
@@ -696,7 +762,8 @@ export async function runLive() {
         assert.equal(menu.id, id);
         return menu;
     };
-    const readRequest = url => ciAccess ? ciAccess.read(context.request, url) : context.request.get(url, { timeout: 20000 });
+    const readRequest = url => ciAccess ? readCloseOnly ? readCloseDirectFetch(context.request, url, ciAccess.token()) : ciAccess.read(context.request, url)
+        : context.request.get(url, { timeout: 20000 });
     const action = async (nextPhase, method, path, click) => {
         if (readCloseOnly) throw Error('READ_ONLY_MUTATION_REFUSED');
         assertIdentityReceipt(identityReceipt);
@@ -747,6 +814,12 @@ export async function runLive() {
         const ciRoute = async route => {
             const sequence = ++routeSequence, started = transportLifecycleSnapshot(lifecyclePhase);
             try {
+                if (readCloseOnly && !readCloseRequestAllowed(route.request().method(), route.request().url()) &&
+                    new URL(route.request().url()).origin === target.origin && !report.readOnlyRefusalClassification) {
+                    const inspected = await readCloseRefusalInspector(route.request(), () => lifecyclePhase);
+                    report.readOnlyRefusalClassification ??= { sequence, ...transportLifecycleSnapshot(lifecyclePhase), predicates: inspected.observation };
+                    // Observation only: no pin is supplied and this decision never grants forwarding.
+                }
                 if (readCloseOnly && !await guardReadCloseRoute(route,
                     () => { report.readOnlyRequestRefused = true; },
                     () => { report.readOnlyOtherRequestsBlocked = (report.readOnlyOtherRequestsBlocked || 0) + 1; })) {
