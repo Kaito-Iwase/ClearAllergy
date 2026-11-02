@@ -349,7 +349,7 @@ test('workflow mode cannot reach existing live job and has zero permissions, sec
     assert.equal(workflow.on.workflow_dispatch.inputs.confirmation.default, 'HOLD');
     assert.ok(workflow.on.workflow_dispatch.inputs.confirmation.options.includes(disabledMode));
     assert.equal(workflow.jobs['live-t1'].if.includes(disabledMode), false);
-    assert.deepEqual(Object.keys(workflow.jobs), ['live-t1']);
+    assert.deepEqual(Object.keys(workflow.jobs), ['live-t1','managed-full-resume']);
     assert.equal(file.includes('run: node scripts/check-issue118-server-callback-candidate.mjs --deployed-diagnostic-only'), true);
     const diagnostic = workflow.jobs['live-t1'].steps.find(x => x.run?.includes('--deployed-diagnostic-only'));
     assert.equal(diagnostic.if, `inputs.confirmation == '${deployedMode}'`);
@@ -362,7 +362,9 @@ test('workflow mode cannot reach existing live job and has zero permissions, sec
         '${{ runner.temp }}/issue118-key-class/result.json');
     assert.deepEqual(workflow.jobs['live-t1'].steps.filter(x => x.env?.ISSUE118_TEST_CLERK_SECRET_KEY).map(x=>x.if).sort(),
         ["(inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')","inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'", "inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'"].sort());
-    assert.equal((file.match(/id-token: write/g) || []).length, 1); assert.equal((file.match(/secrets\./g) || []).length, 3);
+    assert.equal(workflow.jobs['managed-full-resume'].if.includes(disabledMode),false);
+    assert.match(workflow.jobs['managed-full-resume'].if,/inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE'/);
+    assert.equal((file.match(/id-token: write/g) || []).length, 2); assert.equal((file.match(/secrets\./g) || []).length, 4);
     assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
     const runner = readFileSync(new URL('../scripts/browser-runner.mjs', import.meta.url), 'utf8');
     assert.ok(runner.includes('tests/issue118-server-callback-candidate.test.mjs'));

@@ -122,7 +122,7 @@ function integration(directory: string, fault: Fault = 'NONE') {
             } else {
                 const menu = entry.menu, data = options.data!;
                 assert.equal(data.__menuId, undefined);
-                menu.version++;
+                menu.version += data.publicationAction === 'publish' ? 3 : 1;
                 if (url.pathname.endsWith('/stop')) menu.isPublished = false;
                 else if (data.publicationAction === 'publish') {
                     menu.isPublished = true; menu.publicationConfirmedFoodVersion = menu.foodVersion;
@@ -280,7 +280,7 @@ test('SYNTHETIC: real controller/runtime/original T2 T3 T4 core reaches 21/79 th
             assert.equal(f.store.get(send.resource.menuId)?.owner, send.owner);
             assert.equal(send.resource.beforeVersion, send.body?.expectedVersion);
             assert.equal(send.before?.menu.version, send.body?.expectedVersion);
-            assert.equal(send.after?.menu.version, send.before!.menu.version + 1);
+            assert.equal(send.after?.menu.version, send.before!.menu.version + (send.body?.publicationAction === 'publish' ? 3 : 1));
             if (send.resource.path.endsWith('/stop')) {
                 assert.equal(send.before?.menu.isPublished, true);
                 assert.equal(send.after?.menu.isPublished, false);

@@ -456,15 +456,77 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
 
 // Existing managed transport adapter. It never authenticates or opens a browser.
 // The caller supplies the two already verified, tracked owned actors.
-export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1FixtureId,record=()=>{},operation='CORE',checkpointFixtures=[]}) {
+export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1FixtureId,record=()=>{},operation='CORE',checkpointFixtures=[],serviceConfig=undefined,resumeCheckpoint=undefined}) {
     const roles=new Map(actors.map(a=>[a.binding.owner,a]));
-    assert.ok(['CORE','SERVICE_ARM'].includes(operation));assert.equal(roles.size,operation==='CORE'?2:1);assert.ok(roles.has('S1')&&(operation==='SERVICE_ARM'||roles.has('S2')));
+    assert.ok(['CORE','SERVICE_ARM','RESUME_CORE'].includes(operation));assert.equal(roles.size,operation==='SERVICE_ARM'?1:2);assert.ok(roles.has('S1')&&(operation==='SERVICE_ARM'||roles.has('S2')));
     for(const [role,a] of roles){assert.equal(a.expectedUserId,managedActorIdentity[role].ownerId);assert.equal(a.binding.shopId,managedActorIdentity[role].shopId);}
     const source=createRequire(import.meta.url)('tsx/cjs/api').require('./issue118-batch-stop.ts',import.meta.url);
     const schemas=createRequire(import.meta.url)('tsx/cjs/api').require('../features/admin/menus/schemas/menu-response.ts',import.meta.url);
     const known=new Map([[t1FixtureId,{id:t1FixtureId,owner:'S1'}]]),operations=[];
     const serviceIds=new Set(),knownObjects=new Map();
-    if(operation==='SERVICE_ARM')for(const f of checkpointFixtures){assert.match(f.id,/^c[a-z0-9]+$/);assert.ok(['S1','S2'].includes(f.owner));known.set(f.id,{...f});}
+    if(operation!=='CORE')for(const f of checkpointFixtures){assert.match(f.id,/^c[a-z0-9]+$/);assert.ok(['S1','S2'].includes(f.owner));known.set(f.id,{...f});}
+    // This fixed interrupted run is a different entry contract from a fresh core.
+    // Merely supplying its ports cannot grant an approval, authenticate, or dispatch.
+    const recoveryBinding={
+        cmvzk8bru0001l608a2gjmewc:['T2','M01','S1'],cmvzk905d0009l608790fkj9u:['T2','M02','S1'],
+        cmvzk9mbm000hl6085xpcrgm6:['T2','M03','S1'],cmvzka8kt000pl608yugd9vi3:['T2','M04','S1'],
+        cmvzkaueq000xl6086shu6i7o:['T2','M05','S2'],cmvzkbgd80015l6089s4spnqg:['T2','M06','S2'],
+        cmvzkc2u5001dl6089rwngm8c:['T2','M07','S2'],cmvzkcoq3001ll608iv8ekwxk:['T2','M08','S2'],
+        cmvzkk6r9002pl608yc64yz0m:['T3','M01','S1'],cmvzkkvde002xl608mxvyjpda:['T3','M02','S1'],
+    };
+    if(operation==='RESUME_CORE'){
+        assert.equal(t1FixtureId,'cmvziwd1k0001js07pqfoctkr');assert.ok(checkpointFixtures.length>=11&&checkpointFixtures.length<=32);
+        if(!resumeCheckpoint)assert.equal(checkpointFixtures.length,11);
+        assert.equal(new Set(checkpointFixtures.map(f=>f.id)).size,checkpointFixtures.length);
+        assert.ok([t1FixtureId,...Object.keys(recoveryBinding)].every(id=>checkpointFixtures.some(f=>f.id===id)));
+        for(const f of checkpointFixtures){if(f.id===t1FixtureId){assert.equal(f.owner,'S1');continue;}
+            if(recoveryBinding[f.id])assert.deepEqual([f.scenario,f.key,f.owner],recoveryBinding[f.id]);else assert.ok(resumeCheckpoint);}
+    }
+    if(resumeCheckpoint){
+        assert.ok(operation!=='CORE'&&Object.keys(resumeCheckpoint).length===3
+            &&['knownFixtures','newClaims','terminalCreationBindings'].every(k=>Object.hasOwn(resumeCheckpoint,k)));
+        const restored=resumeCheckpoint.knownFixtures,claims=resumeCheckpoint.newClaims,terminalBindings=resumeCheckpoint.terminalCreationBindings;
+        assert.ok(Array.isArray(restored)&&restored.length>=11&&restored.length<=32&&new Set(restored.map(f=>f.id)).size===restored.length);
+        assert.ok(Array.isArray(claims)&&claims.length<=180&&new Set(claims.map(c=>c.id)).size===claims.length&&Array.isArray(terminalBindings));
+        const canonical=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
+        const hash=v=>createHash('sha256').update(canonical(v)).digest('hex');
+        const creations=claims.filter(c=>c.kind==='MENU_CREATE'&&c.createdId!==undefined),usedOperations=new Set();
+        assert.equal(new Set(creations.map(c=>c.createdId)).size,creations.length);
+        assert.equal(new Set(terminalBindings.map(b=>b.operationId)).size,terminalBindings.length);
+        const fixed=new Set([t1FixtureId,...Object.keys(recoveryBinding)]);
+        for(const f of restored){
+            assert.match(f.id,/^c[a-z0-9]+$/);assert.ok(['S1','S2'].includes(f.owner));
+            if(fixed.has(f.id)){
+                assert.equal(f.owner,f.id===t1FixtureId?'S1':recoveryBinding[f.id][2]);
+                if(f.id!==t1FixtureId)assert.deepEqual([f.scenario,f.key],recoveryBinding[f.id].slice(0,2));continue;
+            }
+            assert.ok(![target.anchor,readCloseFixtureId,'cmvs4x86o000vwn0w93c8ttez','cmvs4x8wt000xwn0wj6gwdih1',
+                'cmvs4x986000zwn0wer2ymhow','cmvuy8d4z0003jw07e9fobsdm','cmvuzlqhf0003l308lem3uwck'].includes(f.id));
+            const c=creations.find(c=>c.createdId===f.id);assert.ok(c&&c.owner===f.owner);
+            assert.equal(c.resource?.method,'POST');assert.equal(c.resource.path,'/api/admin/menus');
+            assert.equal(c.resource.shopId,managedActorIdentity[f.owner].shopId);
+            assert.match(c.resource.creationOperationId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+            assert.ok(!usedOperations.has(c.resource.creationOperationId));usedOperations.add(c.resource.creationOperationId);
+            if(c.state!=='CONFIRMED_RESPONSE_AND_READBACK'){
+                assert.equal(c.state,'FORWARD_CONSUMED');assert.match(c.arm,/^RESUME_SERVICE_[1-6]$/);
+                const binding=terminalBindings.find(b=>b.operationId===c.id);
+                assert.ok(binding&&Object.keys(binding).length===6&&['id','operationId','creationOperationId','owner','armId','resourcesSha256'].every(k=>Object.hasOwn(binding,k)));
+                assert.equal(binding.id,c.createdId);assert.equal(binding.creationOperationId,c.resource.creationOperationId);
+                assert.equal(binding.owner,c.owner);assert.equal(binding.armId,c.arm);
+                const armClaims=claims.filter(value=>value.arm===c.arm).map(value=>({operationId:value.id,kind:value.kind,mode:value.mode,owner:value.owner,resource:value.resource}));
+                assert.equal(binding.resourcesSha256,hash(armClaims));
+            }
+            const fromT3=/^RESUME414953_T3_(M0[3-8])_CREATE$/.exec(c.id);
+            if(fromT3)assert.equal(f.owner,Number(fromT3[1].slice(1))<=4?'S1':'S2');
+            const scenario=fromT3?'T3':f.scenario,key=fromT3?fromT3[1]:f.key;
+            known.set(f.id,{id:f.id,owner:f.owner,zone:f.zone,...(scenario?{scenario}:{}),...(key?{key}:{}),creationOperationId:c.resource.creationOperationId});
+            if(f.owner==='S1'&&(f.zone==='SERVICE'||c.cellId))serviceIds.add(f.id);
+        }
+        assert.ok([...fixed].every(id=>restored.some(f=>f.id===id)));
+        assert.ok(creations.every(c=>!fixed.has(c.createdId)&&restored.some(f=>f.id===c.createdId)));
+        assert.ok(terminalBindings.every(b=>creations.some(c=>c.id===b.operationId&&['FORWARD_CONSUMED','CONFIRMED_RESPONSE_AND_READBACK'].includes(c.state))));
+        assert.ok(checkpointFixtures.every(f=>restored.some(r=>r.id===f.id&&r.owner===f.owner)));
+    }
     let boundary,managed,batchResult,held=false;
     const requireOpen=()=>assert.equal(held,false);
     const event=value=>{record({...value,observedUtc:new Date().toISOString()});};
@@ -478,7 +540,7 @@ export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1Fi
     const read=async(id,role)=>{assert.match(id,/^c[a-z0-9]+$/);assert.equal(known.get(id)?.owner,role);const a=await verify(role);
         const r=await a.access.read(a.context.request,target.origin+'/api/admin/menus/'+id);assert.equal(r.status(),200);
         const m=schemas.savedMenuResponseSchema.parse(await r.json()).menu;assert.equal(m.id,id);return m;};
-    const write=async(id,role,phase,method,path,body,scope)=>{
+    const write=async(id,role,phase,method,path,body,scope,uiCommand)=>{
         requireOpen();const a=await verify(role);assert.ok(boundary);const creation=phase==='CREATE';
         if(scope){assert.equal(role,'S1');assert.ok(['SETUP_CREATE','SETUP_PUBLISH','FOLLOWUP_PUBLISH','CLEANUP'].includes(scope.purpose));
             assert.match(scope.cellId,/^(MENU_CREATE|MENU_SAVE|STOP|MENU_UPLOAD|SHOP_SAVE|SHOP_UPLOAD)_(DELIVER|BLOCK_BEFORE_FORWARD|WITHHOLD_AFTER_RESPONSE)$/);
@@ -491,7 +553,7 @@ export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1Fi
             ...(creation?{creationOperationId:data.operationId}:{menuId:body.__menuId,beforeVersion:data.expectedVersion})};
         const permit=await boundary.authorize({id,kind:creation?'MENU_CREATE':'MENU_WRITE',owner:role,resource,...(scope?{cellId:scope.cellId,mode:'DELIVER'}:{})});
         assert.equal(permit.allowedForward,true);const op={id,owner:role,phase,state:'INTENT',startedUtc:new Date().toISOString(),...(creation?{creationOperationId:data.operationId}:{menuId:body.__menuId})};operations.push(op);event({stage:'SUITE_WRITE_INTENT',operation:id,owner:role,phase});
-        try {const url=target.origin+path;op.state='REQUEST_SENT';boundary.consumeSendPermission({id:permit.id,resource});const r=await a.context.request.fetch(url,{method,data,
+        try {const url=target.origin+path;op.state='REQUEST_SENT';if(!uiCommand)boundary.consumeSendPermission({id:permit.id,resource});const r=uiCommand?await (await import('./issue118-t2-reobserve.mjs')).dispatchT2Ui({actor:a,command:uiCommand,data,permit,resource,boundary,verify:()=>verify(role)}):await a.context.request.fetch(url,{method,data,
             headers:scopedOidcHeaders(url,{'Content-Type':'application/json',Origin:target.origin},assertOidcClaims(a.access.token())),
             maxRedirects:0,maxRetries:0,timeout:20000,failOnStatusCode:false});op.status=r.status();
             const requestId=r.headers()['x-request-id'];if(typeof requestId==='string'&&/^[0-9a-f-]{36}$/i.test(requestId))op.requestId=requestId;
@@ -518,9 +580,10 @@ export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1Fi
             return {beforeSend:true,remove:async()=>{assert.equal(boundary,value);boundary=undefined;return true;}};},
         prepareBatch(input){managed=prepareOriginalBatchRun(input);return {execute:async()=>{batchResult=await managed.execute();
             for(const f of managed.createdFixtures())known.set(f.menuId,{id:f.menuId,owner:f.owner,key:f.key,scenario:f.scenario});return batchResult;}};},
-        async runControls(){
+        async runControls({runId:fixedRunId}={}){
             const cases=[['PRICE','M04','S1'],['STOP','M07','S2'],['SILENT','M08','S2']];const measured={};
-            for(const [kind,key,role] of cases){const runId=randomUUID(),payload=source.projectOriginalPayloads(runId).expectedByMenu[key];
+            if(fixedRunId!==undefined)assert.match(fixedRunId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+            for(const [kind,key,role] of cases){const runId=fixedRunId||randomUUID(),payload=source.projectOriginalPayloads(runId).expectedByMenu[key];
                 const created=await write('CONTROL_'+kind+'_CREATE',role,'CREATE','POST','/api/admin/menus',{...payload,isPublished:false,operationId:randomUUID()});
                 const id=created.menu.id;const published=(await write('CONTROL_'+kind+'_PUBLISH',role,'PUBLISH','PUT',`/api/admin/menus/${id}`,{__menuId:id,expectedVersion:created.menu.version,publicationAction:'publish'})).menu;
                 assert.equal(published.isPublished,true);const food=published.foodVersion;
@@ -615,7 +678,7 @@ export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1Fi
             assert.ok(evidence&&['knownOutcome','ownerStateMatches','freshVersion'].every(k=>evidence[k]===true));
             const stopping=publicationAction==='stop';const {menu}=await write(id,'S1',stopping?'STOP':'PUBLISH',stopping?'POST':'PUT',
                 `/api/admin/menus/${menuId}${stopping?'/stop':''}`,{__menuId:menuId,expectedVersion:before.version,...(!stopping?{publicationAction:'publish'}:{})},
-                {cellId,purpose,evidence});assert.equal(menu.foodVersion,before.foodVersion);assert.equal(menu.version,before.version+1);
+                {cellId,purpose,evidence});assert.equal(menu.foodVersion,before.foodVersion);assert.equal(menu.version,before.version+(stopping?1:3));
             assert.deepEqual(source.fixturePayload(menu),source.fixturePayload(before));assert.equal(menu.isPublished,!stopping);return menu;}),
         verifyPublicImage:({menuId,url})=>serviceGuard(async()=>{
             requireServiceId(menuId);blobUrl(url,'menu');assert.ok(knownObjects.has(url));const own=await readMenu(menuId);
@@ -646,7 +709,223 @@ export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1Fi
             }catch{op.state='HOLD_NO_FURTHER_WRITES';throw Error('MANAGED_SERVICE_SHOP_HELD');}
         }),
     };
-    return {ports,serviceApi,snapshot:()=>({held,operations:structuredClone(operations),fixtures:[...known.values()],batch:batchResult}),assertOpen:requireOpen};
+    // No CLI/workflow uses this port set. The resume controller must first verify
+    // a new explicit approval and independent checkpoint, and install its guard.
+    let serviceBrowser,servicePreparation,servicePages,serviceClosed=false;
+    const createPermissions=new Map(),remainderStages=new Set();
+    const ensureServiceBrowser=async()=>{
+        requireOpen();assert.ok(boundary&&!serviceClosed);
+        if(serviceBrowser)return serviceBrowser;
+        assert.ok(serviceConfig&&Object.keys(serviceConfig).length===4&&['runId','identityReceipt','image','preparationState'].every(k=>Object.hasOwn(serviceConfig,k)));
+        assert.match(serviceConfig.runId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        assertIdentityReceipt(serviceConfig.identityReceipt);
+        const serviceModule=await import('./issue118-managed-service-browser.mjs'),a=await verify('S1');
+        for(const key of ['origin','source','deployment'])assert.equal(serviceModule.serviceBrowserApplication[key],target[key]);
+        assert.ok(Buffer.isBuffer(serviceConfig.image?.buffer));assert.equal(serviceConfig.image.buffer.length,serviceModule.serviceBrowserImage.bytes);
+        assert.equal(sha(serviceConfig.image.buffer),serviceModule.serviceBrowserImage.sha256);
+        assert.ok(serviceConfig.preparationState&&Object.getPrototypeOf(serviceConfig.preparationState)===Object.prototype);
+        const ts=createRequire(import.meta.url)('tsx/cjs/api'),{ALLERGEN_MASTER}=ts.require('../lib/constants/allergen-master.ts',import.meta.url);
+        servicePreparation=serviceModule.createManagedServicePreparation({api:serviceApi,state:serviceConfig.preparationState,runId:serviceConfig.runId,
+            menuTemplate:source.projectOriginalPayloads(serviceConfig.runId).expectedByMenu.M04,allergens:ALLERGEN_MASTER,shopId:target.shop});
+        const {prepareWriteObservation}=ts.require('./issue118-service-observer.ts',import.meta.url);
+        servicePages=new Set(a.context.pages());
+        serviceBrowser=serviceModule.prepareManagedServiceBrowser({actor:{...a,owner:'S1'},target,image:serviceConfig.image,
+            scope:{runId:serviceConfig.runId,applicationSha:target.source,shopId:target.shop,
+                isolationReceiptSha256:sha(JSON.stringify(serviceConfig.identityReceipt))},
+            ports:{prepareCell:servicePreparation.prepareCell,finishCell:servicePreparation.finishCell,
+                recordSetupObject:servicePreparation.recordSetupObject,retainHeldCell:servicePreparation.retainHeldCell,
+                verifyActor:async(value,expected)=>{assert.equal(value.context,a.context);
+                    for(const key of ['origin','source','deployment'])assert.equal(expected[key],target[key]);assert.equal(await serviceApi.verifyActor(value),true);},
+                readOwner:value=>serviceApi.readOwner(value),claimPrivate:value=>serviceApi.claimPrivate(value),emit:event,
+                oidcHeaders:(url,headers,token)=>scopedOidcHeaders(url,headers,assertOidcClaims(token)),prepareWriteObservation}});
+        return serviceBrowser;
+    };
+    const serviceObservationPorts={
+        async runServiceCellLazy(value){try{const browser=await ensureServiceBrowser(),result=await browser.runServiceCell(value);
+            assert.notEqual(result?.status,'NOT_IMPLEMENTED');return result;}
+            catch{held=true;throw Error('MANAGED_RECOVERY_SERVICE_HELD');}},
+        async restorePriorShop(value){try{await ensureServiceBrowser();return await servicePreparation.restorePriorShop(value);}
+            catch{held=true;throw Error('MANAGED_RECOVERY_SERVICE_RESTORE_HELD');}},
+        async closeServiceBrowser(){
+            serviceClosed=true;
+            if(!serviceBrowser)return {ownedPageClosed:true,routesDrained:true,notStarted:true};
+            try{const result=await serviceBrowser.close(),a=roles.get('S1');
+                assert.equal(result.ownedPageClosed,true);assert.equal(result.routesDrained,true);
+                assert.ok([...servicePages].every(p=>!p.isClosed())&&a.context.pages().every(p=>servicePages.has(p)||p.isClosed()));
+                return {...result,preexistingPagesPreserved:true};
+            }catch{held=true;throw Error('MANAGED_RECOVERY_SERVICE_CLOSE_HELD');}
+        },
+        closeServiceObservation(){return serviceObservationPorts.closeServiceBrowser();},
+    };
+    const resumePorts=operation!=='RESUME_CORE'?undefined:{
+        readT2:({id,owner})=>read(id,owner),
+        async writeT2({command,claim,resource,before}){
+            try{requireOpen();const f=known.get(command.id);assert.equal(f?.scenario,'T2');assert.equal(f.key,command.key);assert.equal(f.owner,command.owner);
+                const {t2ExpectedFood}=await import('./issue118-t2-reobserve.mjs');assert.equal(resource.menuId,command.id);assert.equal(resource.beforeVersion,before.version);
+                assert.equal(claim.id,command.claimId);assert.equal(claim.kind,'MENU_WRITE');
+                const body={__menuId:command.id,expectedVersion:before.version,...(command.kind==='PUBLISH'?{publicationAction:'publish'}:
+                    command.kind==='SAVE'?{...t2ExpectedFood(command.key,command.phase==='CORRECT'),isPublished:false}:{})};
+                const response=await write(claim.id,command.owner,command.kind,resource.method,resource.path,body,undefined,command.ui?command:undefined),op=operations.at(-1);
+                return {status:op.status,requestId:op.requestId,menu:response.menu,uiObserved:command.ui};
+            }catch{held=true;throw Error('MANAGED_T2_WRITE_HELD');}
+        },
+        async readT2Evidence(){requireOpen();const cards=[...source.originalEvidence('T2','START'),...source.originalEvidence('T2','RECIPE_LOOKUP'),...source.originalEvidence('T2','PHYSICAL_SOURCE_LOOKUP')];
+            assert.deepEqual(cards.map(c=>c.id),['E21','E22','E23']);return {source:'ORIGINAL_T2_EVIDENCE',evidenceIds:cards.map(c=>c.id)};},
+        async observeT2(args){try{return await (await import('./issue118-t2-reobserve.mjs')).observeT2RuntimePhase({...args,actors:roles,readOwner:read,verify});}
+            catch{held=true;throw Error('MANAGED_T2_OBSERVATION_HELD');}},
+        installSendGuard:ports.installSendGuard,claimOperation:ports.claimOperation,
+        ...serviceObservationPorts,
+        async verifyResourceBeforeForward({claim:pending}){
+            try{requireOpen();assert.ok(boundary&&pending&&['S1','S2'].includes(pending.owner));
+                const r=pending.resource;assert.ok(r&&typeof r==='object');
+                if(pending.kind!=='DENIAL')assert.ok(r.shopId===undefined||r.shopId===managedActorIdentity[pending.owner].shopId);
+                if(pending.kind==='MENU_CREATE'){
+                    assert.equal(r.method,'POST');assert.equal(r.path,'/api/admin/menus');assert.match(r.creationOperationId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+                    assert.ok(!operations.some(o=>o.creationOperationId===r.creationOperationId)&&![...known.values()].some(f=>f.creationOperationId===r.creationOperationId));
+                    const previous=createPermissions.get(r.creationOperationId);assert.ok(previous===undefined||previous===pending.id);
+                    createPermissions.set(r.creationOperationId,pending.id);return {creationOperationFresh:true};
+                }
+                if(['MENU_WRITE','DENIAL'].includes(pending.kind)){
+                    const owner=known.get(r.menuId)?.owner;assert.ok(owner&&(/^\/api\/admin\/menus\/[a-z0-9]+(?:\/stop)?$/).test(r.path));
+                    assert.equal(r.path,'/api/admin/menus/'+r.menuId+(r.method==='POST'?'/stop':''));
+                    if(r.shopId!==undefined)assert.equal(r.shopId,managedActorIdentity[owner].shopId);
+                    if(pending.kind==='MENU_WRITE')assert.equal(owner,pending.owner);
+                    return {menu:await read(r.menuId,owner)};
+                }
+                if(pending.kind==='SHOP_WRITE'){assert.equal(pending.owner,'S1');assert.equal(r.method,'PUT');assert.equal(r.path,'/api/admin/shop');return {shop:await readShop()};}
+                if(pending.kind==='BLOB_UPLOAD'){assert.equal(pending.owner,'S1');assert.equal(r.method,'POST');
+                    assert.ok(['/api/admin/upload-menu-image','/api/admin/upload-shop-image'].includes(r.path));return {uploadTargetValidated:true};}
+                assert.equal(pending.kind,'SESSION');assert.equal(pending.owner,'S1');assert.equal(r.method,'NONE');assert.equal(r.path,'');return {sessionPermitOnly:true};
+            }catch{held=true;throw Error('MANAGED_RECOVERY_PRE_SEND_HELD');}
+        },
+        async runT4({runId}={}){
+            const report={status:'T4_HOLD_NO_FURTHER_WRITES',writesConfirmed:0,observation:null,ownedPagesClosed:false,
+                preexistingPagesPreserved:false,database:'NOT_ATTESTED'};
+            let observer,beforePages,a;
+            try{
+                requireOpen();assert.ok(boundary&&!remainderStages.has('T4'));remainderStages.add('T4');
+                assert.match(runId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+                a=await verify('S1');const payload=source.projectOriginalPayloads(runId).expectedByMenu.M02;
+                const created=await write('RESUME_T4_CREATE','S1','CREATE','POST','/api/admin/menus',{...payload,isPublished:false,operationId:randomUUID()});
+                const id=created.menu.id;known.set(id,{id,owner:'S1',scenario:'T4',key:'M02'});report.fixtureId=id;report.writesConfirmed++;
+                const published=(await write('RESUME_T4_INITIAL_PUBLISH','S1','PUBLISH','PUT','/api/admin/menus/'+id,
+                    {__menuId:id,expectedVersion:created.menu.version,publicationAction:'publish'})).menu;
+                assert.equal(published.isPublished,true);assert.deepEqual(source.fixturePayload(published),payload);
+                assert.equal(published.foodVersion,created.menu.foodVersion);assert.equal(published.publicationConfirmedFoodVersion,published.foodVersion);report.writesConfirmed++;
+                beforePages=new Set(a.context.pages());
+                observer=await prepareT4Observation({context:a.context,fixture:{origin:target.origin,shopId:target.shop,menuId:id,name:payload.name},
+                    assertReadTarget:()=>verify('S1'),evidenceLevel:'APP_BROWSER_READS_ONLY',readPublicApi:async url=>{
+                        assert.equal(url,target.origin+'/api/menus/'+id);await verify('S1');
+                        const r=await a.access.read(a.context.request,url),status=r.status();return {status,...(status===200?{menuId:(await r.json())?.menu?.id}:{})};
+                    }});
+                event({stage:'RESUME_T4_BASELINE_READY_BEFORE_STOP',menuId:id});
+                const stopped=(await write('RESUME_T4_STOP','S1','STOP','POST','/api/admin/menus/'+id+'/stop',
+                    {__menuId:id,expectedVersion:published.version})).menu;
+                assert.equal(stopped.isPublished,false);assert.equal(stopped.foodVersion,published.foodVersion);
+                assert.deepEqual(source.fixturePayload(stopped),payload);assert.equal(stopped.publicationConfirmedFoodVersion,published.publicationConfirmedFoodVersion);
+                report.writesConfirmed++;report.observation=await observer.afterExternalChange();const o=report.observation;
+                assert.equal(o.freshReadOutcome,'FRESH_READS_HIDE_TARGET');assert.equal(o.truncated,false);assert.equal(o.observationFailed,false);
+                assert.equal(o.held.targetMatched,true);assert.equal(o.back.targetMatched,true);assert.equal(o.failedRefetch.injection,'ONE_DOCUMENT_GET_ABORTED_BEFORE_FORWARD');
+                report.status='T4_STOP_API_AND_OBSERVATIONS_CONFIRMED_NOT_LIVE_PASS';
+            }catch{held=true;}
+            finally{
+                try{if(observer)assert.equal((await observer.close()).allOwnedPagesClosed,true);
+                    report.ownedPagesClosed=beforePages?!!observer&&a.context.pages().every(p=>beforePages.has(p)||p.isClosed()):true;
+                    report.preexistingPagesPreserved=beforePages?[...beforePages].every(p=>!p.isClosed()):true;
+                }catch{held=true;report.ownedPagesClosed=false;report.preexistingPagesPreserved=false;}
+                if(!report.ownedPagesClosed||!report.preexistingPagesPreserved)held=true;
+            }
+            if(held)report.status='T4_HOLD_NO_FURTHER_WRITES';return report;
+        },
+        async runControls(input){try{requireOpen();assert.ok(boundary&&!remainderStages.has('CONTROLS'));remainderStages.add('CONTROLS');
+            assert.match(input?.runId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);return await ports.runControls(input);
+        }catch{held=true;throw Error('MANAGED_RECOVERY_CONTROLS_HELD');}},
+        async runDenials(input){try{requireOpen();assert.ok(boundary&&!remainderStages.has('DENIALS'));remainderStages.add('DENIALS');
+            return await ports.runDenials({...input,authorize:input?.authorize||boundary.authorize});
+        }catch{held=true;throw Error('MANAGED_RECOVERY_DENIALS_HELD');}},
+        async reserveRecoveryBudget(value){
+            try { requireOpen();
+            assert.ok(['RESUME_414953_B4_T3_ONLY','RESUME_414953_FULL_MANAGED'].includes(value?.scope));
+            if(value.type==='OWNER_SESSIONS'){
+                assert.ok(Object.keys(value).every(k=>['type','scope','limits','normal','recovery','oldClaimsSha256'].includes(k)));
+                assert.deepEqual(value.normal,{S1:1,S2:1});assert.deepEqual(value.recovery,{S1:1,S2:1});
+                assert.deepEqual(value.limits,{menus:32,createAttempts:33,menuWrites:106,shopWrites:5,blobUploads:5,sessions:16,denialRequests:10});
+                assert.match(value.oldClaimsSha256,/^[a-f0-9]{64}$/);return claim('recovery-reservation',structuredClone(value));
+            }
+            assert.equal(value.type,'STOP_WRITE');assert.ok(Object.keys(value).every(k=>['type','scope','menuId','owner','sourceClaimId','slots'].includes(k)));
+            assert.equal(known.get(value.menuId)?.owner,value.owner);assert.equal(value.slots,1);
+            assert.match(value.sourceClaimId,/^[A-Za-z0-9_-]{1,128}$/);
+            return claim('recovery-stop-'+value.menuId,structuredClone(value));
+            }catch{held=true;throw Error('MANAGED_RECOVERY_RESERVATION_HELD');}
+        },
+        async readMenu({id,owner,key,scenario,checkpoint}){
+            try {
+                requireOpen();assert.equal(known.get(id)?.owner,owner);
+                if(scenario==='REMAINDER_PRIVATE'){assert.ok(boundary&&key===undefined&&checkpoint===undefined);return {menu:await read(id,owner),checkpointMatches:false};}
+                assert.equal(known.get(id)?.key,key);
+                assert.equal(known.get(id)?.scenario,scenario);assert.ok(['T2','T3'].includes(scenario));
+                if(scenario==='T2')assert.ok(['M05','M06','M07','M08'].includes(key));
+                const menu=await read(id,owner);
+                const recipeRunId=scenario==='T3'?'39390038-ddea-409d-bbe3-0faee2293ed6':'fc6fd8a4-6f9a-4fa9-b30e-04981bf77f67';
+                const pack=source.projectOriginalPayloads(recipeRunId);
+                const expected=scenario==='T2'&&['M05','M06'].includes(key)
+                    ?source.t2PrivateCorrections(recipeRunId,['E21','E23']).find(c=>c.key===key).body:pack.expectedByMenu[key];
+                const payload={...expected};delete payload.isPublished;
+                assert.deepEqual(source.fixturePayload(menu),payload);
+                if(checkpoint){
+                    assert.equal(checkpoint.id,id);assert.equal(checkpoint.owner,owner);assert.equal(checkpoint.ownerMatches,true);
+                    assert.equal(checkpoint.shopId,managedActorIdentity[owner].shopId);
+                    for(const field of ['version','foodVersion','reviewedFoodVersion','publicationConfirmedFoodVersion','isPublished'])assert.equal(menu[field],checkpoint[field]);
+                    assert.deepEqual(source.fixturePayload(menu),checkpoint.food);
+                    assert.equal(checkpoint.reviews,'0');assert.equal(checkpoint.resolutions,'0');assert.equal(menu.foodReviews.length,0);
+                }
+                return {menu,checkpointMatches:!!checkpoint};
+            }catch{held=true;throw Error('MANAGED_RECOVERY_READ_HELD');}
+        },
+        async write({claim:expectedClaim,resource,payloadIntent}){
+            try{
+                requireOpen();assert.ok(boundary);assert.equal(resource.purpose,'CORE');
+                assert.ok(Object.keys(payloadIntent).every(k=>['kind','key','scenario'].includes(k)));
+                const {kind,key,scenario}=payloadIntent;assert.ok(['CREATE','PUBLISH','STOP'].includes(kind));
+                assert.ok(/^M0[1-8]$/.test(key));assert.ok(['T2','T3'].includes(scenario));
+                const owner=expectedClaim.owner;assert.equal(owner,Number(key.slice(1))<=4?'S1':'S2');
+                assert.equal(resource.shopId,managedActorIdentity[owner].shopId);
+                assert.equal(expectedClaim.kind,kind==='CREATE'?'MENU_CREATE':'MENU_WRITE');
+                let body,path,method;
+                if(kind==='CREATE'){
+                    assert.equal(scenario,'T3');assert.ok(['M03','M04','M05','M06','M07','M08'].includes(key));
+                    assert.ok(![...known.values()].some(f=>f.scenario==='T3'&&f.key===key));
+                    body={...source.projectOriginalPayloads('39390038-ddea-409d-bbe3-0faee2293ed6').expectedByMenu[key],
+                        isPublished:false,operationId:resource.creationOperationId};method='POST';path='/api/admin/menus';
+                }else{
+                    const f=known.get(resource.menuId);assert.equal(f?.scenario,scenario);assert.equal(f?.key,key);assert.equal(f?.owner,owner);
+                    if(scenario==='T2')assert.ok(kind==='STOP'&&['M05','M06','M07','M08'].includes(key));
+                    const before=(await resumePorts.readMenu({id:resource.menuId,owner,key,scenario})).menu;
+                    assert.equal(before.version,resource.beforeVersion);
+                    if(kind==='STOP')assert.equal(before.isPublished,true);else assert.equal(before.isPublished,false);
+                    method=kind==='STOP'?'POST':'PUT';path='/api/admin/menus/'+resource.menuId+(kind==='STOP'?'/stop':'');
+                    body={__menuId:resource.menuId,expectedVersion:before.version,...(kind==='PUBLISH'?{publicationAction:'publish'}:{})};
+                }
+                assert.equal(resource.method,method);assert.equal(resource.path,path);
+                const result=await write(expectedClaim.id,owner,kind,method,path,body);
+                if(kind==='CREATE')known.set(result.menu.id,{id:result.menu.id,owner,key,scenario});
+                const op=operations.at(-1);assert.equal(op.id,expectedClaim.id);
+                return {status:op.status,requestId:op.requestId,menu:result.menu,...(kind==='CREATE'?{createdId:result.menu.id}:{})};
+            }catch{held=true;throw Error('MANAGED_RECOVERY_WRITE_HELD');}
+        },
+        async observeT3Evidence({phase}){
+            try {
+            requireOpen();for(const owner of ['S1','S2'])await verify(owner);
+            assert.ok(['START','LOT_ALLOCATION_LOOKUP'].includes(phase));
+            const cards=source.originalEvidence('T3',phase);
+            assert.deepEqual(cards.map(c=>c.id),[phase==='START'?'E31':'E32']);assert.ok(cards.every(c=>c.caseId==='T3'&&typeof c.text==='string'&&c.text.length>0));
+            event({stage:phase==='START'?'RESUME_ORIGINAL_E31_CONSULTED_AUTOMATED':'RESUME_ORIGINAL_E32_CONSULTED_AUTOMATED'});
+            return {evidenceIds:cards.map(c=>c.id),source:'ORIGINAL_T3_EVIDENCE',observed:true,lotAllocationHeld:phase==='LOT_ALLOCATION_LOOKUP'};
+            }catch{held=true;throw Error('MANAGED_RECOVERY_EVIDENCE_HELD');}
+        },
+    };
+    return {ports,serviceApi,resumePorts,serviceObservationPorts,snapshot:()=>({held,operations:structuredClone(operations),fixtures:[...known.values()],batch:batchResult,
+        ...(serviceConfig?{preparationState:structuredClone(serviceConfig.preparationState)}:{})}),assertOpen:requireOpen};
 }
 
 // One callable first-arm continuation. The root owns actor authentication/finalization;
@@ -946,9 +1225,57 @@ export function assertManagedCleanupProof(proof,now=Date.now()) {
     }catch{throw Error('MANAGED_CLEANUP_PROOF_REFUSED');}
 }
 
+// Unwired local B candidate. Its proposed eighth-session metadata is not a
+// change to the active seven-session policy or permission to authenticate.
+export function assertManagedBCleanupProof(proof,now=Date.now()) {
+    try {
+        const fixtures=[['cmvzkaueq000xl6086shu6i7o',95,88],['cmvzkbgd80015l6089s4spnqg',95,88],
+            ['cmvzkc2u5001dl6089rwngm8c',32,29],['cmvzkcoq3001ll608iv8ekwxk',32,29]];
+        const fixed={source:'INDEPENDENT_READ_ONLY',verifiedBy:'cli_metadata_observer',sourceRunId:'41495319922',
+            checkpointRunId:'41501320828',checkpointSqlObservedUtc:'2026-11-02T18:42:53.901Z',status:'completed',
+            evidenceReference:'https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/41501320828',
+            applicationSha:'8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1',deployment:'dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo',
+            origin:'https://clear-allergy-e2e-qs7v9eaim-kaitoexe00-9350s-projects.vercel.app',
+            ownerId:'user_3LFyNjtUBNFHoDjyYiieTXEhHd0',shopId:'cmvs4x9h80011wn0w7s8abaie',
+            knownTerminal:true,sessionsEnded:true,pendingRequests:0,unknownResolved:true};
+        const budget={priorSessions:7,priorMenuWrites:42,proposedSessionMaximum:8,neededSessions:1,maximumMenuWrites:103};
+        const exact=(value,keys)=>assert.ok(value&&Object.getPrototypeOf(value)===Object.prototype&&Object.keys(value).length===keys.length
+            &&keys.every(k=>Object.hasOwn(value,k)));
+        exact(proof,[...Object.keys(fixed),'sqlObservedUtc','observedUtc','fixtures','candidateBudget']);
+        for(const [key,value] of Object.entries(fixed))assert.equal(proof[key],value);
+        exact(proof.candidateBudget,Object.keys(budget));for(const [key,value] of Object.entries(budget))assert.equal(proof.candidateBudget[key],value);
+        assert.equal(target.source,fixed.applicationSha);assert.equal(target.deployment,fixed.deployment);assert.equal(target.origin,fixed.origin);
+        assert.equal(managedActorIdentity.S2.ownerId,fixed.ownerId);assert.equal(managedActorIdentity.S2.shopId,fixed.shopId);
+        assert.match(proof.sqlObservedUtc,/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+        assert.match(proof.observedUtc,/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+        const sqlObserved=Date.parse(proof.sqlObservedUtc),observed=Date.parse(proof.observedUtc);
+        assert.ok(Number.isFinite(now)&&Number.isFinite(sqlObserved)&&Number.isFinite(observed)
+            &&sqlObserved>=Date.parse(fixed.checkpointSqlObservedUtc)&&sqlObserved<=observed&&observed<=now&&now-sqlObserved<=3600000);
+        assert.equal(new Date(sqlObserved).toISOString(),proof.sqlObservedUtc);assert.equal(new Date(observed).toISOString(),proof.observedUtc);
+        assert.ok(Array.isArray(proof.fixtures)&&proof.fixtures.length===4&&new Set(proof.fixtures.map(f=>f.id)).size===4);
+        for(const [id,version,foodVersion] of fixtures){const f=proof.fixtures.find(f=>f.id===id);
+            exact(f,['id','version','foodVersion','isPublished','publicationConfirmedFoodVersion','foodSha256']);
+            assert.equal(f.version,version);assert.equal(f.foodVersion,foodVersion);assert.equal(f.isPublished,true);
+            assert.equal(f.publicationConfirmedFoodVersion,foodVersion);assert.match(f.foodSha256,/^[a-f0-9]{64}$/);}
+        return Object.freeze({...fixed,sqlObservedUtc:proof.sqlObservedUtc,observedUtc:proof.observedUtc,candidateBudget:Object.freeze({...budget}),
+            fixtures:Object.freeze(fixtures.map(([id])=>Object.freeze({...proof.fixtures.find(f=>f.id===id)})))});
+    }catch{throw Error('MANAGED_B_CLEANUP_PROOF_REFUSED');}
+}
+
 // Stops only explicitly attested, already-existing S1 fixtures. The caller owns
 // the actor/session lifecycle. A fresh GET is an observation, not an atomic CAS.
-export async function executeManagedKnownFixtureCleanup({actor,proof,record=()=>{}}={}) {
+export async function executeManagedKnownFixtureCleanup(input={}) {
+    return executeManagedFixtureCleanup(input,{assertProof:assertManagedCleanupProof,owner:'S1',maxStops:5});
+}
+
+// Candidate callable seam only: no CLI/workflow connection, session creation,
+// automatic finalization, or active-budget increase is introduced here.
+export async function executeManagedKnownBFixtureCleanup(input={}) {
+    const result=await executeManagedFixtureCleanup(input,{assertProof:assertManagedBCleanupProof,owner:'S2',maxStops:4,revalidateBeforeFetch:true});
+    return {...result,candidateOnly:true,activeSessionMaximum:7};
+}
+
+async function executeManagedFixtureCleanup({actor,proof,record=()=>{}}={},policy) {
     const result={status:'HOLD_KNOWN_FIXTURE_CLEANUP',stopAttempts:0,fixtures:[],failureStage:null,
         automaticRetry:false,automaticCleanup:false,independentDatabase:'EXTERNAL_ATTESTER_REQUIRED'};
     let stage='PROOF';
@@ -957,8 +1284,8 @@ export async function executeManagedKnownFixtureCleanup({actor,proof,record=()=>
         if(typeof requestId==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId))event.requestId=requestId;
         try{await record(event);}catch{throw Error('MANAGED_CLEANUP_DIAGNOSTIC_REFUSED');}};
     try {
-        const attestation=assertManagedCleanupProof(proof);assert.equal(typeof record,'function');stage='ACTOR';
-        assert.equal(actor?.binding?.owner,'S1');assert.equal(actor.binding.shopId,attestation.shopId);assert.equal(actor.expectedUserId,attestation.ownerId);
+        const attestation=policy.assertProof(proof);assert.equal(typeof record,'function');stage='ACTOR';
+        assert.equal(actor?.binding?.owner,policy.owner);assert.equal(actor.binding.shopId,attestation.shopId);assert.equal(actor.expectedUserId,attestation.ownerId);
         assert.equal(actor.access?.sessionLifecycleMode(),'TRACKED_OWNER_SESSION');
         const owned=()=>{const s=actor.access.sessionObservation();assert.equal(s?.ownerId,attestation.ownerId);
             assert.equal(s.ownerVerified,true);assert.equal(s.eligibleForCleanup,true);assert.ok(!actor.routeFailed?.());};
@@ -977,12 +1304,14 @@ export async function executeManagedKnownFixtureCleanup({actor,proof,record=()=>
             const entry={id:expected.id,state:'NOT_CONFIRMED',stopAttempted:false};result.fixtures.push(entry);stage='OWNER_READ';
             const before=await read(expected.id);assert.equal(before.version,expected.version);assert.equal(before.foodVersion,expected.foodVersion);
             assert.equal(before.isPublished,expected.isPublished);assert.equal(foodHash(before),expected.foodSha256);
+            if(Object.hasOwn(expected,'publicationConfirmedFoodVersion'))assert.equal(before.publicationConfirmedFoodVersion,expected.publicationConfirmedFoodVersion);
             await emit('CLEANUP_OWNER_STATE_MATCHED',expected.id,200);
             if(!before.isPublished){entry.state='NO_WRITE_ALREADY_PRIVATE';await emit('CLEANUP_NO_WRITE_PRIVATE',expected.id);continue;}
-            stage='STOP_PRE_SEND';assertManagedCleanupProof(attestation);owned();await actor.access.ensureToken();owned();
+            stage='STOP_PRE_SEND';policy.assertProof(attestation);owned();await actor.access.ensureToken();owned();
             const url=attestation.origin+'/api/admin/menus/'+expected.id+'/stop';
-            assert.ok(result.stopAttempts<5);
+            assert.ok(result.stopAttempts<policy.maxStops);
             entry.stopAttempted=true;result.stopAttempts++;await emit('CLEANUP_STOP_INTENT',expected.id);
+            if(policy.revalidateBeforeFetch){policy.assertProof(attestation);owned();}
             stage='STOP';
             // Deliberately omit data/body: the stop endpoint's approved contract is an empty POST.
             const response=await actor.context.request.fetch(url,{method:'POST',headers:scopedOidcHeaders(url,
@@ -1136,9 +1465,18 @@ export async function verifyManagedOwnedPage({role,page,context,access,navigate=
     }
 }
 
-export async function openManagedOwnedActor({role,chromium,env,identityReceipt,record=()=>{}}){
+const managedResumeSessionPermits=new WeakSet();
+export async function openManagedOwnedActor({role,chromium,env,identityReceipt,record=()=>{},sessionPermit}){
     assert.equal(liveTargetPinsVerified,true);assert.ok(['S1','S2'].includes(role));assertIdentityReceipt(identityReceipt);
-    assert.equal(env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
+    let actorEnv=env;
+    if(['RESUME_414953_FULL_MANAGED','RESUME_414953_T2_FULL'].includes(env.ISSUE118_MANAGED_SCOPE)){
+        assert.ok(managedResumeSessionPermits.has(sessionPermit)&&sessionPermit.owner===role);
+        managedResumeSessionPermits.delete(sessionPermit);
+        // The SDK adapter's legacy flag authorizes the same fixed A/B identities;
+        // it is not the session/write budget. Extended admission and fsync charge
+        // have already happened before minting this non-serializable permit.
+        actorEnv={...env,ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7'};
+    }else assert.equal(env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
     const identity=managedActorIdentity[role],tracker=createCiRouteLifecycleTracker();
     const observation={owner:role,expectedUserId:identity.ownerId,expectedShopId:identity.shopId,stage:'SETUP',gateVerified:false,sessionIdentity:null};
     let browser,context,page,access,phase='AUTHENTICATION',routeFailed=false;
@@ -1148,7 +1486,7 @@ export async function openManagedOwnedActor({role,chromium,env,identityReceipt,r
     const ready=()=>{const s=access.sessionObservation();assert.ok(s?.eligibleForCleanup&&s.ownerVerified);assert.equal(s.ownerId,identity.ownerId);};
     const policy=createVerifiedReadCloseAuthPolicyCandidate(identityReceipt,ready);
     try{
-        access=await createCiAccess({...env,ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},fetch,setupStage,
+        access=await createCiAccess({...actorEnv,ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},fetch,setupStage,
             {session:s=>{observation.sessionIdentity=s;emit();},authentication:a=>{observation.authentication=a;emit();},
                 transport:t=>{if(t.exception!=='NONE'&&t.exception!=='POLICY_REFUSED')routeFailed=true;},
                 handshake:h=>{observation.handshake=h;emit();}},role);
@@ -1182,6 +1520,246 @@ export async function openManagedOwnedActor({role,chromium,env,identityReceipt,r
             drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot(),attempts:{browserLaunchAttempted:!!browser,contextCreateAttempted:!!context},onStage:stages})
             :await closeIsolatedBrowser(context,browser,{browserLaunchAttempted:!!browser,contextCreateAttempted:!!context});
         emit();throw Error('MANAGED_ACTOR_GATE_HELD');}
+}
+
+const managedResumeCanonical=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)
+    ?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
+const managedResumeHash=v=>createHash('sha256').update(managedResumeCanonical(v)).digest('hex');
+// Admission is data-only and runs before creating a directory, actor, OIDC client
+// or temporary Clerk session. The explicit FULL candidate CLI repeats it before auth.
+export async function assertManagedResumeActivation({authorization,identityReceipt,checkpointReceipt,snapshot,terminal,creationOperationIds,fullCheckpoint,continuationReceipt,prefixCheckpoint,prefixReceipt,operation,now=Date.now()}={}){
+    try{
+        const {planManaged414953Recovery,validateManagedFullCheckpoint}=await import('./issue118-managed-suite.mjs');
+        const {completionScope,planManagedT2Completion,validateT2PrefixCheckpoint}=await import('./issue118-t2-reobserve.mjs');
+        const fullT2=authorization?.scope===completionScope;
+        const plan=(fullT2?planManagedT2Completion:planManaged414953Recovery)({snapshot,terminal});
+        assertIdentityReceipt(identityReceipt,now);
+        assert.equal(identityReceipt.protectionVerified,true);assert.equal(identityReceipt.protectionMode,'ALL_DEPLOYMENTS');
+        assert.equal(identityReceipt.productionTarget,false);
+        assert.equal(authorization?.status,'APPROVED');assert.ok(['RESUME_414953_FULL_MANAGED',completionScope].includes(authorization.scope));
+        assert.equal(authorization.verifiedBy,'human');assert.match(authorization.evidenceReference,/^Sentinel_[a-f0-9]{32,64}$/);
+        assert.ok(Number.isFinite(Date.parse(authorization.approvedUtc))&&Date.parse(authorization.approvedUtc)<=now);
+        assert.deepEqual(authorization.limits,plan.reservedMaximum);
+        assert.equal(authorization.oldClaimsSha256,plan.inherited.claimsSha256);
+        assert.equal(authorization.snapshotSha256,managedResumeHash(snapshot));
+        assert.equal(authorization.terminalSha256,managedResumeHash(terminal));
+        assert.equal(authorization.creationIdsSha256,managedResumeHash(creationOperationIds));
+        const keys=['M03','M04','M05','M06','M07','M08'];assert.deepEqual(Object.keys(creationOperationIds).sort(),keys);
+        const ids=Object.values(creationOperationIds);assert.equal(new Set(ids).size,6);
+        assert.ok(ids.every(id=>typeof id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)&&!plan.inherited.creationOperationIds.includes(id)));
+        const p=checkpointReceipt;assert.equal(p?.source,'INDEPENDENT_READ_ONLY');assert.equal(p.readOnly,true);
+        assert.equal(p.project,'patient-heart-55595249');assert.equal(p.branch,'br-flat-wildflower-aoeragrs');assert.equal(p.database,'clearallergy_main19');assert.equal(p.role,'neondb_owner');
+        assert.equal(p.applicationSha,target.source);assert.equal(p.deployment,target.deployment);
+        assert.equal(p.originalRunId,'41495319922');assert.equal(p.originalTerminal,true);assert.equal(p.unknownResolved,true);
+        assert.equal(p.allSevenSessionsClosed,true);assert.equal(p.pendingRequests,0);assert.equal(p.menuWrites,42);assert.equal(p.menuCount,11);
+        assert.equal(p.extraAudits,0);assert.equal(p.exclusive,true);assert.equal(p.snapshotSha256,authorization.snapshotSha256);
+        assert.equal(p.terminalSha256,authorization.terminalSha256);assert.equal(p.oldClaimsSha256,authorization.oldClaimsSha256);
+        assert.equal(p.requestIdsSha256,managedResumeHash([...terminal.consumedRequestIds].sort()));
+        const sql=Date.parse(p.sqlObservedUtc),observed=Date.parse(p.observedUtc);
+        assert.ok(Number.isFinite(sql)&&Number.isFinite(observed)&&sql>=Date.parse('2026-11-02T18:42:53.901Z')&&sql<=observed&&observed<=now&&(fullCheckpoint!==undefined||prefixCheckpoint!==undefined||now-sql<=3600000));
+        assert.equal(terminal.consumedSessions,7);assert.equal(terminal.confirmedMenuWrites,42);
+        if(operation==='T2_REOBSERVE_PREFIX')assert.ok(fullT2&&prefixCheckpoint===undefined&&prefixReceipt===undefined&&fullCheckpoint===undefined&&continuationReceipt===undefined);
+        if(fullT2&&operation==='CORE_AND_SERVICE')assert.ok(prefixCheckpoint!==undefined&&prefixReceipt!==undefined&&fullCheckpoint===undefined&&continuationReceipt===undefined);
+        if(operation==='SERVICE_NEXT')assert.ok(fullCheckpoint!==undefined&&continuationReceipt!==undefined&&prefixCheckpoint===undefined&&prefixReceipt===undefined);
+        const prefixData=fullCheckpoint?.controller?.t2Prefix??(prefixCheckpoint?{checkpoint:prefixCheckpoint,receipt:prefixReceipt}:null);
+        const prefix=fullT2&&prefixData?validateT2PrefixCheckpoint({snapshot,terminal,authorization,prefixCheckpoint:prefixData.checkpoint,prefixReceipt:prefixData.receipt,now,historical:fullCheckpoint!==undefined}):null;
+        assert.ok(!fullT2||prefix||operation==='T2_REOBSERVE_PREFIX');assert.ok(fullT2||!prefixData);
+        const restored=fullCheckpoint===undefined?null:validateManagedFullCheckpoint({snapshot,terminal,approval:authorization,creationOperationIds,fullCheckpoint,continuationReceipt,now});
+        return {scope:authorization.scope,limits:structuredClone(plan.reservedMaximum),plan,restored,prefix,prefixData,
+            checkpointKey:managedResumeHash({snapshot:authorization.snapshotSha256,terminal:authorization.terminalSha256,approval:authorization.evidenceReference,
+                stage:restored?restored.controller.serviceArms.at(-1).id:operation==='T2_REOBSERVE_PREFIX'?'T2_PREFIX':prefix?'CORE_AFTER_T2':'INITIAL_CORE'}),
+            initialCounts:restored?structuredClone(restored.controller.counts):prefix?structuredClone(prefix.controller.counts):{menus:11,menuWrites:42,shopWrites:0,blobUploads:0,sessions:7}};
+    }catch{throw Error('MANAGED_RESUME_ACTIVATION_NOT_APPROVED_OR_FRESH');}
+}
+
+// Same callable entry is used by memory-transport tests and future owned actors.
+// Overrides substitute the transport factories, never the admission or budget
+// checks. The candidate CLI additionally requires a new explicit approval and provenance.
+export async function executeManagedApprovedResume(input={}){
+    const {authorization,identityReceipt,snapshot,terminal,creationOperationIds,claimDirectory,
+        chromium,env=process.env,image,serviceRunId,preparationState={},terminalReader,dependencies={}}=input;
+    const admission=await assertManagedResumeActivation(input);
+    if((input.operation??'CORE_AND_SERVICE')!==(admission.restored?'SERVICE_NEXT':input.operation==='T2_REOBSERVE_PREFIX'&&authorization.scope==='RESUME_414953_T2_FULL'?'T2_REOBSERVE_PREFIX':'CORE_AND_SERVICE'))throw Error('MANAGED_RESUME_STAGE_NOT_IMPLEMENTED');
+    if(typeof claimDirectory!=='string'||claimDirectory.length===0)throw Error('MANAGED_RESUME_CLAIM_DIRECTORY_REQUIRED');
+    const {serviceBrowserImage}=await import('./issue118-managed-service-browser.mjs');
+    if(!Buffer.isBuffer(image?.buffer)||image.buffer.length!==serviceBrowserImage.bytes
+        ||createHash('sha256').update(image.buffer).digest('hex')!==serviceBrowserImage.sha256
+        ||typeof serviceRunId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(serviceRunId)
+        ||!preparationState||Object.keys(preparationState).length!==0||admission.restored&&serviceRunId!==admission.restored.controller.serviceRunId)throw Error('MANAGED_RESUME_SERVICE_INPUT_REQUIRED');
+    const prefixOnly=input.operation==='T2_REOBSERVE_PREFIX',restored=admission.restored,serviceState=restored?structuredClone(restored.preparationState):preparationState;
+    const {prepareManaged414953Resume}=await import('./issue118-managed-suite.mjs');
+    const report={status:'LOCAL_ENTRY_ADMITTED_NOT_STARTED',target,scope:authorization.scope,livePass:false,coverage:'NOT_ATTESTED',
+        transportEvidence:dependencies.openActor||dependencies.createRuntime?'INJECTED_TRANSPORT_TEST':'OWNED_PREVIEW_TRANSPORT_NOT_YET_ATTESTED',
+        originalHold:snapshot.status,sessionConsumption:admission.initialCounts.sessions,sessionReservations:{normal:restored?{S1:6-restored.nextArmIndex,S2:0}:{S1:1,S2:1},recovery:{S1:1,S2:1}},
+        sessionAttempts:[],sessionFinalizations:[],evidencePersistenceComplete:true,writes:'NOT_STARTED',independentDatabase:'NOT_ATTESTED',automaticRetry:false,automaticCleanup:false};
+    let actorA,actorB,runtime,runtimeGuard,pendingBoundary,controller,held=false,normalA=restored?restored.nextArmIndex:0,normalB=restored?1:0,latestServiceTerminal=restored?{observedUtc:restored.receipt.observedUtc}:undefined;
+    if(restored){actorB={owner:'S2',expectedUserId:managedActorIdentity.S2.ownerId,binding:{owner:'S2',shopId:managedActorIdentity.S2.shopId},closedMetadataOnly:true};}
+    const closed=new WeakSet(),owned=new Set();if(actorB)closed.add(actorB);
+    const safeSession=(s,owner)=>{
+        if(!s||typeof s.id!=='string'||!/^sess_[A-Za-z0-9]{1,128}$/.test(s.id)||s.ownerId!==managedActorIdentity[owner].ownerId)return null;
+        return {id:s.id,ownerId:s.ownerId,providerCreatedUtc:typeof s.providerCreatedUtc==='string'&&Number.isFinite(Date.parse(s.providerCreatedUtc))?s.providerCreatedUtc:null,
+            ownerVerified:s.ownerVerified===true,providerTerminationConfirmed:s.providerTerminationConfirmed===true,
+            providerStatus:['active','pending','ended','revoked','removed','expired','abandoned','replaced'].includes(s.providerStatus)?s.providerStatus:'OTHER'};
+    };
+    const directory=resolve(claimDirectory),persist=(name,value)=>{
+        let fd;try{assert.match(name,/^[A-Za-z0-9_-]{1,160}$/);fd=openSync(join(directory,name+'.json'),'wx',0o600);
+            writeFileSync(fd,JSON.stringify(value));fsyncSync(fd);return true;
+        }catch{return false;}finally{if(fd!==undefined)closeSync(fd);}
+    };
+    const checkpoint=()=>{assertIdentityReceipt(identityReceipt);return assertManagedResumeActivation({...input,now:Date.now()});};
+    const record=value=>{
+        // Only session metadata from the owned actor is retained. No provider URL,
+        // header, key, cookie, token, raw exception or full actor object is saved.
+        const owner=value?.owner;if(!['S1','S2'].includes(owner))return;
+        const slot=[...report.sessionAttempts].reverse().find(s=>s.owner===owner);
+        if(slot){const s=safeSession(value.sessionIdentity||value.finalization?.sessionIdentity,owner);if(s){slot.sessionIdentity=s;
+                const key=managedResumeCanonical(s);
+                if(slot.lastSessionObservation!==key){
+                    slot.sessionObservationCount=(slot.sessionObservationCount||0)+1;slot.lastSessionObservation=key;
+                    if(!persist('session-observation-'+slot.index+'-'+slot.sessionObservationCount,{index:slot.index,owner,sessionIdentity:s})){
+                        held=true;report.evidencePersistenceComplete=false;
+                    }
+                }
+            }
+            if(value.finalization)slot.failedOpeningFinalization={owner,complete:value.finalization.complete===true,
+                authenticationCleanup:value.finalization.authenticationCleanup==='SIGNOUT_CONFIRMED'?'SIGNOUT_CONFIRMED':'SIGNOUT_UNVERIFIED',
+                sessionIdentity:safeSession(value.finalization.sessionIdentity,owner),localClosed:value.finalization.localClose?.allLocalClosed===true};
+            slot.stage=/^[A-Z0-9_]{1,100}$/.test(value.stage||'')?value.stage:'OBSERVATION';}
+    };
+    const finalize=async actor=>{
+        if(!actor||closed.has(actor))return;closed.add(actor);
+        let result;try{result=await actor.finalize();}catch{result={complete:false,authenticationCleanup:'SIGNOUT_UNVERIFIED'};}
+        const safe={owner:actor.owner,complete:result?.complete===true,authenticationCleanup:result?.authenticationCleanup==='SIGNOUT_CONFIRMED'?'SIGNOUT_CONFIRMED':'SIGNOUT_UNVERIFIED',
+            sessionIdentity:safeSession(result?.sessionIdentity,actor.owner),localClosed:result?.localClose?.allLocalClosed===true};
+        report.sessionFinalizations.push(safe);if(!safe.complete)held=true;
+        if(!persist('session-end-'+report.sessionFinalizations.length,safe)){held=true;report.evidencePersistenceComplete=false;}
+        return safe;
+    };
+    const open=async owner=>{
+        await checkpoint();assert.equal(held,false);assert.ok(owner==='S1'?normalA<6:normalB<1);
+        if(owner==='S1'&&normalA>0){
+            assert.ok(latestServiceTerminal&&Date.now()-Date.parse(latestServiceTerminal.observedUtc)<=3600000);
+            assert.ok(!actorA||closed.has(actorA));assert.ok(!actorB||closed.has(actorB));latestServiceTerminal=null;
+        }
+        // Recovery S1/S2 slots are never available to normal authentication.
+        assert.ok(report.sessionConsumption+1+2<=admission.limits.sessions);
+        if(owner==='S1')normalA++;else normalB++;
+        const slot={index:report.sessionAttempts.length+1,owner,consumedBeforeAuthentication:true,startedUtc:new Date().toISOString(),stage:'AUTHENTICATION_NOT_STARTED',sessionIdentity:null};
+        assert.ok(persist('session-attempt-'+slot.index,slot));report.sessionAttempts.push(slot);report.sessionConsumption++;
+        const permit=Object.freeze({owner,index:slot.index});managedResumeSessionPermits.add(permit);
+        let actor;try{
+            actor=await (dependencies.openActor||openManagedOwnedActor)({role:owner,chromium,env:{...env,ISSUE118_MANAGED_SCOPE:authorization.scope},
+                identityReceipt,record,sessionPermit:permit});
+            managedResumeSessionPermits.delete(permit);
+            assert.equal(actor.owner,owner);assert.equal(actor.expectedUserId,managedActorIdentity[owner].ownerId);
+            assert.equal(actor.binding.shopId,managedActorIdentity[owner].shopId);assert.equal(typeof actor.finalize,'function');
+            assert.ok(ownedCiActorBoundary({access:actor.access,page:actor.page,context:actor.context,browser:actor.lifecycle?.browser,
+                expectedOwnerId:actor.expectedUserId,drainRoutes:()=>actor.lifecycle.tracker.drain(),readRouteState:()=>actor.lifecycle.tracker.snapshot()},true));
+            owned.add(actor);slot.stage='OWNER_AND_SESSION_CONFIRMED';slot.sessionIdentity=safeSession(actor.access.sessionObservation(),owner);
+            assert.ok(slot.sessionIdentity);assert.equal(held,false);assert.ok(persist('session-created-'+slot.index,{index:slot.index,owner,sessionIdentity:slot.sessionIdentity}));return actor;
+        }catch{managedResumeSessionPermits.delete(permit);held=true;slot.stage='AUTHENTICATION_UNCERTAIN_NO_RETRY';
+            if(actor)await finalize(actor);else if(slot.failedOpeningFinalization){report.sessionFinalizations.push(slot.failedOpeningFinalization);
+                if(!persist('session-end-'+report.sessionFinalizations.length,slot.failedOpeningFinalization))report.evidencePersistenceComplete=false;}
+            throw Error('MANAGED_RESUME_AUTH_HELD');}
+    };
+    const bindRuntime=async suppliedCheckpoint=>{
+        assert.ok(actorA&&actorB);const state=controller.snapshot();
+        if(runtimeGuard){assert.equal(await runtimeGuard.remove(),true);runtimeGuard=undefined;}
+        const initialFixtures=snapshot.fixtures.map(f=>{const c=snapshot.claims.find(c=>c.kind==='MENU_CREATE'&&c.createdId===f.id),m=/^(T[23])_(M0[1-8])_CREATE$/.exec(c?.id||'');
+            return {...f,...(m?{scenario:m[1],key:m[2]}:{})};});
+        runtime=(dependencies.createRuntime||createManagedRuntimePorts)({actors:[actorA,actorB],claimDirectory:directory,t1FixtureId:'cmvziwd1k0001js07pqfoctkr',
+            operation:'RESUME_CORE',checkpointFixtures:initialFixtures,...(!prefixOnly?{resumeCheckpoint:suppliedCheckpoint||{
+                knownFixtures:state.knownFixtures,newClaims:state.newClaims,terminalCreationBindings:state.terminalCreationBindings||[]}}:{}),
+            ...(!prefixOnly?{serviceConfig:{runId:serviceRunId,identityReceipt,image,preparationState:serviceState}}:{}),record:()=>{}});
+        assert.ok(runtime.resumePorts);if(pendingBoundary)runtimeGuard=await runtime.ports.installSendGuard(pendingBoundary);
+    };
+    const call=(name,...args)=>{assert.equal(held,false);assert.equal(typeof runtime?.resumePorts?.[name],'function');return runtime.resumePorts[name](...args);};
+    const ports={
+        verifyApproval:async()=>{await checkpoint();return true;},verifyCheckpoint:async()=>{await checkpoint();return true;},
+        reserveRecoveryBudget:async value=>{
+            assert.equal(value.scope,authorization.scope);assert.ok(['OWNER_SESSIONS','STOP_WRITE','CONTINUATION_RESERVATIONS','T2_PREFIX_OWNER_SESSIONS'].includes(value.type));
+            if(value.type==='T2_PREFIX_OWNER_SESSIONS'){assert.ok(prefixOnly);assert.deepEqual(value.normal,{S1:1,S2:1});assert.deepEqual(value.recovery,{S1:1,S2:1});assert.deepEqual(value.limits,admission.limits);return persist('t2-owner-reservations',value);}
+            if(value.type==='CONTINUATION_RESERVATIONS'){
+                assert.ok(restored);assert.deepEqual(value.normal,{S1:6-restored.nextArmIndex,S2:0});assert.deepEqual(value.recovery,{S1:1,S2:1});
+                assert.deepEqual(value.limits,admission.limits);assert.equal(value.priorSessionConsumption,report.sessionConsumption);
+                assert.equal(value.checkpointSha256,restored.checkpointSha256);return persist('continuation-recovery-reservations',value);
+            }
+            if(value.type==='OWNER_SESSIONS'){
+                assert.deepEqual(value.normal,{S1:1,S2:1});assert.deepEqual(value.recovery,{S1:1,S2:1});assert.deepEqual(value.limits,admission.limits);
+                return persist('owner-recovery-reservations',{type:value.type,scope:value.scope,limits:value.limits,normal:value.normal,recovery:value.recovery,oldClaimsSha256:authorization.oldClaimsSha256});
+            }
+            assert.match(value.menuId,/^c[a-z0-9]+$/);assert.ok(['S1','S2'].includes(value.owner));assert.equal(value.slots,1);assert.match(value.sourceClaimId,/^[A-Za-z0-9_-]{1,128}$/);
+            return persist('stop-reservation-'+value.menuId+'-'+managedResumeHash(value.sourceClaimId).slice(0,32),{type:value.type,scope:value.scope,menuId:value.menuId,owner:value.owner,sourceClaimId:value.sourceClaimId,slots:1});
+        },
+        claimOperation:async claim=>persist('operation-'+claim.id,claim),
+        installSendGuard:async boundary=>{assert.equal(pendingBoundary,undefined);pendingBoundary=boundary;
+            if(runtime)runtimeGuard=await runtime.ports.installSendGuard(boundary);
+            return {beforeSend:true,remove:async()=>{if(runtimeGuard){assert.equal(await runtimeGuard.remove(),true);runtimeGuard=undefined;}pendingBoundary=undefined;return true;}};},
+        readT2:args=>call('readT2',args),writeT2:args=>call('writeT2',args),observeT2:args=>call('observeT2',args),readT2Evidence:()=>call('readT2Evidence'),
+        readMenu:args=>call('readMenu',args),write:args=>call('write',args),observeT3Evidence:args=>call('observeT3Evidence',args),
+        runT4:args=>call('runT4',args),runControls:args=>call('runControls',args),runDenials:args=>call('runDenials',args),
+        runServiceCell:args=>call('runServiceCell',args),restorePriorShop:args=>call('restorePriorShop',args),
+        runServiceCellLazy:args=>call('runServiceCellLazy',args),verifyResourceBeforeForward:args=>call('verifyResourceBeforeForward',args),
+        closeServiceBrowser:args=>call('closeServiceObservation',args),
+        async prepareServiceActor({existingActor,resumeCheckpoint}){if(existingActor){assert.ok(actorA&&!closed.has(actorA));}
+            else{assert.ok(!actorA||closed.has(actorA));actorA=await open('S1');await bindRuntime(resumeCheckpoint);}
+            return {owner:'S1',identityVerified:true,separateFromClosedActors:true,globalConsumedSessions:report.sessionConsumption,
+                recoveryReservations:{S1:1,S2:1},sessionConsumedBeforeAuthentication:true};},
+        async finishServiceActor(){await finalize(actorA);await finalize(actorB);assert.equal(held,false);return {sessionsClosed:true,pendingRequests:0};},
+        async verifyServiceTerminal(args){
+            if(typeof terminalReader!=='function')return null;
+            const result=await terminalReader(args);assert.ok(result?.source==='INDEPENDENT_READ_ONLY'&&result.originalTerminal===true
+                &&result.unknownResolved===true&&result.sessionsClosed===true&&result.pendingRequests===0&&result.resourcesSha256===args.resourcesSha256
+                &&managedResumeCanonical(result.operationIds)===managedResumeCanonical(args.operationIds));
+            assert.equal(result.applicationSha,target.source);assert.equal(result.deployment,target.deployment);
+            assert.equal(result.project,'patient-heart-55595249');assert.equal(result.branch,'br-flat-wildflower-aoeragrs');
+            assert.equal(result.database,'clearallergy_main19');assert.equal(result.readOnly,true);
+            assert.equal(args.closedOwnerPrivateBindingsSha256,managedResumeHash(args.closedOwnerPrivateBindings));
+            assert.equal(result.closedOwnerPrivateBindingsSha256,args.closedOwnerPrivateBindingsSha256);
+            assert.equal(result.closedOwnerPrivateBindingsMatch,true);
+            assert.deepEqual(result.closedOwnerPrivateIds,[...args.closedOwnerPrivateBindings.map(b=>b.id)].sort());
+            const observed=Date.parse(result.observedUtc);assert.ok(Number.isFinite(observed)&&observed<=Date.now()&&Date.now()-observed<=3600000);
+            latestServiceTerminal={observedUtc:result.observedUtc};return result;
+        },
+    };
+    try{
+        assert.ok(typeof claimDirectory==='string'&&claimDirectory.length>0);mkdirSync(directory,{recursive:true});
+        assert.ok(lstatSync(directory).isDirectory()&&!lstatSync(directory).isSymbolicLink());
+        assert.ok(persist('resume-admission',{scope:authorization.scope,checkpointKey:admission.checkpointKey,evidenceReference:authorization.evidenceReference,
+            limits:admission.limits,oldClaimsSha256:authorization.oldClaimsSha256,originalSnapshotSha256:authorization.snapshotSha256,originalTerminalSha256:authorization.terminalSha256}));
+        controller=prefixOnly?(await import('./issue118-t2-reobserve.mjs')).prepareT2Reobservation({snapshot,terminal,authorization,runId:serviceRunId,ports}):prepareManaged414953Resume({snapshot,terminal,approval:authorization,creationOperationIds,ports,fullCheckpoint:input.fullCheckpoint,continuationReceipt:input.continuationReceipt,prefixCheckpoint:input.prefixCheckpoint,prefixReceipt:input.prefixReceipt});
+        await controller.initialize();
+        if(!restored){actorA=await open('S1');actorB=await open('S2');await bindRuntime();
+            report.core=prefixOnly?await controller.execute():await controller.executeT3();
+            if(!prefixOnly&&!report.core.status.startsWith('T3_API_SEQUENCE_PRIVATE'))throw Error('MANAGED_RESUME_CORE_HELD');
+        }else report.core={status:'INHERITED_TERMINAL_NOT_REPLAYED',checkpointSha256:restored.checkpointSha256};
+        if(prefixOnly){report.status=report.core.status;}
+        else if(typeof controller.executeRemainder!=='function'){report.status='HOLD_REMAINDER_NOT_IMPLEMENTED';}
+        else{report.remainder=await controller.executeRemainder({runId:serviceRunId});report.status=report.remainder.status;}
+    }catch{held=true;report.status='HOLD_MANAGED_RESUME_ENTRY';}
+    finally{
+        if(runtime?.resumePorts?.closeServiceObservation)try{report.observerClose=await runtime.resumePorts.closeServiceObservation();}catch{held=true;}
+        for(const actor of [...owned].reverse())try{await finalize(actor);}catch{held=true;report.evidencePersistenceComplete=false;}
+        report.controller=controller?.snapshot();report.runtime=runtime?.snapshot();report.writes=report.controller?.counts||'NOT_STARTED';
+        report.sessionsComplete=report.sessionFinalizations.length===report.sessionAttempts.length&&report.sessionFinalizations.every(r=>r.complete);
+        if(held||!report.sessionsComplete)report.status='HOLD_MANAGED_RESUME_ENTRY';
+        report.actualServicePass=false;report.independentDatabase='NOT_ATTESTED';
+        const priorAttempts=restored?restored.sessionLedger.attempts:admission.prefix?admission.prefix.sessionLedger.attempts:[];
+        report.fullCheckpointPayload={version:1,controller:report.controller,preparationState:structuredClone(serviceState),
+            sessionLedger:{version:1,baselineConsumed:7,attempts:[...priorAttempts,...report.sessionAttempts.map((a,i)=>{
+                const end=report.sessionFinalizations.find(e=>e.sessionIdentity?.id===a.sessionIdentity?.id),sid=end?.sessionIdentity;
+                return {index:priorAttempts.length+i+1,owner:a.owner,sessionId:sid?.id??null,providerCreatedUtc:sid?.providerCreatedUtc??null,
+                    providerStatus:sid?.providerStatus??'OTHER',terminated:sid?.providerTerminationConfirmed===true&&end?.complete===true,
+                    localClosed:end?.localClosed===true,sourceGithubRunId:env.GITHUB_RUN_ID??null,runnerSha:env.GITHUB_SHA??null};})]}};
+        // Terminal/source/artifact provenance is attached only after the job ends
+        // and the independent operator reads the immutable artifact and SQL.
+        report.fullCheckpointExportable=!!report.controller&&report.sessionsComplete&&report.evidencePersistenceComplete
+            &&report.controller.status==='HOLD_REMAINDER_RESULT_OR_INDEPENDENT_TERMINAL'
+            &&report.controller.serviceArms?.at(-1)?.status==='HOLD';
+        report.t2CheckpointExportable=prefixOnly&&report.sessionsComplete&&report.evidencePersistenceComplete&&report.controller?.status==='T2_PRIVATE_PENDING_INDEPENDENT_SQL';
+        if(prefixOnly){const payload=report.fullCheckpointPayload;delete payload.preparationState;report.t2PrefixPayload=payload;report.fullCheckpointExportable=false;}
+    }
+    return report;
 }
 
 // Restore the single verified signout document, never a session or a mutation.

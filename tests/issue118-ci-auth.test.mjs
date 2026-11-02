@@ -769,12 +769,12 @@ test('readonly API interface refuses mutation before transport, provider URL/sec
     assert.equal(calls, 0);
 });
 
-test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no normal CI privilege expansion', () => {
+test('dedicated workflow preserves original job and separately gates the unapproved FULL candidate', () => {
     const yaml = readFileSync(new URL('../.github/workflows/issue118-live-e2e.yml', import.meta.url), 'utf8');
     const parsed = createRequire(import.meta.url)('js-yaml').load(yaml);
     assert.deepEqual(Object.keys(parsed.on), ['workflow_dispatch']);
     assert.deepEqual(parsed.permissions, { contents: 'read' });
-    assert.deepEqual(Object.keys(parsed.jobs), ['live-t1']);
+    assert.deepEqual(Object.keys(parsed.jobs), ['live-t1','managed-full-resume']);
     assert.deepEqual(parsed.jobs['live-t1'].permissions, { contents: 'read', 'id-token': 'write' });
     const secretSteps = parsed.jobs['live-t1'].steps.filter(step => Object.values(step.env || {}).some(value => String(value).includes('secrets.')));
     assert.equal(secretSteps.length, 3);
@@ -807,11 +807,14 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.equal(redirectDiagnostic.if, "inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'");
     assert.ok(!JSON.stringify(redirectDiagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(redirectDiagnostic.env, 'ISSUE118_APPLY'));
     assert.match(yaml, /workflow_dispatch:/); assert.ok(!/\n  (push|pull_request|schedule|workflow_call):/.test(yaml));
-    assert.equal((yaml.match(/id-token: write/g) || []).length, 1);
+    assert.equal((yaml.match(/id-token: write/g) || []).length, 2);
+    assert.deepEqual(parsed.jobs['managed-full-resume'].permissions,{contents:'read',actions:'read','id-token':'write'});
+    assert.match(parsed.jobs['managed-full-resume'].if,/inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE'/);
+    assert.equal(parsed.jobs['live-t1'].if.includes('APPROVE_FULL_RESUME_CANDIDATE'),false);
     assert.match(yaml, /environment: clearallergy-e2e-test/); assert.match(yaml, /cancel-in-progress: false/);
     assert.match(yaml, /inputs.expected_runner_sha == github.sha/);
     assert.match(parsed.jobs['live-t1'].if, /github\.run_attempt == 1/);
-    assert.equal((yaml.match(/secrets\./g) || []).length, 3);
+    assert.equal((yaml.match(/secrets\./g) || []).length, 4);
     assert.ok(!yaml.includes('DATABASE_URL')); assert.ok(!yaml.includes('DIRECT_URL'));
     assert.ok(!yaml.includes('storageState')); assert.ok(!yaml.includes('continue-on-error'));
     const runner = readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs', import.meta.url), 'utf8');
