@@ -90,6 +90,15 @@ function request(method: "GET" | "PUT", body?: unknown, requestOrigin = "http://
     });
 }
 
+test("shop route rejects numeric cover URLs and normalizes blank strings before storage", async (t) => {
+    const { writes } = setup(t);
+    assert.equal((await route.PUT(request("PUT", { name: "Fixture", coverImageUrl: 42 }))).status, 400);
+    assert.equal(writes.length, 0);
+    assert.equal((await route.PUT(request("PUT", { name: "Fixture", coverImageUrl: "  " }))).status, 200);
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].data?.coverImageUrl, null);
+});
+
 test("店舗APIは未認証をDB参照前に拒否し、稼働する所有店舗なしでは更新しない", async (t) => {
     const { writes } = setup(t);
     clerkUserId = null;

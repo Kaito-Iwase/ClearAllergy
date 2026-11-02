@@ -4,6 +4,7 @@
 // 入力値の state 管理、画像アップロード、作成 API 呼び出しまでを担当します。
 
 import React from "react";
+import { parseUploadedImageUrl } from "@/lib/validators/upload-response";
 import MenuEditClient from "./MenuEditClient";
 import { loadSavedMenu, savedMenuEditorProps } from "../saved-menu";
 import type { SavedMenu } from "../schemas/menu-response";
@@ -43,12 +44,6 @@ type Allergen = {
     nameJa: string;
     nameEn: string;
     sortOrder: number;
-};
-
-type UploadResponse = {
-    url?: string;
-    pathname?: string;
-    error?: string;
 };
 
 const CREATE_ERROR_MESSAGE =
@@ -192,17 +187,14 @@ export default function NewMenuForm({
                 );
             }
 
-            const data = (await res.json().catch(() => null)) as
-                | UploadResponse
-                | null;
-
-            if (!data?.url) {
+            const url = parseUploadedImageUrl(await res.json().catch(() => null));
+            if (!url) {
                 throw new Error(UPLOAD_ERROR_MESSAGE);
             }
 
-            setImageUrl(data.url);
-            uploadedFile.current = { file: selectedFile, url: data.url };
-            return data.url;
+            setImageUrl(url);
+            uploadedFile.current = { file: selectedFile, url };
+            return url;
         } finally {
             setUploading(false);
         }
