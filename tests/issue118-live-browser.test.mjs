@@ -9,13 +9,89 @@ import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityRe
     transportLifecycleSnapshot, recordTransportDiagnostic, readCloseRequestAllowed, observeReadCloseFixture,
     readCloseFixtureId, readCloseResult, guardReadCloseRoute, createReadCloseAuthPolicyCandidate,
     readCloseDirectFetch,createVerifiedReadCloseAuthPolicyCandidate,verifiedReadCloseAction,
-    readCloseRequestObservation,observeReadCloseRoute } from "../scripts/check-issue118-live-t1-browser.mjs";
+    readCloseRequestObservation,observeReadCloseRoute,recordReadClosePolicy,recordReadCloseHandlerFailure } from "../scripts/check-issue118-live-t1-browser.mjs";
 import { closeIsolatedBrowser } from "../scripts/issue118-close-browser.mjs";
 import { routePreviewRequest } from "../scripts/issue118-preview-transport.mjs";
 import {ciIdentity} from '../scripts/issue118-ci-auth.mjs';
 const readCloseEvidence=()=>({readOnlyApiRequests:[{kind:'SHOP',status:200,responseObserved:true},{kind:'FIXTURE',status:200,responseObserved:true}],
     sessionIdentity:{id:'sess_Unit12345678901234567890',ownerId:ciIdentity.ownerId,ownerVerified:true,
         providerTerminationConfirmed:true,frontendSignOutAcknowledged:true,providerCreatedUtc:new Date().toISOString()}});
+
+test('first refusal/app refusal/failure survive full normal samples and never serialize unknown predicate/error values',()=>{
+    const report={readClosePolicyObservations:Array.from({length:128},()=>({decision:'USE_EXISTING_TRANSPORT'}))};
+    const other=readCloseRequestObservation({url:()=> 'https://other.invalid/private?SYNTHETIC_SECRET',method:()=> 'GET',resourceType:()=> 'script'},129,transportLifecycleSnapshot('AUTHENTICATION'));
+    recordReadClosePolicy(report,other,{unexpected:'SYNTHETIC_SECRET'},'REFUSE','AUTHENTICATION');
+    const entry=readCloseRequestObservation({url:()=>target.origin+'/admin/shop',method:()=> 'POST',resourceType:()=> 'fetch'},140,transportLifecycleSnapshot('SIGNOUT'));
+    recordReadClosePolicy(report,entry,{isApp:true,isPost:true,nextActionPinned:true,authPhase:false,unexpected:'SYNTHETIC_SECRET'},'REFUSE','SIGNOUT');
+    recordReadCloseHandlerFailure(report,entry,'SIGNOUT',Error('READ_ONLY_REQUEST_REFUSED'));
+    recordReadCloseHandlerFailure(report,other,'SIGNOUT',Error('SYNTHETIC_SECRET'));
+    entry.pending=false;
+    assert.equal(report.firstReadCloseRefusal.request.sequence,129);
+    assert.equal(report.firstReadCloseAppRefusal.request.sequence,140);
+    assert.equal(report.firstReadCloseSignoutPolicy.request.sequence,140);
+    assert.equal(report.firstRouteHandlerFailure.request.sequence,140);
+    assert.equal(report.firstRouteHandlerFailure.code,'READ_ONLY_REQUEST_REFUSED');
+    assert.equal(report.firstRouteHandlerFailure.request.pending,false);
+    assert.equal(report.readClosePolicyObservations.length,128);assert.equal(report.readClosePolicyObservationsTruncated,true);
+    assert.doesNotMatch(JSON.stringify(report),/SYNTHETIC_SECRET|https:|other.invalid/);
+    const unknown={};recordReadCloseHandlerFailure(unknown,entry,'SIGNOUT',Error('SYNTHETIC_SECRET'));
+    assert.equal(unknown.firstRouteHandlerFailure.code,'UNKNOWN_HANDLER_FAILURE');
+    let messageReads=0;
+    for(const error of [Object.defineProperty({},'message',{get(){return ++messageReads===1?'CI_ROUTE_FAILED':'SYNTHETIC_SECRET';}}),
+        Object.defineProperty({},'message',{get(){messageReads++;throw Error('SYNTHETIC_SECRET');}})]){
+        const controlled={};recordReadCloseHandlerFailure(controlled,entry,'SIGNOUT',error);
+        assert.equal(controlled.firstRouteHandlerFailure.code,'UNKNOWN_HANDLER_FAILURE');
+        assert.doesNotMatch(JSON.stringify(controlled),/SYNTHETIC_SECRET/);
+    }
+    assert.equal(messageReads,0);
+});
+
+test('after activation/two reads and 150 static successes, real browser signout POST, telemetry and redirect retain distinct fixed evidence',async()=>{
+    const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+    const browser=await chromium.launch({headless:true,channel:'chromium'});
+    try{for(const mode of ['ACTION','TELEMETRY','REDIRECT']){
+        const context=await browser.newContext({serviceWorkers:'block'}),report={},policy=createReadCloseAuthPolicyCandidate({actionReference:verifiedReadCloseAction.reference});
+        let phase='AUTHENTICATION',sequence=0,forwards=0;const pending=new Set();
+        await context.route('**/*',async route=>{
+            const request=route.request(),entry=readCloseRequestObservation(request,++sequence,transportLifecycleSnapshot(phase));pending.add(entry);
+            try{
+                if(!await guardReadCloseRoute(route,()=>{report.readOnlyRequestRefused=true;},()=>{},
+                    {policy,getPhase:()=>phase,observe:(p,d)=>recordReadClosePolicy(report,entry,p,d,phase)}))return;
+                if(phase==='SIGNOUT'&&mode==='REDIRECT'){
+                    const observed=observeReadCloseRoute({request:()=>request,fetch:async()=>({status:()=>307}),abort:async()=>route.abort('blockedbyclient')},entry,()=>phase,()=>{});
+                    await routePreviewRequest(observed,'synthetic.oidc.token',o=>recordTransportDiagnostic(report,o,transportLifecycleSnapshot(phase)));return;
+                }
+                forwards++;await route.fulfill({status:200,contentType:request.method()==='POST'?'text/x-component':'text/html',body:request.method()==='POST'?'0:null\n':'<link rel="icon" href="data:,">offline'});
+            }catch(error){recordReadCloseHandlerFailure(report,entry,phase,error);}
+            finally{pending.delete(entry);entry.pending=false;}
+        });
+        try{
+            const page=await context.newPage();await page.goto(target.origin+'/admin/login');
+            const actionHeaders={'next-action':verifiedReadCloseAction.reference,accept:'text/x-component','content-type':'text/plain;charset=UTF-8'};
+            assert.equal(await page.evaluate(async headers=>(await fetch('/admin/login',{method:'POST',headers,body:'[]'})).status,actionHeaders),200);
+            await page.evaluate(async()=>{for(let i=0;i<150;i++)await fetch('/_next/static/control-'+i+'.js');});
+            phase='APP_FLOW';await page.evaluate(async id=>{for(const p of ['/api/admin/shop','/api/admin/menus/'+id])if((await fetch(p)).status!==200)throw Error('READ_FAILED');},readCloseFixtureId);
+            phase='SIGNOUT';
+            await page.evaluate(async({mode,headers})=>{try{await fetch(mode==='ACTION'?'/admin/shop':mode==='TELEMETRY'?'/_vercel/insights/view':'/admin/shop',
+                mode==='REDIRECT'?{}:{method:'POST',headers,body:'[]'});}catch{/* Expected offline refusal; assertions below must establish cause. */}},{mode,headers:actionHeaders});
+            assert.equal(pending.size,0);assert.equal(report.readClosePolicyObservationsTruncated,true);
+            assert.equal(report.firstReadCloseSignoutPolicy.request.sequence,155);
+            if(mode==='REDIRECT'){
+                assert.equal(report.firstReadCloseAppRefusal,undefined);
+                assert.equal(report.firstTransportFailure.stages.redirectRejected,true);
+                assert.equal(report.firstTransportFailure.status,307);
+                assert.ok(report.firstRouteHandlerFailure);
+            }else{
+                const p=report.firstReadCloseAppRefusal.policy.predicates;
+                assert.equal(p.authPhase,false);assert.equal(p.exactShopTarget,mode==='ACTION');
+                assert.equal(p.nextActionPinned,mode==='ACTION');assert.equal(p.emptyArguments,mode==='ACTION');
+                assert.equal(p.legacyTelemetryShape,mode==='TELEMETRY');
+                assert.equal(report.firstRouteHandlerFailure.code,'READ_ONLY_REQUEST_REFUSED');
+            }
+            assert.equal(forwards,154);assert.doesNotMatch(JSON.stringify(report),/synthetic\.oidc|https:\/\/|next-action/);
+        }finally{await context.close();}
+    }}finally{await browser.close();}
+});
 
 test('read-close correlates a particular fetch failure across close phases without recording URL/error values',async()=>{
     let phase='SIGNOUT',release,started;

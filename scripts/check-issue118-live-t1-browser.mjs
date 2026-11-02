@@ -589,6 +589,29 @@ export function createVerifiedReadCloseAuthPolicyCandidate(receipt) {
     return createReadCloseAuthPolicyCandidate({actionReference:verifiedReadCloseAction.reference,
         telemetryScripts:['/_vercel/insights/script.js'],assertContext:()=>assertIdentityReceipt(fixedReceipt)});
 }
+const readClosePredicateNames = ['isApp', 'isPost', 'authPhase', 'exactLoginTarget', 'exactShopTarget', 'authAuditApi', 'menuApi',
+    'queryPresent', 'legacyTelemetryShape', 'pinnedTelemetry', 'headersRead', 'nextActionPresent',
+    'nextActionPinned', 'originMatches', 'refererMatches', 'plainTextUtf8', 'acceptsRsc', 'bodyInspected',
+    'emptyArguments', 'actionUnused', 'inspectionComplete','pinnedTelemetryScript','isScript'];
+export function recordReadClosePolicy(report,entry,predicates,decision,phase) {
+    const safe={sequence:entry?.sequence??null,...transportLifecycleSnapshot(phase),
+        predicates:Object.fromEntries(readClosePredicateNames.map(k=>[k,predicates?.[k]===true])),
+        decision:['REFUSE','USE_EXISTING_TRANSPORT','ALLOW_PINNED_AUTH_CACHE_ACTION','SUPPRESS_PINNED_TELEMETRY_SCRIPT','SUPPRESS_PINNED_TELEMETRY'].includes(decision)?decision:'REFUSE'};
+    if(entry)entry.policy=safe;
+    const events=report.readClosePolicyObservations??=[];
+    if(events.length<128)events.push(safe);else report.readClosePolicyObservationsTruncated=true;
+    if(safe.decision==='REFUSE') {
+        report.firstReadCloseRefusal??={policy:safe,request:entry};
+        if(safe.predicates.isApp)report.firstReadCloseAppRefusal??={policy:safe,request:entry};
+    }
+    if(safe.phase==='SIGNOUT')report.firstReadCloseSignoutPolicy??={policy:safe,request:entry};
+}
+export function recordReadCloseHandlerFailure(report,entry,phase,error) {
+    const codes=['READ_ONLY_REQUEST_REFUSED','READ_CLOSE_PRE_SEND_REFUSED','CI_ROUTE_FAILED'];
+    let code='UNKNOWN_HANDLER_FAILURE';try{const message=Object.getOwnPropertyDescriptor(error,'message')?.value;if(codes.includes(message))code=message;}catch{/* no provider values or accessors */}
+    report.firstRouteHandlerFailure??={sequence:entry?.sequence??null,started:entry?.started,
+        observed:transportLifecycleSnapshot(phase),code,request:entry};
+}
 export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryPaths = [],telemetryScripts=[],assertContext=()=>{} } = {}) {
     const actionPinned = typeof actionReference === 'string' && /^[a-f0-9]{40,128}$/.test(actionReference);
     const telemetry = new Set((Array.isArray(telemetryPaths) ? telemetryPaths : []).filter(path => typeof path === 'string' &&
@@ -596,11 +619,7 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
     const scripts=new Set((Array.isArray(telemetryScripts)?telemetryScripts:[]).filter(path=>path==='/_vercel/insights/script.js'));
     let actionUsed = false;const approvedRequests=new WeakSet(),sentRequests=new WeakSet();
     const policy=async (request, getPhase) => {
-        const names = ['isApp', 'isPost', 'authPhase', 'exactLoginTarget', 'authAuditApi', 'menuApi',
-            'queryPresent', 'legacyTelemetryShape', 'pinnedTelemetry', 'headersRead', 'nextActionPresent',
-            'nextActionPinned', 'originMatches', 'refererMatches', 'plainTextUtf8', 'acceptsRsc', 'bodyInspected',
-            'emptyArguments', 'actionUnused', 'inspectionComplete','pinnedTelemetryScript','isScript'];
-        const observation = Object.fromEntries(names.map(name => [name, false]));
+        const observation = Object.fromEntries(readClosePredicateNames.map(name => [name, false]));
         const result = { decision: 'REFUSE', observation };
         try {
             assertContext();
@@ -609,6 +628,7 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             observation.isPost = method === 'POST'; observation.authPhase = getPhase() === 'AUTHENTICATION';
             observation.queryPresent = !!url.search || raw.includes('?');
             observation.exactLoginTarget = raw === target.origin + '/admin/login';
+            observation.exactShopTarget = raw === target.origin + '/admin/shop';
             observation.authAuditApi = url.pathname === '/api/admin/auth/login';
             observation.menuApi = url.pathname.startsWith('/api/admin/menus');
             observation.legacyTelemetryShape = /^\/_vercel\/insights\/(?:view|event)$/.test(url.pathname);
@@ -632,7 +652,8 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             if (readCloseRequestAllowed(method, raw)) {
                 observation.inspectionComplete = true; result.decision = 'USE_EXISTING_TRANSPORT'; return result;
             }
-            if (!observation.isPost || !observation.authPhase || !observation.exactLoginTarget) return result;
+            // Diagnose refused document POSTs too, without granting their phase/target.
+            if (!observation.isPost || observation.legacyTelemetryShape) return result;
             const headers = await request.allHeaders(); observation.headersRead = true;
             const header = name => {
                 const keys = Object.keys(headers).filter(key => key.toLowerCase() === name);
@@ -645,12 +666,12 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             observation.refererMatches = header('referer') === target.origin + '/admin/login';
             observation.plainTextUtf8 = typeof contentType === 'string' && contentType.toLowerCase().replaceAll(' ', '') === 'text/plain;charset=utf-8';
             observation.acceptsRsc = header('accept') === 'text/x-component';
-            if (!observation.nextActionPresent || !observation.originMatches || !observation.refererMatches || !observation.plainTextUtf8 || !observation.acceptsRsc) return result;
             const body = request.postData(); observation.bodyInspected = true; observation.emptyArguments = body === '[]';
             observation.actionUnused = !actionUsed; observation.authPhase = getPhase() === 'AUTHENTICATION';
             assertContext();
             observation.inspectionComplete = true;
-            if (observation.nextActionPinned && observation.emptyArguments && observation.actionUnused && observation.authPhase) {
+            if (observation.exactLoginTarget && observation.nextActionPresent && observation.originMatches && observation.refererMatches &&
+                observation.plainTextUtf8 && observation.acceptsRsc && observation.nextActionPinned && observation.emptyArguments && observation.actionUnused && observation.authPhase) {
                 actionUsed = true;approvedRequests.add(request);result.decision = 'ALLOW_PINNED_AUTH_CACHE_ACTION';
             }
         } catch { /* Unknown inputs/provider failures are REFUSE; no values or raw exceptions escape. */ }
@@ -818,7 +839,7 @@ export async function runLive() {
     const mutationCounts = new Map();
     const ledger = newWriteLedger(); report.writes = ledger;
     const requestOperations = new WeakMap();
-    const readCloseRequestEntries=new WeakMap();
+    const readCloseRequestEntries=new WeakMap(),pendingReadCloseRoutes=new Set();
     let activeOperation;
     let ciAccess;
     let ciTransportFailed = false;
@@ -904,15 +925,15 @@ export async function runLive() {
             try {
                 if(readCloseOnly) {
                     const request=route.request();entry=readCloseRequestObservation(request,sequence,started);readCloseRequestEntries.set(request,entry);
-                    const entries=report.readCloseRoutes??=[];if(entries.length<128)entries.push(entry);else report.lifecycleIncomplete=true;
+                    pendingReadCloseRoutes.add(entry);
+                    const counts=report.readCloseRouteCounts??={started:0,settled:0,sampledOut:0};counts.started++;
+                    const entries=report.readCloseRoutes??=[];if(entries.length<128)entries.push(entry);else {counts.sampledOut++;report.readCloseRoutesTruncated=true;}
                 }
                 if (readCloseOnly && !await guardReadCloseRoute(route,
                     () => { report.readOnlyRequestRefused = true; },
                     () => { report.readOnlyOtherRequestsBlocked = (report.readOnlyOtherRequestsBlocked || 0) + 1; },
                     {policy:readClosePolicy,getPhase:()=>lifecyclePhase,observe:(predicates,decision)=>{
-                        const events=report.readClosePolicyObservations??=[];
-                        if(events.length<128)events.push({sequence,...transportLifecycleSnapshot(lifecyclePhase),predicates,decision});
-                        else report.readClosePolicyObservationsTruncated=true;
+                        recordReadClosePolicy(report,entry,predicates,decision,lifecyclePhase);
                         save();
                     }})) {
                     save(); return;
@@ -924,14 +945,15 @@ export async function runLive() {
                     else report.lifecycleIncomplete=true;save();
                 }:undefined,readCloseOnly?()=>readClosePolicy.assertBeforeSend(route.request(),()=>lifecyclePhase):undefined);
             }
-            catch {
+            catch (error) {
                 if(entry)entry.handlerFailed=true;
-                report.firstRouteHandlerFailure ??= { sequence, started, observed: transportLifecycleSnapshot(lifecyclePhase) };
+                if(readCloseOnly)recordReadCloseHandlerFailure(report,entry,lifecyclePhase,error);
+                else report.firstRouteHandlerFailure ??= { sequence, started, observed: transportLifecycleSnapshot(lifecyclePhase) };
                 ciTransportFailed = true; report.transportError = "CI_ROUTE_FAILED";
                 if (activeOperation) holdWrite(ledger, activeOperation, "TRANSPORT_RESULT_UNCONFIRMED");
                 save();
             }
-            finally{if(entry){entry.pending=false;entry.finished=transportLifecycleSnapshot(lifecyclePhase);save();}}
+            finally{if(entry){entry.pending=false;entry.finished=transportLifecycleSnapshot(lifecyclePhase);pendingReadCloseRoutes.delete(entry);report.readCloseRouteCounts.settled++;save();}}
         };
         if (ciAccess) await context.route("**/*", ciRoute);
         context.on("response", response => {
@@ -1095,7 +1117,7 @@ export async function runLive() {
             markLifecycle('SIGNOUT_FINISHED');
         }
         report.localClose = await closeIsolatedBrowser(context, browser, { browserLaunchAttempted, contextCreateAttempted }, markLifecycle);
-        if(readCloseOnly){report.pendingReadCloseRoutes=(report.readCloseRoutes||[]).filter(r=>r.pending).length;if(report.pendingReadCloseRoutes)ciTransportFailed=true;}
+        if(readCloseOnly){report.pendingReadCloseRoutes=pendingReadCloseRoutes.size;if(report.pendingReadCloseRoutes||report.readCloseRouteCounts?.started!==report.readCloseRouteCounts?.settled)ciTransportFailed=true;}
         markLifecycle('LOCAL_CLOSE_FINISHED');
         report.browserClose = report.localClose.allLocalClosed ? "CONFIRMED" : "UNVERIFIED";
         const closureComplete = report.browserClose === 'CONFIRMED' && !report.localClose.lifecycleObservationFailed && !report.lifecycleIncomplete;
