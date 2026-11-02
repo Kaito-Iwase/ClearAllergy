@@ -60,7 +60,7 @@ jobs:
           import { execFileSync } from 'node:child_process';
           import { writeFileSync } from 'node:fs';
           import { join } from 'node:path';
-          import { assertIdentityReceipt, assertManagedSessionBudget, decodeManagedResumeBundle } from './scripts/check-issue118-live-t1-browser.mjs';
+            import { assertIdentityReceipt, assertManagedSessionBudget, decodeManagedResumeBundle, assertManagedT1ResumeProofMetadata } from './scripts/check-issue118-live-t1-browser.mjs';
           import { deployedMode, assertDeployedCandidateReceipt, keyClassMode, assertKeyClassReceipt } from './scripts/check-issue118-server-callback-candidate.mjs';
           try {
             const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -69,7 +69,10 @@ jobs:
             if (process.env.CONFIRMATION_MODE === keyClassMode) assertKeyClassReceipt(receipt);
             else if (process.env.CONFIRMATION_MODE === deployedMode) assertDeployedCandidateReceipt(receipt);
             else assertIdentityReceipt(receipt);
-            if(process.env.CONFIRMATION_MODE === 'APPROVE_MANAGED_SUITE') assertManagedSessionBudget(receipt,2);
+            if(process.env.CONFIRMATION_MODE === 'APPROVE_MANAGED_SUITE') {
+              assertManagedSessionBudget(receipt,2);
+              assertManagedT1ResumeProofMetadata(receipt.managedT1Resume);
+            }
             if(process.env.CONFIRMATION_MODE === 'APPROVE_MANAGED_SERVICE_ARM') assertManagedSessionBudget(receipt,decodeManagedResumeBundle(receipt).nextCellId===null?0:1);
             writeFileSync(join(process.env.RUNNER_TEMP, 'issue118-identity.json'), JSON.stringify(receipt));
             console.log('IDENTITY_RECEIPT_VALIDATED_NO_AUTH');

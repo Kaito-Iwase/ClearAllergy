@@ -32,9 +32,30 @@ test('shared owned actor finalizer confirms exact session, drains before close a
     const ok=fixture();assert.equal((await finalizeOwnedCiActor(ok.input)).complete,true);
     assert.deepEqual(ok.calls,['signout','drain','context','browser']);
     assert.equal((await finalizeOwnedCiActor(ok.input)).complete,false);assert.equal(ok.calls.length,4);
-    for(const state of [{ownerVerified:false},{eligibleForCleanup:false},{ownerId:'user_other'},{providerCreatedUtc:'invalid'}]){
-        const f=fixture();Object.assign(f.session,state);const r=await finalizeOwnedCiActor(f.input);
+    for(const state of [{id:'SYNTHETIC_UNKNOWN'},{ownerVerified:false},{eligibleForCleanup:false},{ownerId:'user_other'},{providerCreatedUtc:'invalid'}]){
+        const f=fixture();Object.assign(f.session,state);f.input.prepareForSignout=async()=>{f.calls.push('prepare');};
+        const r=await finalizeOwnedCiActor(f.input);
         assert.equal(r.complete,false);assert.ok(!f.calls.includes('signout'));assert.deepEqual(f.calls,['drain','context','browser']);
+    }
+    const prepared=fixture();
+    prepared.input.prepareForSignout=async()=>{prepared.calls.push('prepare');await Promise.resolve();prepared.calls.push('prepared');};
+    prepared.input.onStage=stage=>{if(stage==='SIGNOUT')prepared.calls.push('stage:SIGNOUT');};
+    assert.equal((await finalizeOwnedCiActor(prepared.input)).complete,true);
+    assert.deepEqual(prepared.calls,['prepare','prepared','stage:SIGNOUT','signout','drain','context','browser']);
+    assert.equal((await finalizeOwnedCiActor(prepared.input)).complete,false);assert.equal(prepared.calls.length,7);
+    for(const mode of ['throw','sessionChanged','eligibilityChanged','invalidCallback']){
+        const f=fixture(),stages=[];f.input.onStage=stage=>stages.push(stage);
+        f.input.prepareForSignout=mode==='invalidCallback'?false:async()=>{
+            f.calls.push('prepare');await Promise.resolve();
+            if(mode==='throw')throw Error('SYNTHETIC_SECRET');
+            if(mode==='sessionChanged')f.session.id='sess_DifferentSynthetic';
+            if(mode==='eligibilityChanged')f.session.eligibleForCleanup=false;
+        };
+        const r=await finalizeOwnedCiActor(f.input);
+        assert.equal(r.authenticationCleanup,'SIGNOUT_UNVERIFIED');assert.equal(r.complete,false);
+        assert.equal(r.localClose.allLocalClosed,true);assert.equal(r.drain.status,'QUIET_CONFIRMED');
+        assert.deepEqual(f.calls,mode==='invalidCallback'?['drain','context','browser']:['prepare','drain','context','browser']);
+        assert.equal(stages.includes('SIGNOUT'),false);assert.doesNotMatch(JSON.stringify(r),/SYNTHETIC_SECRET/);
     }
     for(const fault of ['signout','drain','context','browser','status','session','observer','lateRoute']){
         const f=fixture();

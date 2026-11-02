@@ -1,7 +1,7 @@
 // Read-only page/access seams. No browser, authentication, session or service I/O.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { verifyManagedOwnedPage, target } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { verifyManagedOwnedPage, prepareManagedSignoutPage, target } from '../scripts/check-issue118-live-t1-browser.mjs';
 import { ciIdentity, managedActorIdentity } from '../scripts/issue118-ci-auth.mjs';
 
 function fixture(fault = 'NONE', role = 'S2') {
@@ -97,4 +97,25 @@ test('a hung hydration seam is externally bounded and preserves original failure
     const f = fixture('HANG'), r = await verifyManagedOwnedPage(f.input);
     assert.equal(r.verified, false); assert.equal(r.failureStage, 'HYDRATION_WAIT'); assert.equal(r.code, 'HYDRATION_TIMEOUT_HELD');
     assert.equal(r.hydrationWaitCompleted, false); assert.equal(f.calls.api, 0); safe(r, f);
+});
+
+test('signout preparation drains then verifies canonical document and owner without auth or mutation',async()=>{
+    for(const role of ['S1','S2']){
+        const f=fixture('DELAYED',role);let drained=false;
+        const goto=f.input.page.goto;f.input.page.goto=async(...args)=>{assert.equal(drained,true);return goto(...args);};
+        await prepareManagedSignoutPage({page:f.input.page,access:f.input.access,expectedOwnerId:managedActorIdentity[role].ownerId,
+            drainRoutes:async()=>{drained=true;return {status:'QUIET_CONFIRMED',pending:0};}});
+        assert.equal(f.calls.goto,1);assert.equal(f.calls.api,1);assert.equal(f.calls.auth,0);assert.equal(f.calls.cleanup,0);
+    }
+});
+test('signout preparation refuses nonquiet route, wrong owner, HTTP and current identity mismatch',async()=>{
+    for(const fault of ['HTTP','OWNER','PK','SHOP']){
+        const f=fixture(fault);
+        await assert.rejects(prepareManagedSignoutPage({page:f.input.page,access:f.input.access,expectedOwnerId:managedActorIdentity.S2.ownerId,
+            drainRoutes:async()=>({status:'QUIET_CONFIRMED',pending:0})}));assert.equal(f.calls.auth,0);
+    }
+    for(const input of [{status:'NOT_QUIET',pending:0},{status:'QUIET_CONFIRMED',pending:1}]){
+        const f=fixture();await assert.rejects(prepareManagedSignoutPage({page:f.input.page,access:f.input.access,
+            expectedOwnerId:managedActorIdentity.S2.ownerId,drainRoutes:async()=>input}));assert.equal(f.calls.goto,0);
+    }
 });

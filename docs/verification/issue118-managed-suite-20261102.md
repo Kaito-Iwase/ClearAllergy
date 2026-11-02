@@ -30,6 +30,12 @@ coreの期待予算は21件/79書込み/session2件。無信号は現物の見�
 
 ## 結果不明と再開
 
+2026-11-02 の初回2runではsession計4件を消費した。run41489714874のCREATEは201後に停止し、独立READ ONLY照合で専用fixture `cmvziwd1k0001js07pqfoctkr` の作成成功・非公開29/食品版29を確認した。元runのHOLDは変更しない。現在の`APPROVE_MANAGED_SUITE`はこの既存作成に対する固定の外部SQL証跡を必須とし、新CREATEを繰り返さずINITIAL_PUBLISHからのみ続行する。再開前の所有APIと公開直前の再読取が一致しなければ、cleanupも書込みも行わない。これは再開用jobがSQLを独立実行したという意味ではない。
+
+通常配達のCREATEでは、ブラウザが201を受けて自動GETする前にIDを記録する。終了時は確認済みowned sessionについてだけ、固定Shop管理画面のGET・200・hydration・owner・公開鍵・所有APIを照合してから、既存の限定signout actionを実行する。過去の通信失敗を消す処理ではない。
+
+今回の残session上限は3件。A/Bの2件でcoreと最初のservice armを進め、その後に最大1 armを行える。残りの障害armを全て実施できたとは扱わず、追加sessionの許可がなければ未実施として残す。fixture数と書込み数では、既存の作成1件/1回を二重計上しない。
+
 タイムアウト後のGETだけでは遅延commitを否定できない。元の要求が終端と確認できるまで、再送・自動cleanup・新しいfixtureを禁止する。新規作成201では、補助項目の検証前に実IDを台帳へ登録する。
 
 cross-runの一度消費はPC側の単一dispatcherが担う。CI jobは外部artifact/SQL確認のattestationを受け入れるため、PCのclaimファイルをサービス側で独立検証する保証はない。今回の実行では同じcheckpointの新dispatchを禁止する。無人の共有dispatcherへ移す場合は別の永続claim設計が必要であり、この手順をその完成としない。

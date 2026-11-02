@@ -23,7 +23,7 @@ export function ownedCiActorBoundary({access,page,context,browser,expectedOwnerI
         return true;
     }catch{return false;}
 }
-export async function finalizeOwnedCiActor({access,page,context,browser,expectedOwnerId,drainRoutes,readRouteState,attempts={},onStage=()=>{}}) {
+export async function finalizeOwnedCiActor({access,page,context,browser,expectedOwnerId,drainRoutes,readRouteState,prepareForSignout=undefined,attempts={},onStage=()=>{}}) {
     const result={complete:false,authenticationCleanup:'SIGNOUT_UNVERIFIED',sessionIdentity:null,drain:{status:'NOT_RUN'},routeState:null,localClose:null,lifecycleObservationFailed:false};
     try{
         if(!ownedCiActorBoundary({access,page,context,browser,expectedOwnerId,drainRoutes,readRouteState}))return result;
@@ -36,6 +36,13 @@ export async function finalizeOwnedCiActor({access,page,context,browser,expected
         // Unknown or other-owner sessions are never signed out by this finalizer.
         if(before?.ownerId===expectedOwnerId&&before.ownerVerified===true&&before.eligibleForCleanup===true&&
             /^sess_[A-Za-z0-9]{1,128}$/.test(before.id||'')&&Number.isFinite(Date.parse(before.providerCreatedUtc))){
+            if(prepareForSignout!==undefined){
+                if(typeof prepareForSignout!=='function')throw Error('SIGNOUT_PREPARATION_UNVERIFIED');
+                await prepareForSignout();
+                const ready=sessionSnapshot(access.sessionObservation(),expectedOwnerId);
+                if(ready.id!==before.id||ready.ownerId!==expectedOwnerId||!ready.ownerVerified||!ready.eligibleForCleanup||
+                    ready.providerCreatedUtc!==before.providerCreatedUtc)throw Error('SIGNOUT_PREPARATION_SESSION_CHANGED');
+            }
             mark('SIGNOUT');
             const status=await access.signOut(page);
             result.authenticationCleanup=status==='SIGNOUT_CONFIRMED'?status:'SIGNOUT_UNVERIFIED';
