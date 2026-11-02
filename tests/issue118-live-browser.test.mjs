@@ -33,6 +33,7 @@ test('read-close result never turns transport/closure/mutation uncertainty into 
     const report={flow:'PASS_READ_ONLY_FIXTURE',cleanup:'NOT_APPLICABLE_READ_ONLY',writes:{held:false,operations:[]},authenticationCleanup:'SIGNOUT_CONFIRMED'};
     assert.equal(readCloseResult(report,false,true).status,'READ_CLOSE_DIAGNOSTIC_COMPLETE');
     for (const [change,transport,closed] of [[{},true,true],[{},false,false],[{readOnlyRequestRefused:true},false,true],
+        [{firstTransportFailure:{originRole:'APP',method:'GET',status:500,exception:'NONE'}},false,true],
         [{writes:{held:false,operations:[{}]}},false,true],[{authenticationCleanup:'SIGNOUT_UNVERIFIED'},false,true],[{flow:'FAIL'},false,true]])
         assert.equal(readCloseResult({...report,...change},transport,closed).status,'FAIL_OR_INCOMPLETE');
     assert.equal(readCloseResult({...report,writes:{held:true,operations:[]}},false,true).status,'HOLD_UNCERTAIN_WRITE');

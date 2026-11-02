@@ -602,7 +602,7 @@ export function readCloseResult(report, transportFailed, closed) {
     if (report.writes?.held) return { status: 'HOLD_UNCERTAIN_WRITE', exit: 2 };
     const complete = report.flow === 'PASS_READ_ONLY_FIXTURE' && report.cleanup === 'NOT_APPLICABLE_READ_ONLY'
         && report.writes?.operations?.length === 0 && report.authenticationCleanup === 'SIGNOUT_CONFIRMED'
-        && closed === true && !transportFailed && !report.readOnlyRequestRefused;
+        && closed === true && !transportFailed && !report.firstTransportFailure && !report.readOnlyRequestRefused;
     return { status: complete ? 'READ_CLOSE_DIAGNOSTIC_COMPLETE' : 'FAIL_OR_INCOMPLETE', exit: complete ? 0 : 1 };
 }
 
