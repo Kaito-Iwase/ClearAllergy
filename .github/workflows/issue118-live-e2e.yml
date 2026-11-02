@@ -1,0 +1,207 @@
+name: Issue118 dedicated live T1
+
+# Explicit manual execution only. No PR/push/schedule/reusable trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Select one explicitly approved operation; diagnostics never authorize fixture writes
+        type: choice
+        options: [HOLD, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED, DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY, DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY]
+        default: HOLD
+        required: true
+      expected_runner_sha:
+        description: Exact reviewed 40-character runner commit (not the app SHA)
+        type: string
+        required: true
+      identity_receipt:
+        description: Fresh non-secret external Project/Deployment/SHA/Ready/alias receipt JSON
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clearallergy-main19-live-fixtures
+  cancel-in-progress: false
+
+jobs:
+  live-t1:
+    if: >-
+      github.repository == 'Kaito-Iwase/ClearAllergy' &&
+      github.ref == 'refs/heads/test/issue118-live-t1-20261030' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.run_attempt == 1 &&
+      (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY') &&
+      inputs.expected_runner_sha == github.sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: clearallergy-e2e-test
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - name: Check the external receipt before dependency install or secret delivery
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        env:
+          IDENTITY_RECEIPT_JSON: ${{ inputs.identity_receipt }}
+          EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CONFIRMATION_MODE: ${{ inputs.confirmation }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { assertIdentityReceipt } from './scripts/check-issue118-live-t1-browser.mjs';
+          import { deployedMode, assertDeployedCandidateReceipt, keyClassMode, assertKeyClassReceipt } from './scripts/check-issue118-server-callback-candidate.mjs';
+          try {
+            const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+            if (!/^[a-f0-9]{40}$/.test(sha) || sha !== process.env.EXPECTED_RUNNER_SHA || sha !== process.env.GITHUB_SHA) throw Error();
+            const receipt = JSON.parse(process.env.IDENTITY_RECEIPT_JSON);
+            if (process.env.CONFIRMATION_MODE === keyClassMode) assertKeyClassReceipt(receipt);
+            else if (process.env.CONFIRMATION_MODE === deployedMode) assertDeployedCandidateReceipt(receipt);
+            else assertIdentityReceipt(receipt);
+            writeFileSync(join(process.env.RUNNER_TEMP, 'issue118-identity.json'), JSON.stringify(receipt));
+            console.log('IDENTITY_RECEIPT_VALIDATED_NO_AUTH');
+          } catch { console.error('IDENTITY_RECEIPT_OR_SHA_REFUSED'); process.exitCode = 1; }
+          NODE
+      - name: Prepare the existing isolated Playwright version (no app secrets)
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        env:
+          CLEARALLERGY_BROWSER_RUNNER_DIR: ${{ runner.temp }}/issue118-playwright
+        run: |
+          npm install --prefix "$RUNNER_TEMP/issue118-npm" --ignore-scripts --no-audit --no-fund --save-exact npm@11.18.0
+          export npm_execpath="$RUNNER_TEMP/issue118-npm/node_modules/npm/bin/npm-cli.js"
+          node "$npm_execpath" ci --ignore-scripts --no-audit --no-fund
+          node scripts/browser-runner.mjs install --with-deps
+      - name: OIDC target predicates only; stop before any request
+        if: inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: OIDC_TARGET_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+        run: node scripts/check-issue118-oidc-target.mjs --diagnose-only
+      - name: ONE guarded T1; independent SQL observation remains separate
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_APPLY: 'true'
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          ISSUE118_TEST_CLERK_SECRET_KEY: ${{ secrets.ISSUE118_TEST_CLERK_SECRET_KEY }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-result
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-live-t1-browser.mjs --ci-apply
+      - name: ONE fixed Preview GET; classify redirect booleans and STOP before any follow or Clerk
+        if: inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: PREVIEW_REDIRECT_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+        run: node scripts/check-issue118-preview-redirect.mjs --redirect-only
+      - name: TWO initial handshake GETs; boolean callback predicates and STOP before callback
+        if: inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: HANDSHAKE_CALLBACK_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-handshake-callback.mjs --callback-only
+      - name: THREE initial handshake GETs; boolean clean-target predicates and STOP before fourth GET
+        if: inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: HANDSHAKE_CLEAN_TARGET_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-handshake-callback.mjs --clean-target-only
+      - name: THREE GETs on the deployed candidate; signature booleans only and unconditional STOP
+        if: inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-server-callback-candidate.mjs --deployed-diagnostic-only
+      - name: ONE query-free GET; key class booleans only and STOP before any Clerk request
+        if: inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-server-callback-candidate.mjs --key-class-only
+      - name: Retain only 27 boolean key class predicates; no credential values or hashes
+        if: always() && inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-key-class-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-key-class/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only the deployed server boolean diagnostic; no callback/cookie/token values
+        if: always() && inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-server-callback-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-server-callback/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only the fixed-schema non-secret result, never browser/session/trace output
+        if: always() && inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-t1-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-result/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only boolean callback predicates; no Location, cookie, nonce or body
+        if: always() && inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-handshake-callback-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-handshake-callback/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only boolean clean-target predicates; never Location or cookie values
+        if: always() && inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-handshake-clean-target-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-handshake-clean-target/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only boolean OIDC target diagnostics
+        if: always() && inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-oidc-target-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-oidc-target/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only fixed redirect classification; no headers, URLs or response bodies
+        if: always() && inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-preview-redirect-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-preview-redirect/result.json
+          if-no-files-found: ignore
+          retention-days: 7

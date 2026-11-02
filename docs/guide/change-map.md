@@ -16,6 +16,8 @@
 
 ブラウザ回帰は `scripts/browser-runner.mjs` が入口です。`public` は公開画面だけ、`demo` は公開画面と保存しない管理デモを検査し、両方とも `scripts/check-first-use-browser.mjs` を使います。`ui` は `scripts/check-public-ui-browser.mjs` でCI（変更ごとの自動検査）用の架空データに対する5種類の画面幅の表示・設定・状態の誤読防止を検査します。
 
+`issue118-live-guards` は専用runner・CLI拒否・transport・CI認証adapterの局所回帰です。`tests/issue118-preview-transport.test.mjs`は合成tokenとloopback HTTPでredirect遮断、`tests/issue118-ci-auth.test.mjs`は合成claims・偽fetch・VM内のClerk代替で認証とworkflowの拒否条件を検査し、実Clerk・DBへ接続しません。限定承認後の設定、本人Secret入力待ち、専用workflowの実行条件と過去実測の境界は [Issue118 runner運用記録](../verification/issue118-live-runner-20261030.md) を参照してください。`issue118-live-t1 --apply` と専用workflowの `--ci-apply` は別の実書込み操作で、guard検査の一部ではありません。
+
 `allergens` は実メニューカードと新規・編集フォームの入力ガイド、`composition` は実画像編集部品、`qr` は実QR部品と印刷PDFを、アプリ・認証・DBなしの隔離した検証用環境（fixture）で検査します。
 
 `admin` は `scripts/check-test-browser.mjs` を使い、専用テスト環境の実Clerk・DB・Blobを必要とします。CIの公開画面回帰の成功を、実認証や外部サービス連携の確認済みとは扱いません。今回の観察・修正・確認範囲は [UI/UX精査記録](ui-ux-review.md) を参照してください。
@@ -119,3 +121,30 @@
 | 対象 | 仕様・運用 | 実装・設定 | 検証入口 |
 | --- | --- | --- | --- |
 | exact test Previewの帯と専用画像保存、staging検証入口 | [stagingの準備](development.md#staging)。現段階はローカル準備・自動配備抑止。専用DB初期化は検証済み、再INIT禁止 | `app/layout.tsx`、`app/globals.css`、`components/layout/TestEnvironmentBanner.tsx`、`lib/test-preview-environment.ts`、`lib/storage/upload-images.ts`、`lib/storage/image-url-policy.ts`、`.github/workflows/ci.yml`、`vercel.json` | `tests/test-environment-banner.test.ts`（Production/main/他branchの非表示）、`tests/test-preview-blob.test.ts`（専用token・不正設定のfallback拒否）。実外部サービス・配備・画像uploadは別確認 |
+
+Issue118 runnerのCI準備段階・固定エラー分類を変更する場合は、docs/verification/issue118-live-runner-20261030.mdとoffline guard testsを同時に照合する。live成功・失敗の証跡は過去runと後続修正を分ける。
+
+Issue118 OIDC停止診断モードは専用workflow・scripts/check-issue118-oidc-target.mjs・tests/issue118-ci-auth.test.mjsと上記runner運用記録を照合する。通常liveガードを緩めず、Secret非配達・要求前停止を検証する。
+
+Issue118認証/route診断を変更する場合はscripts/issue118-ci-auth.mjs・issue118-preview-transport.mjs・check-issue118-live-t1-browser.mjs、tests/issue118-ci-auth.test.mjs、runner運用記録を照合する。固定分類だけを保存し、認証/transportの制約を変更しない。
+
+保存済み公開のfocus検査はscripts/check-saved-publication-browser.mjsと上記運用記録を照合する。既存requestAnimationFrame後の同一対象へのfocusを標準toBeFocusedで待ち、未focus・別対象・期限超過のFAILを維持する。製品動作の変更とは区別する。
+
+Issue118初回redirect停止診断はscripts/check-issue118-preview-redirect.mjs・issue118-redirect-location.mjs、tests/issue118-redirect-diagnostic.test.mjs、専用workflowとrunner運用記録を照合する。Secret配達なし、単発固定GET・manual redirect、全分岐でfollow/Clerk/fixture前停止を維持する。通常liveの認証経路とは分ける。
+
+初回handshake例外は[限定設計](../verification/issue118-initial-handshake-candidate-20261101.md)、scripts/issue118-initial-handshake-candidate.mjs・issue118-ci-auth.mjs、同名testとrunner receiptを照合する。初回main-frame documentだけの固定SDK経路であり、通常API/後続navigationのredirect禁止は維持する。
+
+callback条件の調査は scripts/check-issue118-handshake-callback.mjs と tests/issue118-handshake-callback.test.mjs、専用workflowのDIAGNOSE_HANDSHAKE_CALLBACK_ONLYを照合する。既存SDK外向きguardのまま最大2 GETで停止し、callback送信・認証・fixtureは実行しない。全predicateはbooleanだけであり、正常な認証/T1の証明ではない。
+
+固定SDKの合成bootstrap検査は[検査範囲と留保](../verification/issue118-offline-sdk-bootstrap-20261101.md)、tests/issue118-sdk-bootstrap.test.mjs、scripts/browser-runner.mjsのissue118-live-guardsを照合する。未知例外やfixture自身の失敗を期待HOLDへ混ぜず、実Cookie配送・認証・API/DBの保証と区別する。
+
+legacy callbackは上記限定設計とci-authの明示的な初回document配線を参照。nonceとの分離と実SDKのoffline署名検査を維持する。browser終了はscripts/issue118-close-browser.mjsの独立booleanを通常runner/停止診断で照合し、片方失敗・handle未取得を全終了と扱わない。
+
+全hop観測と3 GET停止診断候補は[認証経路点検](../verification/issue118-clean-target-observation-20261101.md)、scripts/issue118-handshake-observation.mjs、同helper/停止診断と既存testを照合する。boolean観測を許可判断に使わず、Cookie共有の構造と実受理、最終fulfillと認証完了を分ける。
+
+Issue118 server callback diagnostic: [execution boundary](../verification/issue118-server-callback-ci-preparation-20261101.md), scripts/check-issue118-server-callback-candidate.mjs, its tests, the dedicated workflow and browser-runner offline guards are maintained together. The old synthetic mode remains disabled; the approved pinned Preview diagnostic stops at 3 GETs / 1 server JWKS GET. This is not authentication, T1 or DB/Blob success.
+
+原本T2/T3/T4とサービス観測の未有効化managed接続は[runner運用](../verification/issue118-live-runner-20261030.md)、scripts/check-issue118-live-t1-browser.mjsのprepareOriginalBatchRun/prepareServiceObservation、再利用したissue118-batch-stop.ts/fixture-map.ts/stop-oracle.ts/t4-observer.mjs/service-observer.tsと対応testを照合する。A/B別context・fresh外部owner根拠・永続claim・単一送信・unknown停止を維持し、実B認証/画像/Blob/応答喪失/DBの未実施を隠さない。通常test globだけに載せ、live workflow権限を変えない。PR121を含む別app candidateは未作成/未配備。
+
+Issue118 one-GET key-class runner: scripts/check-issue118-server-callback-candidate.mjs, tests/issue118-server-callback-candidate.test.mjs, the exact workflow selectors and docs/verification/issue118-server-callback-ci-preparation-20261101.md are maintained together. The new immutable target is separate from old signature/T1 targets. Observation success never establishes credential validity or authentication.
+Issue118 corrected-Secret T1: maintain the pinned target in check-issue118-live-t1-browser.mjs and issue118-preview-transport.mjs with the reused key-class parser/preflight in check-issue118-server-callback-candidate.mjs, both focused test files and docs/verification/issue118-live-runner-20261030.md. The new deployment requires fresh external metadata; format readiness, authentication, fixture flow/cleanup and independent SQL are separate observations. No disabled batch/service observer is enabled.
