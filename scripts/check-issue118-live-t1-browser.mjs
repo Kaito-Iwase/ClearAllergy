@@ -449,9 +449,9 @@ export async function browserSetupStage(stage, operation, onStage) {
 export const target = Object.freeze({
     project: "clear-allergy-e2e",
     projectId: "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK",
-    origin: "https://clear-allergy-e2e-nv6akym6f-kaitoexe00-9350s-projects.vercel.app",
-    deployment: "dpl_BQHQr4WYL9SVphQB1BpJZ8r2ad29",
-    source: "ea9f28b14b7741276115abb8a33b331339526f5e",
+    origin: "https://clear-allergy-e2e-7kdxp3nys-kaitoexe00-9350s-projects.vercel.app",
+    deployment: "dpl_E6BEMYCcuE2u7Ha3WEN42kp5u4Kt",
+    source: "8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1",
     alias: null, // CLI source deployment has no alias; all requests use its immutable URL.
     shop: "cmvs4x80y000twn0wbxkwzbt6",
     anchor: "cmvuiodx30001jg08xmr6nexe",
@@ -588,8 +588,11 @@ export async function readCloseDirectFetch(api, url, token) {
 }
 // Unwired candidate. Pins must come from the reviewed immutable public client build,
 // not a CLI/env input or a guessed Server Action/telemetry path. Missing pins grant nothing.
+// The new target is readable for byte verification, but no live auth/write path
+// may start until its compiled action/caller/factory have been verified.
+export const liveTargetPinsVerified = false;
 export const verifiedReadCloseAction = Object.freeze({
-    source:'ea9f28b14b7741276115abb8a33b331339526f5e',deployment:'dpl_BQHQr4WYL9SVphQB1BpJZ8r2ad29',
+    source:'8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1',deployment:'dpl_E6BEMYCcuE2u7Ha3WEN42kp5u4Kt',
     reference:'002d5a40d57114e6b57c906dd03491ecf8c46419f0',
     callerChunk:'/_next/static/immutable/chunks/1yxbpkao8jjq-.js',callerSha256:'22f889779049694ab8497801e8286d170f1101edbad60f9d61d06335458a50a7',
     factoryChunk:'/_next/static/immutable/chunks/44xcerwlley0q.js',factorySha256:'a070e193cc6aa2af93f87b93c668ae7fa6039f396007a82104ba7b228d7850ac',
@@ -862,6 +865,7 @@ export async function stopWithDialog(page, name, click, timeout = 20000) {
 }
 
 export async function runLive() {
+    if (!liveTargetPinsVerified) throw Error('TARGET_STATIC_VERIFICATION_PENDING');
     const readCloseOnly = process.argv.slice(2).join(' ') === '--ci-read-close';
     if (readCloseOnly && process.env.ISSUE118_DIAGNOSTIC_MODE !== readCloseMode) throw Error('READ_CLOSE_MODE_REFUSED');
     const ciMode = readCloseOnly || process.argv.slice(2).join(" ") === "--ci-apply";

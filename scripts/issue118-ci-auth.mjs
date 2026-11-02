@@ -11,6 +11,10 @@ export const ciIdentity = Object.freeze({
     clerkDomain: 'one-dolphin-7936.clerk.accounts.dev',
     ownerId: 'user_3LFy4E2hco0VpC63CbjjMjOznIx', ownerEmail: 'ca-owner-a+clerk_test@example.com',
 });
+export const managedActorIdentity = Object.freeze({
+    S1: Object.freeze({ ownerId: ciIdentity.ownerId, ownerEmail: ciIdentity.ownerEmail, shopId: 'cmvs4x80y000twn0wbxkwzbt6' }),
+    S2: Object.freeze({ ownerId: 'user_3LFyNjtUBNFHoDjyYiieTXEhHd0', ownerEmail: 'ca-owner-b+clerk_test@example.com', shopId: 'cmvs4x9h80011wn0w7s8abaie' }),
+});
 const fail = code => { throw Error(code); };
 export async function withClerkDeadline(operation,ms=20000) {
     let timer;try{return await Promise.race([operation,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('CLERK_OPERATION_TIMEOUT')),ms);})]);}
@@ -86,7 +90,10 @@ async function jsonOnce(fetcher, url, options, code) {
         return await response.json();
     } catch { fail(code); } // No provider message, response body, header, URL or stack leaves this boundary.
 }
-export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, observers = {}) {
+export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, observers = {}, actorRole = 'S1') {
+    if (typeof actorRole !== 'string' || !Object.hasOwn(managedActorIdentity, actorRole) || (actorRole !== 'S1' &&
+        (env.ISSUE118_MANAGED_SCOPE !== 'MAX32_103_4_5_7' || env.ISSUE118_SESSION_LIFECYCLE !== 'TRACKED_OWNER_SESSION'))) fail('CI_ACTOR_SCOPE_REFUSED');
+    const ownerIdentity = managedActorIdentity[actorRole];
     onStage('CI_ENV_VALIDATE');
     assertCiEnvironment(env);
     onStage('OIDC_TARGET_VALIDATE');
@@ -141,7 +148,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
         sessionRecord.canonicalReadAttempts=sessionReads;
         return backend('sessions/'+sessionRecord.id,'GET',undefined,code,true);
     };
-    const sessionIdentityMatches=data=>data?.id===sessionRecord.id&&data.user_id===ciIdentity.ownerId&&
+    const sessionIdentityMatches=data=>data?.id===sessionRecord.id&&data.user_id===ownerIdentity.ownerId&&
         Number.isFinite(data.created_at)&&data.created_at>=Date.parse(sessionRecord.creationAttemptedUtc)-30000&&
         data.created_at<=Date.now()+30000&&(!sessionRecord.providerCreatedUtc||new Date(data.created_at).toISOString()===sessionRecord.providerCreatedUtc);
     return {
@@ -265,14 +272,14 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 mark('frontendMatched');
                 // Existing fixed user lookup before creating any token/session; no email search or account creation.
                 mark('ownerLookupStarted');
-                const user = await backend('users/' + ciIdentity.ownerId, 'GET', undefined, 'CLERK_OWNER_LOOKUP_FAILED');
-                if (user.id !== ciIdentity.ownerId || !user.email_addresses?.some(email => email.email_address === ciIdentity.ownerEmail)) fail('CLERK_OWNER_REFUSED');
+                const user = await backend('users/' + ownerIdentity.ownerId, 'GET', undefined, 'CLERK_OWNER_LOOKUP_FAILED');
+                if (user.id !== ownerIdentity.ownerId || !user.email_addresses?.some(email => email.email_address === ownerIdentity.ownerEmail)) fail('CLERK_OWNER_REFUSED');
                 mark('ownerMatched'); mark('testingTokenRequestStarted');
                 const testing = await backend('testing_tokens', 'POST', {}, 'CLERK_TESTING_TOKEN_FAILED');
                 if (typeof testing.token !== 'string' || !testing.token) fail('CLERK_TESTING_TOKEN_FAILED');
                 testingToken = testing.token;
                 mark('testingTokenReceived'); mark('signInTokenRequestStarted');
-                const ticket = await backend('sign_in_tokens', 'POST', { user_id: ciIdentity.ownerId, expires_in_seconds: 120 }, 'CLERK_SIGNIN_TOKEN_FAILED');
+                const ticket = await backend('sign_in_tokens', 'POST', { user_id: ownerIdentity.ownerId, expires_in_seconds: 120 }, 'CLERK_SIGNIN_TOKEN_FAILED');
                 if (typeof ticket.token !== 'string' || !ticket.token) fail('CLERK_SIGNIN_TOKEN_FAILED');
                 mark('signInTokenReceived');
                 if (routeHeld) fail('CI_TRANSPORT_HELD');
@@ -281,7 +288,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 mark('sessionCreationAttempted');
                 let owner;
                 if(trackedReadClose) {
-                    sessionRecord={id:null,ownerId:ciIdentity.ownerId,creationAttemptedUtc:new Date().toISOString(),
+                    sessionRecord={id:null,ownerId:ownerIdentity.ownerId,creationAttemptedUtc:new Date().toISOString(),
                         creationAcknowledgedUtc:null,providerCreatedUtc:null,ownerVerified:false,eligibleForCleanup:false,
                         providerStatus:'UNKNOWN',frontendSignOutAcknowledged:false,providerTerminationConfirmed:false};emitSession();
                     onStage('CLERK_TICKET_SESSION_CREATE');
@@ -311,7 +318,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                     await window.Clerk.setActive({ session: result.createdSessionId });
                     return window.Clerk.user?.id;
                 }, ticket.token);
-                if (owner !== ciIdentity.ownerId) fail('CLERK_SESSION_OWNER_REFUSED');
+                if (owner !== ownerIdentity.ownerId) fail('CLERK_SESSION_OWNER_REFUSED');
                 authenticated = true;
                 if(trackedReadClose){sessionRecord.activationAcknowledgedUtc=new Date().toISOString();emitSession();}
                 mark('activationAcknowledged'); mark('adminNavigationStarted');
@@ -333,7 +340,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                         if(window.Clerk.session&&window.Clerk.session.id!==id)throw Error('SESSION_REFUSED');
                         await window.Clerk.signOut({sessionId:id});
                         return window.Clerk.session?.id!==id;
-                    },{id:sessionRecord.id,owner:ciIdentity.ownerId}));
+                    },{id:sessionRecord.id,owner:ownerIdentity.ownerId}));
                     sessionRecord.frontendSignOutAcknowledged=ended===true;
                 }catch {sessionRecord.frontendSignOutAcknowledged=false;}
                 try {
@@ -357,7 +364,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                     await window.Clerk.signOut();
                     if (window.Clerk.session) throw Error('SIGNOUT_UNCONFIRMED');
                     return 'SIGNED_OUT';
-                }, ciIdentity.ownerId);
+                }, ownerIdentity.ownerId);
                 authenticated = false;
                 testingToken = undefined;
                 // No local session is NOT evidence that a possibly created provider session was terminated.

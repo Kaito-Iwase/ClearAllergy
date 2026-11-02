@@ -6,7 +6,7 @@ import { join, dirname, resolve, basename } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { assertCiEnvironment, ciIdentity, assertOidcClaims, oidcRequestUrl, inspectOidcRequestTarget, assertClerkPublishableKey, createCiAccess,withClerkDeadline } from '../scripts/issue118-ci-auth.mjs';
+import { assertCiEnvironment, ciIdentity, managedActorIdentity, assertOidcClaims, oidcRequestUrl, inspectOidcRequestTarget, assertClerkPublishableKey, createCiAccess,withClerkDeadline } from '../scripts/issue118-ci-auth.mjs';
 import { oidcTargetDiagnostic } from '../scripts/check-issue118-oidc-target.mjs';
 import { target, classifyLiveError, recordTransportDiagnostic,createReadCloseAuthPolicyCandidate } from '../scripts/check-issue118-live-t1-browser.mjs';
 import { routePreviewRequest, transportObservation } from '../scripts/issue118-preview-transport.mjs';
@@ -441,8 +441,8 @@ test('public frontend must be exact test instance before any Backend API call', 
     await assert.rejects(authenticate(access, page), code('CI_AUTH_RETRY_REFUSED'));
 });
 
-function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, backendFailure, signoutFailure = false,
-    setActiveFailure = false, createResponseLost = false, activationAckLost = false,sessionOwner=ciIdentity.ownerId,
+function authFixture({ actor = managedActorIdentity.S1, userId = actor.ownerId, owner = actor.ownerId, backendFailure, signoutFailure = false,
+    setActiveFailure = false, createResponseLost = false, activationAckLost = false,sessionOwner=actor.ownerId,
     sessionCreatedOffset=0,signoutNoRevoke=false,sessionReadFailsAt=0 } = {}) {
     const calls = []; const visits = [];
     let providerSession = false; let signOutCalls = 0,createdAt,sessionReads=0;
@@ -453,9 +453,9 @@ function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, 
         assert.equal(new URL(url).origin, 'https://api.clerk.com');
         assert.equal(options.headers.Authorization, 'Bearer ' + syntheticSecret);
         if (backendFailure && url.endsWith(backendFailure)) throw Error('raw ' + syntheticSecret);
-        if (url.endsWith('/users/' + ciIdentity.ownerId)) return response({ id: userId, email_addresses: [{ email_address: ciIdentity.ownerEmail }] });
+        if (url.endsWith('/users/' + actor.ownerId)) return response({ id: userId, email_addresses: [{ email_address: actor.ownerEmail }] });
         if (url.endsWith('/testing_tokens')) return response({ token: 'SYNTHETIC_TESTING_TOKEN' });
-        if (url.endsWith('/sign_in_tokens')) { assert.deepEqual(JSON.parse(options.body), { user_id: ciIdentity.ownerId, expires_in_seconds: 120 }); return response({ token: 'SYNTHETIC_TICKET' }); }
+        if (url.endsWith('/sign_in_tokens')) { assert.deepEqual(JSON.parse(options.body), { user_id: actor.ownerId, expires_in_seconds: 120 }); return response({ token: 'SYNTHETIC_TICKET' }); }
         if(url.endsWith('/sessions/'+sessionId)) {
             assert.equal(options.method,'GET');if(++sessionReads===sessionReadFailsAt)throw Error(syntheticSecret);
             return response({id:sessionId,user_id:sessionOwner,created_at:createdAt,status:providerSession?'active':'revoked',latest_activity:{ip_address:'DO_NOT_RECORD'}});
@@ -479,6 +479,32 @@ function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, 
         evaluate: async (fn, arg) => runInNewContext('(' + fn.toString() + ')(__arg)', { window: { Clerk: clerk }, __arg: arg }) };
     return { calls, visits, page, fetcher, providerSession: () => providerSession, signOutCalls: () => signOutCalls };
 }
+
+test('managed B uses only its pinned existing user and ends its own tracked session; other roles fail before OIDC',async()=>{
+    for(const role of ['S2','OTHER','__proto__']){
+        let calls=0;
+        await assert.rejects(createCiAccess(env(),async()=>{calls++;},()=>{},{},role),code('CI_ACTOR_SCOPE_REFUSED'));
+        assert.equal(calls,0);
+    }
+    for(const lifecycle of [undefined,'LEGACY_UNTRACKED']) {
+        let calls=0;
+        await assert.rejects(createCiAccess({...env(),ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7',ISSUE118_SESSION_LIFECYCLE:lifecycle},async()=>{calls++;},()=>{},{},'S2'),code('CI_ACTOR_SCOPE_REFUSED'));
+        assert.equal(calls,0);
+    }
+    const f=authFixture({actor:managedActorIdentity.S2}),sessions=[];
+    const a=await createCiAccess({...env(),ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7',ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher,()=>{},
+        {session:r=>sessions.push(r)},'S2');
+    await authenticate(a,f.page);
+    assert.equal(a.sessionObservation().ownerId,managedActorIdentity.S2.ownerId);
+    assert.equal(await a.signOut(f.page),'SIGNOUT_CONFIRMED');
+    assert.equal(f.signOutCalls(),1);assert.equal(a.sessionObservation().canonicalReadAttempts,2);
+    assert.ok(!f.calls.some(c=>c.url.endsWith('/users/'+managedActorIdentity.S1.ownerId)));
+    assert.doesNotMatch(JSON.stringify(sessions),/sk_test_|SYNTHETIC_TICKET|DO_NOT_RECORD/);
+    const wrong=authFixture({actor:managedActorIdentity.S2,owner:managedActorIdentity.S1.ownerId});
+    const b=await createCiAccess({...env(),ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7',ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},wrong.fetcher,()=>{},{},'S2');
+    await assert.rejects(authenticate(b,wrong.page),code('CI_AUTHENTICATION_FAILED'));
+    assert.equal(b.isAuthenticated(),false);
+});
 
 test('read-close records its exact created session before activation and confirms only its provider termination',async()=>{
     for(const lifecycleEnv of [{ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},{ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'}]){
