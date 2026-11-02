@@ -574,19 +574,36 @@ export async function readCloseDirectFetch(api, url, token) {
 }
 // Unwired candidate. Pins must come from the reviewed immutable public client build,
 // not a CLI/env input or a guessed Server Action/telemetry path. Missing pins grant nothing.
-export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryPaths = [] } = {}) {
+export const verifiedReadCloseAction = Object.freeze({
+    source:'ea9f28b14b7741276115abb8a33b331339526f5e',deployment:'dpl_BQHQr4WYL9SVphQB1BpJZ8r2ad29',
+    reference:'002d5a40d57114e6b57c906dd03491ecf8c46419f0',
+    callerChunk:'/_next/static/immutable/chunks/1yxbpkao8jjq-.js',callerSha256:'22f889779049694ab8497801e8286d170f1101edbad60f9d61d06335458a50a7',
+    factoryChunk:'/_next/static/immutable/chunks/44xcerwlley0q.js',factorySha256:'a070e193cc6aa2af93f87b93c668ae7fa6039f396007a82104ba7b228d7850ac',
+});
+// Local candidate only: the live read-close entry below still passes NO policy.
+// Provenance: caller41895 -> getters95187 -> CJS35326 ->21413 -> React64893;
+// callServer95187 ->32120 -> Next48658. No environment/CLI action-ID override.
+export function createVerifiedReadCloseAuthPolicyCandidate(receipt) {
+    const fixedReceipt=structuredClone(receipt);assertIdentityReceipt(fixedReceipt);
+    assert.equal(target.source,verifiedReadCloseAction.source);assert.equal(target.deployment,verifiedReadCloseAction.deployment);
+    return createReadCloseAuthPolicyCandidate({actionReference:verifiedReadCloseAction.reference,
+        telemetryScripts:['/_vercel/insights/script.js'],assertContext:()=>assertIdentityReceipt(fixedReceipt)});
+}
+export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryPaths = [],telemetryScripts=[],assertContext=()=>{} } = {}) {
     const actionPinned = typeof actionReference === 'string' && /^[a-f0-9]{40,128}$/.test(actionReference);
     const telemetry = new Set((Array.isArray(telemetryPaths) ? telemetryPaths : []).filter(path => typeof path === 'string' &&
         /^\/(?:_vercel\/insights|[A-Za-z0-9_-]{8,64})\/(?:view|event)$/.test(path)));
+    const scripts=new Set((Array.isArray(telemetryScripts)?telemetryScripts:[]).filter(path=>path==='/_vercel/insights/script.js'));
     let actionUsed = false;
     return async (request, getPhase) => {
         const names = ['isApp', 'isPost', 'authPhase', 'exactLoginTarget', 'authAuditApi', 'menuApi',
             'queryPresent', 'legacyTelemetryShape', 'pinnedTelemetry', 'headersRead', 'nextActionPresent',
             'nextActionPinned', 'originMatches', 'refererMatches', 'plainTextUtf8', 'acceptsRsc', 'bodyInspected',
-            'emptyArguments', 'actionUnused', 'inspectionComplete'];
+            'emptyArguments', 'actionUnused', 'inspectionComplete','pinnedTelemetryScript','isScript'];
         const observation = Object.fromEntries(names.map(name => [name, false]));
         const result = { decision: 'REFUSE', observation };
         try {
+            assertContext();
             const raw = request.url(), url = new URL(raw), method = request.method();
             observation.isApp = url.origin === target.origin;
             observation.isPost = method === 'POST'; observation.authPhase = getPhase() === 'AUTHENTICATION';
@@ -602,6 +619,13 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
                 return result; // Configured Clerk still delegates to its unchanged CI adapter; no other origin is granted.
             }
             if (observation.authAuditApi || observation.menuApi && method !== 'GET') return result;
+            observation.pinnedTelemetryScript=scripts.has(url.pathname);
+            if(method==='GET'&&observation.pinnedTelemetryScript) {
+                if(observation.queryPresent||raw!==target.origin+url.pathname)return result;
+                observation.isScript=request.resourceType()==='script';
+                if(observation.isScript) {observation.inspectionComplete=true;result.decision='SUPPRESS_PINNED_TELEMETRY_SCRIPT';return result;}
+                return result;
+            }
             if (observation.isPost && observation.pinnedTelemetry && !observation.queryPresent) {
                 observation.inspectionComplete = true; result.decision = 'SUPPRESS_PINNED_TELEMETRY'; return result;
             }
@@ -624,6 +648,7 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             if (!observation.nextActionPresent || !observation.originMatches || !observation.refererMatches || !observation.plainTextUtf8 || !observation.acceptsRsc) return result;
             const body = request.postData(); observation.bodyInspected = true; observation.emptyArguments = body === '[]';
             observation.actionUnused = !actionUsed; observation.authPhase = getPhase() === 'AUTHENTICATION';
+            assertContext();
             observation.inspectionComplete = true;
             if (observation.nextActionPinned && observation.emptyArguments && observation.actionUnused && observation.authPhase) {
                 actionUsed = true; result.decision = 'ALLOW_PINNED_AUTH_CACHE_ACTION';
@@ -643,8 +668,20 @@ export function readCloseRequestAllowed(method, rawUrl) {
         return true; // Static/document GETs remain subject to existing origin/redirect guards.
     } catch { return false; }
 }
-export async function guardReadCloseRoute(route, onAppRefused, onOtherBlocked) {
+export async function guardReadCloseRoute(route, onAppRefused, onOtherBlocked, candidate) {
     const request = route.request();
+    if(candidate) {
+        try {
+            const inspected=await candidate.policy(request,candidate.getPhase);
+            candidate.observe?.(inspected.observation);
+            if(inspected.decision==='ALLOW_PINNED_AUTH_CACHE_ACTION'||inspected.decision==='USE_EXISTING_TRANSPORT')return true;
+            if(inspected.decision==='SUPPRESS_PINNED_TELEMETRY_SCRIPT') {
+                await route.fulfill({status:200,contentType:'application/javascript',body:''});return false;
+            }
+            if(inspected.decision==='SUPPRESS_PINNED_TELEMETRY') {await route.fulfill({status:204,body:''});return false;}
+        }catch { /* Unknown policy/header/callback/fulfillment failure refuses below. */ }
+        // Never fall back to a broader GET rule after an explicit candidate refusal.
+    }else
     if (readCloseRequestAllowed(request.method(), request.url())) return true;
     let app = false;
     try { app = new URL(request.url()).origin === target.origin; } catch { /* unknown target is never forwarded */ }

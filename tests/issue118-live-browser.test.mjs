@@ -1,14 +1,106 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityReceipt,
     newWriteLedger, beginWrite, holdWrite, confirmWrite, consumeWriteResponse, canCleanup,
     claimMutation, protectedApiSnapshot, overallResult, openCreatedEditor, classifyLiveError, browserSetupStage,
     transportLifecycleSnapshot, recordTransportDiagnostic, readCloseRequestAllowed, observeReadCloseFixture,
     readCloseFixtureId, readCloseResult, guardReadCloseRoute, createReadCloseAuthPolicyCandidate,
-    readCloseDirectFetch } from "../scripts/check-issue118-live-t1-browser.mjs";
+    readCloseDirectFetch,createVerifiedReadCloseAuthPolicyCandidate,verifiedReadCloseAction } from "../scripts/check-issue118-live-t1-browser.mjs";
 import { closeIsolatedBrowser } from "../scripts/issue118-close-browser.mjs";
 import { routePreviewRequest } from "../scripts/issue118-preview-transport.mjs";
+
+test('fixed public reference candidate checks receipt and does not alter the live read-close wiring',async()=>{
+    const receipt={...target,environment:'Preview',status:'Ready',verifiedBy:'human',observedUtc:new Date().toISOString(),evidenceReference:'Synthetic offline control'};
+    const policy=createVerifiedReadCloseAuthPolicyCandidate(receipt),ref=verifiedReadCloseAction.reference;
+    const make=(url=target.origin+'/admin/login',type='document')=>({url:()=>url,method:()=> 'POST',resourceType:()=>type,
+        allHeaders:async()=>({'next-action':ref,origin:target.origin,referer:target.origin+'/admin/login','content-type':'text/plain;charset=UTF-8',accept:'text/x-component'}),postData:()=> '[]'});
+    assert.equal((await policy(make(),()=> 'AUTHENTICATION')).decision,'ALLOW_PINNED_AUTH_CACHE_ACTION');
+    assert.equal((await policy(make(),()=> 'AUTHENTICATION')).decision,'REFUSE');
+    assert.equal((await createVerifiedReadCloseAuthPolicyCandidate(receipt)(make(),()=> 'SIGNOUT')).decision,'REFUSE');
+    for(const change of [{source:'a'.repeat(40)},{deployment:'other'},{observedUtc:'2000-01-01T00:00:00Z'}])
+        assert.throws(()=>createVerifiedReadCloseAuthPolicyCandidate({...receipt,...change}));
+    const script={...make(target.origin+'/_vercel/insights/script.js','script'),method:()=> 'GET'};
+    assert.equal((await policy(script,()=> 'APP_FLOW')).decision,'SUPPRESS_PINNED_TELEMETRY_SCRIPT');
+    for(const change of [{resourceType:()=> 'document'},{url:()=>target.origin+'/_vercel/insights/script.js?other'}])
+        assert.equal((await policy({...script,...change},()=> 'APP_FLOW')).decision,'REFUSE');
+    assert.equal((await policy({...make(target.origin+'/_vercel/insights/view')},()=> 'APP_FLOW')).decision,'REFUSE');
+    const source=readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs',import.meta.url),'utf8');
+    assert.match(source,/readCloseOnly \? createReadCloseAuthPolicyCandidate\(\) : undefined/);
+    assert.equal((source.match(/createVerifiedReadCloseAuthPolicyCandidate\(/g)||[]).length,1); // definition only, not a live caller
+});
+
+test('candidate identity changes and unknown policy/observer errors never fall back to forwarding',async()=>{
+    let validations=0,aborted=0,refused=0;
+    const request={url:()=>target.origin+'/admin/login',method:()=> 'POST',allHeaders:async()=>({'next-action':verifiedReadCloseAction.reference,
+        origin:target.origin,referer:target.origin+'/admin/login','content-type':'text/plain;charset=UTF-8',accept:'text/x-component'}),postData:()=> '[]'};
+    const policy=createReadCloseAuthPolicyCandidate({actionReference:verifiedReadCloseAction.reference,assertContext:()=>{if(++validations===2)throw Error('SYNTHETIC_PRIVATE');}});
+    assert.equal((await policy(request,()=> 'AUTHENTICATION')).decision,'REFUSE');assert.equal(validations,2);
+    const route={request:()=>({...request,method:()=> 'GET'}),abort:async()=>{aborted++;},fulfill:()=>assert.fail('No fulfillment after unknown error')};
+    for(const candidate of [{policy:async()=>{throw Error('SYNTHETIC_PRIVATE');},getPhase:()=> 'AUTHENTICATION'},
+        {policy:async()=>({decision:'USE_EXISTING_TRANSPORT',observation:{}}),getPhase:()=> 'AUTHENTICATION',observe:()=>{throw Error('SYNTHETIC_PRIVATE');}}])
+        await assert.rejects(guardReadCloseRoute(route,()=>{refused++;},()=>{},candidate),{message:'READ_ONLY_REQUEST_REFUSED'});
+    assert.equal(aborted,2);assert.equal(refused,2);
+});
+
+test('real browser transport runs the installed Clerk activation/read/signout hooks with one pinned POST and no signout POST',async()=>{
+    const require=createRequire(import.meta.url),ts=require('typescript');
+    const provider=readFileSync(new URL('../node_modules/@clerk/nextjs/dist/esm/app-router/client/ClerkProvider.js',import.meta.url),'utf8');
+    assert.equal(createHash('sha256').update(provider).digest('hex'),'a129f276e9ef2490ca228397f14a16e55bdb43d34939b7eb5d535946683b6f67');
+    const ast=ts.createSourceFile('provider.js',provider,ts.ScriptTarget.ESNext,true,ts.ScriptKind.JS),hooks={};
+    const visit=n=>{if(ts.isBinaryExpression(n)&&n.operatorToken.kind===ts.SyntaxKind.EqualsToken&&ts.isPropertyAccessExpression(n.left)&&
+        ['__internal_onBeforeSetActive','__internal_onAfterSetActive'].includes(n.left.name.text))hooks[n.left.name.text]=n.getText(ast);ts.forEachChild(n,visit);};visit(ast);
+    assert.equal(Object.keys(hooks).length,2);
+    const rsc=require('next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.production.js');
+    const body=await rsc.encodeReply([]);assert.equal(body,'[]');
+    const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright'),browser=await chromium.launch({headless:true,channel:'chromium'});
+    const context=await browser.newContext({serviceWorkers:'block'});
+    let phase='AUTHENTICATION',forwards=[],refused=0,suppressed=0;
+    const receipt={...target,environment:'Preview',status:'Ready',verifiedBy:'human',observedUtc:new Date().toISOString(),evidenceReference:'Synthetic offline browser control'};
+    const policy=createVerifiedReadCloseAuthPolicyCandidate(receipt);
+    await context.route('**/*',async route=>{
+        try {
+            if(!await guardReadCloseRoute(route,()=>{refused++;},()=>{}, {policy,getPhase:()=>phase})) {suppressed++;return;}
+            const request=route.request(),url=new URL(request.url());forwards.push({phase,method:request.method(),path:url.pathname});
+            if(url.origin!==target.origin) {
+                await route.fulfill({status:200,headers:{'access-control-allow-origin':target.origin,'access-control-allow-methods':'DELETE, OPTIONS'},body:'{}'});return;
+            }
+            if(request.method()==='POST') {assert.equal(request.postData(),body);await route.fulfill({status:200,contentType:'text/x-component',body:'0:null\n'});return;}
+            await route.fulfill({status:200,contentType:url.pathname.startsWith('/api/')?'application/json':'text/html',
+                body:url.pathname.startsWith('/api/')?'{}':'<link rel="icon" href="data:,">offline hook fixture'});
+        }catch { /* Fixed refusal is counted; never forward after a policy error. */ }
+    });
+    try {
+        const page=await context.newPage();await page.goto(target.origin+'/admin/login');
+        await page.addScriptTag({content:`window.next={version:'16.4.1'};const __internal_invokeMiddlewareOnAuthStateChange=true;
+            const router={refresh:()=>fetch(location.href).then(r=>{if(!r.ok)throw Error('REFRESH_FAILED');})};
+            const invalidateCacheAction=()=>fetch('/admin/login',{method:'POST',headers:{'next-action':${JSON.stringify(verifiedReadCloseAction.reference)},accept:'text/x-component'},body:${JSON.stringify(body)}}).then(r=>{if(!r.ok)throw Error('ACTION_FAILED');});
+            ${hooks.__internal_onBeforeSetActive};${hooks.__internal_onAfterSetActive};`});
+        await page.evaluate(async()=>{let timer;try{await Promise.race([
+            (async()=>{await window.__internal_onBeforeSetActive('sign-in');await window.__internal_onAfterSetActive();})(),
+            new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('OFFLINE_ACTIVATION_TIMEOUT')),5000);})
+        ]);}finally{clearTimeout(timer);}});
+        phase='APP_FLOW';await page.evaluate(()=>history.pushState({},'', '/admin/shop'));
+        await page.evaluate(async id=>{for(const path of ['/api/admin/shop','/api/admin/menus/'+id]){const r=await fetch(path);if(!r.ok)throw Error('READ_FAILED');}},readCloseFixtureId);
+        await page.addScriptTag({url:target.origin+'/_vercel/insights/script.js'});
+        phase='SIGNOUT';await page.evaluate(async()=>{
+            await window.__internal_onBeforeSetActive('sign-out');
+            await fetch('https://one-dolphin-7936.clerk.accounts.dev/v1/client/sessions/synthetic/revoke',{method:'DELETE'});
+            await window.__internal_onAfterSetActive();
+        });
+        assert.equal(refused,0);assert.equal(suppressed,1);
+        assert.deepEqual(forwards.filter(x=>x.method==='POST'),[{phase:'AUTHENTICATION',method:'POST',path:'/admin/login'}]);
+        assert.equal(forwards.filter(x=>x.phase==='APP_FLOW'&&x.path.startsWith('/api/')).length,2);
+        assert.ok(forwards.some(x=>x.phase==='SIGNOUT'&&x.method==='DELETE'));
+        assert.ok(forwards.some(x=>x.phase==='SIGNOUT'&&x.method==='GET'&&x.path==='/admin/shop'));
+        const before=forwards.length;
+        for(const path of ['/api/admin/menus','/api/admin/auth/login','/admin/login'])
+            assert.equal(await page.evaluate(async path=>{try{await fetch(path,{method:'POST',body:'[]'});return true;}catch{return false;}},path),false);
+        assert.equal(forwards.length,before);assert.equal(refused,3);
+    }finally{await context.close();await browser.close();}
+});
 
 test('unwired auth POST candidate needs exact pinned action, clean target, empty args and live auth phase; permits one call only', async () => {
     const action='a'.repeat(40), secret='SYNTHETIC_PRIVATE_VALUE';
