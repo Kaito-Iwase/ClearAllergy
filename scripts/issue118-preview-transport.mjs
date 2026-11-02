@@ -1,6 +1,6 @@
 // Used only by the explicitly guarded CI path; the manual-login path has no OIDC token.
 // No global extraHTTPHeaders: the token belongs to one fixed Preview origin only.
-export const previewOrigin = 'https://clear-allergy-e2e-kzfhilgul-kaitoexe00-9350s-projects.vercel.app';
+export const previewOrigin = 'https://clear-allergy-e2e-nv6akym6f-kaitoexe00-9350s-projects.vercel.app';
 const oidcHeader = 'x-vercel-trusted-oidc-idp-token';
 
 export function transportObservation(role, method, status, exception, flags = {}) {

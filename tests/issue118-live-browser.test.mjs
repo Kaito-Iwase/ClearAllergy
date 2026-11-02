@@ -8,7 +8,8 @@ import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityRe
 test("fixed setup errors remain distinguishable without provider text or getters", async () => {
     for (const code of ["CI_IDENTITY_REFUSED", "CI_AMBIENT_CONFIGURATION_REFUSED", "CI_DEBUG_REFUSED",
         "TEST_CLERK_KEY_REQUIRED", "OIDC_REQUEST_TARGET_REFUSED", "OIDC_REQUEST_AUTH_REQUIRED",
-        "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_INVALID", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED"])
+        "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_INVALID", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED",
+        "T1_KEY_CLASS_READ_HELD", "T1_KEY_CLASS_NOT_READY"])
         assert.equal(classifyLiveError(Error(code)), code);
     for (const secret of ["sk_test_SYNTHETIC", "https://u:p@invalid/", "秘密・架空"])
         assert.equal(classifyLiveError(Error(secret)), "UNCLASSIFIED_ERROR");
@@ -44,7 +45,7 @@ test("new Project pin rejects old Project receipts and bootstrap Production", ()
     const now = Date.parse("2026-10-30T17:30:00Z");
     const receipt = { ...target, environment: "Preview", status: "Ready", verifiedBy: "browser_metadata_observer", evidenceReference: "offline synthetic", observedUtc: "2026-10-30T17:29:00Z" };
     assert.equal(target.projectId, "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK");
-    assert.equal(target.deployment, "dpl_FCdWVUy7Zo1GQd2xXdbDiFUD2wz3");
+    assert.equal(target.deployment, "dpl_BQHQr4WYL9SVphQB1BpJZ8r2ad29");
     assertIdentityReceipt(receipt, now);
     for (const change of [{ project: "clear-allergy" }, { projectId: "other" }, { project: undefined },
         { origin: "https://clear-allergy-ernxjj96q-kaitoexe00-9350s-projects.vercel.app" },

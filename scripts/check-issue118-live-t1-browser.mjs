@@ -407,7 +407,8 @@ const fixedErrors = new Set(["DIALOG_TIMEOUT", "DIALOG_HANDLER_FAILED", "WRITE_R
     "CI_AUTHENTICATION_FAILED", "CI_TRANSPORT_HELD", "CI_IDENTITY_REFUSED", "CI_AMBIENT_CONFIGURATION_REFUSED",
     "CI_DEBUG_REFUSED", "TEST_CLERK_KEY_REQUIRED", "OIDC_REQUEST_TARGET_REFUSED", "OIDC_REQUEST_AUTH_REQUIRED",
     "OIDC_REQUEST_FAILED", "OIDC_CLAIMS_INVALID", "OIDC_CLAIMS_REFUSED", "OIDC_TIME_REFUSED",
-    "BROWSER_LAUNCH_FAILED", "BROWSER_CONTEXT_FAILED", "BROWSER_PAGE_FAILED"]);
+    "BROWSER_LAUNCH_FAILED", "BROWSER_CONTEXT_FAILED", "BROWSER_PAGE_FAILED",
+    "T1_KEY_CLASS_READ_HELD", "T1_KEY_CLASS_NOT_READY"]);
 export function classifyLiveError(error) {
     if (error instanceof assert.AssertionError) return "ASSERTION_FAILED";
     if (!(error instanceof Error)) return "UNCLASSIFIED_ERROR";
@@ -425,10 +426,10 @@ export async function browserSetupStage(stage, operation, onStage) {
 export const target = Object.freeze({
     project: "clear-allergy-e2e",
     projectId: "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK",
-    origin: "https://clear-allergy-e2e-kzfhilgul-kaitoexe00-9350s-projects.vercel.app",
-    deployment: "dpl_FCdWVUy7Zo1GQd2xXdbDiFUD2wz3",
-    source: "6293d5a02758f72a7cf00201fec239afc6b699eb",
-    alias: "https://clear-allergy-e2e-git-test-staging-kaitoexe00-9350s-projects.vercel.app",
+    origin: "https://clear-allergy-e2e-nv6akym6f-kaitoexe00-9350s-projects.vercel.app",
+    deployment: "dpl_BQHQr4WYL9SVphQB1BpJZ8r2ad29",
+    source: "ea9f28b14b7741276115abb8a33b331339526f5e",
+    alias: null, // CLI source deployment has no alias; all requests use its immutable URL.
     shop: "cmvs4x80y000twn0wbxkwzbt6",
     anchor: "cmvuiodx30001jg08xmr6nexe",
     anchorName: "【架空・Issue118 T1】ひよこ豆サラダ 20261030-A1",
@@ -461,7 +462,7 @@ export function allowedMutation(method, pathname, phase, menuId) {
 export function assertIdentityReceipt(receipt, now = Date.now()) {
     for (const key of ["project", "projectId", "origin", "deployment", "source", "alias"]) assert.equal(receipt[key], target[key]);
     assert.equal(receipt.environment, "Preview"); assert.equal(receipt.status, "Ready");
-    assert.ok(["human", "browser_metadata_observer"].includes(receipt.verifiedBy));
+    assert.ok(["human", "browser_metadata_observer", "cli_metadata_observer"].includes(receipt.verifiedBy));
     assert.ok(typeof receipt.evidenceReference === "string" && receipt.evidenceReference.length > 0);
     const age = now - Date.parse(receipt.observedUtc);
     assert.ok(Number.isFinite(age) && age >= 0 && age <= 60 * 60 * 1000);
@@ -698,6 +699,13 @@ export async function runLive() {
         page = await browserSetupStage("BROWSER_PAGE", () => context.newPage(), setupStage);
         page.setDefaultTimeout(20000);
         if (ciAccess) {
+            // Keep the diagnostic CLI's top-level await out of TSX/CJS imports of disabled batch helpers.
+            const { readT1KeyClassPreflight, assertT1KeyClassReady } = await import("./check-issue118-server-callback-candidate.mjs");
+            report.stage = "T1_KEY_CLASS_PREFLIGHT"; save();
+            report.keyClassPreflight = await readT1KeyClassPreflight(context.request, ciAccess.token());
+            save();
+            assertT1KeyClassReady(report.keyClassPreflight);
+            report.keyClassFormatReady = true; save();
             report.stage = "CI_AUTHENTICATION"; save();
             await ciAccess.authenticate(page);
             report.authentication = "OFFICIAL_TEST_TICKET_OWNER_A";

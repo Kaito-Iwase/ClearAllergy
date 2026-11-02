@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { ciIdentity } from '../scripts/issue118-ci-auth.mjs';
 import { initialHandshakeContract as contract } from '../scripts/issue118-initial-handshake-candidate.mjs';
+import { previewOrigin } from '../scripts/issue118-preview-transport.mjs';
+import { readT1KeyClassPreflight, assertT1KeyClassReady } from '../scripts/check-issue118-server-callback-candidate.mjs';
 import { disabledMode, syntheticTarget as target, assertSyntheticCandidateReceipt, simulateServerCallbackCandidate, deployedMode, deployedTarget, diagnoseDeployedServerCallback, assertDeployedCandidateReceipt, keyClassMode, keyClassTarget, assertKeyClassReceipt, diagnoseKeyClassOnly } from '../scripts/check-issue118-server-callback-candidate.mjs';
 
 const secret = 'SYNTHETIC_PRIVATE_VALUE_NOT_A_CREDENTIAL';
@@ -38,6 +40,47 @@ const keyClassBody = () => ({
     publishablePrefix: false, minimumLength16: true, hasCr: false, hasLf: false, hasNul: false,
     hasOtherAsciiControl: false, trimWouldChange: false, sdkDevelopmentCheckAttempted: true,
     sdkDevelopmentCheckCompleted: true, sdkDevelopmentClassified: true, existingDiagnosticGuardWouldAllow: true,
+});
+test('T1 preflight sends one query-free app-only GET, not a Clerk request', async () => {
+    const calls = [];
+    const api = { fetch: async (url, options) => {
+        calls.push({ url, options });
+        return { status: () => 200, headers: () => ({ 'content-type': 'application/json', 'cache-control': 'no-store' }),
+            body: async () => Buffer.from(JSON.stringify(keyClassBody())) };
+    } };
+    const result = await readT1KeyClassPreflight(api, token());
+    assert.equal(assertT1KeyClassReady(result), true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, previewOrigin + '/admin/login');
+    assert.equal(calls[0].options.headers['x-issue118-callback-diagnostic'], 'key-class-only-v1');
+    assert.equal(calls[0].options.headers['x-vercel-trusted-oidc-idp-token'], token());
+    assert.equal(calls[0].options.headers.Authorization, undefined);
+    assert.equal(calls[0].options.maxRedirects, 0); assert.equal(calls[0].options.maxRetries, 0);
+});
+test('T1 format gate rejects invalid/unknown observations, not merely incomplete ones', () => {
+    for (const key of Object.keys(keyClassBody())) {
+        const changed = { ...keyClassBody(), [key]: !keyClassBody()[key] };
+        assert.throws(() => assertT1KeyClassReady(changed), { message: 'T1_KEY_CLASS_NOT_READY' });
+    }
+    for (const value of [undefined, null, [], { ...keyClassBody(), extra: secret }])
+        assert.throws(() => assertT1KeyClassReady(value), { message: 'T1_KEY_CLASS_NOT_READY' });
+});
+test('T1 preflight rejects redirect/provider/invalid body without retry or provider text', async () => {
+    for (const kind of ['redirect', 'fetch', 'body', 'schema', 'oversize']) {
+        let sends = 0, reads = 0;
+        const api = { fetch: async () => {
+            sends++; if (kind === 'fetch') throw Error(secret);
+            return { status: () => kind === 'redirect' ? 307 : 200,
+                headers: () => ({ 'content-type': 'application/json', 'cache-control': 'no-store' }),
+                body: async () => { reads++; if (kind === 'body') throw Error(secret);
+                    return kind === 'oversize' ? Buffer.alloc(16385) : Buffer.from(JSON.stringify(kind === 'schema' ? { secret } : keyClassBody())); } };
+        } };
+        await assert.rejects(readT1KeyClassPreflight(api, token()), { message: 'T1_KEY_CLASS_READ_HELD' });
+        assert.equal(sends, 1); if (kind === 'redirect' || kind === 'fetch') assert.equal(reads, 0);
+    }
+    const source = readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs', import.meta.url), 'utf8');
+    const start = source.indexOf('export async function runLive()');
+    assert.ok(source.indexOf('assertT1KeyClassReady(report.keyClassPreflight)', start) < source.indexOf('await ciAccess.authenticate(page)', start));
 });
 function harness(change = {}) {
     const pinned = change.keyClass ? keyClassTarget : change.live ? deployedTarget : target;

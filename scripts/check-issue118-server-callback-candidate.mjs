@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { ciIdentity, assertOidcClaims, oidcRequestUrl } from './issue118-ci-auth.mjs';
 import { initialHandshakeContract } from './issue118-initial-handshake-candidate.mjs';
 import { closeIsolatedBrowser } from './issue118-close-browser.mjs';
+import { previewOrigin, protectedPreviewFetch } from './issue118-preview-transport.mjs';
 
 export const disabledMode = 'PREPARE_SERVER_CALLBACK_DISABLED';
 export const candidateSource = 'aa92dbba35088f807b8f54a7548556ab4009a37b';
@@ -157,6 +158,30 @@ async function serverResult(response, observeHeld = false, keyClassOnly = false)
     return body;
 }
 const deadlineError = () => Error('DEADLINE_HELD');
+// Same runtime as the subsequent T1. This reads only the existing boolean marker;
+// no Clerk request or authentication is started by this preflight.
+export async function readT1KeyClassPreflight(api, token) {
+    try {
+        const response = await protectedPreviewFetch(api, previewOrigin + '/admin/login',
+            { headers: { 'x-issue118-callback-diagnostic': 'key-class-only-v1' } }, token);
+        return await serverResult(response, true, true);
+    } catch { fail('T1_KEY_CLASS_READ_HELD'); }
+}
+export function assertT1KeyClassReady(observation) {
+    try {
+        keyClassSchema(observation, 200);
+        for (const key of ['keyReadCompleted', 'keyPresent', 'typeString', 'nonEmptyString',
+            'modernTestPrefix', 'minimumLength16', 'sdkDevelopmentCheckCompleted',
+            'sdkDevelopmentClassified', 'existingDiagnosticGuardWouldAllow']) {
+            if (observation[key] !== true) fail('T1_KEY_CLASS_NOT_READY');
+        }
+        for (const key of ['legacyTestPrefix', 'productionPrefix', 'publishablePrefix',
+            'hasCr', 'hasLf', 'hasNul', 'hasOtherAsciiControl', 'trimWouldChange']) {
+            if (observation[key] !== false) fail('T1_KEY_CLASS_NOT_READY');
+        }
+    } catch { fail('T1_KEY_CLASS_NOT_READY'); }
+    return true; // Format only; credential validity is established later, if at all.
+}
 async function deadline(operation, milliseconds) {
     let timer;
     try { return await Promise.race([Promise.resolve().then(operation), new Promise((_, reject) => {

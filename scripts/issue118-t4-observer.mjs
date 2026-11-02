@@ -1,7 +1,7 @@
 // Read-only observer, not an auth adapter or an executable live entrypoint.
 // Caller owns target/isolation/auth/transport guards and the external STOP ledger.
 // No cookies, headers, response bodies, raw URLs or provider exceptions are logged.
-const pinnedPreview = 'https://clear-allergy-e2e-kzfhilgul-kaitoexe00-9350s-projects.vercel.app';
+import { previewOrigin as pinnedPreview } from './issue118-preview-transport.mjs';
 const refuse = () => { throw Error('ISSUE118_T4_TARGET_REFUSED'); };
 export function t4Target(input) {
     let origin;

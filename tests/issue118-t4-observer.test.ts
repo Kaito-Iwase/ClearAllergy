@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { prepareT4Observation, t4FreshReadOutcome, t4RefetchFailure, t4Target } from "../scripts/issue118-t4-observer.mjs";
+import { previewOrigin } from "../scripts/issue118-preview-transport.mjs";
 
 const fixture = { origin: "http://127.0.0.1:3102", shopId: "cshop", menuId: "cmenu", name: "【架空】T4観測" };
+test("disabled observer shares the one fixed transport origin without accepting the old deployment", () => {
+    assert.equal(t4Target({ ...fixture, origin: previewOrigin }).origin, previewOrigin);
+    assert.throws(() => t4Target({ ...fixture, origin: "https://clear-allergy-e2e-kzfhilgul-kaitoexe00-9350s-projects.vercel.app" }), /TARGET_REFUSED/);
+});
 test("T4の対象は固定Previewまたはloopbackの1fixtureだけで、query/credentials/Productionを受理しない", () => {
     assert.equal(t4Target(fixture).menu, "http://127.0.0.1:3102/shops/cshop/menus/cmenu");
     for (const origin of ["https://clearallergy.example", "http://127.0.0.1:3102/", "http://u:p@127.0.0.1:3102",
