@@ -109,12 +109,29 @@ test('Clerk callback permits only exact app login with nonce and optional dev to
     for(const value of values) await held(fixture([response(307,outbound()),response(302,value)]),2);
 });
 test('cleanup URL and status are exact; loops or a fourth redirect never start another request',async()=>{
-    for(const value of [outbound(),callback(),c.appLogin+'?leftover='+secret,'https://other.invalid/','/admin/login'])
+    for(const value of [outbound(),callback(),c.appLogin+'?leftover='+secret,'https://other.invalid/',
+        '//'+new URL(c.appLogin).host+'/admin/login','admin/login','/admin/./login','/admin/login/','/admin/login?',
+        '/admin/login#','/admin/login?token='+secret,'/admin/login\n','/%61dmin/login','/admin/login#'+secret])
         await held(fixture([response(307,outbound()),response(302,callback()),response(307,value)]),3);
     await held(fixture([response(308,outbound())]),1);
     await held(fixture([response(307,outbound()),response(200)]),2);
     await held(fixture([response(307,outbound()),response(302,callback()),response(200)]),3);
     await held(fixture([...happy().slice(0,3),response(307,outbound())]),4);
+});
+test('only the third response accepts the exact relative clean path, canonicalized to the fixed app',async()=>{
+    for(const legacy of [false,true]) {
+        const carrier=legacy?c.appLogin+'?__clerk_handshake=synthetic.payload.signature':callback();
+        const f=fixture([response(307,outbound()),response(307,carrier),response(307,'/admin/login'),response(200)],{}, {allowLegacyCandidate:legacy});
+        await f.policy.run(f.route);
+        assert.equal(f.calls.length,4); assert.equal(f.calls[3].url,c.appLogin);
+        assert.equal(f.fulfills,1); assert.equal(f.getters,3);
+        const r=safeReport(f);assert.equal(r.complete,true);assert.equal(r.locations.APP_CLEAN_TARGET.contractMatches,true);
+        assert.equal(r.locations.APP_CLEAN_TARGET.absoluteParseable,false);
+        assert.equal(r.locations.APP_CLEAN_TARGET.relativeWouldResolveExactCleanApp,true);
+    }
+    await held(fixture(happy(),{url:()=>'/admin/login'}),0);
+    await held(fixture([response(307,'/admin/login')]),1);
+    await held(fixture([response(307,outbound()),response(307,'/admin/login')]),2);
 });
 
 test('LOCAL legacy candidate is opt-in, exact carrier only; nonce remains separate and all hop/header constraints stay',async()=>{
@@ -163,17 +180,17 @@ test('pinned REAL SDK verifies legacy signature offline before applying directiv
     } finally {globalThis.fetch=originalFetch;}
 });
 
-test('all clean-target predicates are boolean-only and match unchanged acceptance, including relative/empty delimiter cases',async()=>{
+test('all clean-target predicates are boolean-only and match candidate acceptance, including exact relative/empty delimiter cases',async()=>{
     const entries=[[c.appLogin,true,'exactCleanApp'],[undefined,false,'valueIsString'],['',false,'valuePresent'],
         ['x'.repeat(16385),false,'lengthAllowed'],[c.appLogin+'\n',false,'controlCharactersAbsent'],['https://[',false,'absoluteParseable'],
-        ['/admin/login',false,'absoluteParseable'],[c.appLogin.replace('https:','http:'),false,'https'],
+        ['/admin/login',true,'relativeWouldResolveExactCleanApp'],[c.appLogin.replace('https:','http:'),false,'https'],
         [c.appLogin.replace('https://','https://user:'+secret+'@'),false,'userinfoAbsent'],
         [c.appLogin.replace('/admin/login',':444/admin/login'),false,'defaultPort'],[c.appLogin+'#'+secret,false,'fragmentAbsent'],
         ['https://other.invalid/admin/login',false,'samePinnedApp'],[c.appLogin+'/other',false,'pathMatchesLogin'],
         [c.appLogin+'?unknown_'+secret+'='+secret,false,'queryAbsent'],[c.appLogin+'?',false,'exactCleanApp'],[c.appLogin+'#',false,'exactCleanApp'],
         [c.appLogin.replace('/admin/login',':443/admin/login'),true,'exactCleanApp']];
     for(const [value,accepted,flag]of entries){
-        const p=inspectHandshakeLocation(value,'APP_CLEAN_TARGET',c,true);
+        const p=inspectHandshakeLocation(value,'APP_CLEAN_TARGET',c,true,undefined,true);
         assert.ok(Object.values(p).every(v=>typeof v==='boolean'));assert.doesNotMatch(JSON.stringify(p),/SYNTHETIC|https:|__clerk|unknown_/);
         assert.equal(p.contractMatches,accepted);assert.equal(p[flag],accepted);
         const f=fixture([response(307,outbound()),response(307,callback()),response(307,value),response(200)],{}, {allowLegacyCandidate:true});

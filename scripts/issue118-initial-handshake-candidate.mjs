@@ -50,8 +50,10 @@ function callbackUrl(value, allowLegacyCandidate = false) {
     return url.href;
 }
 export { callbackUrl as validateInitialCallbackTarget };
-function cleanUrl(value) {
-    const url = safeAbsolute(value);
+function cleanUrl(value, allowExactRelativeClean = false) {
+    // Only the post-callback Location may use this one literal representation.
+    // Initial navigation, outbound Clerk and signed callback targets remain absolute.
+    const url = safeAbsolute(allowExactRelativeClean && value === '/admin/login' ? initialHandshakeContract.appLogin : value);
     if (url.href !== initialHandshakeContract.appLogin) refuse();
     return url.href;
 }
@@ -64,7 +66,7 @@ function locationOnly(response, kind, report, allowLegacyCandidate, sourceUrl) {
         refuse();
     }
     report.locations[kind] = { observed:true, headerReadSucceeded:true, singleLocation:values.length===1,
-        ...inspectHandshakeLocation(values.length===1?values[0][1]:undefined,kind,initialHandshakeContract,allowLegacyCandidate,sourceUrl) };
+        ...inspectHandshakeLocation(values.length===1?values[0][1]:undefined,kind,initialHandshakeContract,allowLegacyCandidate,sourceUrl,kind==='APP_CLEAN_TARGET') };
     if (values.length !== 1) refuse();
     return values[0][1];
 }
@@ -121,7 +123,7 @@ export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { a
                     }
                     if (index === 0 && status === 307) { report.stage = 'APP_TO_CLERK_VALIDATE'; url = handshakeUrl(locationOnly(response,'APP_TO_CLERK',report,allowLegacyCandidate)); report.handshakeUsed = true; }
                     else if (index === 1 && [302,303,307].includes(status)) { report.stage = 'CLERK_TO_APP_VALIDATE'; url = callbackUrl(locationOnly(response,'CLERK_TO_APP',report,allowLegacyCandidate), allowLegacyCandidate); }
-                    else if (index === 2 && status === 307) { report.stage = 'APP_CLEAN_TARGET_VALIDATE'; url = cleanUrl(locationOnly(response,'APP_CLEAN_TARGET',report,allowLegacyCandidate,url)); }
+                    else if (index === 2 && status === 307) { report.stage = 'APP_CLEAN_TARGET_VALIDATE'; url = cleanUrl(locationOnly(response,'APP_CLEAN_TARGET',report,allowLegacyCandidate,url), true); }
                     else refuse();
                     report.redirects++;
                     if (report.redirects > initialHandshakeContract.maxRedirects) refuse();

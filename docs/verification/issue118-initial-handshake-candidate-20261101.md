@@ -67,3 +67,8 @@ offlineでは一時生成した合成RSA鍵だけで実SDKのauthenticateRequest
 - https://github.com/clerk/clerk-docs/blob/main/docs/guides/how-clerk-works/overview.mdx
 - https://github.com/microsoft/playwright/blob/v1.61.0/docs/src/api-testing-js.md
 - https://github.com/microsoft/playwright/blob/v1.61.0/docs/src/api/class-apirequestcontext.md
+## 2026-11-02: exact relative clean-return representation
+
+The corrected-Secret runtime returned a relative Location after the signed callback. Run 41366783027 stopped before its fourth handshake GET: the recorded booleans establish the same pinned app/login, no query/fragment/userinfo/nondefault port, and a relative reference resolving to the exact clean URL. The original run remains FAIL; no owner lookup, explicit session creation or menu write was attempted.
+
+Only the third response, HTTP307, may now represent the clean return with the literal `/admin/login`; the driver converts that literal to the existing fixed absolute app URL. It does not resolve arbitrary relative strings. Protocol-relative URLs, dot/encoded paths, suffixes, query, fragment and control characters remain refused. Initial navigation, Clerk outbound and signed callback remain absolute-only. Destination, signature verification, app-only OIDC, four-GET/three-redirect bounds and unknown-write handling are unchanged. The old stop-only diagnostic keeps its default absolute-only predicate; the live candidate opts into the exact representation when observing its third response. This is a driver correction, not a product/auth/schema change or proof of live success.

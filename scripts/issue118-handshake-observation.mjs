@@ -1,6 +1,6 @@
 // Pure observations only. Never used as permission to follow a redirect.
 // No URL, query key/value, header, cookie, payload or exception is returned.
-export function inspectHandshakeLocation(value, kind, c, allowLegacyCandidate = false, originalCallback) {
+export function inspectHandshakeLocation(value, kind, c, allowLegacyCandidate = false, originalCallback, allowExactRelativeClean = false) {
     const p = { kindKnown: ['APP_TO_CLERK','CLERK_TO_APP','APP_CLEAN_TARGET'].includes(kind),
         valueIsString:false, valuePresent:false, lengthAllowed:false, controlCharactersAbsent:false,
         absoluteParseable:false, relativeReference:false, diagnosticParseable:false,
@@ -56,7 +56,7 @@ export function inspectHandshakeLocation(value, kind, c, allowLegacyCandidate = 
             shape=p.samePinnedApp&&p.pathMatchesLogin&&(legacy?p.legacyShapeMatches:p.noncePresent);
         }else shape=p.exactCleanApp;
         p.additionalQueryPresent=keys.some(key=>!allowed.includes(key));p.queryKeysAllowed=!p.additionalQueryPresent;
-        p.contractMatches=p.controlCharactersAbsent&&p.absoluteParseable&&p.https&&p.userinfoAbsent&&p.defaultPort&&p.fragmentAbsent&&
+        p.contractMatches=p.controlCharactersAbsent&&(p.absoluteParseable||allowExactRelativeClean===true&&kind==='APP_CLEAN_TARGET'&&value==='/admin/login')&&p.https&&p.userinfoAbsent&&p.defaultPort&&p.fragmentAbsent&&
             p.queryKeysUnique&&p.queryValuesNonEmpty&&p.queryKeysAllowed&&shape;
     }catch{/* Only fixed booleans survive malformed input/provider-independent errors. */}
     return p;
