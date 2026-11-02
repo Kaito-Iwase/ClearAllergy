@@ -73,7 +73,7 @@ function locationOnly(response, kind, report, allowLegacyCandidate, sourceUrl) {
 
 // The supplier must be createCiAccess's existing token() (which validates exact
 // claims/expiry on every app use), matching the current normal transport contract.
-export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { allowLegacyCandidate = false } = {}) {
+export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { allowLegacyCandidate = false, assertBeforeSend = () => {} } = {}) {
     let used = false;
     const report = { stage: 'NOT_STARTED', complete: false, held: false, requests: 0, redirects: 0, lastHttpStatus: null,
         handshakeUsed: false, cookieOrProviderStateMayExist: false, contextDisposalRequired: false,
@@ -102,6 +102,7 @@ export function createInitialHandshakeCandidate(page, getValidatedOidcToken, { a
                         index === 1 ? undefined : getValidatedOidcToken());
                     // No initial headers, Cookie, Authorization, Referer, Origin or bypass
                     // header is forwarded. No OIDC getter is even called on the Clerk hop.
+                    if (assertBeforeSend() !== undefined) refuse();
                     report.requests++; report.cookieOrProviderStateMayExist = true;
                     const response = await api.fetch(url, { method: 'GET', headers, timeout: 20000,
                         maxRedirects: 0, maxRetries: 0, failOnStatusCode: false });

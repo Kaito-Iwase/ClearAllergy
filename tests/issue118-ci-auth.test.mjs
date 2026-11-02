@@ -168,9 +168,48 @@ test('Clerk/OTHER route diagnostics preserve fixed roles and never relax externa
         fulfill: async () => assert.fail('redirect must never fulfill'), abort: async () => {} });
     await assert.rejects(access.route(route('https://' + ciIdentity.clerkDomain)), code('CI_ROUTE_FAILED'));
     assert.equal(events[0].originRole, 'CLERK'); assert.equal(events[0].exception, 'REDIRECT_REFUSED'); assert.equal(events[0].status, 307);
-    await access.route(route('https://other.invalid'));
+    const freshOther = await createCiAccess(env(), async () => response({ value: jwt(claims()) }), () => {},
+        { transport: value => events.push(value) });
+    await freshOther.route(route('https://other.invalid'));
     assert.equal(events[1].originRole, 'OTHER'); assert.equal(events[1].exception, 'POLICY_REFUSED');
     assert.ok(!JSON.stringify(events).includes('synthetic-secret')); assert.ok(!JSON.stringify(events).includes('/v1/'));
+});
+test('first Clerk redirect is boolean-classified, never followed, and latches all later browser requests before sending', async () => {
+    const observations = []; let sends = 0, aborts = 0, requestReads = 0;
+    const access = await createCiAccess(env(), async () => response({ value: jwt(claims()) }), () => {},
+        { frontendRedirect: p => observations.push(p) });
+    const origin = 'https://' + ciIdentity.clerkDomain;
+    const route = { request: () => ({ url: () => origin + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js',
+        method: () => 'GET', resourceType: () => 'script', allHeaders: async () => ({}) }),
+        fetch: async () => { sends++; return { status: () => 307, headers: () => ({ location: 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6.24.0/dist/clerk.browser.js?SYNTHETIC_PRIVATE' }) }; },
+        fulfill: async () => assert.fail('redirect must not fulfill'), abort: async () => { aborts++; } };
+    await assert.rejects(access.route(route), code('CI_ROUTE_FAILED'));
+    assert.equal(sends, 1); assert.equal(observations.length, 1);
+    assert.equal(observations[0].resourceIsScript, true); assert.equal(observations[0].requestIsClerkJsBundle, true);
+    assert.equal(observations[0].targetIsJsDelivr, true); assert.equal(observations[0].targetIsClerkJsBundle, true);
+    assert.ok(Object.values(observations[0]).every(v => typeof v === 'boolean'));
+    assert.doesNotMatch(JSON.stringify(observations), /SYNTHETIC|https:|clerk\.browser|jsdelivr\.net/);
+    for (let i = 0; i < 3; i++) await assert.rejects(access.route({ ...route, request: () => { requestReads++; throw Error(syntheticSecret); } }), code('CI_ROUTE_FAILED'));
+    assert.equal(sends, 1); assert.equal(requestReads, 0); assert.equal(aborts, 4);
+    assert.equal(access.authenticationProgress().ownerLookupStarted, false);
+});
+test('concurrent Clerk or app route waiting on headers cannot send after another route latches HOLD', { timeout: 3000 }, async () => {
+    for (const origin of ['https://' + ciIdentity.clerkDomain, target.origin]) {
+        let release, headerReady, sends = 0;
+        const headers = new Promise(resolve => { release = resolve; });
+        const started = new Promise(resolve => { headerReady = resolve; });
+        const access = await createCiAccess(env(), async () => response({ value: jwt(claims()) }));
+        const waiting = assert.rejects(access.route({ request: () => ({ url: () => origin + '/pending', method: () => 'GET',
+            resourceType: () => 'fetch', allHeaders: async () => { headerReady(); return await headers; } }),
+            fetch: async () => { sends++; assert.fail('held route must never send'); },
+            fulfill: async () => assert.fail('held route must never fulfill'), abort: async () => {} }), code('CI_ROUTE_FAILED'));
+        await started;
+        await assert.rejects(access.route({ request: () => ({ url: () => 'https://' + ciIdentity.clerkDomain + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js',
+            method: () => 'GET', resourceType: () => 'script', allHeaders: async () => ({}) }),
+            fetch: async () => ({ status: () => 307, headers: () => ({ location: '/public-script' }) }),
+            fulfill: async () => assert.fail('redirect must not fulfill'), abort: async () => {} }), code('CI_ROUTE_FAILED'));
+        release({}); await waiting; assert.equal(sends, 0);
+    }
 });
 
 test('Backend API failures record Clerk role/method/status or fixed fetch class without key or response body', async () => {
@@ -515,9 +554,10 @@ test('Clerk/Blob forwarding strips Vercel header and forbids redirects/repeated 
     await access.route(route); await assert.rejects(access.route(route), code('CI_ROUTE_FAILED'));
     assert.equal(forwarded, 1); assert.equal(aborted, 1);
     const redirect = { ...route, request: () => ({ url: () => 'https://' + ciIdentity.clerkDomain + '/v1/client', method: () => 'GET', allHeaders: async () => ({}) }), fetch: async () => ({ status: () => 302 }) };
-    await assert.rejects(access.route(redirect), code('CI_ROUTE_FAILED'));
+    const redirectAccess = await createCiAccess(env(), async () => response({ value: jwt(claims()) }));
+    await assert.rejects(redirectAccess.route(redirect), code('CI_ROUTE_FAILED'));
     let unknownFetch = 0;
-    await access.route({ ...route, request: () => ({ url: () => 'https://other.invalid/' }), fetch: async () => { unknownFetch++; } });
+    await assert.rejects(access.route({ ...route, request: () => ({ url: () => 'https://other.invalid/' }), fetch: async () => { unknownFetch++; } }), code('CI_ROUTE_FAILED'));
     assert.equal(unknownFetch, 0);
 });
 

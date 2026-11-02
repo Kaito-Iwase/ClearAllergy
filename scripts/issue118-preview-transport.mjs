@@ -3,6 +3,48 @@
 export const previewOrigin = 'https://clear-allergy-e2e-nv6akym6f-kaitoexe00-9350s-projects.vercel.app';
 const oidcHeader = 'x-vercel-trusted-oidc-idp-token';
 
+// Observation only: none of these predicates grants permission to follow.
+// Unknown header/URL/resource strings and provider exceptions never leave this function.
+export function clerkFrontendRedirectObservation({ requestUrl: rawRequest, method, resourceType, readHeaders, clerkOrigin }) {
+    const names = ['requestIsConfiguredClerk', 'requestIsGet', 'resourceIsScript', 'resourceIsDocument', 'resourceIsFetch',
+        'resourceIsXhr', 'requestIsClerkJsBundle', 'requestHasQuery', 'headersReadCompleted', 'singleLocationProperty',
+        'locationIsString', 'locationPresent', 'locationLengthAllowed', 'locationControlAbsent', 'absoluteParseable',
+        'relativeReference', 'parseable', 'https', 'userinfoAbsent', 'defaultPort', 'fragmentAbsent', 'queryAbsent',
+        'targetSameConfiguredClerk', 'targetSamePinnedApp', 'targetIsJsDelivr', 'targetIsClerkCdn', 'targetIsVercel',
+        'targetOtherOrigin', 'targetSamePath', 'targetIsClerkJsBundle'];
+    const p = Object.fromEntries(names.map(key => [key, false]));
+    p.requestIsGet = method === 'GET';
+    p.resourceIsScript = resourceType === 'script'; p.resourceIsDocument = resourceType === 'document';
+    p.resourceIsFetch = resourceType === 'fetch'; p.resourceIsXhr = resourceType === 'xhr';
+    const bundle = path => /^\/npm\/@clerk\/clerk-js@[0-9]+(?:\.[0-9]+){0,2}\/dist\/clerk\.browser\.js$/.test(path);
+    try {
+        const request = new URL(rawRequest);
+        p.requestIsConfiguredClerk = request.origin === clerkOrigin;
+        p.requestIsClerkJsBundle = bundle(request.pathname); p.requestHasQuery = !!request.search;
+        let entries;
+        try { entries = Object.entries(readHeaders()).filter(([key]) => key.toLowerCase() === 'location'); p.headersReadCompleted = true; }
+        catch { return p; }
+        p.singleLocationProperty = entries.length === 1;
+        const value = p.singleLocationProperty ? entries[0][1] : undefined;
+        p.locationIsString = typeof value === 'string'; p.locationPresent = p.locationIsString && value.length > 0;
+        p.locationLengthAllowed = p.locationIsString && value.length <= 16384;
+        p.locationControlAbsent = p.locationIsString && !/[\u0000-\u0020\u007f]/.test(value);
+        if (!p.locationPresent || !p.locationLengthAllowed || !p.locationControlAbsent) return p;
+        let target;
+        try { target = new URL(value); p.absoluteParseable = true; }
+        catch { try { target = new URL(value, request); p.relativeReference = true; } catch { return p; } }
+        p.parseable = true; p.https = target.protocol === 'https:'; p.userinfoAbsent = !target.username && !target.password;
+        p.defaultPort = !target.port; p.fragmentAbsent = !target.hash; p.queryAbsent = !target.search;
+        p.targetSameConfiguredClerk = target.origin === clerkOrigin; p.targetSamePinnedApp = target.origin === previewOrigin;
+        // Named comparison categories, not an allowlist. Redirects to ALL categories remain refused.
+        p.targetIsJsDelivr = target.origin === 'https://cdn.jsdelivr.net'; p.targetIsClerkCdn = target.origin === 'https://cdn.clerk.com';
+        p.targetIsVercel = target.origin === 'https://vercel.com';
+        p.targetOtherOrigin = ![p.targetSameConfiguredClerk, p.targetSamePinnedApp, p.targetIsJsDelivr, p.targetIsClerkCdn, p.targetIsVercel].some(Boolean);
+        p.targetSamePath = target.pathname === request.pathname; p.targetIsClerkJsBundle = bundle(target.pathname);
+    } catch { /* Fixed booleans only, never provider text or attacker strings. */ }
+    return p;
+}
+
 export function transportObservation(role, method, status, exception, flags = {}) {
     const allowedExceptions = ['NONE', 'REDIRECT_REFUSED', 'TIMEOUT_EXCEPTION', 'TARGET_EXCEPTION',
         'TOKEN_EXCEPTION', 'HEADERS_EXCEPTION', 'FETCH_EXCEPTION', 'STATUS_EXCEPTION', 'FULFILL_EXCEPTION',
@@ -68,7 +110,7 @@ export async function protectedPreviewFetch(api, url, options = {}, token) {
 
 // Fetch without redirects and fulfill only a non-redirect response. In particular, do
 // not continue a token-bearing request: Playwright carries overridden headers on redirects.
-export async function routePreviewRequest(route, token, observer = () => {}) {
+export async function routePreviewRequest(route, token, observer = () => {}, assertBeforeSend = () => {}) {
     let role = 'OTHER', method = 'OTHER', status = null, stage = 'TARGET';
     const flags = {};
     try {
@@ -83,12 +125,14 @@ export async function routePreviewRequest(route, token, observer = () => {}) {
         stage = 'TOKEN';
         const headers = scopedOidcHeaders(url, existingHeaders, token);
         if (requestUrl(url).origin !== previewOrigin) {
+            if (assertBeforeSend() !== undefined) throw Error('PROTECTED_PRE_SEND_REFUSED');
             stage = 'CONTINUE'; flags.continueStarted = true;
             const result = await route.continue({ headers });
             observeTransport(observer, transportObservation(role, method, status, 'NONE', flags));
             return result;
         }
         flags.tokenValidated = true;
+        if (assertBeforeSend() !== undefined) throw Error('PROTECTED_PRE_SEND_REFUSED');
         stage = 'FETCH'; flags.fetchStarted = true;
         const response = await route.fetch({ headers, maxRedirects: 0, maxRetries: 0, timeout: 20000 });
         flags.responseObserved = true; stage = 'STATUS'; status = response.status();

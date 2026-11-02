@@ -44,7 +44,7 @@ function fixture(responses=happy(), requestChange={}, options={}) {
     const route={request:()=>request,fulfill:async ({response:r})=>{fulfills++;assert.equal(r.status(),200);if(options.fulfillFailure)throw Error(secret);},
         abort:async()=>{aborts++;if(options.abortFailure)throw Error(secret);}};
     const policy=createInitialHandshakeCandidate(page,()=>{getters++;return assertOidcClaims(options.expireOnGetter===getters?jwt({exp:0}):token);},
-        {allowLegacyCandidate:options.allowLegacyCandidate});
+        {allowLegacyCandidate:options.allowLegacyCandidate,assertBeforeSend:options.assertBeforeSend});
     return {policy,route,calls,get fulfills(){return fulfills;},get aborts(){return aborts;},get getters(){return getters;}};
 }
 function safeReport(f) {
@@ -77,6 +77,14 @@ test('one bounded handshake shares only context-managed cookies; OIDC is app-onl
 test('already-ready initial document needs one GET and duplicate use cannot start another request',async()=>{
     const f=fixture([response(200)]);await f.policy.run(f.route);assert.equal(f.calls.length,1);assert.equal(f.getters,1);
     assert.equal(safeReport(f).handshakeUsed,false);await held(f,1);assert.equal(f.fulfills,1);
+});
+test('the shared context HOLD guard is rechecked before every handshake send',async()=>{
+    for(let blocked=1;blocked<=4;blocked++){
+        let checks=0;
+        const f=fixture(happy(),{}, {assertBeforeSend:()=>{if(++checks===blocked)throw Error(secret);}});
+        await held(f,blocked-1);assert.equal(checks,blocked);assert.equal(f.fulfills,0);
+    }
+    await held(fixture(happy(),{}, {assertBeforeSend:()=> 'unexpected return'}),0);
 });
 test('a previous successful abort is never reused as confirmation when a prohibited reuse abort fails',async()=>{
     const options={};const f=fixture([response(500)],{},options);
@@ -269,7 +277,7 @@ test('existing normal API-write redirect refusal remains intact; callsite is ini
     assert.ok(live.includes('createInitialHandshakeCandidate'));
     assert.match(live,/initialDocumentWindow && request\.isNavigationRequest\(\) && request\.resourceType\(\) === 'document'/);
     assert.match(live,/request\.frame\(\) === initialPage\.mainFrame\(\)/);
-    assert.match(live,/createInitialHandshakeCandidate\(page, token, \{ allowLegacyCandidate: true \}\)/);
+    assert.match(live,/createInitialHandshakeCandidate\(page, token, \{ allowLegacyCandidate: true, assertBeforeSend: assertTransportOpen \}\)/);
     assert.match(live,/finally \{ initialDocumentWindow = false; \}/);
     const runner=readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs',import.meta.url),'utf8');
     const contextCreation=runner.slice(runner.indexOf('browser.newContext('),runner.indexOf('const ciRoute ='));

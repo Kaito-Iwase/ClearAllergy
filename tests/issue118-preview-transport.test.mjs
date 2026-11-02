@@ -2,12 +2,32 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { previewOrigin, scopedOidcHeaders, protectedPreviewFetch, routePreviewRequest } from '../scripts/issue118-preview-transport.mjs';
+import { previewOrigin, scopedOidcHeaders, protectedPreviewFetch, routePreviewRequest, clerkFrontendRedirectObservation } from '../scripts/issue118-preview-transport.mjs';
 import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
 
 const token = 'synthetic.payload.signature';
 const header = 'x-vercel-trusted-oidc-idp-token';
 const assertCode = code => error => error.message === code && !error.cause;
+test('Clerk frontend Location classifier returns only booleans across valid, hostile, missing and throwing inputs', () => {
+    const clerkOrigin = 'https://one-dolphin-7936.clerk.accounts.dev', secret = 'SYNTHETIC_PRIVATE_VALUE';
+    const options = { requestUrl: clerkOrigin + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js', method: 'GET', resourceType: 'script', clerkOrigin };
+    for (const location of [undefined, null, '', [], '/relative?'+secret, 'https://[', 'x'.repeat(16385),
+        'https://user:'+secret+'@cdn.jsdelivr.net/a?'+secret+'#'+secret, 'http://cdn.clerk.com:444/a',
+        clerkOrigin+'/npm/@clerk/clerk-js@6.24.0/dist/clerk.browser.js', previewOrigin+'/admin/login',
+        'https://cdn.jsdelivr.net/a', 'https://cdn.clerk.com/a', 'https://vercel.com/a', 'https://unknown.invalid/'+secret, 'https://x.invalid/\n'+secret]) {
+        const p = clerkFrontendRedirectObservation({ ...options, readHeaders: () => ({ location }) });
+        assert.ok(Object.values(p).every(v => typeof v === 'boolean'));
+        assert.doesNotMatch(JSON.stringify(p), /SYNTHETIC|https:|unknown\.invalid|clerk\.browser/);
+        assert.equal(p.requestIsClerkJsBundle, true); assert.equal(p.resourceIsScript, true);
+    }
+    const missing = clerkFrontendRedirectObservation({ ...options, readHeaders: () => ({}) });
+    assert.equal(missing.headersReadCompleted, true); assert.equal(missing.singleLocationProperty, false);
+    const duplicate = clerkFrontendRedirectObservation({ ...options, readHeaders: () => ({ location: '/a', Location: '/b' }) });
+    assert.equal(duplicate.singleLocationProperty, false); assert.equal(duplicate.parseable, false);
+    const throwing = clerkFrontendRedirectObservation({ ...options, readHeaders: () => { const e = {}; Object.defineProperty(e,'message',{get(){assert.fail('never inspect exception');}}); throw e; } });
+    assert.equal(throwing.headersReadCompleted, false); assert.equal(throwing.parseable, false);
+    assert.equal(clerkFrontendRedirectObservation({ ...options, requestUrl: 'https://[', readHeaders: () => assert.fail('bad request must not read headers') }).parseable, false);
+});
 
 test('transport and live target agree; credentials never enter other origin header maps', () => {
     assert.equal(previewOrigin, target.origin);

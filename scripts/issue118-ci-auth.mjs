@@ -1,5 +1,5 @@
 // Test infrastructure only. Importing this module performs no I/O or authentication.
-import { routePreviewRequest, protectedPreviewFetch, previewOrigin, transportObservation,
+import { routePreviewRequest, protectedPreviewFetch, previewOrigin, transportObservation, clerkFrontendRedirectObservation,
     transportException, observeTransport } from './issue118-preview-transport.mjs';
 import { createInitialHandshakeCandidate } from './issue118-initial-handshake-candidate.mjs';
 
@@ -100,6 +100,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     let sessionCreationAttempted = false;
     let ticketRequests = 0;
     let initialHandshake, initialPage, initialDocumentWindow = false, handshakeObservationFailed = false, routeHeld = false;
+    const assertTransportOpen = () => { if (routeHeld) fail('CI_TRANSPORT_HELD'); };
     const progress = Object.fromEntries(['loginNavigationStarted', 'loginNavigationCompleted', 'clerkLoaded',
         'frontendMatched', 'ownerLookupStarted', 'ownerMatched', 'testingTokenRequestStarted', 'testingTokenReceived',
         'signInTokenRequestStarted', 'signInTokenReceived', 'sessionCreationAttempted', 'activationAcknowledged',
@@ -132,6 +133,8 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
             let role = 'OTHER', method = 'OTHER', status = null, stage = 'TARGET', delegated = false, handshakeDelegated = false;
             const flags = {};
             try {
+                // A refused request latches the whole context before SDK/browser retries can send again.
+                if (routeHeld) fail('CI_TRANSPORT_HELD');
                 const request = route.request();
                 const url = new URL(request.url());
                 role = url.origin === previewOrigin ? 'APP' : url.origin === 'https://' + ciIdentity.clerkDomain ? 'CLERK' : 'OTHER';
@@ -151,7 +154,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                 if (url.origin === previewOrigin) {
                     stage = 'TOKEN'; const value = token(); flags.tokenValidated = true;
                     delegated = true;
-                    return await routePreviewRequest(route, value, transportObserver);
+                    return await routePreviewRequest(route, value, transportObserver, () => { assertTransportOpen(); token(); });
                 }
                 if (url.origin === 'https://' + ciIdentity.clerkDomain || url.origin === 'https://wtqdbklmg3bbqk4s.public.blob.vercel-storage.com') {
                     stage = 'HEADERS';
@@ -160,10 +163,21 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                     for (const key of Object.keys(headers)) if (key.toLowerCase() === 'x-vercel-trusted-oidc-idp-token') delete headers[key];
                     if (url.hostname === ciIdentity.clerkDomain && testingToken && url.pathname.startsWith('/v1/')) url.searchParams.set('__clerk_testing_token', testingToken);
                     if (url.hostname === ciIdentity.clerkDomain && url.pathname === '/v1/client/sign_ins' && route.request().method() === 'POST' && ++ticketRequests > 1) fail('CLERK_TICKET_RETRY_REFUSED');
+                    assertTransportOpen();
                     stage = 'FETCH'; flags.fetchStarted = true;
                     const response = await route.fetch({ url: url.href, headers, maxRedirects: 0, maxRetries: 0, timeout: 20000 });
                     flags.responseObserved = true; stage = 'STATUS'; status = response.status();
-                    if (status >= 300 && status < 400) { flags.redirectRejected = true; fail('CI_EXTERNAL_REDIRECT_REFUSED'); }
+                    if (status >= 300 && status < 400) {
+                        flags.redirectRejected = true;
+                        if (role === 'CLERK' && method === 'GET') {
+                            const observation = clerkFrontendRedirectObservation({ requestUrl: url.href, method,
+                                resourceType: typeof request.resourceType === 'function' ? request.resourceType() : undefined,
+                                readHeaders: () => response.headers(),
+                                clerkOrigin: 'https://' + ciIdentity.clerkDomain });
+                            try { observers.frontendRedirect?.(observation); } catch { fail('AUTH_DIAGNOSTIC_FAILED'); }
+                        }
+                        fail('CI_EXTERNAL_REDIRECT_REFUSED');
+                    }
                     stage = 'FULFILL'; flags.fulfillStarted = true;
                     const result = await route.fulfill({ response });
                     transportObserver(transportObservation(role, method, status, 'NONE', flags));
@@ -189,7 +203,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
             authenticationAttempted = true;
             try {
                 if (routeHeld) fail('CI_TRANSPORT_HELD');
-                initialPage = page; initialHandshake = createInitialHandshakeCandidate(page, token, { allowLegacyCandidate: true });
+                initialPage = page; initialHandshake = createInitialHandshakeCandidate(page, token, { allowLegacyCandidate: true, assertBeforeSend: assertTransportOpen });
                 initialDocumentWindow = true;
                 mark('loginNavigationStarted');
                 await page.goto(previewOrigin + '/admin/login');

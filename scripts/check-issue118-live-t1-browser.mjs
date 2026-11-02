@@ -650,6 +650,7 @@ export async function runLive() {
         if (ciMode) ciAccess = await createCiAccess(process.env, fetch, setupStage, {
             authentication: progress => { report.authenticationProgress = progress; save(); },
             handshake: progress => { report.initialHandshake = progress; save(); },
+            frontendRedirect: observation => { report.frontendRedirect ??= observation; save(); },
             transport: observation => {
                 recordTransportDiagnostic(report, observation);
                 save();
