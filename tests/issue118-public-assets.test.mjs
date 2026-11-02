@@ -83,7 +83,12 @@ test('bundled candidate provenance emits local shapes only and never confirms a 
     const r=inspectPublicCode(source),p=r.actionCandidates[0].localProvenance;
     assert.deepEqual(r.actionReferences,[]);assert.equal(r.actionCandidates[0].confirmed,false);
     assert.deepEqual(p,{calleeShape:'PROPERTY',knownFactoryProperty:true,aliasHops:2,declarationKind:'VARIABLE',
-        initializerShape:'MEMBER_CALL',providerModuleId:123,sameChunkModuleShapes:1,sameChunkKnownExport:true});
+        initializerShape:'MEMBER_CALL',providerModuleId:123,sameChunkModuleShapes:1,sameChunkKnownExport:true,
+        moduleParameterShape:'IDENTIFIER',moduleFactoryNameLiteral:true,moduleContextCalls:[{method:'s',argumentKinds:['ARRAY'],argumentCount:1}]});
+    const extended=inspectPublicCode(source.replace('e.s(["createServerReference",()=>f]);','e.s(["other",0,f,"createServerReference",0,f],123);'));
+    assert.equal(extended.actionCandidates[0].localProvenance.sameChunkKnownExport,true);
+    assert.deepEqual(extended.actionCandidates[0].localProvenance.moduleContextCalls,[{method:'s',argumentKinds:['ARRAY','NUMBER'],argumentCount:2}]);
+    assert.deepEqual(extended.actionReferences,[]);
     for(const changed of [source.replace('e.i(123)','e.i(999)'),source.replace('e.s([','function nested(e){e.s([').replace('()=>f]);','()=>f]);}'),
         source.replace('"createServerReference"','"'+secret+'"')]) {
         const x=inspectPublicCode(changed);assert.equal(x.actionCandidates[0].localProvenance.sameChunkKnownExport,false);

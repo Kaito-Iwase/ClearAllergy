@@ -162,7 +162,8 @@ export function inspectPublicCode(text, html = false) {
         // Emit fixed shapes/numeric module IDs, not unknown identifier/string text.
         const localProvenance = input => {
             const out={calleeShape:'OTHER',knownFactoryProperty:false,aliasHops:0,declarationKind:'NONE',
-                initializerShape:'NONE',providerModuleId:null,sameChunkModuleShapes:0,sameChunkKnownExport:false};
+                initializerShape:'NONE',providerModuleId:null,sameChunkModuleShapes:0,sameChunkKnownExport:false,
+                moduleParameterShape:'NONE',moduleFactoryNameLiteral:false,moduleContextCalls:[]};
             let node=unwrap(input);const seen=new Set();
             out.calleeShape=ts.isPropertyAccessExpression(node)?'PROPERTY':ts.isIdentifier(node)?'IDENTIFIER':'OTHER';
             if(ts.isPropertyAccessExpression(node)) {out.knownFactoryProperty=node.name.text==='createServerReference';node=unwrap(node.expression);}
@@ -189,13 +190,24 @@ export function inspectPublicCode(text, html = false) {
                         if(!ts.isNumericLiteral(id)||Number(id.text)!==out.providerModuleId||
                             (!ts.isArrowFunction(fn)&&!ts.isFunctionExpression(fn)))continue;
                         out.sameChunkModuleShapes++;const parameter=fn.parameters[0]?.name;
+                        out.moduleParameterShape=parameter&&ts.isIdentifier(parameter)?'IDENTIFIER':parameter?'DESTRUCTURED':'NONE';
                         const contextSymbol=parameter&&ts.isIdentifier(parameter)?symbol(parameter):null;
                         const exports = child => {
+                            if(ts.isStringLiteral(child)&&child.text==='createServerReference')out.moduleFactoryNameLiteral=true;
                             if(contextSymbol&&ts.isCallExpression(child)&&ts.isPropertyAccessExpression(child.expression)&&
-                                child.expression.name.text==='s'&&symbol(child.expression.expression)===contextSymbol&&
-                                child.arguments.length===1&&ts.isArrayLiteralExpression(child.arguments[0])) {
-                                const es=child.arguments[0].elements;
-                                for(let n=0;n<es.length;n+=2)if(ts.isStringLiteral(es[n])&&es[n].text==='createServerReference')out.sameChunkKnownExport=true;
+                                symbol(child.expression.expression)===contextSymbol) {
+                                const method=child.expression.name.text;
+                                const kind=arg=>ts.isArrayLiteralExpression(arg)?'ARRAY':ts.isObjectLiteralExpression(arg)?'OBJECT':
+                                    ts.isNumericLiteral(arg)?'NUMBER':ts.isStringLiteral(arg)?'STRING':
+                                    ts.isArrowFunction(arg)||ts.isFunctionExpression(arg)?'FUNCTION':ts.isIdentifier(arg)?'IDENTIFIER':'OTHER';
+                                const shape={method:['s','i','r','n','j','v'].includes(method)?method:'OTHER',
+                                    argumentKinds:child.arguments.slice(0,5).map(kind),argumentCount:Math.min(child.arguments.length,6)};
+                                if(out.moduleContextCalls.length<16&&!out.moduleContextCalls.some(x=>JSON.stringify(x)===JSON.stringify(shape)))out.moduleContextCalls.push(shape);
+                                if(method==='s'&&child.arguments.length>=1&&ts.isArrayLiteralExpression(child.arguments[0])) {
+                                    // Observe the known label in any supported export table layout.
+                                    // Multiple arguments/triple encodings are not proof of implementation.
+                                    for(const entry of child.arguments[0].elements)if(ts.isStringLiteral(entry)&&entry.text==='createServerReference')out.sameChunkKnownExport=true;
+                                }
                             }
                             ts.forEachChild(child,exports);
                         };exports(fn.body);
