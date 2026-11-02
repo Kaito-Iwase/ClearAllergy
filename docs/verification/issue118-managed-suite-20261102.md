@@ -34,7 +34,11 @@ coreの期待予算は21件/79書込み/session2件。無信号は現物の見�
 
 通常配達のCREATEでは、ブラウザが201を受けて自動GETする前にIDを記録する。終了時は確認済みowned sessionについてだけ、固定Shop管理画面のGET・200・hydration・owner・公開鍵・所有APIを照合してから、既存の限定signout actionを実行する。過去の通信失敗を消す処理ではない。
 
-今回の残session上限は3件。A/Bの2件でcoreと最初のservice armを進め、その後に最大1 armを行える。残りの障害armを全て実施できたとは扱わず、追加sessionの許可がなければ未実施として残す。fixture数と書込み数では、既存の作成1件/1回を二重計上しない。
+run41489714874後の時点では残session上限は3件だった。A/Bの2件でcoreと最初のservice armへ進め、その後に最大1 armを行う計画だった。残りの障害armを全て実施できたとは扱わず、追加sessionの許可がなければ未実施として残す。fixture数と書込み数では、既存の作成1件/1回を二重計上しない。
+
+続くrun41495319922はT1のフロー・非公開化・保護比較・A/B終了を確認した。T2は8件作成/公開、4STOP、4訂正/別再公開を応答とreadbackで確認し、T3は2件目の作成後にHOLDとなった。独立SQLでは全11件・37成功監査・37要求IDが一致し、残るメニューwrite不明はない。総合HOLDは保持する。固定10分の所有確認証跡が継続実読取でも更新されない測定器欠陥を合成再現し、frontend/公開鍵/所有APIと再期限検査の成功後にそのroleの時刻だけを更新した。期限自体は変更していない。
+
+この時点のsession消費は6件、公開fixtureはA5件/B4件。`APPROVE_MANAGED_KNOWN_CLEANUP`は独立terminal/SQL証跡、prior session6/menu write37、同じ固定配備を必須とし、残る1件のS1 sessionだけでAの固定7件を照合する。private2件は書込みなし、publicは各1回・最大5回の空POST STOPのみ。新作成・訂正・画像・Shop・B操作は行わない。競合/不一致/結果不明なら後続STOPも再送もしない。STOPにはatomic CASがなく、前後の厳密照合で検知できる範囲を報告する。Bの後片付けや網羅検証の続行には、7件のsession上限を超える新たな承認が必要である。
 
 タイムアウト後のGETだけでは遅延commitを否定できない。元の要求が終端と確認できるまで、再送・自動cleanup・新しいfixtureを禁止する。新規作成201では、補助項目の検証前に実IDを台帳へ登録する。
 

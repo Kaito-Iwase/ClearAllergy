@@ -119,6 +119,10 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
             check(identity?.id === actor.expectedUserId); assertClerkPublishableKey(identity.pk);
             const response = await readProtected(actor, "/api/admin/shop");
             check(response.status() === 200 && (await response.json())?.shop?.id === binding.shopId);
+            // Refresh only this role after both real frontend and owner API checks.
+            // A late response cannot revive evidence that expired while awaiting it.
+            validate();
+            evidence.find(entry => entry.owner === binding.owner).observedUtc = new Date(now()).toISOString();
             return actor;
         } catch { held = true; refused(); }
     };
@@ -911,6 +915,93 @@ export async function executeManagedServiceResume({initialSnapshot,preparationSt
     return {result,actorHandle};
 }
 
+// Metadata only: the PC attester supplies independently observed SQL/terminal facts.
+// This helper is usable before dependencies/authentication and performs no I/O.
+export function assertManagedCleanupProof(proof,now=Date.now()) {
+    try {
+        const ids=['cmvziwd1k0001js07pqfoctkr','cmvzk8bru0001l608a2gjmewc','cmvzk905d0009l608790fkj9u',
+            'cmvzk9mbm000hl6085xpcrgm6','cmvzka8kt000pl608yugd9vi3','cmvzkk6r9002pl608yc64yz0m','cmvzkkvde002xl608mxvyjpda'];
+        const fixed={source:'INDEPENDENT_READ_ONLY',verifiedBy:'cli_metadata_observer',sourceRunId:'41495319922',status:'completed',
+            evidenceReference:'https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/41495319922',
+            applicationSha:'8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1',deployment:'dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo',
+            origin:'https://clear-allergy-e2e-qs7v9eaim-kaitoexe00-9350s-projects.vercel.app',ownerId:'user_3LFy4E2hco0VpC63CbjjMjOznIx',
+            shopId:'cmvs4x80y000twn0wbxkwzbt6',knownTerminal:true,sessionsEnded:true,pendingRequests:0,unknownResolved:true};
+        const exact=(value,keys)=>assert.ok(value&&Object.getPrototypeOf(value)===Object.prototype&&Object.keys(value).length===keys.length
+            &&keys.every(k=>Object.hasOwn(value,k)));
+        exact(proof,[...Object.keys(fixed),'observedUtc','fixtures']);
+        for(const [key,value] of Object.entries(fixed))assert.equal(proof[key],value);
+        assert.equal(target.source,fixed.applicationSha);assert.equal(target.deployment,fixed.deployment);assert.equal(target.origin,fixed.origin);
+        assert.equal(ciIdentity.ownerId,fixed.ownerId);assert.equal(target.shop,fixed.shopId);
+        assert.match(proof.observedUtc,/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+        const age=now-Date.parse(proof.observedUtc);assert.ok(Number.isFinite(now)&&Number.isFinite(age)&&age>=0&&age<=3600000);
+        assert.ok(Array.isArray(proof.fixtures)&&proof.fixtures.length===7&&new Set(proof.fixtures.map(f=>f.id)).size===7);
+        for(const f of proof.fixtures){exact(f,['id','version','foodVersion','isPublished','foodSha256']);assert.ok(ids.includes(f.id));
+            assert.ok(Number.isSafeInteger(f.version)&&f.version>=0&&f.version<=2147483647&&Number.isSafeInteger(f.foodVersion)&&f.foodVersion>=0&&f.foodVersion<=f.version);
+            assert.equal(typeof f.isPublished,'boolean');assert.match(f.foodSha256,/^[a-f0-9]{64}$/);}
+        assert.equal(proof.fixtures.find(f=>f.id===ids[0]).isPublished,false);
+        assert.equal(proof.fixtures.find(f=>f.id===ids[6]).isPublished,false);
+        assert.ok(proof.fixtures.filter(f=>f.isPublished).length<=5);
+        return Object.freeze({...fixed,observedUtc:proof.observedUtc,
+            fixtures:Object.freeze(ids.map(id=>Object.freeze({...proof.fixtures.find(f=>f.id===id)})))});
+    }catch{throw Error('MANAGED_CLEANUP_PROOF_REFUSED');}
+}
+
+// Stops only explicitly attested, already-existing S1 fixtures. The caller owns
+// the actor/session lifecycle. A fresh GET is an observation, not an atomic CAS.
+export async function executeManagedKnownFixtureCleanup({actor,proof,record=()=>{}}={}) {
+    const result={status:'HOLD_KNOWN_FIXTURE_CLEANUP',stopAttempts:0,fixtures:[],failureStage:null,
+        automaticRetry:false,automaticCleanup:false,independentDatabase:'EXTERNAL_ATTESTER_REQUIRED'};
+    let stage='PROOF';
+    const emit=async(stage,id,status,requestId)=>{const event={stage};if(id)event.id=id;
+        if(Number.isInteger(status)&&status>=100&&status<=599)event.status=status;
+        if(typeof requestId==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId))event.requestId=requestId;
+        try{await record(event);}catch{throw Error('MANAGED_CLEANUP_DIAGNOSTIC_REFUSED');}};
+    try {
+        const attestation=assertManagedCleanupProof(proof);assert.equal(typeof record,'function');stage='ACTOR';
+        assert.equal(actor?.binding?.owner,'S1');assert.equal(actor.binding.shopId,attestation.shopId);assert.equal(actor.expectedUserId,attestation.ownerId);
+        assert.equal(actor.access?.sessionLifecycleMode(),'TRACKED_OWNER_SESSION');
+        const owned=()=>{const s=actor.access.sessionObservation();assert.equal(s?.ownerId,attestation.ownerId);
+            assert.equal(s.ownerVerified,true);assert.equal(s.eligibleForCleanup,true);assert.ok(!actor.routeFailed?.());};
+        owned();assert.equal(typeof actor.access.ensureToken,'function');assert.equal(typeof actor.context?.request?.fetch,'function');
+        const ts=createRequire(import.meta.url)('tsx/cjs/api');
+        const {savedMenuResponseSchema}=ts.require('../features/admin/menus/schemas/menu-response.ts',import.meta.url);
+        const {fixturePayload}=ts.require('./issue118-batch-stop.ts',import.meta.url);
+        const canonical=value=>JSON.stringify(value,(_key,v)=>v&&typeof v==='object'&&!Array.isArray(v)
+            ?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+        const foodHash=menu=>createHash('sha256').update(canonical(fixturePayload(menu))).digest('hex');
+        const read=async id=>{owned();await actor.access.ensureToken();owned();const response=await protectedPreviewFetch(actor.context.request,
+            attestation.origin+'/api/admin/menus/'+id,{},actor.access.token());assert.equal(response.status(),200);
+            const raw=await response.json();if(raw?.menu?.shopId!==undefined)assert.equal(raw.menu.shopId,attestation.shopId);
+            const menu=savedMenuResponseSchema.parse(raw).menu;assert.equal(menu.id,id);return menu;};
+        for(const expected of attestation.fixtures){
+            const entry={id:expected.id,state:'NOT_CONFIRMED',stopAttempted:false};result.fixtures.push(entry);stage='OWNER_READ';
+            const before=await read(expected.id);assert.equal(before.version,expected.version);assert.equal(before.foodVersion,expected.foodVersion);
+            assert.equal(before.isPublished,expected.isPublished);assert.equal(foodHash(before),expected.foodSha256);
+            await emit('CLEANUP_OWNER_STATE_MATCHED',expected.id,200);
+            if(!before.isPublished){entry.state='NO_WRITE_ALREADY_PRIVATE';await emit('CLEANUP_NO_WRITE_PRIVATE',expected.id);continue;}
+            stage='STOP_PRE_SEND';assertManagedCleanupProof(attestation);owned();await actor.access.ensureToken();owned();
+            const url=attestation.origin+'/api/admin/menus/'+expected.id+'/stop';
+            assert.ok(result.stopAttempts<5);
+            entry.stopAttempted=true;result.stopAttempts++;await emit('CLEANUP_STOP_INTENT',expected.id);
+            stage='STOP';
+            // Deliberately omit data/body: the stop endpoint's approved contract is an empty POST.
+            const response=await actor.context.request.fetch(url,{method:'POST',headers:scopedOidcHeaders(url,
+                {Origin:attestation.origin},actor.access.token()),maxRedirects:0,maxRetries:0,timeout:20000,failOnStatusCode:false});
+            const status=response.status(),requestId=response.headers?.()['x-request-id'];await emit('CLEANUP_STOP_STATUS',expected.id,status,requestId);
+            assert.equal(status,200);const body=await response.json();assert.equal(body?.ok,true);assert.equal(body.menu?.id,expected.id);
+            assert.equal(body.menu.isPublished,false);assert.ok(Number.isSafeInteger(body.menu.version)&&body.menu.version<=2147483647);
+            assert.equal(body.menu.version,before.version+1);
+            stage='STOP_READBACK';const after=await read(expected.id);assert.equal(after.isPublished,false);assert.equal(after.version,body.menu.version);
+            assert.equal(after.foodVersion,before.foodVersion);assert.equal(foodHash(after),expected.foodSha256);
+            assert.equal(after.publicationConfirmedFoodVersion,before.publicationConfirmedFoodVersion);
+            assert.equal(after.reviewedFoodVersion,before.reviewedFoodVersion);assert.deepEqual(after.foodReviews,before.foodReviews);
+            entry.state='PRIVATE_API_CONFIRMED';entry.version=after.version;await emit('CLEANUP_PRIVATE_API_CONFIRMED',expected.id,200,requestId);
+        }
+        result.status='KNOWN_FIXTURES_PRIVATE_API_CONFIRMED';
+    }catch{result.failureStage=stage;result.errorClass='MANAGED_KNOWN_FIXTURE_CLEANUP_HELD';}
+    return result;
+}
+
 // Pre-authentication metadata check only. It does not manufacture menu/API evidence,
 // prove the SQL observation, or authorize continuation without the owner-API check below.
 export function assertManagedT1ResumeProofMetadata(proof,now=Date.now()) {
@@ -1678,6 +1769,34 @@ export async function runManagedServiceArm(){
     }
 }
 
+export async function runManagedCleanup(){
+    assert.equal(liveTargetPinsVerified,true);assertCiEnvironment(process.env);
+    assert.equal(process.env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
+    assert.equal(process.env.ISSUE118_MANAGED_OPERATION,'APPROVE_MANAGED_KNOWN_CLEANUP');
+    assert.ok(!process.env.DEBUG&&!process.env.PWDEBUG&&!process.env.NODE_OPTIONS);
+    const receipt=JSON.parse(readFileSync(process.env.CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT,'utf8'));assertIdentityReceipt(receipt);
+    const proof=receipt.managedCleanupProof;assertManagedCleanupProof(proof);
+    assert.equal(receipt.managedPriorSessionConsumption,6);assert.equal(receipt.managedPriorMenuWrites,37);
+    const budget=assertManagedSessionBudget(receipt,1);assert.ok(37+proof.fixtures.filter(f=>f.isPublished).length<=103);
+    const output=resolve(process.env.CLEARALLERGY_BROWSER_OUTPUT);mkdirSync(dirname(output),{recursive:true});mkdirSync(output,{recursive:false});
+    const report={target,startedUtc:new Date().toISOString(),operation:'EXACT_KNOWN_OWNER_A_CLEANUP',status:'HOLD_NOT_STARTED',
+        sessionBudget:budget,sourceRunId:'41495319922',menuCreates:0,shopWrites:0,uploads:0,
+        independentDatabase:'NOT_RUN_IN_JOB',events:[],automaticRetry:false,automaticCleanup:false};
+    const save=()=>writeFileSync(join(output,'result.json'),JSON.stringify(report,null,2));let actor;
+    try{
+        save();const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+        actor=await openManagedOwnedActor({role:'S1',chromium,env:process.env,identityReceipt:receipt,
+            record:value=>{report.actor=value;save();}});
+        report.cleanup=await executeManagedKnownFixtureCleanup({actor,proof,record:value=>{report.events.push(value);save();}});
+        report.status=report.cleanup.status==='KNOWN_FIXTURES_PRIVATE_API_CONFIRMED'?'INCOMPLETE_INDEPENDENT_DB':'HOLD_KNOWN_CLEANUP_INCOMPLETE';
+    }catch{report.status='HOLD_KNOWN_CLEANUP_FAILED';}
+    finally{
+        if(actor){try{report.actorFinalization=await actor.finalize();if(!report.actorFinalization.complete)report.status='HOLD_KNOWN_CLEANUP_LIFECYCLE';}
+            catch{report.actorFinalization={complete:false};report.status='HOLD_KNOWN_CLEANUP_LIFECYCLE';}}
+        report.finishedUtc=new Date().toISOString();save();process.exitCode=2;console.log('ISSUE118_RESULT '+report.status);
+    }
+}
+
 export async function runLive() {
     if (!liveTargetPinsVerified) throw Error('TARGET_STATIC_VERIFICATION_PENDING');
     const readCloseOnly = process.argv.slice(2).join(' ') === '--ci-read-close';
@@ -1685,6 +1804,7 @@ export async function runLive() {
     const managedMode = process.argv.slice(2).join(' ') === '--ci-managed';
     if(managedMode&&process.env.ISSUE118_MANAGED_SCOPE!=='MAX32_103_4_5_7')throw Error('MANAGED_SCOPE_REFUSED');
     if(managedMode&&process.env.ISSUE118_MANAGED_OPERATION==='APPROVE_MANAGED_SERVICE_ARM')return runManagedServiceArm();
+    if(managedMode&&process.env.ISSUE118_MANAGED_OPERATION==='APPROVE_MANAGED_KNOWN_CLEANUP')return runManagedCleanup();
     if(managedMode&&process.env.ISSUE118_MANAGED_OPERATION!=='APPROVE_MANAGED_SUITE')throw Error('MANAGED_OPERATION_REFUSED');
     const ciMode = managedMode || readCloseOnly || process.argv.slice(2).join(" ") === "--ci-apply";
     if (!ciMode && process.argv.slice(2).join(" ") !== "--apply") throw Error("EXPLICIT_APPLY_REQUIRED");

@@ -782,10 +782,17 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.equal(t1.if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
     const readClose = secretSteps.find(step => step.run === 'node scripts/check-issue118-live-t1-browser.mjs --ci-read-close');
     const managed=secretSteps.find(step=>step.run==='node scripts/check-issue118-live-t1-browser.mjs --ci-managed');
-    assert.equal(managed.if,"(inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM')");
+    assert.equal(managed.if,"(inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')");
     assert.equal(managed.env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
     assert.equal(managed.env.ISSUE118_SESSION_LIFECYCLE,'TRACKED_OWNER_SESSION');
     assert.equal(managed.env.ISSUE118_TEST_CLERK_SECRET_KEY,t1.env.ISSUE118_TEST_CLERK_SECRET_KEY);
+    const preflight=parsed.jobs['live-t1'].steps.find(step=>step.name==='Check the external receipt before dependency install or secret delivery').run;
+    assert.ok(parsed.on.workflow_dispatch.inputs.confirmation.options.includes('APPROVE_MANAGED_KNOWN_CLEANUP'));
+    assert.match(preflight,/CONFIRMATION_MODE === 'APPROVE_MANAGED_KNOWN_CLEANUP'/);
+    assert.match(preflight,/assertManagedSessionBudget\(receipt,1\)/);
+    assert.match(preflight,/managedPriorSessionConsumption!==6 \|\| receipt.managedPriorMenuWrites!==37/);
+    assert.match(preflight,/assertManagedCleanupProof\(receipt.managedCleanupProof\)/);
+    assert.ok(preflight.indexOf('assertManagedCleanupProof(receipt.managedCleanupProof)')<preflight.indexOf('writeFileSync(join(process.env.RUNNER_TEMP'));
     assert.equal(readClose.if, "inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
     assert.equal(readClose.env.ISSUE118_DIAGNOSTIC_MODE, 'FIXTURE_READ_CLOSE_ONLY');
     assert.equal(readClose.env.ISSUE118_TEST_CLERK_SECRET_KEY, t1.env.ISSUE118_TEST_CLERK_SECRET_KEY);
@@ -793,9 +800,9 @@ test('dedicated workflow is manual/one job/branch+SHA guarded, no DB secret, no 
     assert.equal(diagnostic.if, "inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'");
     assert.ok(!JSON.stringify(diagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(diagnostic.env, 'ISSUE118_APPLY'));
     assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === 'Check the external receipt before dependency install or secret delivery').if,
-        "(inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM')) || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY' || inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'");
+        "(inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')) || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY' || inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'");
     assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === 'Prepare the existing isolated Playwright version (no app secrets)').if,
-        "(inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM')) || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
+        "(inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')) || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
     const redirectDiagnostic = parsed.jobs['live-t1'].steps.find(step => step.run === 'node scripts/check-issue118-preview-redirect.mjs --redirect-only');
     assert.equal(redirectDiagnostic.if, "inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'");
     assert.ok(!JSON.stringify(redirectDiagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(redirectDiagnostic.env, 'ISSUE118_APPLY'));

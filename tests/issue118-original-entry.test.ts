@@ -175,6 +175,47 @@ async function withClaims(action: (directory: string) => Promise<void>) {
         rmSync(directory, { recursive: true });
     }
 }
+test('managed owner evidence refreshes only after successful live-shaped reads; active work can exceed10min without extending idle TTL',async()=>{
+    await withClaims(async directory=>{
+        const f=managedFixture(directory),start=Date.parse(f.input.managed.ownerEvidence[0].observedUtc);let clock=start;
+        f.input.managed.now=()=>clock;
+        const externalEvidence=structuredClone(f.input.managed.ownerEvidence),checks={S1:0,S2:0};
+        for(const actor of f.actors){
+            const evaluate=actor.page.evaluate;
+            actor.page.evaluate=async()=>{clock+=2000;checks[actor.binding.owner as 'S1'|'S2']++;return evaluate();};
+            const token=actor.access.token(),parts=token.split('.');
+            actor.access.token=()=>{const claims=JSON.parse(Buffer.from(parts[1],'base64url').toString('utf8'));
+                return parts[0]+'.'+Buffer.from(JSON.stringify({...claims,iat:Math.floor(clock/1000),exp:Math.floor(clock/1000)+600})).toString('base64url')+'.'+parts[2];};
+        }
+        const result=await prepareOriginalBatchRun(f.input).execute();
+        assert.equal(result.status,'MANAGED_ADAPTER_SEQUENCE_CONFIRMED_NOT_LIVE_PASS',JSON.stringify({elapsed:clock-start,checks,sends:f.calls.length}));assert.equal(f.calls.length,49);
+        assert.ok(clock-start>600000);assert.ok(checks.S1>0&&checks.S2>0);
+        assert.deepEqual(f.input.managed.ownerEvidence,externalEvidence,'caller evidence remains an immutable external baseline');
+    });
+    await withClaims(async directory=>{
+        const f=managedFixture(directory),start=Date.parse(f.input.managed.ownerEvidence[0].observedUtc);let clock=start;
+        f.input.managed.now=()=>clock;const run=prepareOriginalBatchRun(f.input);clock+=600001;
+        assert.equal((await run.execute()).status,'MANAGED_HOLD_NO_FURTHER_WRITES');assert.equal(f.calls.length,0);
+    });
+});
+
+test('failed owner API cannot refresh evidence or authorize a write; expiry during the read also holds',async()=>{
+    for(const fault of ['STATUS','OWNER','READ_EXPIRED'] as const)await withClaims(async directory=>{
+        const f=managedFixture(directory),start=Date.parse(f.input.managed.ownerEvidence[0].observedUtc);let clock=start,shopReads=0;
+        f.input.managed.now=()=>clock;
+        const actor=f.actors[0],fetch=actor.context.request.fetch;
+        actor.context.request.fetch=async(url,options)=>{
+            if(!url.endsWith('/api/admin/shop'))return fetch(url,options);
+            shopReads++;clock+=fault==='READ_EXPIRED'?600001:1000;
+            return {status:()=>fault==='STATUS'?500:200,json:async()=>({shop:{id:fault==='OWNER'?'cwrongshop':actor.binding.shopId}})};
+        };
+        const before=structuredClone(f.input.managed.ownerEvidence),run=prepareOriginalBatchRun(f.input),result=await run.execute();
+        assert.equal(result.status,'MANAGED_HOLD_NO_FURTHER_WRITES');assert.equal(shopReads,1);assert.equal(f.calls.length,0);
+        assert.deepEqual(f.input.managed.ownerEvidence,before);
+        await assert.rejects(run.execute());assert.equal(shopReads,1);assert.equal(f.calls.length,0);
+    });
+});
+
 test('managed preparation finalizes separately owned A/B sessions through the shared lifecycle without enabling a live entry',async()=>{
     for(const fault of ['OK','B_LEGACY','SWAP_BROWSER','LATE_ROUTE']){
     await withClaims(async directory=>{
