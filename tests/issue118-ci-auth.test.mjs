@@ -481,9 +481,11 @@ function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, 
 }
 
 test('read-close records its exact created session before activation and confirms only its provider termination',async()=>{
+    for(const lifecycleEnv of [{ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},{ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'}]){
     const fixture=authFixture(),sessions=[];
-    const access=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},fixture.fetcher,()=>{},
+    const access=await createCiAccess({...env(),...lifecycleEnv},fixture.fetcher,()=>{},
         {session:entry=>sessions.push(entry)});
+    assert.equal(access.sessionLifecycleMode(),'TRACKED_OWNER_SESSION');
     await authenticate(access,fixture.page);
     assert.ok(sessions.some(x=>x.id&&x.ownerVerified===false));
     const created=access.sessionObservation();assert.equal(created.ownerVerified,true);assert.equal(created.eligibleForCleanup,true);
@@ -496,6 +498,7 @@ test('read-close records its exact created session before activation and confirm
     assert.doesNotMatch(JSON.stringify(sessions),/DO_NOT_RECORD|SYNTHETIC_TICKET|SYNTHETIC_TESTING_TOKEN|sk_test_/);
     const lookups=fixture.calls.filter(x=>x.url.includes('/sessions/'));assert.equal(lookups.length,2);
     assert.ok(lookups.every(x=>x.url==='https://api.clerk.com/v1/sessions/'+created.id&&x.method==='GET'));
+    }
 });
 test('read-close partial activation can terminate only a recorded owned session; unknown creation or identity holds',async()=>{
     for(const options of [{setActiveFailure:true},{activationAckLost:true},{createResponseLost:true},

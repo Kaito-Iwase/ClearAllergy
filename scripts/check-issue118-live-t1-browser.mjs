@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCiAccess, assertCiEnvironment, ciIdentity, assertOidcClaims, assertClerkPublishableKey } from "./issue118-ci-auth.mjs";
 import { transportObservation, scopedOidcHeaders, protectedPreviewFetch } from "./issue118-preview-transport.mjs";
-import { closeIsolatedBrowser } from "./issue118-close-browser.mjs";
+import { closeIsolatedBrowser,finalizeOwnedCiActor,ownedCiActorBoundary } from "./issue118-close-browser.mjs";
 import { prepareT4Observation } from "./issue118-t4-observer.mjs";
 
 // Callable bridge for the separately scoped T2/T3 run. It deliberately does not
@@ -77,7 +77,7 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
         && Array.from({ length: 8 }, (_, i) => "M0" + (i + 1)).every(k => uuid(operationIds[s][k])))
         && Object.keys(operationIds).length === 3 && Object.keys(operationIds.T4 || {}).length === 1 && uuid(operationIds.T4.M02)
         && new Set(Object.values(operationIds).flatMap(x => Object.values(x))).size === 17);
-    let used = false, held = false, journal, sequence = 0, managedReady = false, serviceActive = false;
+    let used = false, held = false, journal, sequence = 0, managedReady = false, serviceActive = false,finalizationStarted=false;
     const claimDirectory = resolve(cfg.claimDirectory), created = new Map(), observations = [];
     const claim = (file, data) => {
         let fd;
@@ -233,7 +233,7 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
         return report;
     };
     const prepareServiceObservation = cfgProbe => {
-        check(managedReady && !held && !serviceActive); validate();
+        check(managedReady && !held && !serviceActive&&!finalizationStarted); validate();
         const { prepareWriteObservation } = createRequire(import.meta.url)("tsx/cjs/api").require("./issue118-service-observer.ts", import.meta.url);
         const { menuCreateResponseSchema } = createRequire(import.meta.url)("tsx/cjs/api").require("../features/admin/menus/schemas/menu-response.ts", import.meta.url);
         const probeTarget = structuredClone(cfgProbe.target), mode = cfgProbe.mode;
@@ -362,8 +362,22 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
             },
         };
     };
-    return { prepareServiceObservation, async execute() {
-        check(!used); used = true;
+    return { prepareServiceObservation, async finalizeActors(){
+        check(!finalizationStarted&&!serviceActive);finalizationStarted=true;managedReady=false;
+        const list=[...actors.values()];
+        if(list.some(a=>!a.lifecycle?.browser||typeof a.lifecycle?.tracker?.drain!=='function'||typeof a.lifecycle?.tracker?.snapshot!=='function'||!ownedCiActorBoundary({access:a.access,page:a.page,
+            context:a.context,browser:a.lifecycle.browser,expectedOwnerId:a.expectedUserId,drainRoutes:()=>a.lifecycle.tracker.drain(),readRouteState:()=>a.lifecycle.tracker.snapshot()},true))||
+            new Set(list.map(a=>a.lifecycle.browser)).size!==2){held=true;return {status:'ACTOR_FINALIZATION_HELD_NO_OPERATION',actors:[]};}
+        const results=[];
+        for(const actor of list){const result=await finalizeOwnedCiActor({access:actor.access,page:actor.page,context:actor.context,
+            browser:actor.lifecycle.browser,expectedOwnerId:actor.expectedUserId,drainRoutes:()=>actor.lifecycle.tracker.drain(),
+            readRouteState:()=>actor.lifecycle.tracker.snapshot(),
+            attempts:{contextCreateAttempted:true,browserLaunchAttempted:true},onStage:actor.lifecycle.onStage});
+            results.push({owner:actor.binding.owner,result});if(!result.complete)held=true;
+        }
+        return {status:results.every(r=>r.result.complete)?'OWNED_ACTORS_FINISHED_NOT_LIVE_PASS':'ACTOR_FINALIZATION_UNVERIFIED',actors:results};
+    },async execute() {
+        check(!used&&!finalizationStarted); used = true;
         const results = []; let report;
         try {
             validate(); for (const owner of owners) await verifyActor(owner);
@@ -783,6 +797,13 @@ export async function drainReadCloseRoutes(getPending,getGeneration,{timeoutMs=1
         return {status:'DRAIN_TIMEOUT',quietWindowObserved:false};
     }catch{return {status:'DRAIN_OBSERVATION_FAILED',quietWindowObserved:false};}
 }
+export function createCiRouteLifecycleTracker(){
+    const pending=new Set();let started=0,settled=0;
+    return {wrap:handler=>async route=>{const token={};pending.add(token);started++;
+        try{return await handler(route);}finally{pending.delete(token);settled++;}},
+        snapshot:()=>({started,settled,pending:pending.size}),
+        drain:()=>drainReadCloseRoutes(()=>pending.size,()=>started)};
+}
 export function readCloseRequestObservation(request,sequence,lifecycle) {
     const out={sequence:Number.isSafeInteger(sequence)&&sequence>0?sequence:null,
         started:transportLifecycleSnapshot(lifecycle?.phase,lifecycle?.observedUtc),pending:true,originRole:'OTHER',method:'OTHER',kind:'OTHER',resourceType:'other',queryPresent:false};
@@ -878,6 +899,7 @@ export async function runLive() {
     const ledger = newWriteLedger(); report.writes = ledger;
     const requestOperations = new WeakMap();
     const readCloseRequestEntries=new WeakMap(),pendingReadCloseRoutes=new Set();
+    const ciRouteLifecycle=createCiRouteLifecycleTracker();
     let activeOperation;
     let ciAccess;
     let ciTransportFailed = false;
@@ -941,7 +963,7 @@ export async function runLive() {
         save();
         markLifecycle('AUTHENTICATION');
         const setupStage = stage => { report.stage = stage; (report.setupStages ??= []).push(stage); save(); };
-        if (ciMode) ciAccess = await createCiAccess(process.env, fetch, setupStage, {
+        if (ciMode) ciAccess = await createCiAccess({...process.env,ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'}, fetch, setupStage, {
             authentication: progress => { report.authenticationProgress = progress; save(); },
             session: progress => { report.sessionIdentity=progress;save(); },
             handshake: progress => { report.initialHandshake = progress; save(); },
@@ -957,7 +979,7 @@ export async function runLive() {
         browser = await browserSetupStage("BROWSER_LAUNCH", () => chromium.launch({ headless: ciMode, ...(ciMode ? { channel: "chromium" } : {}) }), setupStage);
         contextCreateAttempted = true;
         context = await browserSetupStage("BROWSER_CONTEXT", () => browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: false, serviceWorkers: "block" }), setupStage);
-        const ciRoute = async route => {
+        const ciRoute = ciRouteLifecycle.wrap(async route => {
             const sequence = ++routeSequence, started = transportLifecycleSnapshot(lifecyclePhase);
             let entry;
             try {
@@ -992,7 +1014,7 @@ export async function runLive() {
                 save();
             }
             finally{if(entry){entry.pending=false;entry.finished=transportLifecycleSnapshot(lifecyclePhase);pendingReadCloseRoutes.delete(entry);report.readCloseRouteCounts.settled++;save();}}
-        };
+        });
         if (ciAccess) await context.route("**/*", ciRoute);
         context.on("response", response => {
             const entry=readCloseRequestEntries.get(response.request());if(entry){entry.browserResponse={...transportLifecycleSnapshot(lifecyclePhase),status:transportObservation(entry.originRole,entry.method,response.status(),'NONE').status};save();}
@@ -1148,19 +1170,17 @@ export async function runLive() {
         if (ledger.held) report.residualRisk = "Original write may commit after timeout, transport failure or last GET. No further write/cleanup/retry. Read-only reconciliation must establish the original operation outcome, creationOperationId/name, current API/DB state and audit history; otherwise keep HOLD.";
         if (ciAccess) report.authenticationProgress = ciAccess.authenticationProgress();
         if (ciAccess) report.initialHandshake = ciAccess.handshakeProgress();
-        if (ciAccess && page) {
-            markLifecycle('SIGNOUT');
-            report.authenticationCleanup = await ciAccess.signOut(page);
-            if(readCloseOnly)report.sessionIdentity=ciAccess.sessionObservation();
-            markLifecycle('SIGNOUT_FINISHED');
-        }
-        if(readCloseOnly&&context){
-            markLifecycle('ROUTE_DRAIN_START');
-            report.readCloseDrain=await drainReadCloseRoutes(()=>pendingReadCloseRoutes.size,()=>routeSequence);
-            if(report.readCloseDrain.status!=='QUIET_CONFIRMED')ciTransportFailed=true;
-            markLifecycle('ROUTE_DRAIN_FINISHED');save();
-        }
-        report.localClose = await closeIsolatedBrowser(context, browser, { browserLaunchAttempted, contextCreateAttempted }, markLifecycle);
+        if(ciAccess&&page){
+            const finalized=await finalizeOwnedCiActor({access:ciAccess,page,context,browser,expectedOwnerId:ciIdentity.ownerId,
+                drainRoutes:()=>ciRouteLifecycle.drain(),readRouteState:()=>ciRouteLifecycle.snapshot(),attempts:{browserLaunchAttempted,contextCreateAttempted},onStage:markLifecycle});
+            report.authenticationCleanup=finalized.authenticationCleanup;report.sessionIdentity=finalized.sessionIdentity;
+            report.ciRouteDrain=finalized.drain;report.ciRouteLifecycle=ciRouteLifecycle.snapshot();
+            if(report.ciRouteLifecycle.pending!==0||report.ciRouteLifecycle.started!==report.ciRouteLifecycle.settled)ciTransportFailed=true;
+            if(readCloseOnly)report.readCloseDrain=finalized.drain;
+            report.localClose=finalized.localClose;
+            if(!finalized.complete)ciTransportFailed=true;
+        }else report.localClose = await closeIsolatedBrowser(context, browser, { browserLaunchAttempted, contextCreateAttempted }, markLifecycle);
+        if(!report.localClose)report.localClose={allLocalClosed:false,lifecycleObservationFailed:true};
         if(readCloseOnly){report.pendingReadCloseRoutes=pendingReadCloseRoutes.size;if(report.pendingReadCloseRoutes||report.readCloseRouteCounts?.started!==report.readCloseRouteCounts?.settled)ciTransportFailed=true;}
         markLifecycle('LOCAL_CLOSE_FINISHED');
         report.browserClose = report.localClose.allLocalClosed ? "CONFIRMED" : "UNVERIFIED";

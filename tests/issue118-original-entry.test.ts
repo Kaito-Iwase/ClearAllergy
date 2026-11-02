@@ -161,6 +161,40 @@ async function withClaims(action: (directory: string) => Promise<void>) {
         rmSync(directory, { recursive: true });
     }
 }
+test('managed preparation finalizes separately owned A/B sessions through the shared lifecycle without enabling a live entry',async()=>{
+    for(const fault of ['OK','B_LEGACY','SWAP_BROWSER','LATE_ROUTE']){
+    await withClaims(async directory=>{
+        const f=managedFixture(directory),calls:string[]=[];
+        const lifecycles=[];
+        for(const actor of f.actors){
+            const session={id:'sess_Synthetic'+actor.binding.owner,ownerId:actor.expectedUserId,providerCreatedUtc:new Date().toISOString(),
+                ownerVerified:true,eligibleForCleanup:true,providerStatus:'active',providerTerminationConfirmed:false,frontendSignOutAcknowledged:false,canonicalReadAttempts:1};
+            const browser={close:async()=>{calls.push(actor.binding.owner+':browser');}};
+            Object.assign(actor.context,{close:async()=>{calls.push(actor.binding.owner+':context');},browser:()=>browser});
+            Object.assign(actor.access,{sessionLifecycleMode:()=>fault==='B_LEGACY'&&actor.binding.owner==='S2'?'LEGACY_UNTRACKED':'TRACKED_OWNER_SESSION',sessionObservation:()=>session,signOut:async()=>{
+                calls.push(actor.binding.owner+':signout');session.providerStatus='removed';session.providerTerminationConfirmed=true;
+                session.frontendSignOutAcknowledged=true;session.canonicalReadAttempts=2;return 'SIGNOUT_CONFIRMED';}});
+            const lifecycle={browser,
+                tracker:{snapshot:()=>fault==='LATE_ROUTE'&&actor.binding.owner==='S2'?{started:1,settled:0,pending:1}:{started:0,settled:0,pending:0},drain:async()=>{calls.push(actor.binding.owner+':drain');return {status:'QUIET_CONFIRMED',pending:0,generation:0,quietWindowObserved:true};}}};
+            lifecycles.push(lifecycle);Object.assign(actor,{lifecycle});
+        }
+        if(fault==='SWAP_BROWSER')[lifecycles[0].browser,lifecycles[1].browser]=[lifecycles[1].browser,lifecycles[0].browser];
+        const run=prepareOriginalBatchRun(f.input),result=await run.finalizeActors();
+        if(['B_LEGACY','SWAP_BROWSER'].includes(fault)){assert.equal(result.status,'ACTOR_FINALIZATION_HELD_NO_OPERATION');assert.deepEqual(calls,[]);}
+        else{
+            assert.equal(result.status,fault==='OK'?'OWNED_ACTORS_FINISHED_NOT_LIVE_PASS':'ACTOR_FINALIZATION_UNVERIFIED');
+            assert.equal(result.actors.every((a:{result:{complete:boolean}})=>a.result.complete),fault==='OK');
+            assert.deepEqual(calls,['S1:signout','S1:drain','S1:context','S1:browser','S2:signout','S2:drain','S2:context','S2:browser']);
+        }
+        assert.equal(f.calls.length,0);assert.equal(readdirSync(directory).length,0);
+        await assert.rejects(run.finalizeActors());await assert.rejects(run.execute());
+    });
+    }
+    await withClaims(async directory=>{
+        const f=managedFixture(directory),result=await prepareOriginalBatchRun(f.input).finalizeActors();
+        assert.equal(result.status,'ACTOR_FINALIZATION_HELD_NO_OPERATION');assert.equal(f.calls.length,0);
+    });
+});
 test("未有効化の単一managed runは原本T2→独立T3→独立T4を49送信で接続し、claimと観測終了を確認する", async () => withClaims(async directory => {
     const f = managedFixture(directory), result = await prepareOriginalBatchRun(f.input).execute();
     assert.equal(result.status, "MANAGED_ADAPTER_SEQUENCE_CONFIRMED_NOT_LIVE_PASS", JSON.stringify(result.results.at(-1)));

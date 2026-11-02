@@ -9,13 +9,68 @@ import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityRe
     transportLifecycleSnapshot, recordTransportDiagnostic, readCloseRequestAllowed, observeReadCloseFixture,
     readCloseFixtureId, readCloseResult, guardReadCloseRoute, createReadCloseAuthPolicyCandidate,
     readCloseDirectFetch,createVerifiedReadCloseAuthPolicyCandidate,verifiedReadCloseAction,
-    readCloseRequestObservation,observeReadCloseRoute,recordReadClosePolicy,recordReadCloseHandlerFailure,assertReadCloseSignoutReady,drainReadCloseRoutes } from "../scripts/check-issue118-live-t1-browser.mjs";
-import { closeIsolatedBrowser } from "../scripts/issue118-close-browser.mjs";
+    readCloseRequestObservation,observeReadCloseRoute,recordReadClosePolicy,recordReadCloseHandlerFailure,assertReadCloseSignoutReady,drainReadCloseRoutes,createCiRouteLifecycleTracker } from "../scripts/check-issue118-live-t1-browser.mjs";
+import { closeIsolatedBrowser,finalizeOwnedCiActor } from "../scripts/issue118-close-browser.mjs";
 import { routePreviewRequest } from "../scripts/issue118-preview-transport.mjs";
 import {ciIdentity} from '../scripts/issue118-ci-auth.mjs';
 const readCloseEvidence=()=>({readCloseDrain:{status:'QUIET_CONFIRMED'},readOnlyApiRequests:[{kind:'SHOP',status:200,responseObserved:true},{kind:'FIXTURE',status:200,responseObserved:true}],
     sessionIdentity:{id:'sess_Unit12345678901234567890',ownerId:ciIdentity.ownerId,ownerVerified:true,
         providerTerminationConfirmed:true,frontendSignOutAcknowledged:true,providerCreatedUtc:new Date().toISOString()}});
+
+test('shared owned actor finalizer confirms exact session, drains before close and refuses duplicate/unknown/mismatched state',async()=>{
+    const fixture=(change={})=>{
+        const calls=[],session={...readCloseEvidence().sessionIdentity,eligibleForCleanup:true,providerStatus:'active',canonicalReadAttempts:1};
+        const context={close:async()=>{calls.push('context');},browser:()=>browser},browser={close:async()=>{calls.push('browser');}},page={context:()=>context};
+        const access={sessionLifecycleMode:()=> 'TRACKED_OWNER_SESSION',sessionObservation:()=>session,
+            signOut:async()=>{calls.push('signout');session.providerStatus='removed';session.canonicalReadAttempts=2;return 'SIGNOUT_CONFIRMED';}};
+        const input={access,page,context,browser,expectedOwnerId:ciIdentity.ownerId,
+            readRouteState:()=>({started:1,settled:1,pending:0}),
+            drainRoutes:async()=>{calls.push('drain');return {status:'QUIET_CONFIRMED',pending:0,generation:1,quietWindowObserved:true};},
+            attempts:{contextCreateAttempted:true,browserLaunchAttempted:true},...change};
+        return {calls,session,input};
+    };
+    const ok=fixture();assert.equal((await finalizeOwnedCiActor(ok.input)).complete,true);
+    assert.deepEqual(ok.calls,['signout','drain','context','browser']);
+    assert.equal((await finalizeOwnedCiActor(ok.input)).complete,false);assert.equal(ok.calls.length,4);
+    for(const state of [{ownerVerified:false},{eligibleForCleanup:false},{ownerId:'user_other'},{providerCreatedUtc:'invalid'}]){
+        const f=fixture();Object.assign(f.session,state);const r=await finalizeOwnedCiActor(f.input);
+        assert.equal(r.complete,false);assert.ok(!f.calls.includes('signout'));assert.deepEqual(f.calls,['drain','context','browser']);
+    }
+    for(const fault of ['signout','drain','context','browser','status','session','observer','lateRoute']){
+        const f=fixture();
+        if(fault==='signout')f.input.access.signOut=async()=>{throw Error('SYNTHETIC_SECRET');};
+        if(fault==='drain')f.input.drainRoutes=async()=>({status:'DRAIN_TIMEOUT'});
+        if(fault==='context'||fault==='browser')f.input[fault].close=async()=>{throw Error('SYNTHETIC_SECRET');};
+        if(fault==='status')f.input.access.signOut=async()=>{f.session.canonicalReadAttempts=2;return 'SIGNOUT_CONFIRMED';};
+        if(fault==='session')f.input.access.signOut=async()=>{f.session.id='sess_different';return 'SIGNOUT_CONFIRMED';};
+        if(fault==='observer')f.input.onStage=()=>{throw Error('SYNTHETIC_SECRET');};
+        if(fault==='lateRoute')f.input.readRouteState=()=>({started:2,settled:1,pending:1});
+        const result=await finalizeOwnedCiActor(f.input);assert.equal(result.complete,false);assert.doesNotMatch(JSON.stringify(result),/SYNTHETIC_SECRET/);
+    }
+    const secret=fixture();secret.session.secret='SYNTHETIC_SECRET';secret.input.drainRoutes=async()=>({status:'QUIET_CONFIRMED',pending:0,generation:1,quietWindowObserved:true,secret:'SYNTHETIC_SECRET'});
+    assert.doesNotMatch(JSON.stringify(await finalizeOwnedCiActor(secret.input)),/SYNTHETIC_SECRET/);
+});
+
+test('T1/shared tracker waits for a real delayed routed response before closing the owned actor',async()=>{
+    const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH||'playwright'),browser=await chromium.launch({headless:true,channel:'chromium'});
+    const context=await browser.newContext({serviceWorkers:'block'}),tracker=createCiRouteLifecycleTracker();let finished=false;
+    await context.route('**/*',tracker.wrap(async route=>{
+        if(route.request().url().endsWith('/admin/shop'))await new Promise(resolve=>setTimeout(resolve,150));
+        await route.fulfill({status:200,contentType:'text/html',body:'<link rel="icon" href="data:,">offline shared actor'});finished=true;
+    }));
+    try{
+        const page=await context.newPage();await page.goto(target.origin+'/admin/login');finished=false;
+        const session={...readCloseEvidence().sessionIdentity,eligibleForCleanup:true,providerStatus:'active',canonicalReadAttempts:1};
+        const access={sessionLifecycleMode:()=> 'TRACKED_OWNER_SESSION',sessionObservation:()=>session,signOut:async()=>{
+            await page.evaluate(()=>{void fetch('/admin/shop').catch(()=>{});});session.providerStatus='removed';session.canonicalReadAttempts=2;return 'SIGNOUT_CONFIRMED';}};
+        const result=await finalizeOwnedCiActor({access,page,context,browser,expectedOwnerId:ciIdentity.ownerId,drainRoutes:()=>tracker.drain(),
+            readRouteState:()=>tracker.snapshot(),
+            attempts:{browserLaunchAttempted:true,contextCreateAttempted:true}});
+        assert.equal(result.complete,true);assert.equal(finished,true);assert.deepEqual(tracker.snapshot(),{started:2,settled:2,pending:0});
+        const source=readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs',import.meta.url),'utf8');
+        assert.match(source,/ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'/);assert.match(source,/drainRoutes:\(\)=>ciRouteLifecycle.drain\(\)/);
+    }finally{await context.close();await browser.close();}
+});
 
 test('read-close bounded drain observes completion and a quiet generation; timeout/unknown never mean success',async()=>{
     let clock=0,generation=1;

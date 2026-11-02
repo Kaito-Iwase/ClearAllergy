@@ -102,7 +102,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     let authenticated = false;
     let authenticationAttempted = false;
     let sessionCreationAttempted = false;
-    const trackedReadClose=env.ISSUE118_DIAGNOSTIC_MODE==='FIXTURE_READ_CLOSE_ONLY';
+    const trackedReadClose=env.ISSUE118_DIAGNOSTIC_MODE==='FIXTURE_READ_CLOSE_ONLY'||env.ISSUE118_SESSION_LIFECYCLE==='TRACKED_OWNER_SESSION';
     let sessionRecord,signoutAttempted=false,sessionReads=0;
     const emitSession=()=>{try{observers.session?.(structuredClone(sessionRecord));}catch{fail('SESSION_DIAGNOSTIC_FAILED');}};
     let ticketRequests = 0;
@@ -146,6 +146,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
         data.created_at<=Date.now()+30000&&(!sessionRecord.providerCreatedUtc||new Date(data.created_at).toISOString()===sessionRecord.providerCreatedUtc);
     return {
         token,
+        sessionLifecycleMode:()=>trackedReadClose?'TRACKED_OWNER_SESSION':'LEGACY_UNTRACKED',
         read: (api, url) => protectedPreviewFetch(api, url, {}, token()),
         async route(route,requestObserver,assertRequestBeforeSend=()=>{}) {
             const routeObserver=observation=>{transportObserver(observation);if(requestObserver)observeTransport(requestObserver,observation);};
