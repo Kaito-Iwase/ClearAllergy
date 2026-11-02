@@ -448,6 +448,57 @@ function authFixture({ userId = ciIdentity.ownerId, owner = ciIdentity.ownerId, 
     return { calls, visits, page, fetcher, providerSession: () => providerSession, signOutCalls: () => signOutCalls };
 }
 
+test('synthetic main-frame SDK UI/JS canonical transfer is bounded and copies no browser credentials into its second GET', async () => {
+    const origin='https://'+ciIdentity.clerkDomain;
+    for(const [pkg,major,file,version] of [['ui','1','ui.browser.js','1.24.2'],['clerk-js','6','clerk.browser.js','6.24.0']]) {
+        const f=authFixture(), source=`${origin}/npm/@clerk/${pkg}@${major}/dist/${file}`,
+            destination=`${origin}/npm/@clerk/${pkg}@${version}/dist/${file}`;
+        let access,sourceCalls=0,fulfilled=0;const events=[];
+        f.page.goto=async url=>{if(url===target.origin+'/admin/login') await access.route({
+            request:()=>({url:()=>source,method:()=>'GET',resourceType:()=>'script',frame:()=>f.page.mainFrame(),
+                allHeaders:async()=>({Cookie:'SYNTHETIC_PRIVATE',Authorization:'SYNTHETIC_PRIVATE','x-vercel-trusted-oidc-idp-token':'SYNTHETIC_OIDC'})}),
+            fetch:async options=>{sourceCalls++;assert.equal(options.headers['x-vercel-trusted-oidc-idp-token'],undefined);
+                return {status:()=>307,headers:()=>({location:destination})};},
+            fulfill:async({response:r})=>{fulfilled++;assert.equal(r.status(),200);},abort:async()=>assert.fail('valid fixture should not abort')});};
+        access=await createCiAccess(env(),f.fetcher,()=>{},{scriptTransfer:p=>events.push(p)});
+        const model=wireAuthPage(access,f.page);
+        model.responses.push({status:()=>200,headers:()=>({})},{status:()=>200,headers:()=>({'content-type':'application/javascript; charset=utf-8'})});
+        await access.authenticate(f.page);assert.equal(sourceCalls,1);assert.equal(fulfilled,1);assert.equal(model.requests.length,2);
+        const canonical=model.requests[1];assert.equal(canonical.url,destination);
+        assert.deepEqual(canonical.options,{method:'GET',headers:{Accept:'application/javascript'},maxRedirects:0,maxRetries:0,timeout:20000});
+        assert.equal(events.at(-1).responseReady,true);assert.equal(events.at(-1).secondGetAttempted,true);
+        assert.doesNotMatch(JSON.stringify(events),/SYNTHETIC|https:|clerk\.browser|ui\.browser/);
+        assert.equal(await access.signOut(f.page),'SIGNOUT_CONFIRMED');
+    }
+});
+
+test('invalid SDK targets, second redirect, HTML and HTTP failure never start a third GET or Backend authentication', async () => {
+    const origin='https://'+ciIdentity.clerkDomain,source=origin+'/npm/@clerk/ui@1/dist/ui.browser.js';
+    for(const variant of ['foreign','crossmajor','query','wrongpath','xhr','subframe','post','unknown-source','second-redirect','html','http500']) {
+        const f=authFixture();let access,sourceCalls=0,aborts=0;
+        let destination=origin+'/npm/@clerk/ui@1.24.2/dist/ui.browser.js';
+        if(variant==='foreign')destination=destination.replace(origin,'https://cdn.jsdelivr.net');
+        if(variant==='crossmajor')destination=destination.replace('@1.24.2','@2.24.2');
+        if(variant==='query')destination+='?SYNTHETIC_PRIVATE';
+        if(variant==='wrongpath')destination=origin+'/v1/client';
+        f.page.goto=async url=>{if(url===target.origin+'/admin/login')await access.route({
+            request:()=>({url:()=>variant==='unknown-source'?origin+'/npm/@clerk/other@1/dist/browser.js':source,
+                method:()=>variant==='post'?'POST':'GET',resourceType:()=>variant==='xhr'?'xhr':'script',
+                frame:()=>variant==='subframe'?{}:f.page.mainFrame(),allHeaders:async()=>({})}),
+            fetch:async()=>{sourceCalls++;return{status:()=>307,headers:()=>({location:destination})};},
+            fulfill:async()=>assert.fail('invalid transfer must not fulfill'),abort:async()=>{aborts++;}});};
+        access=await createCiAccess(env(),f.fetcher);
+        const model=wireAuthPage(access,f.page);
+        model.responses.push({status:()=>200,headers:()=>({})},{status:()=>variant==='second-redirect'?307:variant==='http500'?500:200,
+            headers:()=>variant==='second-redirect'?{location:source}:{'content-type':variant==='html'?'text/html':'text/javascript'}});
+        await assert.rejects(access.authenticate(f.page),code('CI_AUTHENTICATION_FAILED'));
+        assert.equal(sourceCalls,1);assert.equal(aborts,1);assert.equal(f.calls.length,1);
+        assert.equal(model.requests.length,['foreign','crossmajor','query','wrongpath','xhr','subframe','post','unknown-source'].includes(variant)?1:2);
+        assert.equal(access.authenticationProgress().ownerLookupStarted,false);
+        assert.equal(access.authenticationProgress().sessionCreationAttempted,false);
+    }
+});
+
 test('authentication progress is boolean-only, monotone and distinguishes no token request from unacknowledged issuance', async () => {
     const navigation = authFixture(); navigation.page.goto = async () => { throw Error(syntheticSecret); };
     const notStarted = await createCiAccess(env(), navigation.fetcher);

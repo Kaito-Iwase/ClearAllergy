@@ -1,5 +1,5 @@
 // Test infrastructure only. Importing this module performs no I/O or authentication.
-import { routePreviewRequest, protectedPreviewFetch, previewOrigin, transportObservation, clerkFrontendRedirectObservation,
+import { routePreviewRequest, protectedPreviewFetch, previewOrigin, transportObservation, clerkFrontendRedirectObservation, resolveClerkSdkCanonicalScript,
     transportException, observeTransport } from './issue118-preview-transport.mjs';
 import { createInitialHandshakeCandidate } from './issue118-initial-handshake-candidate.mjs';
 
@@ -165,19 +165,47 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                     if (url.hostname === ciIdentity.clerkDomain && url.pathname === '/v1/client/sign_ins' && route.request().method() === 'POST' && ++ticketRequests > 1) fail('CLERK_TICKET_RETRY_REFUSED');
                     assertTransportOpen();
                     stage = 'FETCH'; flags.fetchStarted = true;
-                    const response = await route.fetch({ url: url.href, headers, maxRedirects: 0, maxRetries: 0, timeout: 20000 });
+                    let response = await route.fetch({ url: url.href, headers, maxRedirects: 0, maxRetries: 0, timeout: 20000 });
                     flags.responseObserved = true; stage = 'STATUS'; status = response.status();
                     if (status >= 300 && status < 400) {
                         flags.redirectRejected = true;
                         if (role === 'CLERK' && method === 'GET') {
+                            let redirectHeaders;
+                            try { redirectHeaders = response.headers(); } catch { /* observation records unreadable headers */ }
+                            const resourceType = typeof request.resourceType === 'function' ? request.resourceType() : undefined;
                             const observation = clerkFrontendRedirectObservation({ requestUrl: url.href, method,
-                                resourceType: typeof request.resourceType === 'function' ? request.resourceType() : undefined,
-                                readHeaders: () => response.headers(),
+                                resourceType, readHeaders: () => { if (!redirectHeaders) fail('HEADERS_UNAVAILABLE'); return redirectHeaders; },
                                 clerkOrigin: 'https://' + ciIdentity.clerkDomain });
                             try { observers.frontendRedirect?.(observation); } catch { fail('AUTH_DIAGNOSTIC_FAILED'); }
+                            // Only public main-frame SDK scripts, not API/XHR, may canonicalize once.
+                            if (status === 307 && resourceType === 'script' && initialPage &&
+                                typeof request.frame === 'function' && request.frame() === initialPage.mainFrame()) {
+                                const resolved = await resolveClerkSdkCanonicalScript(url.href, redirectHeaders);
+                                const transfer = { ...resolved.observation, secondGetAttempted: false, secondStatusReadCompleted: false,
+                                    secondResponseIs200: false, secondHeadersReadCompleted: false, javascriptMime: false, secondLocationAbsent: false, responseReady: false };
+                                const observe = () => { try { observers.scriptTransfer?.({ ...transfer }); } catch { fail('AUTH_DIAGNOSTIC_FAILED'); } };
+                                observe();
+                                if (!resolved.observation.targetAllowed || !resolved.url) fail('CI_SDK_SCRIPT_TARGET_REFUSED');
+                                assertTransportOpen(); transfer.secondGetAttempted = true; observe();
+                                // Same context's correctly scoped Cookie jar; no explicit browser headers,
+                                // Cookie, Authorization, OIDC, testing token, Origin or Referer are copied.
+                                assertTransportOpen();
+                                response = await initialPage.context().request.fetch(resolved.url, { method: 'GET',
+                                    headers: { Accept: 'application/javascript' }, maxRedirects: 0, maxRetries: 0, timeout: 20000 });
+                                assertTransportOpen(); status = response.status(); transfer.secondStatusReadCompleted = true;
+                                transfer.secondResponseIs200 = status === 200; observe();
+                                const finalHeaders = response.headers(); transfer.secondHeadersReadCompleted = true;
+                                transfer.javascriptMime = /^(?:application|text)\/(?:javascript|ecmascript)(?:;|$)/i.test(finalHeaders['content-type'] || '');
+                                transfer.secondLocationAbsent = !Object.keys(finalHeaders).some(key => key.toLowerCase() === 'location');
+                                transfer.responseReady = transfer.secondResponseIs200 && transfer.javascriptMime && transfer.secondLocationAbsent;
+                                observe();
+                                if (!transfer.responseReady) fail('CI_SDK_SCRIPT_RESPONSE_REFUSED');
+                                flags.redirectRejected = false;
+                            }
                         }
-                        fail('CI_EXTERNAL_REDIRECT_REFUSED');
+                        if (flags.redirectRejected) fail('CI_EXTERNAL_REDIRECT_REFUSED');
                     }
+                    assertTransportOpen();
                     stage = 'FULFILL'; flags.fulfillStarted = true;
                     const result = await route.fulfill({ response });
                     transportObserver(transportObservation(role, method, status, 'NONE', flags));

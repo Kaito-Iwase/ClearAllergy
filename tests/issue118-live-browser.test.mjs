@@ -29,6 +29,24 @@ test("fixed setup errors remain distinguishable without provider text or getters
 
 const response = (status, body) => ({ status: () => status, json: async () => body });
 const saved = { menu: { id: "cnewfixture", version: 4, foodVersion: 2, isPublished: true, publicationConfirmedFoodVersion: 2 } };
+test("audit UUID correlation is bounded, non-secret and cannot turn an unknown write into success", async () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    for (const value of [id, null, "SYNTHETIC_PRIVATE_NOT_AN_ID"]) {
+        const ledger=newWriteLedger(),op=beginWrite(ledger,"CREATE");let tracked;
+        await consumeWriteResponse(ledger,op,{...response(201,{id:"cnewfixture"}),headerValue:async name=>{assert.equal(name,"x-request-id");return value;}},undefined,x=>{tracked=x;});
+        assert.equal(tracked,"cnewfixture");confirmWrite(ledger,op);assert.equal(canCleanup(ledger),true);
+        assert.equal(op.auditRequestId,value===id?id:undefined);assert.doesNotMatch(JSON.stringify(op),/SYNTHETIC_PRIVATE/);
+    }
+    const ledger=newWriteLedger(),op=beginWrite(ledger,"CREATE");
+    await assert.rejects(consumeWriteResponse(ledger,op,{status:()=>201,json:async()=>{throw Error("SYNTHETIC_PRIVATE");},headerValue:async()=>id}));
+    assert.equal(op.auditRequestId,id);assert.equal(op.state,"INDETERMINATE");assert.equal(canCleanup(ledger),false);
+    const failed=newWriteLedger(),bad=beginWrite(failed,"CREATE");
+    await consumeWriteResponse(failed,bad,{...response(201,{id:"cknown"}),headerValue:async()=>{throw Error("SYNTHETIC_PRIVATE");}});
+    assert.equal(bad.bodyValidated,true);assert.equal(bad.auditCorrelationReadCompleted,false);assert.equal(bad.createdId,"cknown");
+    const pending=newWriteLedger(),waiting=beginWrite(pending,"CREATE");
+    await consumeWriteResponse(pending,waiting,{...response(201,{id:"cknown"}),headerValue:()=>new Promise(()=>{})});
+    assert.equal(waiting.bodyValidated,true);assert.equal(waiting.auditCorrelationReadCompleted,false);
+});
 
 test("external identity receipt is required, exact and recent", () => {
     const now = Date.parse("2026-10-30T11:00:00Z");

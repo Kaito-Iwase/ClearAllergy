@@ -3,6 +3,53 @@
 export const previewOrigin = 'https://clear-allergy-e2e-nv6akym6f-kaitoexe00-9350s-projects.vercel.app';
 const oidcHeader = 'x-vercel-trusted-oidc-idp-token';
 
+// Local SDK URL builders are loaded lazily: external-receipt guards run before npm install.
+// Public host encoding is used only by the URL builders, never issued/configured as a credential.
+export async function resolveClerkSdkCanonicalScript(source, headers) {
+    const names = ['sdkBuildersLoaded', 'sourceIsJs', 'sourceIsUi', 'sourceMatched', 'singleLocationProperty',
+        'locationIsString', 'locationBounded', 'locationControlAbsent', 'absoluteParseable', 'https',
+        'userinfoAbsent', 'defaultPort', 'queryAbsent', 'fragmentAbsent', 'sameConfiguredClerk',
+        'samePackagePath', 'canonicalVersion', 'sameMajor', 'matchesSdkUrl', 'targetAllowed'];
+    const observation = Object.fromEntries(names.map(key => [key, false]));
+    const result = { observation, url: undefined };
+    try {
+        const origin = 'https://one-dolphin-7936.clerk.accounts.dev';
+        if (typeof source !== 'string' || !source.startsWith(origin + '/npm/@clerk/')) return result;
+        const { clerkJSScriptUrl, clerkUIScriptUrl } = await import('@clerk/shared/loadClerkJsScript');
+        observation.sdkBuildersLoaded = true;
+        const publishableKey = 'pk_test_' + Buffer.from(new URL(origin).hostname + '$').toString('base64');
+        const entries = [{ flag: 'sourceIsJs', build: clerkJSScriptUrl, option: '__internal_clerkJSVersion' },
+            { flag: 'sourceIsUi', build: clerkUIScriptUrl, option: '__internal_clerkUIVersion' }];
+        const entry = entries.find(e => e.build({ publishableKey }) === source);
+        if (!entry) return result;
+        observation[entry.flag] = true; observation.sourceMatched = true;
+        const locations = Object.entries(headers).filter(([key]) => key.toLowerCase() === 'location');
+        observation.singleLocationProperty = locations.length === 1;
+        const location = locations.length === 1 ? locations[0][1] : undefined;
+        observation.locationIsString = typeof location === 'string';
+        observation.locationBounded = observation.locationIsString && location.length > 0 && location.length <= 16384;
+        observation.locationControlAbsent = observation.locationIsString && !/[\u0000-\u0020\u007f]/.test(location);
+        if (!observation.locationBounded || !observation.locationControlAbsent) return result;
+        const target = new URL(location); observation.absoluteParseable = true;
+        observation.https = target.protocol === 'https:'; observation.userinfoAbsent = !target.username && !target.password;
+        observation.defaultPort = !target.port; observation.queryAbsent = !target.search && !location.includes('?');
+        observation.fragmentAbsent = !target.hash && !location.includes('#'); observation.sameConfiguredClerk = target.origin === origin;
+        const path = new URL(source).pathname, start = path.lastIndexOf('@') + 1, end = path.indexOf('/dist/', start);
+        const prefix = path.slice(0, start), suffix = path.slice(end), major = path.slice(start, end);
+        observation.samePackagePath = end > start && target.pathname.startsWith(prefix) && target.pathname.endsWith(suffix);
+        if (!observation.samePackagePath) return result;
+        const version = target.pathname.slice(prefix.length, -suffix.length);
+        observation.canonicalVersion = /^(?:0|[1-9][0-9]{0,5})\.(?:0|[1-9][0-9]{0,5})\.(?:0|[1-9][0-9]{0,5})$/.test(version);
+        observation.sameMajor = version.split('.')[0] === major;
+        if (!observation.canonicalVersion || !observation.sameMajor) return result;
+        const expected = entry.build({ publishableKey, [entry.option]: version });
+        observation.matchesSdkUrl = location === expected && target.href === expected;
+        observation.targetAllowed = names.filter(key => !['sourceIsJs','sourceIsUi','targetAllowed'].includes(key)).every(key => observation[key]);
+        if (observation.targetAllowed) result.url = expected;
+    } catch { /* Unknown provider/SDK errors are a refusal with fixed booleans, never success. */ }
+    return result;
+}
+
 // Observation only: none of these predicates grants permission to follow.
 // Unknown header/URL/resource strings and provider exceptions never leave this function.
 export function clerkFrontendRedirectObservation({ requestUrl: rawRequest, method, resourceType, readHeaders, clerkOrigin }) {

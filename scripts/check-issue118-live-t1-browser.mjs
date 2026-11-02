@@ -519,6 +519,21 @@ export async function consumeWriteResponse(ledger, op, response, menuId, trackCr
     } catch {
         holdWrite(ledger, op, "WRITE_RESPONSE_UNCONFIRMED");
         throw Error("WRITE_RESULT_UNCERTAIN");
+    } finally {
+        // Non-secret UUID header only; metadata failure never overrides the write outcome.
+        // Capture after body/created-ID handling, including a failed body parse, with a bound.
+        let timer;
+        try {
+            if (typeof response.headerValue === "function") {
+                op.auditCorrelationReadAttempted = true; op.auditCorrelationReadCompleted = false;
+                const value = await Promise.race([Promise.resolve().then(() => response.headerValue("x-request-id")),
+                    new Promise(resolve => { timer = setTimeout(() => resolve(undefined), 1000); })]);
+                op.auditCorrelationReadCompleted = value !== undefined;
+                op.auditRequestIdValid = typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+                if (op.auditRequestIdValid) op.auditRequestId = value.toLowerCase();
+            }
+        } catch { op.auditCorrelationReadCompleted = false; }
+        finally { clearTimeout(timer); }
     }
 }
 export function protectedApiSnapshot(menu) {
@@ -535,6 +550,8 @@ export function overallResult(flow, cleanup, protection, held, browserClosed = t
 export function state(menu) {
     return { id: menu.id, isPublished: menu.isPublished, version: menu.version,
         foodVersion: menu.foodVersion, publicationConfirmedFoodVersion: menu.publicationConfirmedFoodVersion,
+        reviewedFoodVersionObserved: menu.reviewedFoodVersion === null || Number.isSafeInteger(menu.reviewedFoodVersion),
+        ...(menu.reviewedFoodVersion === null || Number.isSafeInteger(menu.reviewedFoodVersion) ? { reviewedFoodVersion: menu.reviewedFoodVersion } : {}),
         priceYen: menu.priceYen, milk: menu.allergens.find(a => a.slug === "milk")?.status,
         unknown: menu.allergens.filter(a => a.status === "UNKNOWN").length };
 }
@@ -591,7 +608,7 @@ export async function runLive() {
         sessionExport: false, traces: false, dbObservation: "NOT_RUN: app API is not independent SQL",
         runnerScriptSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
         externalIdentityReceiptSha256: createHash("sha256").update(identityBytes).digest("hex"),
-        run: randomUUID(), stage: "LOGIN", phase: "NONE", observations: [], requests: [], status: "RUNNING",
+        run: randomUUID(), startedUtc: new Date().toISOString(), stage: "LOGIN", phase: "NONE", observations: [], requests: [], status: "RUNNING",
         flow: "NOT_RUN", cleanup: "NOT_REQUIRED_NO_KNOWN_FIXTURE", protection: "NOT_CHECKED" };
     const save = () => writeFileSync(join(output, "result.json"), JSON.stringify(report, null, 2));
     let browser;
@@ -624,16 +641,19 @@ export async function runLive() {
         assertIdentityReceipt(identityReceipt);
         if (ciTransportFailed) throw Error("CI_TRANSPORT_HELD");
         const op = beginWrite(ledger, nextPhase); activeOperation = op;
+        op.startedUtc = new Date().toISOString();
+        op.auditActionExpected = ({ CREATE: "menu_create", INITIAL_PUBLISH: "menu_publish", STOP: "menu_unpublish",
+            CORRECT: "menu_update", REPUBLISH: "menu_publish", CLEANUP: "menu_unpublish" })[nextPhase];
         phase = nextPhase; report.stage = nextPhase; save();
         try {
             const response = page.waitForResponse(r => r.url() === target.origin + path && r.request().method() === method && requestOperations.get(r.request()) === op, { timeout: 20000 });
             const body = response.then(actual => consumeWriteResponse(ledger, op, actual, menuId, id => { menuId = id; report.fixtureId = id; save(); }));
             const [, parsed] = await Promise.all([click(), body]);
-            confirmWrite(ledger, op); phase = "NONE"; activeOperation = undefined; save();
+            confirmWrite(ledger, op); op.acknowledgedUtc = new Date().toISOString(); phase = "NONE"; activeOperation = undefined; save();
             return parsed;
         } catch {
             // Neither a timeout nor a GET showing private proves the original request cannot commit later.
-            holdWrite(ledger, op, "ORIGINAL_REQUEST_NOT_CONFIRMED"); phase = "HOLD"; save();
+            holdWrite(ledger, op, "ORIGINAL_REQUEST_NOT_CONFIRMED"); op.heldUtc = new Date().toISOString(); phase = "HOLD"; save();
             throw Error("WRITE_RESULT_UNCERTAIN");
         }
     };
@@ -651,6 +671,8 @@ export async function runLive() {
             authentication: progress => { report.authenticationProgress = progress; save(); },
             handshake: progress => { report.initialHandshake = progress; save(); },
             frontendRedirect: observation => { report.frontendRedirect ??= observation; save(); },
+            scriptTransfer: observation => { const events = report.clerkScriptTransfers ??= [];
+                if (events.length < 64) events.push(observation); else report.clerkScriptTransfersTruncated = true; save(); },
             transport: observation => {
                 recordTransportDiagnostic(report, observation);
                 save();

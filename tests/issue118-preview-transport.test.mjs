@@ -2,12 +2,41 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { previewOrigin, scopedOidcHeaders, protectedPreviewFetch, routePreviewRequest, clerkFrontendRedirectObservation } from '../scripts/issue118-preview-transport.mjs';
+import { previewOrigin, scopedOidcHeaders, protectedPreviewFetch, routePreviewRequest, clerkFrontendRedirectObservation, resolveClerkSdkCanonicalScript } from '../scripts/issue118-preview-transport.mjs';
 import { target } from '../scripts/check-issue118-live-t1-browser.mjs';
 
 const token = 'synthetic.payload.signature';
 const header = 'x-vercel-trusted-oidc-idp-token';
 const assertCode = code => error => error.message === code && !error.cause;
+test('fixed installed SDK admits only its JS/UI major URL to same-package same-major canonical version URL', async () => {
+    const origin = 'https://one-dolphin-7936.clerk.accounts.dev';
+    for (const [pkg,major,file,version,flag] of [['clerk-js','6','clerk.browser.js','6.24.0','sourceIsJs'],['ui','1','ui.browser.js','1.24.2','sourceIsUi']]) {
+        const source = `${origin}/npm/@clerk/${pkg}@${major}/dist/${file}`;
+        const destination = `${origin}/npm/@clerk/${pkg}@${version}/dist/${file}`;
+        const allowed = await resolveClerkSdkCanonicalScript(source, { location: destination });
+        assert.equal(allowed.url, destination); assert.equal(allowed.observation.targetAllowed, true);
+        assert.equal(allowed.observation[flag], true); assert.ok(Object.values(allowed.observation).every(v => typeof v === 'boolean'));
+        const invalid = [source, destination.replace(origin,'https://cdn.clerk.com'), destination.replace('https:','http:'),
+            destination.replace(origin,origin+':444'), destination.replace('https://','https://u:SYNTHETIC_PRIVATE@'),
+            destination+'?',destination+'?SYNTHETIC_PRIVATE',destination+'#',destination+'#SYNTHETIC_PRIVATE',destination+'\n',
+            destination.replace('@'+version,'@'+(Number(major)+1)+'.24.0'),destination.replace('@'+version,'@'+major+'.024.0'),
+            destination.replace('@'+version,'@'+version+'-snapshot.x'),destination.replace('/dist/','/private/'),
+            destination.replace('/dist/','/dist/../dist/'),destination.replace('@'+version,'@'+version.replaceAll('.','%2E')),
+            destination.replace(pkg+'@','other@'),'/npm/@clerk/'+pkg+'@'+version+'/dist/'+file,
+            '//'+new URL(origin).hostname+'/npm/@clerk/'+pkg+'@'+version+'/dist/'+file];
+        for (const value of invalid) {
+            const r = await resolveClerkSdkCanonicalScript(source, { location:value });
+            assert.equal(r.url, undefined); assert.equal(r.observation.targetAllowed, false);
+            assert.doesNotMatch(JSON.stringify(r.observation), /SYNTHETIC|https:|clerk\.browser|ui\.browser/);
+        }
+        for (const changed of [source+'?',source+'#x',source.replace('/dist/','/%64ist/'),source.replace(origin,'https://other.invalid')])
+            assert.equal((await resolveClerkSdkCanonicalScript(changed,{location:destination})).observation.sourceMatched,false);
+        const duplicate = await resolveClerkSdkCanonicalScript(source,{location:destination,Location:destination});
+        assert.equal(duplicate.url,undefined);assert.equal(duplicate.observation.singleLocationProperty,false);
+        const throwing = {};Object.defineProperty(throwing,'location',{enumerable:true,get(){throw Error('SYNTHETIC_PRIVATE');}});
+        assert.equal((await resolveClerkSdkCanonicalScript(source,throwing)).url,undefined);
+    }
+});
 test('Clerk frontend Location classifier returns only booleans across valid, hostile, missing and throwing inputs', () => {
     const clerkOrigin = 'https://one-dolphin-7936.clerk.accounts.dev', secret = 'SYNTHETIC_PRIVATE_VALUE';
     const options = { requestUrl: clerkOrigin + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js', method: 'GET', resourceType: 'script', clerkOrigin };
