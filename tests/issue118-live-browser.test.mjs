@@ -9,13 +9,26 @@ import { allowedMutation, assertAnchor, stopWithDialog, target, assertIdentityRe
     transportLifecycleSnapshot, recordTransportDiagnostic, readCloseRequestAllowed, observeReadCloseFixture,
     readCloseFixtureId, readCloseResult, guardReadCloseRoute, createReadCloseAuthPolicyCandidate,
     readCloseDirectFetch,createVerifiedReadCloseAuthPolicyCandidate,verifiedReadCloseAction,
-    readCloseRequestObservation,observeReadCloseRoute,recordReadClosePolicy,recordReadCloseHandlerFailure,assertReadCloseSignoutReady } from "../scripts/check-issue118-live-t1-browser.mjs";
+    readCloseRequestObservation,observeReadCloseRoute,recordReadClosePolicy,recordReadCloseHandlerFailure,assertReadCloseSignoutReady,drainReadCloseRoutes } from "../scripts/check-issue118-live-t1-browser.mjs";
 import { closeIsolatedBrowser } from "../scripts/issue118-close-browser.mjs";
 import { routePreviewRequest } from "../scripts/issue118-preview-transport.mjs";
 import {ciIdentity} from '../scripts/issue118-ci-auth.mjs';
-const readCloseEvidence=()=>({readOnlyApiRequests:[{kind:'SHOP',status:200,responseObserved:true},{kind:'FIXTURE',status:200,responseObserved:true}],
+const readCloseEvidence=()=>({readCloseDrain:{status:'QUIET_CONFIRMED'},readOnlyApiRequests:[{kind:'SHOP',status:200,responseObserved:true},{kind:'FIXTURE',status:200,responseObserved:true}],
     sessionIdentity:{id:'sess_Unit12345678901234567890',ownerId:ciIdentity.ownerId,ownerVerified:true,
         providerTerminationConfirmed:true,frontendSignOutAcknowledged:true,providerCreatedUtc:new Date().toISOString()}});
+
+test('read-close bounded drain observes completion and a quiet generation; timeout/unknown never mean success',async()=>{
+    let clock=0,generation=1;
+    const time={now:()=>clock,wait:async ms=>{clock+=ms;},timeoutMs:300,quietMs:30,pollMs:5};
+    assert.equal((await drainReadCloseRoutes(()=>clock<25?1:0,()=>generation,time)).status,'QUIET_CONFIRMED');assert.equal(clock,55);
+    clock=0;let generationReads=0;
+    const quiet=await drainReadCloseRoutes(()=>0,()=>{if(++generationReads===3)generation++;return generation;},time);
+    assert.equal(quiet.status,'QUIET_CONFIRMED');assert.equal(generationReads,9);assert.equal(clock,40);
+    clock=0;assert.equal((await drainReadCloseRoutes(()=>1,()=>1,{...time,timeoutMs:25,quietMs:10})).status,'DRAIN_TIMEOUT');
+    for(const get of [()=>{throw Error('SYNTHETIC_SECRET');},()=>-1,()=> 'SYNTHETIC_SECRET']){
+        const result=await drainReadCloseRoutes(get,()=>1);assert.equal(result.status,'DRAIN_OBSERVATION_FAILED');assert.doesNotMatch(JSON.stringify(result),/SYNTHETIC/);
+    }
+});
 
 test('first refusal/app refusal/failure survive full normal samples and never serialize unknown predicate/error values',()=>{
     const report={readClosePolicyObservations:Array.from({length:128},()=>({decision:'USE_EXISTING_TRANSPORT'}))};
@@ -186,11 +199,12 @@ test('real browser transport runs fixed Clerk hooks for both next-version branch
     const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright'),browser=await chromium.launch({headless:true,channel:'chromium'});
     try{for(const nextVersion of ['16.4.1','']){
     const context=await browser.newContext({serviceWorkers:'block'});
-    let phase='AUTHENTICATION',forwards=[],refused=0,suppressed=0;
+    let phase='AUTHENTICATION',forwards=[],refused=0,suppressed=0,pending=0,generation=0;
     const receipt={...target,environment:'Preview',status:'Ready',verifiedBy:'human',observedUtc:new Date().toISOString(),evidenceReference:'Synthetic offline browser control'};
     let readsComplete=false;
     const policy=createVerifiedReadCloseAuthPolicyCandidate(receipt,()=>{assert.equal(readsComplete,true);});
     await context.route('**/*',async route=>{
+        pending++;generation++;
         try {
             if(!await guardReadCloseRoute(route,()=>{refused++;},()=>{}, {policy,getPhase:()=>phase})) {suppressed++;return;}
             const request=route.request(),url=new URL(request.url());forwards.push({phase,method:request.method(),path:url.pathname});
@@ -198,9 +212,11 @@ test('real browser transport runs fixed Clerk hooks for both next-version branch
                 await route.fulfill({status:200,headers:{'access-control-allow-origin':target.origin,'access-control-allow-methods':'DELETE, OPTIONS'},body:'{}'});return;
             }
             if(request.method()==='POST') {policy.assertBeforeSend(request,()=>phase);assert.equal(request.postData(),body);await route.fulfill({status:200,contentType:'text/x-component',body:'0:null\n'});return;}
+            if(phase==='SIGNOUT'&&request.method()==='GET')await new Promise(resolve=>setTimeout(resolve,200));
             await route.fulfill({status:200,contentType:url.pathname.startsWith('/api/')?'application/json':'text/html',
                 body:url.pathname.startsWith('/api/')?'{}':'<link rel="icon" href="data:,">offline hook fixture'});
         }catch { /* Fixed refusal is counted; never forward after a policy error. */ }
+        finally{pending--;}
     });
     try {
         const page=await context.newPage();await page.goto(target.origin+'/admin/login');
@@ -221,8 +237,9 @@ test('real browser transport runs fixed Clerk hooks for both next-version branch
             await fetch('https://one-dolphin-7936.clerk.accounts.dev/v1/client/sessions/synthetic/revoke',{method:'DELETE'});
             if(window.__internal_onAfterSetActive()!==undefined)throw Error('REFRESH_MUST_BE_VOID');
         });
-        // Explicit test-controller drain, NOT a completion guarantee from Clerk/router.refresh.
-        await page.evaluate(()=>Promise.all(window.__fixtureRefreshes));
+        // SDK refresh returns void. Wait for the managed route lifecycle, not SDK completion.
+        const drained=await drainReadCloseRoutes(()=>pending,()=>generation);
+        assert.equal(drained.status,'QUIET_CONFIRMED');assert.equal(pending,0);
         assert.equal(await page.evaluate(()=>window.__fixtureRefreshes.length),2);
         assert.equal(refused,0);assert.equal(suppressed,1);
         assert.deepEqual(forwards.filter(x=>x.method==='POST'),[{phase:'AUTHENTICATION',method:'POST',path:'/admin/login'},
@@ -312,7 +329,8 @@ test('read-close result never turns transport/closure/mutation uncertainty into 
     assert.equal(readCloseResult(report,false,true).status,'READ_CLOSE_DIAGNOSTIC_COMPLETE');
     for (const [change,transport,closed] of [[{},true,true],[{},false,false],[{readOnlyRequestRefused:true},false,true],
         [{firstTransportFailure:{originRole:'APP',method:'GET',status:500,exception:'NONE'}},false,true],
-        [{writes:{held:false,operations:[{}]}},false,true],[{authenticationCleanup:'SIGNOUT_UNVERIFIED'},false,true],[{flow:'FAIL'},false,true]])
+        [{writes:{held:false,operations:[{}]}},false,true],[{authenticationCleanup:'SIGNOUT_UNVERIFIED'},false,true],[{flow:'FAIL'},false,true],
+        [{readCloseDrain:undefined},false,true],[{readCloseDrain:{status:'DRAIN_TIMEOUT'}},false,true],[{readCloseDrain:{status:'DRAIN_OBSERVATION_FAILED'}},false,true]])
         assert.equal(readCloseResult({...report,...change},transport,closed).status,'FAIL_OR_INCOMPLETE');
     assert.equal(readCloseResult({...report,writes:{held:true,operations:[]}},false,true).status,'HOLD_UNCERTAIN_WRITE');
     for(const change of [{readOnlyApiRequests:[]},{readOnlyApiRequests:[report.readOnlyApiRequests[0],report.readOnlyApiRequests[0]]},

@@ -396,7 +396,7 @@ function prepareManagedOriginalBatch(input, { prepareOriginalScenario, projectOr
 
 export function transportLifecycleSnapshot(phase, at = new Date().toISOString()) {
     const phases = ['SETUP', 'AUTHENTICATION', 'APP_FLOW', 'FLOW_VERIFIED', 'CLEANUP',
-        'PROTECTION_CHECK', 'PROTECTION_CHECK_FINISHED', 'SIGNOUT', 'SIGNOUT_FINISHED',
+        'PROTECTION_CHECK', 'PROTECTION_CHECK_FINISHED', 'SIGNOUT', 'SIGNOUT_FINISHED', 'ROUTE_DRAIN_START', 'ROUTE_DRAIN_FINISHED',
         'CONTEXT_CLOSE_START', 'CONTEXT_CLOSE_END', 'BROWSER_CLOSE_START', 'BROWSER_CLOSE_END', 'LOCAL_CLOSE_FINISHED'];
     return { phase: phases.includes(phase) ? phase : 'UNKNOWN',
         observedUtc: typeof at === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(at)
@@ -763,8 +763,25 @@ export function readCloseResult(report, transportFailed, closed) {
         !session.diagnosticObservationFailed&&Number.isFinite(Date.parse(session.providerCreatedUtc));
     const complete = report.flow === 'PASS_READ_ONLY_FIXTURE' && report.cleanup === 'NOT_APPLICABLE_READ_ONLY'
         && report.writes?.operations?.length === 0 && report.authenticationCleanup === 'SIGNOUT_CONFIRMED'
-        && readsConfirmed&&sessionConfirmed&&closed === true && !transportFailed && !report.firstTransportFailure && !report.readOnlyRequestRefused;
+          && readsConfirmed&&sessionConfirmed&&report.readCloseDrain?.status==='QUIET_CONFIRMED'&&closed === true && !transportFailed && !report.firstTransportFailure && !report.readOnlyRequestRefused;
     return { status: complete ? 'READ_CLOSE_DIAGNOSTIC_COMPLETE' : 'FAIL_OR_INCOMPLETE', exit: complete ? 0 : 1 };
+}
+export async function drainReadCloseRoutes(getPending,getGeneration,{timeoutMs=10000,quietMs=250,pollMs=25,
+    now=()=>performance.now(),wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+    let generation,quietStarted;
+    try {
+        if(!Number.isFinite(timeoutMs)||!Number.isFinite(quietMs)||!Number.isFinite(pollMs)||timeoutMs<quietMs||quietMs<0||pollMs<1)throw Error();
+        const started=now();
+        while(now()-started<=timeoutMs){
+            const pending=getPending(),nextGeneration=getGeneration();
+            if(!Number.isSafeInteger(pending)||pending<0||!Number.isSafeInteger(nextGeneration)||nextGeneration<0)throw Error();
+            if(nextGeneration!==generation||pending!==0)quietStarted=undefined;
+            generation=nextGeneration;
+            if(pending===0){quietStarted??=now();if(now()-quietStarted>=quietMs)return {status:'QUIET_CONFIRMED',pending:0,generation,quietWindowObserved:true};}
+            await wait(pollMs);
+        }
+        return {status:'DRAIN_TIMEOUT',quietWindowObserved:false};
+    }catch{return {status:'DRAIN_OBSERVATION_FAILED',quietWindowObserved:false};}
 }
 export function readCloseRequestObservation(request,sequence,lifecycle) {
     const out={sequence:Number.isSafeInteger(sequence)&&sequence>0?sequence:null,
@@ -1136,6 +1153,12 @@ export async function runLive() {
             report.authenticationCleanup = await ciAccess.signOut(page);
             if(readCloseOnly)report.sessionIdentity=ciAccess.sessionObservation();
             markLifecycle('SIGNOUT_FINISHED');
+        }
+        if(readCloseOnly&&context){
+            markLifecycle('ROUTE_DRAIN_START');
+            report.readCloseDrain=await drainReadCloseRoutes(()=>pendingReadCloseRoutes.size,()=>routeSequence);
+            if(report.readCloseDrain.status!=='QUIET_CONFIRMED')ciTransportFailed=true;
+            markLifecycle('ROUTE_DRAIN_FINISHED');save();
         }
         report.localClose = await closeIsolatedBrowser(context, browser, { browserLaunchAttempted, contextCreateAttempted }, markLifecycle);
         if(readCloseOnly){report.pendingReadCloseRoutes=pendingReadCloseRoutes.size;if(report.pendingReadCloseRoutes||report.readCloseRouteCounts?.started!==report.readCloseRouteCounts?.settled)ciTransportFailed=true;}
