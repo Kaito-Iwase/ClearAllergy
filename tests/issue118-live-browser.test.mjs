@@ -75,11 +75,12 @@ test('real browser transport runs the installed Clerk activation/read/signout ho
     try {
         const page=await context.newPage();await page.goto(target.origin+'/admin/login');
         await page.addScriptTag({content:`window.next={version:'16.4.1'};const __internal_invokeMiddlewareOnAuthStateChange=true;
-            const router={refresh:()=>fetch(location.href).then(r=>{if(!r.ok)throw Error('REFRESH_FAILED');})};
+            window.__fixtureRefreshes=[];
+            const router={refresh:()=>{window.__fixtureRefreshes.push(fetch(location.href).then(r=>{if(!r.ok)throw Error('REFRESH_FAILED');}));}};
             const invalidateCacheAction=()=>fetch('/admin/login',{method:'POST',headers:{'next-action':${JSON.stringify(verifiedReadCloseAction.reference)},accept:'text/x-component'},body:${JSON.stringify(body)}}).then(r=>{if(!r.ok)throw Error('ACTION_FAILED');});
             ${hooks.__internal_onBeforeSetActive};${hooks.__internal_onAfterSetActive};`});
         await page.evaluate(async()=>{let timer;try{await Promise.race([
-            (async()=>{await window.__internal_onBeforeSetActive('sign-in');await window.__internal_onAfterSetActive();})(),
+            (async()=>{await window.__internal_onBeforeSetActive('sign-in');if(window.__internal_onAfterSetActive()!==undefined)throw Error('REFRESH_MUST_BE_VOID');await Promise.all(window.__fixtureRefreshes);})(),
             new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('OFFLINE_ACTIVATION_TIMEOUT')),5000);})
         ]);}finally{clearTimeout(timer);}});
         phase='APP_FLOW';await page.evaluate(()=>history.pushState({},'', '/admin/shop'));
@@ -88,8 +89,11 @@ test('real browser transport runs the installed Clerk activation/read/signout ho
         phase='SIGNOUT';await page.evaluate(async()=>{
             await window.__internal_onBeforeSetActive('sign-out');
             await fetch('https://one-dolphin-7936.clerk.accounts.dev/v1/client/sessions/synthetic/revoke',{method:'DELETE'});
-            await window.__internal_onAfterSetActive();
+            if(window.__internal_onAfterSetActive()!==undefined)throw Error('REFRESH_MUST_BE_VOID');
         });
+        // Explicit test-controller drain, NOT a completion guarantee from Clerk/router.refresh.
+        await page.evaluate(()=>Promise.all(window.__fixtureRefreshes));
+        assert.equal(await page.evaluate(()=>window.__fixtureRefreshes.length),2);
         assert.equal(refused,0);assert.equal(suppressed,1);
         assert.deepEqual(forwards.filter(x=>x.method==='POST'),[{phase:'AUTHENTICATION',method:'POST',path:'/admin/login'}]);
         assert.equal(forwards.filter(x=>x.phase==='APP_FLOW'&&x.path.startsWith('/api/')).length,2);
