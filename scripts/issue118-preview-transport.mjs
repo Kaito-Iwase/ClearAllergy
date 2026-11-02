@@ -1,6 +1,6 @@
 // Used only by the explicitly guarded CI path; the manual-login path has no OIDC token.
 // No global extraHTTPHeaders: the token belongs to one fixed Preview origin only.
-export const previewOrigin = 'https://clear-allergy-e2e-7kdxp3nys-kaitoexe00-9350s-projects.vercel.app';
+export const previewOrigin = 'https://clear-allergy-e2e-qs7v9eaim-kaitoexe00-9350s-projects.vercel.app';
 const oidcHeader = 'x-vercel-trusted-oidc-idp-token';
 
 // Local SDK URL builders are loaded lazily: external-receipt guards run before npm install.

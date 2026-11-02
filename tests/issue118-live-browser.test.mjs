@@ -520,7 +520,7 @@ test("new Project pin rejects old Project receipts and bootstrap Production", ()
     const now = Date.parse("2026-10-30T17:30:00Z");
     const receipt = { ...target, environment: "Preview", status: "Ready", verifiedBy: "browser_metadata_observer", evidenceReference: "offline synthetic", observedUtc: "2026-10-30T17:29:00Z" };
     assert.equal(target.projectId, "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK");
-    assert.equal(target.deployment, "dpl_E6BEMYCcuE2u7Ha3WEN42kp5u4Kt");
+    assert.equal(target.deployment, "dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo");
     assertIdentityReceipt(receipt, now);
     for (const change of [{ project: "clear-allergy" }, { projectId: "other" }, { project: undefined },
         { origin: "https://clear-allergy-ernxjj96q-kaitoexe00-9350s-projects.vercel.app" },

@@ -313,6 +313,6 @@ DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY uses no Clerk Secret. A new nonpersistent brow
 Playwright buffers API replies internally. Final HTML is capped at1MiB before inspector parsing/copying; its body/hash is not retained. Static JS keeps streamed per-file/total limits, fixed immutable origin, canonical public static paths and redirect refusal. New fixtures, backend testing/sign-in token APIs, owner login, DB calls, auth POST permission, keys/trust/settings/deploy/main changes are absent. The root-only run41405423423 stays a separate observation (13 GET/637946bytes, no action references); this new mode does not retroactively change it or the failed T1.
 # 2026-11-02 画像修正入りPreviewへの切替準備
 
-結合app source `8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1`、Deployment `dpl_E6BEMYCcuE2u7Ha3WEN42kp5u4Kt` を固定対象とする。通常app CIと509送信ファイルのserver側hash一致を確認した。実サービス認証・fixture書込みは、固定buildの公開JSからaction/caller/factoryを照合するまで `liveTargetPinsVerified=false` により停止する。以前の成功/失敗は別runの記録として維持する。
+結合app source `8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1`、Deployment `dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo` を固定対象とする。通常app CIと509送信ファイルのserver側hash一致を確認した。実サービス認証・fixture書込みは、固定buildの公開JSからaction/caller/factoryを照合するまで `liveTargetPinsVerified=false` により停止する。以前の成功/失敗は別runの記録として維持する。
 
 S2 adapterは既存の固定ownerのみ、正確なmanaged scopeとtracked session lifecycleをOIDC前に必須とする。A/Bの資格情報は既存Test/Developmentのままで、session ID・作成時刻・provider終了確認を個別記録する。未追跡B認証、新しいキー・権限・設定変更は許可しない。

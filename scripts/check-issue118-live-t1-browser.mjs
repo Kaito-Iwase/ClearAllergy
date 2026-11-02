@@ -449,8 +449,8 @@ export async function browserSetupStage(stage, operation, onStage) {
 export const target = Object.freeze({
     project: "clear-allergy-e2e",
     projectId: "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK",
-    origin: "https://clear-allergy-e2e-7kdxp3nys-kaitoexe00-9350s-projects.vercel.app",
-    deployment: "dpl_E6BEMYCcuE2u7Ha3WEN42kp5u4Kt",
+    origin: "https://clear-allergy-e2e-qs7v9eaim-kaitoexe00-9350s-projects.vercel.app",
+    deployment: "dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo",
     source: "8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1",
     alias: null, // CLI source deployment has no alias; all requests use its immutable URL.
     shop: "cmvs4x80y000twn0wbxkwzbt6",
@@ -592,7 +592,7 @@ export async function readCloseDirectFetch(api, url, token) {
 // may start until its compiled action/caller/factory have been verified.
 export const liveTargetPinsVerified = false;
 export const verifiedReadCloseAction = Object.freeze({
-    source:'8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1',deployment:'dpl_E6BEMYCcuE2u7Ha3WEN42kp5u4Kt',
+    source:'8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1',deployment:'dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo',
     reference:'002d5a40d57114e6b57c906dd03491ecf8c46419f0',
     callerChunk:'/_next/static/immutable/chunks/1yxbpkao8jjq-.js',callerSha256:'22f889779049694ab8497801e8286d170f1101edbad60f9d61d06335458a50a7',
     factoryChunk:'/_next/static/immutable/chunks/44xcerwlley0q.js',factorySha256:'a070e193cc6aa2af93f87b93c668ae7fa6039f396007a82104ba7b228d7850ac',
