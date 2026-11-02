@@ -63,7 +63,55 @@ test('one OIDC request then fixed app GET graph only, deduplicated and no cookie
 });
 test('no action in reachable graph is reported as unobserved rather than inferred', async () => {
     let calls = 0; const r = await inspectDeploymentAssets(env(), receipt(), async () => ++calls === 1 ? issued() : response('<html>No provider</html>', 'text/html'));
-    assert.equal(r.completed, true); assert.equal(r.code, 'PUBLIC_REACHABLE_ASSETS_INSPECTED_ACTION_UNOBSERVED'); assert.equal(r.actionReferences.length, 0); stopped(r);
+    assert.equal(r.completed, true); assert.equal(r.code, 'PUBLIC_ROOT_ONLY_ACTION_UNOBSERVED'); assert.equal(r.actionReferences.length, 0); stopped(r);
+});
+test('HTML structure accepts only pinned dpl, normalizes relative/absolute references and counts duplicates and escapes', () => {
+    const path='/_next/static/chunks/a.js', dpl='?dpl='+target.deployment;
+    const html=`<!doctype html><html><head><!-- <script src="/_next/static/chunks/comment.js"></script> -->`+
+        `<script async src="${path+dpl}"></script><script src='${target.origin+path+dpl}'></script>`+
+        `<link rel="preload" as="script" href="_next/static/chunks/a.js"><link rel="modulepreload" href="static/chunks/a.js">`+
+        `<script src="&#x2f;_next/static/chunks/a.js${dpl}"></script>`+
+        `<script>const s="<script src='/_next/static/chunks/inline.js'>";</script>`+
+        `<textarea><script src="/_next/static/chunks/textarea.js"></script></textarea>`+
+        `<script src="https://other.invalid/_next/static/chunks/a.js"></script>`+
+        `<script src="/_vercel/insights/script.js"></script></head></html>`;
+    const r=inspectPublicCode(html,true);assert.deepEqual(r.paths,[path]);
+    assert.equal(r.referenceCounts.scriptSrc,5);assert.equal(r.referenceCounts.scriptPreload,2);
+    assert.equal(r.referenceCounts.matchingDpl,3);assert.equal(r.referenceCounts.queryless,2);
+    assert.equal(r.referenceCounts.sameOriginAbsolute,1);assert.equal(r.referenceCounts.assetRelative,1);
+    assert.equal(r.referenceCounts.documentRelative,1);assert.equal(r.referenceCounts.htmlEscaped,1);
+    assert.equal(r.referenceCounts.duplicate,4);assert.equal(r.referenceCounts.foreignOriginRefused,1);
+    assert.equal(r.referenceCounts.nonStaticRefused,1);assert.equal(r.referenceCounts.htmlMalformed,0);
+});
+test('HTML malformed or duplicate attributes and unsafe/mismatching query forms never authorize GETs', async () => {
+    const path='/_next/static/chunks/a.js';
+    for(const value of [path+'?dpl=dpl_OTHER',path+'?other='+secret,path+'?dpl='+target.deployment+'&amp;other='+secret,
+        path+'?dpl='+target.deployment+'&amp;dpl='+target.deployment,path+'#fragment',path.replace('a.js','../a.js'),
+        path.replace('a.js','%61.js'),target.origin+':444'+path,'//other.invalid'+path]) {
+        const r=inspectPublicCode(`<script src="${value}"></script>`,true);assert.equal(r.paths.length,0);assert.doesNotMatch(JSON.stringify(r),/SYNTHETIC|OTHER|fragment/);
+    }
+    for(const html of [`<script src="${path}" src="/_next/static/chunks/b.js"></script>`,
+        `<script src="${path}`,`<!-- unterminated`, `<script src="${path}">`,
+        `<script src="&#x110000;${path}"></script>`]) assert.equal(inspectPublicCode(html,true).referenceCounts.htmlMalformed,1);
+    for(const tag of ['script','style','textarea','title']) {
+        const html=`<${tag}/><script src="${path}"></script>`;
+        const parsed=inspectPublicCode(html,true);assert.equal(parsed.referenceCounts.htmlMalformed,1);assert.deepEqual(parsed.paths,[]);
+        let sent=0;const stoppedRun=await inspectDeploymentAssets(env(),receipt(),async()=>++sent===1?issued():response(html,'text/html'));
+        assert.equal(sent,2);assert.equal(stoppedRun.appGetCount,1);assert.equal(stoppedRun.code,'APP_REFERENCES_HELD');stopped(stoppedRun);
+    }
+    let calls=0;const r=await inspectDeploymentAssets(env(),receipt(),async()=>++calls===1?issued():response(`<script src="${path}?dpl=dpl_OTHER"></script>`,'text/html'));
+    assert.equal(calls,2);assert.equal(r.appGetCount,1);assert.equal(r.code,'APP_REFERENCES_HELD');
+    assert.equal(r.publicAssets[0].referenceCounts.otherQueryRefused,1);stopped(r);
+});
+test('matching dpl sources fetch only the canonical static path once with app-only OIDC', async () => {
+    const path='/_next/static/chunks/a.js';let calls=0;
+    const r=await inspectDeploymentAssets(env(),receipt(),async(url,options)=>{
+        calls++;if(calls===1)return issued();if(calls===2)return response(`<script src="${path}?dpl=${target.deployment}"></script>`,'text/html');
+        assert.equal(url,target.origin+path);assert.equal(new URL(url).search,'');assert.equal(options.redirect,'error');
+        return response(`"${path}?dpl=${target.deployment}";`);
+    });
+    assert.equal(calls,3);assert.equal(r.completed,true);assert.equal(r.publicAssets.length,2);
+    assert.equal(r.publicAssets[0].referenceCounts.matchingDpl,1);assert.equal(r.publicAssets[1].referenceCounts.matchingDpl,1);stopped(r);
 });
 test('redirect or non-200 response stops without reading or following it', async () => {
     for (const status of [301,302,307,308,401,403,404,500]) {
