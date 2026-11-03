@@ -366,7 +366,7 @@ jobs:
             const x=decodeManagedFullInput(process.env.ISSUE118_FULL_INPUT);
             if(x.executionApproval?.status!=='APPROVED' || x.executionApproval.scope!=='FULL_RESUME_WITH_ACTIONS_READ'
               || x.executionApproval.actionsReadApproved!==true || x.executionApproval.runnerSha!==process.env.GITHUB_SHA) throw Error();
-            const id=(x.fullCheckpoint?.source??x.prefixCheckpoint?.source)?.githubRunId;
+            const id=(x.fullCheckpoint?.source??x.prefixCheckpoint?.source??x.cleanupCheckpoint?.source)?.githubRunId;
             if(id!==undefined&&!/^\d{1,20}$/.test(id)) throw Error();
             appendFileSync(process.env.GITHUB_OUTPUT,'source_run='+String(id??'')+'\nfinal_only='+String(x.fullCheckpoint?.controller?.serviceArms?.length===6)+'\n');
           } catch {console.error('FULL_BUNDLE_REFUSED_NO_AUTH');process.exitCode=1;}

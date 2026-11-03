@@ -1300,11 +1300,14 @@ async function executeManagedFixtureCleanup({actor,proof,record=()=>{}}={},polic
             attestation.origin+'/api/admin/menus/'+id,{},actor.access.token());assert.equal(response.status(),200);
             const raw=await response.json();if(raw?.menu?.shopId!==undefined)assert.equal(raw.menu.shopId,attestation.shopId);
             const menu=savedMenuResponseSchema.parse(raw).menu;assert.equal(menu.id,id);return menu;};
-        for(const expected of attestation.fixtures){
-            const entry={id:expected.id,state:'NOT_CONFIRMED',stopAttempted:false};result.fixtures.push(entry);stage='OWNER_READ';
-            const before=await read(expected.id);assert.equal(before.version,expected.version);assert.equal(before.foodVersion,expected.foodVersion);
+        const validateBefore=(before,expected)=>{assert.equal(before.version,expected.version);assert.equal(before.foodVersion,expected.foodVersion);
             assert.equal(before.isPublished,expected.isPublished);assert.equal(foodHash(before),expected.foodSha256);
             if(Object.hasOwn(expected,'publicationConfirmedFoodVersion'))assert.equal(before.publicationConfirmedFoodVersion,expected.publicationConfirmedFoodVersion);
+            if(Object.hasOwn(expected,'reviewsSha256')){assert.equal(before.reviewedFoodVersion,expected.reviewedFoodVersion);assert.equal(createHash('sha256').update(canonical(before.foodReviews)).digest('hex'),expected.reviewsSha256);}};
+        if(policy.preReadAll){stage='OWNER_PREFLIGHT';for(const expected of attestation.fixtures)validateBefore(await read(expected.id),expected);}
+        for(const expected of attestation.fixtures){
+            const entry={id:expected.id,state:'NOT_CONFIRMED',stopAttempted:false};result.fixtures.push(entry);stage='OWNER_READ';
+            const before=await read(expected.id);validateBefore(before,expected);
             await emit('CLEANUP_OWNER_STATE_MATCHED',expected.id,200);
             if(!before.isPublished){entry.state='NO_WRITE_ALREADY_PRIVATE';await emit('CLEANUP_NO_WRITE_PRIVATE',expected.id);continue;}
             stage='STOP_PRE_SEND';policy.assertProof(attestation);owned();await actor.access.ensureToken();owned();
@@ -1317,6 +1320,7 @@ async function executeManagedFixtureCleanup({actor,proof,record=()=>{}}={},polic
             const response=await actor.context.request.fetch(url,{method:'POST',headers:scopedOidcHeaders(url,
                 {Origin:attestation.origin},actor.access.token()),maxRedirects:0,maxRetries:0,timeout:20000,failOnStatusCode:false});
             const status=response.status(),requestId=response.headers?.()['x-request-id'];await emit('CLEANUP_STOP_STATUS',expected.id,status,requestId);
+            if(policy.requestIds){assert.match(requestId,/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i);assert.ok(!policy.requestIds.has(requestId));policy.requestIds.add(requestId);}
             assert.equal(status,200);const body=await response.json();assert.equal(body?.ok,true);assert.equal(body.menu?.id,expected.id);
             assert.equal(body.menu.isPublished,false);assert.ok(Number.isSafeInteger(body.menu.version)&&body.menu.version<=2147483647);
             assert.equal(body.menu.version,before.version+1);
@@ -1326,9 +1330,116 @@ async function executeManagedFixtureCleanup({actor,proof,record=()=>{}}={},polic
             assert.equal(after.reviewedFoodVersion,before.reviewedFoodVersion);assert.deepEqual(after.foodReviews,before.foodReviews);
             entry.state='PRIVATE_API_CONFIRMED';entry.version=after.version;await emit('CLEANUP_PRIVATE_API_CONFIRMED',expected.id,200,requestId);
         }
+        if(policy.verifyAllAfter){stage='OWNER_FINAL_READ';for(const expected of attestation.fixtures)validateBefore(await read(expected.id),{...expected,version:expected.version+1,isPublished:false});}
         result.status='KNOWN_FIXTURES_PRIVATE_API_CONFIRMED';
     }catch{result.failureStage=stage;result.errorClass='MANAGED_KNOWN_FIXTURE_CLEANUP_HELD';}
     return result;
+}
+
+// Exact finite cleanup only. Runtime IDs come from the genuine prior artifact,
+// not a second menu registry. This does not enable FULL/T2 continuation.
+export function assertExact8CleanupInput(input,now=Date.now()){
+    try{
+        const hash=v=>createHash('sha256').update(managedResumeCanonical(v)).digest('hex');
+        const exact=(v,keys)=>assert.ok(v&&Object.getPrototypeOf(v)===Object.prototype&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k)));
+        exact(input,['operation','authorization','identityReceipt','cleanupCheckpoint','cleanupReceipt','executionApproval']);
+        assert.equal(input.operation,'EXACT_T2_CLEANUP8');exact(input.identityReceipt,['project','projectId','origin','deployment','source','alias','environment','status','observedUtc','verifiedBy','evidenceReference','protectionVerified','protectionMode','productionTarget']);assertIdentityReceipt(input.identityReceipt,now);
+        assert.equal(input.identityReceipt.protectionVerified,true);assert.equal(input.identityReceipt.protectionMode,'ALL_DEPLOYMENTS');assert.equal(input.identityReceipt.productionTarget,false);
+        const a=input.authorization,cp=input.cleanupCheckpoint,p=input.cleanupReceipt;
+        exact(a,['status','scope','verifiedBy','evidenceReference','approvedUtc','limits','sourceSha256']);
+        assert.equal(a.status,'APPROVED');assert.equal(a.scope,'EXACT_T2_CLEANUP8');assert.equal(a.verifiedBy,'human');assert.match(a.evidenceReference,/^Sentinel_[a-f0-9]{32,64}$/);
+        assert.ok(Number.isFinite(Date.parse(a.approvedUtc))&&Date.parse(a.approvedUtc)<=now);
+        const e=input.executionApproval;exact(e,['status','scope','verifiedBy','evidenceReference','actionsReadApproved','singleAttempt','runnerSha','operation','inputSha256']);
+        assert.equal(e.status,'APPROVED');assert.equal(e.scope,'FULL_RESUME_WITH_ACTIONS_READ');assert.equal(e.verifiedBy,'human');assert.equal(e.evidenceReference,a.evidenceReference);
+        assert.equal(e.actionsReadApproved,true);assert.equal(e.singleAttempt,true);assert.match(e.runnerSha,/^[a-f0-9]{40}$/);assert.equal(e.operation,input.operation);
+        assert.equal(e.inputSha256,hash(Object.fromEntries(Object.entries(input).filter(([k])=>k!=='executionApproval'))));
+        assert.deepEqual(a.limits,{priorMenuWrites:58,priorSessions:9,maximumMenuWrites:66,maximumSessions:11,maximumStops:8,maximumNewSessions:2,globalMenuWrites:138,globalSessions:18});
+        exact(cp,['version','result','source']);assert.equal(cp.version,1);assert.equal(a.sourceSha256,hash(cp));
+        exact(cp.source,['githubRunId','runnerSha','artifactSha256','jobTerminal','pendingRequests']);
+        assert.match(cp.source.githubRunId,/^\d{1,20}$/);assert.match(cp.source.runnerSha,/^[a-f0-9]{40}$/);assert.match(cp.source.artifactSha256,/^[a-f0-9]{64}$/);
+        assert.equal(cp.source.jobTerminal,true);assert.equal(cp.source.pendingRequests,0);
+        const r=cp.result,c=r.controller;assert.equal(r.target?.source,target.source);assert.equal(r.target?.deployment,target.deployment);assert.equal(r.target?.origin,target.origin);
+        assert.equal(r.livePass,false);assert.equal(r.sessionConsumption,9);assert.equal(r.evidencePersistenceComplete,true);
+        assert.equal(c?.kind,'T2_REOBSERVATION_PREFIX');assert.equal(c.status,'HOLD_T2_REOBSERVATION_NO_RETRY_OR_CLEANUP');assert.equal(c.firstFailure?.stage,'BASELINE');
+        assert.equal(c.applicationSha,target.source);assert.equal(c.deployment,target.deployment);assert.equal(c.automaticRetry,false);assert.equal(c.automaticCleanup,false);
+        assert.deepEqual(c.counts,{menus:11,createAttempts:11,menuWrites:58,shopWrites:0,blobUploads:0,sessions:9,denialRequests:0});
+        assert.equal(c.claims.length,16);const ids=new Map(),requests=new Set(),states=new Map();
+        const order=[...['M05','M06','M07','M08'].map(key=>['B_CLEANUP',key]),...['M01','M02','M05','M06'].map(key=>['RESET',key]),...Array.from({length:8},(_,i)=>['BASELINE_PUBLISH','M0'+(i+1)])];
+        for(const [i,x] of c.claims.entries()){
+            const [phase,key]=order[i],owner=Number(key.slice(1))<=4?'S1':'S2',pub=phase==='BASELINE_PUBLISH';
+            assert.equal(x.id,'REOBSERVE_T2_'+phase+'_'+key);assert.equal(x.phase,phase);assert.equal(x.key,key);assert.equal(x.owner,owner);assert.equal(x.kind,'MENU_WRITE');
+            assert.equal(x.state,'CONFIRMED_RESPONSE_AND_READBACK');assert.equal(x.uiObserved,false);assert.match(x.requestId,/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i);assert.ok(!requests.has(x.requestId));requests.add(x.requestId);
+            assert.match(x.after?.id,/^c[a-z0-9]+$/);assert.equal(x.before.id,x.after.id);assert.equal(x.before.owner,owner);assert.equal(x.after.owner,owner);
+            if(ids.has(key))assert.equal(ids.get(key),x.after.id);else{assert.ok(![...ids.values()].includes(x.after.id));ids.set(key,x.after.id);}
+            if(states.has(x.after.id))assert.deepEqual(x.before,states.get(x.after.id));
+            assert.equal(x.after.isPublished,pub);assert.ok(Number.isSafeInteger(x.after.version)&&Number.isSafeInteger(x.after.foodVersion)&&x.after.foodVersion>=0&&x.after.foodVersion<=x.after.version&&x.after.version<=2147483647);
+            assert.equal(x.after.reviewedFoodVersion,null);assert.match(x.after.foodSha256,/^[a-f0-9]{64}$/);assert.match(x.after.reviewsSha256,/^[a-f0-9]{64}$/);
+            assert.deepEqual(x.resource,{method:phase==='B_CLEANUP'?'POST':'PUT',path:'/api/admin/menus/'+x.after.id+(phase==='B_CLEANUP'?'/stop':''),shopId:managedActorIdentity[owner].shopId,menuId:x.after.id,purpose:'CORE',beforeVersion:x.before.version});
+            if(phase==='RESET'){assert.equal(x.before.isPublished,false);assert.ok(x.after.version>x.before.version&&x.after.foodVersion>x.before.foodVersion);assert.equal(x.after.publicationConfirmedFoodVersion,null);}
+            else{assert.equal(x.before.isPublished,!pub);assert.equal(x.after.version,x.before.version+(pub?3:1));assert.equal(x.after.foodVersion,x.before.foodVersion);assert.equal(x.after.foodSha256,x.before.foodSha256);assert.equal(x.after.publicationConfirmedFoodVersion,pub?x.before.foodVersion:x.before.publicationConfirmedFoodVersion);}
+            assert.equal(x.after.reviewsSha256,x.before.reviewsSha256);states.set(x.after.id,x.after);
+        }
+        assert.equal(ids.size,8);assert.equal(states.size,8);
+        exact(p,['source','readOnly','verifiedBy','project','branch','database','role','applicationSha','deployment','sourceSha256','knownTerminal','unknownResolved','exclusive','pendingRequests','menuWrites','sessionConsumption','allNineSessionsClosed','requestIds','rows','sessionClosures','sqlObservedUtc','observedUtc']);
+        assert.equal(p.source,'INDEPENDENT_READ_ONLY');assert.equal(p.readOnly,true);assert.ok(['human','cli_metadata_observer'].includes(p.verifiedBy));
+        assert.equal(p.project,'patient-heart-55595249');assert.equal(p.branch,'br-flat-wildflower-aoeragrs');assert.equal(p.database,'clearallergy_main19');assert.equal(p.role,'neondb_owner');
+        assert.equal(p.applicationSha,target.source);assert.equal(p.deployment,target.deployment);assert.equal(p.sourceSha256,hash(cp));
+        for(const k of ['knownTerminal','unknownResolved','exclusive','allNineSessionsClosed'])assert.equal(p[k],true);
+        assert.equal(p.pendingRequests,0);assert.equal(p.menuWrites,58);assert.equal(p.sessionConsumption,9);
+        const sql=Date.parse(p.sqlObservedUtc),at=Date.parse(p.observedUtc);assert.ok(Number.isFinite(sql)&&Number.isFinite(at)&&sql<=at&&at<=now&&now-sql<=3600000);
+        assert.equal(p.requestIds.length,58);assert.equal(new Set(p.requestIds).size,58);assert.ok(p.requestIds.every(x=>/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(x)));assert.ok([...requests].every(x=>p.requestIds.includes(x)));
+        assert.equal(p.rows.length,8);assert.equal(new Set(p.rows.map(x=>x.id)).size,8);const owners={S1:[],S2:[]};
+        for(const row of p.rows){exact(row,['id','owner','version','foodVersion','isPublished','reviewedFoodVersion','publicationConfirmedFoodVersion','foodSha256','reviewsSha256','ownerMatches']);assert.equal(row.ownerMatches,true);
+            const {ownerMatches,...projection}=row;assert.equal(ownerMatches,true);assert.deepEqual(projection,states.get(row.id));assert.equal(row.isPublished,true);owners[row.owner].push({...projection});}
+        assert.equal(owners.S1.length,4);assert.equal(owners.S2.length,4);assert.equal(r.sessionAttempts.length,2);assert.equal(r.sessionFinalizations.length,2);assert.equal(p.sessionClosures.length,2);
+        const sessionIds=new Set();for(const role of ['S1','S2']){const slot=r.sessionAttempts.find(x=>x.owner===role),fin=r.sessionFinalizations.find(x=>x.owner===role),s=slot?.sessionIdentity,e=p.sessionClosures.find(x=>x.owner===role);
+            assert.equal(s?.ownerId,managedActorIdentity[role].ownerId);assert.equal(s.ownerVerified,true);assert.match(s.id,/^sess_[A-Za-z0-9]{1,128}$/);assert.ok(!sessionIds.has(s.id));sessionIds.add(s.id);assert.equal(fin?.localClosed,true);assert.equal(fin.sessionIdentity?.id,s.id);
+            exact(e,['owner','sessionId','providerCreatedUtc','method','terminated','localClosed','observedUtc']);assert.equal(e.sessionId,s.id);assert.equal(e.providerCreatedUtc,s.providerCreatedUtc);assert.equal(e.terminated,true);assert.equal(e.localClosed,true);
+            assert.ok(['PROVIDER_TERMINAL','DASHBOARD_REVOKED_RELOAD_ABSENT'].includes(e.method));if(e.method==='PROVIDER_TERMINAL')assert.equal(s.providerTerminationConfirmed,true);
+            const created=Date.parse(s.providerCreatedUtc),ended=Date.parse(e.observedUtc);assert.ok(Number.isFinite(created)&&Number.isFinite(ended)&&created<=ended&&ended<=at&&created<=sql);
+        }
+        return {cleanup:true,owners,requestIds:[...p.requestIds],source:structuredClone(cp.source),checkpointKey:hash({operation:input.operation,source:a.sourceSha256,approval:a.evidenceReference}),limits:structuredClone(a.limits)};
+    }catch{throw Error('EXACT8_CLEANUP_ADMISSION_REFUSED');}
+}
+
+export async function executeExact8Cleanup(input,{env=process.env,chromium,claimDirectory,openActor=openManagedOwnedActor}={}){
+    const frozen=structuredClone(input),admission=assertExact8CleanupInput(frozen);assert.equal(env.GITHUB_SHA,frozen.executionApproval.runnerSha);assert.equal(typeof claimDirectory,'string');
+    const directory=resolve(claimDirectory);mkdirSync(directory,{recursive:false});assert.equal(lstatSync(directory).isSymbolicLink(),false);
+    const report={status:'HOLD_EXACT8_CLEANUP',scope:'EXACT_T2_CLEANUP8',livePass:false,sourceRunId:admission.source.githubRunId,
+        counts:{menus:11,menuWrites:58,sessions:9,shopWrites:0,blobUploads:0},sessionAttempts:[],owners:[],evidencePersistenceComplete:true,automaticRetry:false,automaticCleanup:false,independentDatabase:'NOT_ATTESTED'};
+    const requestIds=new Set(admission.requestIds),intents=new Set(),sessionIds=new Set(frozen.cleanupCheckpoint.result.sessionAttempts.map(x=>x.sessionIdentity.id));let event=0;
+    const persist=(name,value)=>{let fd;try{fd=openSync(join(directory,name+'.json'),'wx',0o600);writeFileSync(fd,JSON.stringify(value));fsyncSync(fd);}catch{report.evidencePersistenceComplete=false;throw Error('EXACT8_JOURNAL_HELD');}finally{if(fd!==undefined)closeSync(fd);}};
+    const safeSession=(s,role)=>{if(!s||s.ownerId!==managedActorIdentity[role].ownerId||!/^sess_[A-Za-z0-9]{1,128}$/.test(s.id||''))return null;
+        return {id:s.id,ownerId:s.ownerId,providerCreatedUtc:Number.isFinite(Date.parse(s.providerCreatedUtc))?s.providerCreatedUtc:null,ownerVerified:s.ownerVerified===true,
+            providerTerminationConfirmed:s.providerTerminationConfirmed===true,providerStatus:['active','pending','ended','revoked','removed','expired','abandoned','replaced'].includes(s.providerStatus)?s.providerStatus:'OTHER'};};
+    try{persist('admission',{operation:frozen.operation,claim:admission.checkpointKey,limits:admission.limits,sourceRunId:admission.source.githubRunId});
+        for(const owner of ['S2','S1']){assertExact8CleanupInput(frozen);assert.equal(report.counts.sessions<11,true);
+            const index=report.counts.sessions+1,slot={index,owner,consumedBeforeAuthentication:true,sessionIdentity:null,finalization:null};report.counts.sessions++;report.sessionAttempts.push(slot);
+            persist('session-attempt-'+index,{index,owner,consumedBeforeAuthentication:true});let actor;
+            const record=value=>{const s=safeSession(value?.sessionIdentity||value?.finalization?.sessionIdentity,owner);if(s){
+                    if(slot.sessionIdentity)assert.equal(s.id,slot.sessionIdentity.id);else{assert.equal(sessionIds.has(s.id),false);sessionIds.add(s.id);}
+                    const created=Date.parse(s.providerCreatedUtc);assert.ok(Number.isFinite(created)&&created>=Date.parse(frozen.cleanupReceipt.sqlObservedUtc)-30000&&created<=Date.now()+30000);slot.sessionIdentity=s;}
+                if(value?.finalization)slot.finalization={complete:value.finalization.complete===true,authenticationCleanup:value.finalization.authenticationCleanup==='SIGNOUT_CONFIRMED'?'SIGNOUT_CONFIRMED':'SIGNOUT_UNVERIFIED',sessionIdentity:s,localClosed:value.finalization.localClose?.allLocalClosed===true};
+                persist('session-observation-'+(++event),{owner,sessionIdentity:slot.sessionIdentity,finalization:slot.finalization,stage:/^[A-Z0-9_]{1,100}$/.test(value?.stage||'')?value.stage:'OTHER'});};
+            try{actor=await openActor({role:owner,chromium,env:{...env,ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7'},identityReceipt:frozen.identityReceipt,record});
+                // Legacy SDK scope selects the already-approved identities only;
+                // exact admission and the durable 9 -> 10/11 charge own this budget.
+                const result=await executeManagedFixtureCleanup({actor,proof:null,record:async x=>{
+                    if(x.stage==='CLEANUP_STOP_INTENT'){assert.equal(intents.has(x.id),false);assert.equal(report.counts.menuWrites<66,true);intents.add(x.id);report.counts.menuWrites++;}
+                    persist('cleanup-event-'+(++event),{owner,...x});}},
+                {owner,maxStops:4,preReadAll:true,verifyAllAfter:true,revalidateBeforeFetch:true,requestIds,
+                    assertProof:()=>{const a=assertExact8CleanupInput(frozen);return {origin:target.origin,ownerId:managedActorIdentity[owner].ownerId,shopId:managedActorIdentity[owner].shopId,fixtures:a.owners[owner]};}});
+                report.owners.push({owner,...result});assert.equal(result.status,'KNOWN_FIXTURES_PRIVATE_API_CONFIRMED');assert.equal(result.stopAttempts,4);
+            }finally{if(actor){try{const fin=await actor.finalize(),ended=safeSession(fin.sessionIdentity,owner);assert.ok(ended&&slot.sessionIdentity&&ended.id===slot.sessionIdentity.id);slot.sessionIdentity=ended;
+                        slot.finalization={complete:fin.complete===true,authenticationCleanup:fin.authenticationCleanup==='SIGNOUT_CONFIRMED'?'SIGNOUT_CONFIRMED':'SIGNOUT_UNVERIFIED',sessionIdentity:slot.sessionIdentity,localClosed:fin.localClose?.allLocalClosed===true};}
+                    catch{slot.finalization={complete:false,authenticationCleanup:'SIGNOUT_UNVERIFIED',sessionIdentity:slot.sessionIdentity,localClosed:false};}}
+                persist('session-end-'+index,{index,owner,finalization:slot.finalization});}
+            assert.equal(slot.finalization?.complete,true);assert.equal(slot.finalization.localClosed,true);assert.equal(slot.finalization.authenticationCleanup,'SIGNOUT_CONFIRMED');
+            assert.equal(slot.sessionIdentity?.ownerVerified,true);assert.equal(slot.sessionIdentity?.providerTerminationConfirmed,true);assert.ok(Number.isFinite(Date.parse(slot.sessionIdentity?.providerCreatedUtc)));
+        }
+        assert.equal(report.counts.menuWrites,66);assert.equal(report.counts.sessions,11);assert.equal(report.evidencePersistenceComplete,true);report.status='EXACT8_PRIVATE_API_CONFIRMED_PENDING_SQL';
+    }catch{report.status=report.evidencePersistenceComplete?'HOLD_EXACT8_CLEANUP':'HOLD_EXACT8_PERSISTENCE';}
+    return report;
 }
 
 // Pre-authentication metadata check only. It does not manufacture menu/API evidence,
