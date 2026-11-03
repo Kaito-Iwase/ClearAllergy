@@ -34,6 +34,7 @@ const base = { id, version: 30, foodVersion: 29, reviewedFoodVersion: null, publ
     imageUrl: null, imageFrame: "square", imageFit: "cover", imagePosition: "center", imageZoom: 100, imagePositionX: 50, imagePositionY: 50,
     foodReviews: [], allergens: ALLERGEN_MASTER.map(a => ({ ...a, status: "FREE" })) };
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
+const { expect } = require((process.env.PLAYWRIGHT_MODULE_PATH || "playwright") + "/test");
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
 const cases = [], errors = [], external = [];
 async function open({ width = 390, menu = {}, path = "/edit", intercept } = {}) {
@@ -126,7 +127,7 @@ try {
                 else await panel(f).getByRole("button", { name: action, exact: true }).click();
                 await panel(f).waitFor({ state: "detached" });
                 assert.equal(f.writes.length, 1); assert.equal(f.state.isPublished, false);
-                if (action === "内容を修正") assert.equal(await f.page.getByLabel("メニュー名", { exact: true }).evaluate(e => e === document.activeElement), true);
+                if (action === "内容を修正") await expect(f.page.getByLabel("メニュー名", { exact: true })).toBeFocused({ timeout: 8000 });
             } finally { await f.context.close(); }
         }
     });
@@ -184,7 +185,9 @@ try {
                 for (const a of allergens.slice(0, count)) assert.ok((await panel(f).innerText()).includes(a.nameJa));
                 await panel(f).getByRole("button", { name: "未設定項目を入力する", exact: true }).click();
                 const first = f.page.getByRole("group", { name: allergens[0].nameJa, exact: true });
-                assert.equal(await first.getByRole("button", { name: "未設定", exact: true }).evaluate(e => e === document.activeElement), true);
+                // The component returns focus in requestAnimationFrame after enabling the form.
+                // Assert that exact target eventually has focus; missing/wrong focus still fails.
+                await expect(first.getByRole("button", { name: "未設定", exact: true })).toBeFocused({ timeout: 8000 });
                 for (const a of allergens.slice(0, count)) await f.page.getByRole("group", { name: a.nameJa, exact: true }).getByRole("button", { name: "原材料に含まない登録", exact: true }).click();
                 assert.equal(await panel(f).count(), 0); await save(f); await panel(f).getByRole("button", { name: "この内容で公開", exact: true }).waitFor(); assert.equal(f.writes.length, 2);
             } finally { await f.context.close(); }

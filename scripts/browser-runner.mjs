@@ -12,7 +12,7 @@ const runner = resolve(process.env.CLEARALLERGY_BROWSER_RUNNER_DIR || join(tmpdi
 const modulePath = join(runner, "node_modules", "playwright");
 const env = { ...process.env, PLAYWRIGHT_MODULE_PATH: modulePath, PLAYWRIGHT_BROWSERS_PATH: join(runner, "browsers") };
 const [command, ...options] = process.argv.slice(2);
-const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | ui | allergens | composition | qr | publication | demo | admin";
+const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | ui | allergens | composition | qr | publication | demo | admin | issue118-live-guards | issue118-live-t1 --apply";
 class RunnerError extends Error {}
 
 function runNode(args, childEnv = env) {
@@ -42,6 +42,15 @@ try {
         assertInstalled();
         runNode([join(modulePath, "cli.js"), "install", ...options, "chromium"]);
         console.log(`Playwright ${version} and Chromium are ready. Start the isolated app, then run node scripts/browser-runner.mjs public.`);
+    } else if (command === "issue118-live-guards" && options.length === 0) {
+        // Offline unit/fixture tests only; never invoke the live entrypoint or --apply.
+        assertInstalled();
+        runNode(["--test", "tests/issue118-managed-read-browser.test.mjs"]);
+        runNode(["--test", "tests/issue118-readonly-entry.test.mjs"]);
+        runNode(["--import", "tsx", "--test", "tests/browser-runner.test.ts", "tests/issue118-live-browser.test.mjs", "tests/issue118-preview-transport.test.mjs", "tests/issue118-ci-auth.test.mjs", "tests/issue118-redirect-diagnostic.test.mjs", "tests/issue118-public-assets.test.mjs", "tests/issue118-initial-handshake-candidate.test.mjs", "tests/issue118-handshake-callback.test.mjs", "tests/issue118-sdk-bootstrap.test.mjs", "tests/issue118-server-callback-candidate.test.mjs", "tests/issue118-managed-suite.test.mjs", "tests/issue118-managed-service-browser.test.mjs", "tests/issue118-managed-continuation.test.mjs", "tests/issue118-managed-service-resume.test.mjs", "tests/issue118-managed-resume-entry.test.mjs", "tests/issue118-managed-owned-page.test.mjs", "tests/issue118-managed-read-page.test.mjs", "tests/issue118-readonly-preflight.test.mjs", "tests/issue118-create-response-route.test.mjs", "tests/issue118-managed-t1-resume-proof.test.mjs", "tests/issue118-managed-known-cleanup.test.mjs", "tests/issue118-managed-known-b-cleanup.test.mjs", "tests/issue118-managed-recovery-runtime.test.mjs", "tests/issue118-managed-remainder-runtime.test.mjs", "tests/issue118-managed-full-entry.test.mjs", "tests/issue118-t2-reobserve.test.mjs", "tests/issue118-exact-cleanup.test.mjs"]);
+    } else if (command === "issue118-live-t1" && options.length === 1 && options[0] === "--apply") {
+        assertInstalled();
+        runNode(["scripts/check-issue118-live-t1-browser.mjs", "--apply"]);
     } else if (["public", "ui", "allergens", "composition", "qr", "publication", "demo", "admin"].includes(command) && options.length === 0) {
         assertInstalled();
         if (command === "admin") {

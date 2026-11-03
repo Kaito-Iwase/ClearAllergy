@@ -1,0 +1,497 @@
+name: Issue118 dedicated live T1
+run-name: ${{ inputs.confirmation == 'APPROVE_READONLY_A_PREFLIGHT' && format('Issue118 AREADONLY {0}', inputs.resume_claim) || inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE' && format('Issue118 FULL {0}', inputs.resume_claim) || 'Issue118 dedicated live T1' }}
+
+# Explicit manual execution only. No PR/push/schedule/reusable trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Select one explicitly approved operation; diagnostics never authorize fixture writes
+        type: choice
+        options: [HOLD, APPROVE_READONLY_A_PREFLIGHT, APPROVE_FULL_RESUME_CANDIDATE, APPROVE_MANAGED_SUITE, APPROVE_MANAGED_SERVICE_ARM, APPROVE_MANAGED_KNOWN_CLEANUP, DIAGNOSE_PINNED_PUBLIC_CODE_ONLY, DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY, DIAGNOSE_PUBLIC_ASSETS_ONLY, DIAGNOSE_FIXTURE_READ_CLOSE_ONLY, APPROVE_NEW_FIXTURE_T1, DIAGNOSE_OIDC_TARGET_ONLY, DIAGNOSE_PREVIEW_REDIRECT_ONLY, DIAGNOSE_HANDSHAKE_CALLBACK_ONLY, DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY, PREPARE_SERVER_CALLBACK_DISABLED, DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY, DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY]
+        default: HOLD
+        required: true
+      expected_runner_sha:
+        description: Exact reviewed 40-character runner commit (not the app SHA)
+        type: string
+        required: true
+      identity_receipt:
+        description: Fresh non-secret external Project/Deployment/SHA/Ready/alias receipt JSON
+        type: string
+        required: true
+
+      full_resume_bundle:
+        description: Bounded gzip/base64url non-secret approval/checkpoint/independent receipt bundle; empty means disabled
+        type: string
+        required: false
+        default: ''
+      resume_claim:
+        description: Deterministic admission checkpoint key; not a credential
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clearallergy-main19-live-fixtures
+  cancel-in-progress: false
+
+jobs:
+  live-t1:
+    if: >-
+      github.repository == 'Kaito-Iwase/ClearAllergy' &&
+      github.ref == 'refs/heads/test/issue118-live-t1-20261030' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.run_attempt == 1 &&
+      (inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY' || inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')) || inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY') &&
+      inputs.expected_runner_sha == github.sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: clearallergy-e2e-test
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - name: Check the external receipt before dependency install or secret delivery
+        if: (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')) || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY' || inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'
+        env:
+          IDENTITY_RECEIPT_JSON: ${{ inputs.identity_receipt }}
+          EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CONFIRMATION_MODE: ${{ inputs.confirmation }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          import { join } from 'node:path';
+            import { assertIdentityReceipt, assertManagedSessionBudget, decodeManagedResumeBundle, assertManagedT1ResumeProofMetadata, assertManagedCleanupProof } from './scripts/check-issue118-live-t1-browser.mjs';
+          import { deployedMode, assertDeployedCandidateReceipt, keyClassMode, assertKeyClassReceipt } from './scripts/check-issue118-server-callback-candidate.mjs';
+          try {
+            const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+            if (!/^[a-f0-9]{40}$/.test(sha) || sha !== process.env.EXPECTED_RUNNER_SHA || sha !== process.env.GITHUB_SHA) throw Error();
+            const receipt = JSON.parse(process.env.IDENTITY_RECEIPT_JSON);
+            if (process.env.CONFIRMATION_MODE === keyClassMode) assertKeyClassReceipt(receipt);
+            else if (process.env.CONFIRMATION_MODE === deployedMode) assertDeployedCandidateReceipt(receipt);
+            else assertIdentityReceipt(receipt);
+            if(process.env.CONFIRMATION_MODE === 'APPROVE_MANAGED_SUITE') {
+              assertManagedSessionBudget(receipt,2);
+              assertManagedT1ResumeProofMetadata(receipt.managedT1Resume);
+            }
+            if(process.env.CONFIRMATION_MODE === 'APPROVE_MANAGED_SERVICE_ARM') assertManagedSessionBudget(receipt,decodeManagedResumeBundle(receipt).nextCellId===null?0:1);
+            if(process.env.CONFIRMATION_MODE === 'APPROVE_MANAGED_KNOWN_CLEANUP') {
+              assertManagedSessionBudget(receipt,1);
+              if(receipt.managedPriorSessionConsumption!==6 || receipt.managedPriorMenuWrites!==37) throw Error();
+              assertManagedCleanupProof(receipt.managedCleanupProof);
+            }
+            writeFileSync(join(process.env.RUNNER_TEMP, 'issue118-identity.json'), JSON.stringify(receipt));
+            console.log('IDENTITY_RECEIPT_VALIDATED_NO_AUTH');
+          } catch { console.error('IDENTITY_RECEIPT_OR_SHA_REFUSED'); process.exitCode = 1; }
+          NODE
+      - name: Install locked parser dependencies only; no browser or app secrets
+        if: inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/issue118-npm" --ignore-scripts --no-audit --no-fund --save-exact npm@11.18.0
+          node "$RUNNER_TEMP/issue118-npm/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts --no-audit --no-fund
+      - name: Prepare isolated browser transport for login document assets only
+        if: inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY'
+        env:
+          CLEARALLERGY_BROWSER_RUNNER_DIR: ${{ runner.temp }}/issue118-playwright
+        run: node scripts/browser-runner.mjs install --with-deps
+      - name: Fixed Preview login HTML and static assets only; no login or session API
+        if: inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: LOGIN_PUBLIC_ASSETS_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-public-assets.mjs --login-public-assets-only
+      - name: Fixed Preview public client assets only; no Clerk or browser
+        if: inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: PUBLIC_ASSETS_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+        run: node scripts/check-issue118-public-assets.mjs --public-assets-only
+      - name: Byte-pinned public JS snapshot only; no HTML browser Clerk or session
+        if: inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: PINNED_PUBLIC_CODE_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+        run: node scripts/check-issue118-public-assets.mjs --pinned-public-code-only
+      - name: Prepare the existing isolated Playwright version (no app secrets)
+        if: (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')) || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
+        env:
+          CLEARALLERGY_BROWSER_RUNNER_DIR: ${{ runner.temp }}/issue118-playwright
+        run: |
+          npm install --prefix "$RUNNER_TEMP/issue118-npm" --ignore-scripts --no-audit --no-fund --save-exact npm@11.18.0
+          export npm_execpath="$RUNNER_TEMP/issue118-npm/node_modules/npm/bin/npm-cli.js"
+          node "$npm_execpath" ci --ignore-scripts --no-audit --no-fund
+          node scripts/browser-runner.mjs install --with-deps
+      - name: Existing fixture READ ONLY and termination observation; no T1 or cleanup
+        if: inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_APPLY: 'true'
+          ISSUE118_DIAGNOSTIC_MODE: FIXTURE_READ_CLOSE_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          ISSUE118_TEST_CLERK_SECRET_KEY: ${{ secrets.ISSUE118_TEST_CLERK_SECRET_KEY }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-result
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-live-t1-browser.mjs --ci-read-close
+      - name: OIDC target predicates only; stop before any request
+        if: inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: OIDC_TARGET_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+        run: node scripts/check-issue118-oidc-target.mjs --diagnose-only
+      - name: ONE guarded T1; independent SQL observation remains separate
+        if: inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_APPLY: 'true'
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          ISSUE118_TEST_CLERK_SECRET_KEY: ${{ secrets.ISSUE118_TEST_CLERK_SECRET_KEY }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-result
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-live-t1-browser.mjs --ci-apply
+      - name: Bounded managed suite; first fault stops for independent SQL reconciliation
+        if: (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_APPLY: 'true'
+          ISSUE118_MANAGED_SCOPE: MAX32_103_4_5_7
+          ISSUE118_MANAGED_OPERATION: ${{ inputs.confirmation }}
+          ISSUE118_SESSION_LIFECYCLE: TRACKED_OWNER_SESSION
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          ISSUE118_TEST_CLERK_SECRET_KEY: ${{ secrets.ISSUE118_TEST_CLERK_SECRET_KEY }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-result
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-live-t1-browser.mjs --ci-managed
+      - name: ONE fixed Preview GET; classify redirect booleans and STOP before any follow or Clerk
+        if: inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: PREVIEW_REDIRECT_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+        run: node scripts/check-issue118-preview-redirect.mjs --redirect-only
+      - name: TWO initial handshake GETs; boolean callback predicates and STOP before callback
+        if: inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: HANDSHAKE_CALLBACK_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-handshake-callback.mjs --callback-only
+      - name: THREE initial handshake GETs; boolean clean-target predicates and STOP before fourth GET
+        if: inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: HANDSHAKE_CLEAN_TARGET_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-handshake-callback.mjs --clean-target-only
+      - name: THREE GETs on the deployed candidate; signature booleans only and unconditional STOP
+        if: inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-server-callback-candidate.mjs --deployed-diagnostic-only
+      - name: ONE query-free GET; key class booleans only and STOP before any Clerk request
+        if: inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        env:
+          ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+          ISSUE118_DIAGNOSTIC_MODE: DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY
+          ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+          CLEARALLERGY_ISSUE118_IDENTITY_RECEIPT: ${{ runner.temp }}/issue118-identity.json
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/check-issue118-server-callback-candidate.mjs --key-class-only
+      - name: Retain login asset references only; no HTML or handshake carriers
+        if: always() && inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-login-public-assets-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-login-public-assets/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only byte-pinned public JS for offline module tracing; no headers HTML or credentials
+        if: always() && inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-pinned-public-code-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-pinned-public-code/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain extracted public asset references only; never raw HTML, JS or credentials
+        if: always() && inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-public-assets-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-public-assets/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only 27 boolean key class predicates; no credential values or hashes
+        if: always() && inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-key-class-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-key-class/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only the deployed server boolean diagnostic; no callback/cookie/token values
+        if: always() && inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-server-callback-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-server-callback/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only the fixed-schema read-close diagnostic result
+        if: always() && inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-read-close-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-result/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only the fixed-schema non-secret result, never browser/session/trace output
+        if: always() && (inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP'))
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-t1-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/issue118-result/result.json
+            ${{ runner.temp }}/issue118-result/managed-claims/*.json
+            ${{ runner.temp }}/issue118-result/managed-claims/events.jsonl
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only boolean callback predicates; no Location, cookie, nonce or body
+        if: always() && inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-handshake-callback-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-handshake-callback/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only boolean clean-target predicates; never Location or cookie values
+        if: always() && inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-handshake-clean-target-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-handshake-clean-target/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only boolean OIDC target diagnostics
+        if: always() && inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-oidc-target-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-oidc-target/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain only fixed redirect classification; no headers, URLs or response bodies
+        if: always() && inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue118-preview-redirect-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-preview-redirect/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # LOCAL candidate only: explicit new FULL caps and Actions-read approval are
+  # mandatory in the bundle. Existing active caps and existing live-t1 job stay unchanged.
+  managed-full-resume:
+    if: >-
+      github.repository == 'Kaito-Iwase/ClearAllergy' &&
+      github.ref == 'refs/heads/test/issue118-live-t1-20261030' &&
+      github.event_name == 'workflow_dispatch' && github.run_attempt == 1 &&
+      ((inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE' && inputs.full_resume_bundle != '') ||
+       (inputs.confirmation == 'APPROVE_READONLY_A_PREFLIGHT' && inputs.full_resume_bundle == '')) &&
+      inputs.expected_runner_sha == github.sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: clearallergy-e2e-test
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      ISSUE118_GITHUB_ENVIRONMENT: clearallergy-e2e-test
+      ISSUE118_EXPECTED_RUNNER_SHA: ${{ inputs.expected_runner_sha }}
+      ISSUE118_RESUME_CLAIM: ${{ inputs.resume_claim }}
+      ISSUE118_FULL_INPUT: ${{ inputs.full_resume_bundle }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - name: Decode bounded data only; never print bundle or provider errors
+        id: source
+        if: inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE'
+        run: |
+          node --input-type=module <<'NODE'
+          import {appendFileSync} from 'node:fs';
+          import {decodeManagedFullInput} from './scripts/issue118-managed-full-entry.mjs';
+          try {
+            const x=decodeManagedFullInput(process.env.ISSUE118_FULL_INPUT);
+            if(x.executionApproval?.status!=='APPROVED' || x.executionApproval.scope!=='FULL_RESUME_WITH_ACTIONS_READ'
+              || x.executionApproval.actionsReadApproved!==true || x.executionApproval.runnerSha!==process.env.GITHUB_SHA) throw Error();
+            const id=(x.fullCheckpoint?.source??x.prefixCheckpoint?.source??x.cleanupCheckpoint?.source)?.githubRunId;
+            if(id!==undefined&&!/^\d{1,20}$/.test(id)) throw Error();
+            const failed=x.cleanupCheckpoint?.failedAttempt?.source?.githubRunId;
+            if(failed!==undefined&&!/^\d{1,20}$/.test(failed)) throw Error();
+            const basis=x.rebaseCheckpoint?.source?.githubRunId;
+            if(basis!==undefined&&!/^\d{1,20}$/.test(basis)) throw Error();
+            appendFileSync(process.env.GITHUB_OUTPUT,'source_run='+String(id??'')+'\nfailed_run='+String(failed??'')+'\nbasis_run='+String(basis??'')+'\nfinal_only='+String(x.fullCheckpoint?.controller?.serviceArms?.length===6)+'\n');
+          } catch {console.error('FULL_BUNDLE_REFUSED_NO_AUTH');process.exitCode=1;}
+          NODE
+      - name: Read the exact prior immutable run artifact; no credentials/session data
+        if: inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE' && steps.source.outputs.source_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: issue118-full-${{ steps.source.outputs.source_run }}
+          run-id: ${{ steps.source.outputs.source_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/issue118-full-source
+      - name: Read the exact charged cleanup attempt; no new authentication
+        if: inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE' && steps.source.outputs.failed_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: issue118-full-${{ steps.source.outputs.failed_run }}
+          run-id: ${{ steps.source.outputs.failed_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/issue118-failed-cleanup-source
+      - name: Locked dependencies only; no browser or Clerk secret
+        run: |
+          npm install --prefix "$RUNNER_TEMP/issue118-npm" --ignore-scripts --no-audit --no-fund --save-exact npm@11.18.0
+          node "$RUNNER_TEMP/issue118-npm/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts --no-audit --no-fund
+      - name: Read the exact private cleanup baseline; never replay old mutations
+        if: inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE' && steps.source.outputs.basis_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: issue118-full-${{ steps.source.outputs.basis_run }}
+          run-id: ${{ steps.source.outputs.basis_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/issue118-rebase-source
+      - name: Validate full state, source artifact and one-shot global claim before secret delivery
+        if: inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE118_SOURCE_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-full-source
+          ISSUE118_FAILED_CLEANUP_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-failed-cleanup-source
+          ISSUE118_REBASE_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-rebase-source
+        run: node scripts/issue118-managed-full-entry.mjs --preflight
+      - name: Prepare fixed browser version after admission
+        if: steps.source.outputs.final_only != 'true'
+        env:
+          CLEARALLERGY_BROWSER_RUNNER_DIR: ${{ runner.temp }}/issue118-playwright
+        run: node scripts/browser-runner.mjs install --with-deps
+      - name: One approved finite arm only; unknown means HOLD without retry/cleanup
+        if: inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE118_SOURCE_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-full-source
+          ISSUE118_FAILED_CLEANUP_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-failed-cleanup-source
+          ISSUE118_REBASE_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-rebase-source
+          ISSUE118_APPLY: 'true'
+          ISSUE118_TEST_CLERK_SECRET_KEY: ${{ steps.source.outputs.final_only != 'true' && secrets.ISSUE118_TEST_CLERK_SECRET_KEY || '' }}
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-full-result
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/issue118-managed-full-entry.mjs --apply
+      - name: Keep distinct raw HOLD and closed-session checkpoint; no success promotion
+        if: always() && inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE'
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue118-full-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/issue118-full-result/result.json
+            ${{ runner.temp }}/issue118-full-result/full-checkpoint-payload.json
+            ${{ runner.temp }}/issue118-full-result/t2-prefix-payload.json
+            ${{ runner.temp }}/issue118-full-result/claims/*.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Same existing job, Environment, global concurrency and permissions.
+      # A-only mode cannot enter any FULL step or receive a FULL bundle.
+      - name: Download the exact immutable failed source for A-only admission
+        if: inputs.confirmation == 'APPROVE_READONLY_A_PREFLIGHT'
+        uses: actions/download-artifact@v4
+        with:
+          name: issue118-full-41637959671
+          run-id: '41637959671'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/issue118-readonly-source
+      - name: Bind source and all-run ledger; durably charge 14 to 15 before any authentication
+        if: inputs.confirmation == 'APPROVE_READONLY_A_PREFLIGHT'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE118_READONLY_MODE: READONLY_A_PREFLIGHT_14_TO_15
+          ISSUE118_READONLY_IDENTITY: ${{ inputs.identity_receipt }}
+          ISSUE118_SOURCE_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-readonly-source
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-readonly-result
+        run: node scripts/issue118-readonly-entry.mjs --admit
+      - name: Persist the consumed session charge independently before delivering the Clerk secret
+        if: inputs.confirmation == 'APPROVE_READONLY_A_PREFLIGHT'
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue118-readonly-charge-${{ github.run_id }}
+          path: ${{ runner.temp }}/issue118-readonly-result/charge.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: One A authentication and read-only editor check; never FULL or B
+        if: inputs.confirmation == 'APPROVE_READONLY_A_PREFLIGHT'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE118_READONLY_MODE: READONLY_A_PREFLIGHT_14_TO_15
+          ISSUE118_READONLY_IDENTITY: ${{ inputs.identity_receipt }}
+          ISSUE118_SOURCE_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-readonly-source
+          ISSUE118_APPLY: 'true'
+          ISSUE118_TEST_CLERK_SECRET_KEY: ${{ secrets.ISSUE118_TEST_CLERK_SECRET_KEY }}
+          CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-readonly-result
+          PLAYWRIGHT_MODULE_PATH: ${{ runner.temp }}/issue118-playwright/node_modules/playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/issue118-playwright/browsers
+        run: node scripts/issue118-readonly-entry.mjs --apply
+      - name: Retain A-only HOLD, consumption and independent termination observations
+        if: always() && inputs.confirmation == 'APPROVE_READONLY_A_PREFLIGHT'
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue118-readonly-a-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/issue118-readonly-result/charge.json
+            ${{ runner.temp }}/issue118-readonly-result/auth-attempt.json
+            ${{ runner.temp }}/issue118-readonly-result/result.json
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,912 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname, resolve, basename } from 'node:path';
+import { runInNewContext } from 'node:vm';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { assertCiEnvironment, ciIdentity, managedActorIdentity, assertOidcClaims, oidcRequestUrl, inspectOidcRequestTarget, assertClerkPublishableKey, createCiAccess,withClerkDeadline } from '../scripts/issue118-ci-auth.mjs';
+import { oidcTargetDiagnostic } from '../scripts/check-issue118-oidc-target.mjs';
+import { target, classifyLiveError, recordTransportDiagnostic,createReadCloseAuthPolicyCandidate } from '../scripts/check-issue118-live-t1-browser.mjs';
+import { routePreviewRequest, transportObservation } from '../scripts/issue118-preview-transport.mjs';
+
+const syntheticSecret = 'sk_test_SYNTHETIC_NOT_REAL';
+const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_REPOSITORY: ciIdentity.repository, GITHUB_REPOSITORY_ID: ciIdentity.repositoryId,
+    GITHUB_REF: ciIdentity.ref, GITHUB_WORKFLOW_REF: ciIdentity.workflowRef,
+    ISSUE118_GITHUB_ENVIRONMENT: ciIdentity.environment, ISSUE118_APPLY: 'true',
+    GITHUB_SHA: 'a'.repeat(40), ISSUE118_EXPECTED_RUNNER_SHA: 'a'.repeat(40),
+    ISSUE118_TEST_CLERK_SECRET_KEY: syntheticSecret,
+    ACTIONS_ID_TOKEN_REQUEST_URL: 'https://run-actions-synthetic.actions.githubusercontent.com/only/_apis/oidc/idtoken?api-version=2.0',
+    ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'SYNTHETIC_REQUEST_CREDENTIAL' });
+const claims = () => ({ iss: 'https://token.actions.githubusercontent.com', aud: ciIdentity.audience,
+    sub: `repo:${ciIdentity.repository}:environment:${ciIdentity.environment}`, repository: ciIdentity.repository,
+    repository_id: ciIdentity.repositoryId, ref: ciIdentity.ref, workflow_ref: ciIdentity.workflowRef,
+    environment: ciIdentity.environment, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300 });
+const jwt = body => 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify(body)).toString('base64url') + '.synthetic';
+const response = body => ({ ok: true, json: async () => body });
+const code = expected => error => error.message === expected && !error.cause && !String(error.stack).includes(syntheticSecret);
+const publicKey = 'pk_test_' + Buffer.from(ciIdentity.clerkDomain + '$').toString('base64');
+test('same-job OIDC renewal is single-flight, preserves claims and stops at a finite issuance budget',async t=>{
+    let clock=Date.now(),calls=0;t.mock.method(Date,'now',()=>clock);
+    const a=await createCiAccess(env(),async()=>{calls++;return response({value:jwt(claims())});});
+    assert.equal(calls,1);await a.ensureToken();assert.equal(calls,1);
+    for(let i=0;i<5;i++){clock+=241000;await Promise.all([a.ensureToken(),a.ensureToken()]);}
+    assert.equal(calls,6);assert.deepEqual(a.oidcLifecycle(),{issuances:6,renewalFailed:false,maximumIssuances:6});
+    clock+=241000;await assert.rejects(a.ensureToken(),code('OIDC_RENEWAL_LIMIT'));assert.equal(calls,6);
+    await assert.rejects(a.ensureToken(),code('OIDC_RENEWAL_HELD'));assert.equal(calls,6);
+});
+test('failed, nonadvanced or changed-claim OIDC renewal never retries or sends an app request',async t=>{
+    for(const bad of ['THROW','SAME','WRONG_REF']){
+        let clock=Date.now(),calls=0,appCalls=0;t.mock.method(Date,'now',()=>clock);const old=claims();
+        const a=await createCiAccess(env(),async()=>{if(++calls===1)return response({value:jwt(old)});
+            if(bad==='THROW')throw Error(syntheticSecret);return response({value:jwt(bad==='SAME'?old:{...claims(),ref:'refs/heads/main'})});});
+        clock+=241000;
+        const api={fetch:async()=>{appCalls++;assert.fail('No app request after failed renewal');}};
+        await assert.rejects(a.read(api,target.origin+'/api/admin/shop'),code('OIDC_RENEWAL_HELD'));
+        await assert.rejects(a.read(api,target.origin+'/api/admin/shop'),code('OIDC_RENEWAL_HELD'));
+        assert.equal(calls,2);assert.equal(appCalls,0);assert.equal(a.oidcLifecycle().renewalFailed,true);t.mock.restoreAll();
+    }
+});
+test('OIDC renewal failure while another route waits for headers prevents its old-token APP fetch',async t=>{
+    let clock=Date.now(),calls=0,fetches=0,aborts=0,release,started;
+    t.mock.method(Date,'now',()=>clock);
+    const ready=new Promise(resolve=>{started=resolve;}),waiting=new Promise(resolve=>{release=resolve;});
+    const a=await createCiAccess(env(),async()=>{if(++calls===1)return response({value:jwt(claims())});throw Error(syntheticSecret);});
+    clock+=230000;
+    const route={request:()=>({url:()=>target.origin+'/admin/shop',method:()=> 'GET',allHeaders:async()=>{started();await waiting;return {};}}),
+        fetch:async()=>{fetches++;return {status:()=>200};},fulfill:async()=>{},abort:async()=>{aborts++;}};
+    const work=assert.rejects(a.route(route),code('CI_ROUTE_FAILED'));await ready;clock+=11000;
+    await assert.rejects(a.ensureToken(),code('OIDC_RENEWAL_HELD'));release();await work;
+    assert.equal(fetches,0);assert.equal(aborts,1);assert.equal(calls,2);
+    assert.throws(()=>a.token(),code('OIDC_RENEWAL_HELD'));
+    let clerkForwards=0;await assert.rejects(a.route({request:()=>({url:()=> 'https://'+ciIdentity.clerkDomain+'/v1/client',method:()=> 'POST'}),
+        fetch:async()=>{clerkForwards++;},abort:async()=>{}}),code('CI_ROUTE_FAILED'));assert.equal(clerkForwards,0);
+});
+test('read-close approved claim cannot send after transport header wait changes phase or receipt validity',async()=>{
+    for(const change of ['PHASE','RECEIPT','NONE']) {
+        let phase='AUTHENTICATION',expired=false,headerCalls=0,release,ready,fetches=0;
+        const started=new Promise(resolve=>{ready=resolve;}),pending=new Promise(resolve=>{release=resolve;});
+        const action='a'.repeat(42),headers={'next-action':action,origin:target.origin,referer:target.origin+'/admin/login',
+            'content-type':'text/plain;charset=UTF-8',accept:'text/x-component'};
+        const request={url:()=>target.origin+'/admin/login',method:()=> 'POST',postData:()=> '[]',
+            allHeaders:async()=>{if(++headerCalls===1)return headers;ready();return await pending;}};
+        const policy=createReadCloseAuthPolicyCandidate({actionReference:action,assertContext:()=>{if(expired)throw Error('EXPIRED_CONTEXT');}});
+        assert.equal((await policy(request,()=>phase)).decision,'ALLOW_PINNED_AUTH_CACHE_ACTION');
+        const access=await createCiAccess(env(),async()=>response({value:jwt(claims())}));
+        const work=access.route({request:()=>request,fetch:async()=>{fetches++;return {status:()=>200};},fulfill:async()=>{},abort:async()=>{}},
+            undefined,()=>policy.assertBeforeSend(request,()=>phase));
+        const checked=change==='NONE'?work:assert.rejects(work,code('CI_ROUTE_FAILED'));
+        await started;if(change==='PHASE')phase='SIGNOUT';if(change==='RECEIPT')expired=true;release(headers);await checked;
+        assert.equal(fetches,change==='NONE'?1:0);
+        assert.equal((await policy({...request,allHeaders:async()=>headers},()=> 'AUTHENTICATION')).decision,'REFUSE');
+        if(change==='NONE')assert.throws(()=>policy.assertBeforeSend(request,()=>phase),{message:'READ_CLOSE_PRE_SEND_REFUSED'});
+    }
+});
+test('Clerk operation deadline does not retry or assume an unresolved session operation failed to commit',async()=>{
+    let completed=false,resolve;
+    const original=new Promise(done=>{resolve=()=>{completed=true;done();};});
+    await assert.rejects(withClerkDeadline(original,5),{message:'CLERK_OPERATION_TIMEOUT'});assert.equal(completed,false);
+    resolve();await original;assert.equal(completed,true);
+});
+const diagnosticEnv = () => ({ ...env(), ISSUE118_APPLY: undefined, ISSUE118_TEST_CLERK_SECRET_KEY: undefined,
+    ISSUE118_DIAGNOSTIC_MODE: 'OIDC_TARGET_ONLY' });
+
+// Unit-only page adapter: the old auth model must acknowledge the initial document
+// route too. This uses a fake API response, not a live browser/authentication.
+const wiredPages = new WeakMap();
+function wireAuthPage(access, page) {
+    if (!wiredPages.has(page)) {
+        const frame = {}, visits = [], originalGoto = page.goto;
+        const state = { access, requests: [], responses: [], fulfills: 0, aborts: 0 };
+        page.mainFrame = () => frame;
+        const context = { request: { fetch: async (url, options) => {
+            state.requests.push({ url, options });
+            return state.responses.shift() || { status: () => 200, headers: () => ({}) };
+        } } };
+        page.context = () => context;
+        page.goto = async url => {
+            visits.push(url);
+            if (url === target.origin + '/admin/login') try { await state.access.route({
+                request: () => ({ url: () => url, method: () => 'GET', resourceType: () => 'document',
+                    isNavigationRequest: () => true, frame: () => frame }),
+                fulfill: async () => { state.fulfills++; }, abort: async () => { state.aborts++; },
+            }); } catch (error) { if (!state.swallowRouteError) throw error; }
+            return originalGoto?.(url);
+        };
+        wiredPages.set(page, state);
+    }
+    wiredPages.get(page).access = access;
+    return wiredPages.get(page);
+}
+const authenticate = (access, page) => { wireAuthPage(access, page); return access.authenticate(page); };
+
+test('wired initial handshake reaches auth only after exact four-GET exchange; later document redirects stay refused', async () => {
+    const fixture = authFixture(); const reports = [];
+    const access = await createCiAccess(env(), fixture.fetcher, () => {}, { handshake: r => reports.push(r) });
+    const model = wireAuthPage(access, fixture.page);
+    const outbound = new URL('https://' + ciIdentity.clerkDomain + '/v1/client/handshake');
+    for (const [k,v] of Object.entries({redirect_url:target.origin+'/admin/login',__clerk_api_version:'2026-05-12',
+        suffixed_cookies:'true',__clerk_hs_reason:'dev-browser-missing',format:'nonce'})) outbound.searchParams.set(k,v);
+    const r = (status,location) => ({status:()=>status,headers:()=>({location})});
+    model.responses.push(r(307,outbound.href),r(302,target.origin+'/admin/login?__clerk_handshake_nonce=SYNTHETIC_NONCE'),
+        r(307,target.origin+'/admin/login'),r(200));
+    await access.authenticate(fixture.page);
+    assert.equal(model.requests.length,4);assert.equal(model.fulfills,1);assert.equal(access.isAuthenticated(),true);
+    assert.equal(access.handshakeProgress().complete,true);assert.equal(reports.length,1);
+    assert.ok(!JSON.stringify(reports).includes('SYNTHETIC_NONCE'));
+    assert.ok(!Object.keys(model.requests[1].options.headers).some(k=>k.toLowerCase().includes('vercel')));
+    let fetches=0;
+    await assert.rejects(access.route({request:()=>({url:()=>target.origin+'/admin/shop',method:()=>'GET',
+        resourceType:()=>'document',isNavigationRequest:()=>true,frame:()=>fixture.page.mainFrame(),allHeaders:async()=>({})}),
+        fetch:async()=>{fetches++;return r(307,outbound.href);},fulfill:async()=>assert.fail('No later redirect'),abort:async()=>{}}),code('CI_ROUTE_FAILED'));
+    assert.equal(fetches,1);
+});
+test('wired handshake HOLD or evidence failure prevents Backend API auth and never retries', async () => {
+    for (const observerFailure of [false,true]) {
+        const fixture=authFixture(); const access=await createCiAccess(env(),fixture.fetcher,()=>{},
+            {handshake:()=>{if(observerFailure)throw Error(syntheticSecret);}});
+        const model=wireAuthPage(access,fixture.page);
+        // Production's event handler may absorb the route error after a fulfilled
+        // document; authenticate's explicit completion/evidence gate must still stop.
+        model.swallowRouteError=observerFailure;
+        if(!observerFailure) model.responses.push({status:()=>307,headers:()=>({location:'https://other.invalid/?secret=SYNTHETIC'})});
+        await assert.rejects(access.authenticate(fixture.page),code('CI_AUTHENTICATION_FAILED'));
+        assert.equal(fixture.calls.length,1);assert.equal(access.authenticationProgress().ownerLookupStarted,false);
+        assert.equal(access.authenticationProgress().testingTokenRequestStarted,false);assert.equal(model.requests.length,1);
+    }
+});
+
+test('wired legacy carrier completes only the same bounded document exchange; mixed and malformed carriers stop before Backend auth',async()=>{
+    const outbound=new URL('https://'+ciIdentity.clerkDomain+'/v1/client/handshake');
+    for(const [k,v] of Object.entries({redirect_url:target.origin+'/admin/login',__clerk_api_version:'2026-05-12',
+        suffixed_cookies:'true',__clerk_hs_reason:'dev-browser-missing',format:'nonce'}))outbound.searchParams.set(k,v);
+    const legacy=target.origin+'/admin/login?__clerk_handshake=synthetic.payload.signature';
+    const r=(status,location)=>({status:()=>status,headers:()=>({location})});
+    for(const [location,allowed] of [[legacy,true],[legacy+'&__clerk_handshake_nonce=SYNTHETIC',false],
+        [legacy+'&__clerk_db_jwt=SYNTHETIC',false],[legacy.replace('synthetic.payload.signature','not-jwt'),false]]){
+        const fixture=authFixture(),reports=[];
+        const access=await createCiAccess(env(),fixture.fetcher,()=>{},{handshake:x=>reports.push(x)});
+        const model=wireAuthPage(access,fixture.page);
+        model.responses.push(r(307,outbound.href),r(307,location),r(307,target.origin+'/admin/login'),r(200));
+        if(allowed){await access.authenticate(fixture.page);assert.equal(model.requests.length,4);assert.equal(access.isAuthenticated(),true);}
+        else{await assert.rejects(access.authenticate(fixture.page),code('CI_AUTHENTICATION_FAILED'));
+            assert.equal(model.requests.length,2);assert.equal(fixture.calls.length,1);
+            assert.equal(access.authenticationProgress().ownerLookupStarted,false);assert.equal(access.authenticationProgress().testingTokenRequestStarted,false);}
+        assert.equal(model.requests[1].options.headers['x-vercel-trusted-oidc-idp-token'],undefined);
+        for(const {options}of model.requests){assert.equal(options.maxRedirects,0);assert.equal(options.maxRetries,0);assert.equal(options.method,'GET');}
+        assert.doesNotMatch(JSON.stringify(reports),/synthetic\.payload|SYNTHETIC|https:/);
+    }
+});
+
+test('transport report permits enums/status/booleans only and retains first unexpected failure beyond cap', () => {
+    const report = {};
+    recordTransportDiagnostic(report, { originRole: syntheticSecret, method: 'https://u:p@invalid/', status: syntheticSecret,
+        exception: syntheticSecret, stages: { fetchStarted: true, url: syntheticSecret }, url: syntheticSecret });
+    assert.deepEqual(report.transportDiagnostics[0].originRole, 'OTHER');
+    assert.equal(report.transportDiagnostics[0].method, 'OTHER'); assert.equal(report.transportDiagnostics[0].status, null);
+    assert.ok(!JSON.stringify(report).includes('SYNTHETIC')); assert.ok(!JSON.stringify(report).includes('https:'));
+    const capped = {};
+    for (let i = 0; i < 70; i++) recordTransportDiagnostic(capped, transportObservation('OTHER', 'GET', null, 'POLICY_REFUSED'));
+    assert.equal(capped.firstTransportFailure, undefined);
+    recordTransportDiagnostic(capped, transportObservation('APP', 'GET', 302, 'REDIRECT_REFUSED', { redirectRejected: true }));
+    recordTransportDiagnostic(capped, transportObservation('CLERK', 'GET', 503, 'NONE'));
+    assert.equal(capped.transportDiagnostics.length, 64); assert.equal(capped.transportDiagnosticsTruncated, true);
+    assert.equal(capped.firstTransportFailure.originRole, 'APP'); assert.equal(capped.firstTransportFailure.status, 302);
+});
+
+test('APP route diagnostics distinguish redirects, HTTP errors, and fetch/headers/status/fulfill failures without raw errors', async () => {
+    for (const scenario of ['redirect', 'http403', 'fetch', 'headers', 'status', 'fulfill', 'abort']) {
+        const events = []; let fetches = 0, fulfilled = 0;
+        const raw = () => { throw Error(syntheticSecret + ' https://u:p@invalid/private?token=secret'); };
+        const route = { request: () => ({ url: () => target.origin + '/admin/login', method: () => 'GET',
+            allHeaders: async () => { if (scenario === 'headers') raw(); return {}; } }),
+            fetch: async options => { fetches++; assert.equal(options.maxRedirects, 0); assert.equal(options.maxRetries, 0);
+                if (['fetch', 'abort'].includes(scenario)) raw();
+                return { status: () => { if (scenario === 'status') raw(); return scenario === 'redirect' ? 302 : scenario === 'http403' ? 403 : 200; } }; },
+            fulfill: async () => { fulfilled++; if (scenario === 'fulfill') raw(); },
+            abort: async () => { if (scenario === 'abort') raw(); } };
+        if (scenario === 'http403') await routePreviewRequest(route, 'synthetic.payload.signature', value => events.push(value));
+        else await assert.rejects(routePreviewRequest(route, 'synthetic.payload.signature', value => events.push(value)),
+            error => ['PROTECTED_REDIRECT_BLOCKED', 'PROTECTED_TRANSPORT_FAILED', 'PROTECTED_ABORT_FAILED'].includes(error.message));
+        const event = events[0]; assert.equal(event.originRole, 'APP'); assert.equal(event.method, 'GET');
+        const expected = { redirect: 'REDIRECT_REFUSED', http403: 'NONE', fetch: 'FETCH_EXCEPTION', headers: 'HEADERS_EXCEPTION',
+            status: 'STATUS_EXCEPTION', fulfill: 'FULFILL_EXCEPTION', abort: 'ABORT_EXCEPTION' };
+        assert.equal(event.exception, expected[scenario]); assert.ok(!JSON.stringify(events).includes('SYNTHETIC'));
+        assert.equal(fetches, scenario === 'headers' ? 0 : 1);
+        if (scenario === 'redirect') { assert.equal(event.status, 302); assert.equal(fulfilled, 0); assert.equal(event.stages.redirectRejected, true); }
+        if (scenario === 'fetch') assert.equal(event.stages.responseObserved, false);
+        if (scenario === 'status') assert.equal(event.stages.responseObserved, true);
+    }
+});
+
+test('Clerk/OTHER route diagnostics preserve fixed roles and never relax external redirect/header policy', async () => {
+    const events = []; const access = await createCiAccess(env(), async () => response({ value: jwt(claims()) }), () => {},
+        { transport: value => events.push(value) });
+    const route = origin => ({ request: () => ({ url: () => origin + '/v1/client?synthetic-secret', method: () => 'GET',
+        allHeaders: async () => ({ 'x-vercel-trusted-oidc-idp-token': 'synthetic.payload.signature' }) }),
+        fetch: async options => { assert.ok(!Object.hasOwn(options.headers, 'x-vercel-trusted-oidc-idp-token'));
+            assert.equal(options.maxRedirects, 0); assert.equal(options.maxRetries, 0); return { status: () => 307 }; },
+        fulfill: async () => assert.fail('redirect must never fulfill'), abort: async () => {} });
+    await assert.rejects(access.route(route('https://' + ciIdentity.clerkDomain)), code('CI_ROUTE_FAILED'));
+    assert.equal(events[0].originRole, 'CLERK'); assert.equal(events[0].exception, 'REDIRECT_REFUSED'); assert.equal(events[0].status, 307);
+    const freshOther = await createCiAccess(env(), async () => response({ value: jwt(claims()) }), () => {},
+        { transport: value => events.push(value) });
+    await freshOther.route(route('https://other.invalid'));
+    assert.equal(events[1].originRole, 'OTHER'); assert.equal(events[1].exception, 'POLICY_REFUSED');
+    assert.ok(!JSON.stringify(events).includes('synthetic-secret')); assert.ok(!JSON.stringify(events).includes('/v1/'));
+});
+test('first Clerk redirect is boolean-classified, never followed, and latches all later browser requests before sending', async () => {
+    const observations = []; let sends = 0, aborts = 0, requestReads = 0;
+    const access = await createCiAccess(env(), async () => response({ value: jwt(claims()) }), () => {},
+        { frontendRedirect: p => observations.push(p) });
+    const origin = 'https://' + ciIdentity.clerkDomain;
+    const route = { request: () => ({ url: () => origin + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js',
+        method: () => 'GET', resourceType: () => 'script', allHeaders: async () => ({}) }),
+        fetch: async () => { sends++; return { status: () => 307, headers: () => ({ location: 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6.24.0/dist/clerk.browser.js?SYNTHETIC_PRIVATE' }) }; },
+        fulfill: async () => assert.fail('redirect must not fulfill'), abort: async () => { aborts++; } };
+    await assert.rejects(access.route(route), code('CI_ROUTE_FAILED'));
+    assert.equal(sends, 1); assert.equal(observations.length, 1);
+    assert.equal(observations[0].resourceIsScript, true); assert.equal(observations[0].requestIsClerkJsBundle, true);
+    assert.equal(observations[0].targetIsJsDelivr, true); assert.equal(observations[0].targetIsClerkJsBundle, true);
+    assert.ok(Object.values(observations[0]).every(v => typeof v === 'boolean'));
+    assert.doesNotMatch(JSON.stringify(observations), /SYNTHETIC|https:|clerk\.browser|jsdelivr\.net/);
+    for (let i = 0; i < 3; i++) await assert.rejects(access.route({ ...route, request: () => { requestReads++; throw Error(syntheticSecret); } }), code('CI_ROUTE_FAILED'));
+    assert.equal(sends, 1); assert.equal(requestReads, 0); assert.equal(aborts, 4);
+    assert.equal(access.authenticationProgress().ownerLookupStarted, false);
+});
+test('concurrent Clerk or app route waiting on headers cannot send after another route latches HOLD', { timeout: 3000 }, async () => {
+    for (const origin of ['https://' + ciIdentity.clerkDomain, target.origin]) {
+        let release, headerReady, sends = 0;
+        const headers = new Promise(resolve => { release = resolve; });
+        const started = new Promise(resolve => { headerReady = resolve; });
+        const access = await createCiAccess(env(), async () => response({ value: jwt(claims()) }));
+        const waiting = assert.rejects(access.route({ request: () => ({ url: () => origin + '/pending', method: () => 'GET',
+            resourceType: () => 'fetch', allHeaders: async () => { headerReady(); return await headers; } }),
+            fetch: async () => { sends++; assert.fail('held route must never send'); },
+            fulfill: async () => assert.fail('held route must never fulfill'), abort: async () => {} }), code('CI_ROUTE_FAILED'));
+        await started;
+        await assert.rejects(access.route({ request: () => ({ url: () => 'https://' + ciIdentity.clerkDomain + '/npm/@clerk/clerk-js@6/dist/clerk.browser.js',
+            method: () => 'GET', resourceType: () => 'script', allHeaders: async () => ({}) }),
+            fetch: async () => ({ status: () => 307, headers: () => ({ location: '/public-script' }) }),
+            fulfill: async () => assert.fail('redirect must not fulfill'), abort: async () => {} }), code('CI_ROUTE_FAILED'));
+        release({}); await waiting; assert.equal(sends, 0);
+    }
+});
+
+test('Backend API failures record Clerk role/method/status or fixed fetch class without key or response body', async () => {
+    for (const network of [false, true]) {
+        const events = []; let calls = 0;
+        const access = await createCiAccess(env(), async url => {
+            calls++;
+            if (url.includes('actions.githubusercontent.com')) return response({ value: jwt(claims()) });
+            if (network) throw Error(syntheticSecret + ' private response');
+            return { ok: false, status: 401, json: async () => assert.fail('do not read failed body') };
+        }, () => {}, { transport: value => events.push(value) });
+        const fixture = authFixture();
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        assert.equal(calls, 2); assert.equal(events.length, 1); assert.equal(events[0].originRole, 'CLERK');
+        assert.equal(events[0].method, 'GET'); assert.equal(events[0].stages.backendRequest, true);
+        assert.equal(events[0].status, network ? null : 401); assert.equal(events[0].exception, network ? 'FETCH_EXCEPTION' : 'NONE');
+        assert.equal(access.authenticationProgress().ownerLookupStarted, true); assert.equal(access.authenticationProgress().ownerMatched, false);
+        assert.ok(!JSON.stringify(events).includes('SYNTHETIC')); assert.ok(!JSON.stringify(events).includes('private'));
+    }
+});
+
+test('OIDC predicate mirror matches candidate validator, never returns URL parts or exceptions', () => {
+    const base = 'https://run-actions-synthetic.actions.githubusercontent.com/only/idtoken?api-version=2.0';
+    for (const value of [undefined, '', 'not a URL', base, base.replace('https:', 'http:'),
+        base.replace('run-actions-synthetic.actions.githubusercontent.com', 'actions.githubusercontent.com'),
+        base.replace('actions.githubusercontent.com', 'actions.githubusercontent.com.evil.invalid'),
+        base.replace('/idtoken', '/other'), base.replace('/idtoken?', '/idtoken/?'),
+        base.replace('https://', 'https://sk_test_SYNTHETIC:password@'),
+        base.replace('.com/', '.com:444/'), base.replace('.com/', '.com:443/'),
+        base + '#sk_test_SYNTHETIC', base + '&secret=sk_test_SYNTHETIC']) {
+        const result = inspectOidcRequestTarget(value);
+        let accepted = true; try { oidcRequestUrl(value); } catch { accepted = false; }
+        assert.equal(result.guardAccepts, accepted);
+        assert.ok(Object.values(result).every(item => typeof item === 'boolean'));
+        assert.ok(!/SYNTHETIC|password|https:|api-version|other/.test(JSON.stringify(result)));
+    }
+    const object = { toString() { throw Error('must not inspect secret-like object'); } };
+    assert.equal(inspectOidcRequestTarget(object).parseable, false);
+});
+
+test('diagnostic accepts only fixed context and always stops before fetch/auth/browser/write', t => {
+    let network = 0; t.mock.method(globalThis, 'fetch', () => { network++; throw Error(syntheticSecret); });
+    for (const value of [env().ACTIONS_ID_TOKEN_REQUEST_URL, 'https://u:sk_test_SYNTHETIC@invalid/']) {
+        const result = oidcTargetDiagnostic({ ...diagnosticEnv(), ACTIONS_ID_TOKEN_REQUEST_URL: value });
+        assert.equal(result.stage, 'DIAGNOSTIC_STOP_BEFORE_REQUEST');
+        for (const field of ['oidcRequestSent', 'clerkStarted', 'browserStarted', 'fixtureWriteStarted']) assert.equal(result[field], false);
+        assert.ok(['OIDC_TARGET_GUARD_MATCH', 'OIDC_REQUEST_TARGET_REFUSED'].includes(result.code));
+        assert.ok(!JSON.stringify(result).includes('SYNTHETIC'));
+    }
+    for (const change of [{ ISSUE118_APPLY: 'true' }, { ISSUE118_TEST_CLERK_SECRET_KEY: syntheticSecret },
+        { GITHUB_RUN_ATTEMPT: '2' }, { GITHUB_REF: 'wrong' }, { GITHUB_WORKFLOW_REF: 'wrong' },
+        { ISSUE118_GITHUB_ENVIRONMENT: 'wrong' }, { ISSUE118_EXPECTED_RUNNER_SHA: 'wrong' },
+        { ISSUE118_DIAGNOSTIC_MODE: 'LIVE' }, { NODE_OPTIONS: 'secret-like preload' }, { ACTIONS_STEP_DEBUG: 'true' }])
+        assert.throws(() => oidcTargetDiagnostic({ ...diagnosticEnv(), ...change }), code('OIDC_DIAGNOSTIC_CONTEXT_REFUSED'));
+    assert.equal(network, 0);
+});
+
+test('actual diagnose-only CLI emits booleans/fixed codes, never raw URL, and cannot run apply or overwrite', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'issue118-oidc-target-test-'));
+    const configuration = { SystemRoot: process.env.SystemRoot, ...diagnosticEnv(), RUNNER_TEMP: directory,
+        ACTIONS_ID_TOKEN_REQUEST_URL: 'https://u:sk_test_SYNTHETIC@wrong.invalid/private/idtoken?token=secret#fragment' };
+    const child = args => spawnSync(process.execPath, ['scripts/check-issue118-oidc-target.mjs', ...args], {
+        env: configuration, encoding: 'utf8', windowsHide: true });
+    try {
+        const result = child(['--diagnose-only']); assert.equal(result.status, 0); assert.equal(result.stderr, '');
+        const report = JSON.parse(result.stdout);
+        assert.equal(report.stage, 'DIAGNOSTIC_STOP_BEFORE_REQUEST'); assert.equal(report.predicates.userinfoAbsent, false);
+        assert.ok(!/SYNTHETIC|wrong.invalid|private|token=|fragment#/.test(result.stdout));
+        const path = join(directory, 'issue118-oidc-target', 'result.json'); const prior = readFileSync(path, 'utf8');
+        for (const args of [['--apply'], ['--diagnose-only', '--ci-apply'], ['--diagnose-only']]) {
+            const refused = child(args); assert.equal(refused.status, 1); assert.equal(refused.stdout, '');
+            assert.equal(refused.stderr.trim(), 'OIDC_DIAGNOSTIC_REFUSED_NO_RAW_ERROR'); assert.equal(readFileSync(path, 'utf8'), prior);
+        }
+    } finally {
+        assert.equal(dirname(resolve(directory)), resolve(tmpdir()));
+        assert.ok(basename(directory).startsWith('issue118-oidc-target-test-'));
+        rmSync(directory, { recursive: true });
+    }
+});
+
+test('access setup reports fixed stages, never secrets, with no auth or retry on failure', async () => {
+    const cases = [
+        [{ ...env(), GITHUB_REF: 'wrong' }, response({}), ['CI_ENV_VALIDATE'], 'CI_IDENTITY_REFUSED', 0],
+        [{ ...env(), ACTIONS_ID_TOKEN_REQUEST_URL: 'https://other.invalid/' }, response({}), ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE'], 'OIDC_REQUEST_TARGET_REFUSED', 0],
+        [{ ...env(), ACTIONS_ID_TOKEN_REQUEST_TOKEN: '' }, response({}), ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE'], 'OIDC_REQUEST_AUTH_REQUIRED', 0],
+        [env(), null, ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE', 'OIDC_REQUEST'], 'OIDC_REQUEST_FAILED', 1],
+        [env(), response({ value: 'secret-like-invalid-jwt' }), ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE', 'OIDC_REQUEST', 'OIDC_CLAIMS_VALIDATE'], 'OIDC_CLAIMS_INVALID', 1],
+        [env(), response({ value: jwt({ ...claims(), ref: 'wrong' }) }), ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE', 'OIDC_REQUEST', 'OIDC_CLAIMS_VALIDATE'], 'OIDC_CLAIMS_REFUSED', 1],
+    ];
+    for (const [configuration, result, expected, category, count] of cases) {
+        const observed = []; let calls = 0;
+        await assert.rejects(createCiAccess(configuration, async () => { calls++; if (!result) throw Error(syntheticSecret + ' https://u:p@invalid/ 秘密'); return result; }, stage => observed.push(stage)),
+            error => classifyLiveError(error) === category);
+        assert.equal(calls, count); assert.deepEqual(observed, expected);
+        assert.ok(!JSON.stringify(observed).includes(syntheticSecret));
+    }
+    const observed = []; let calls = 0;
+    const access = await createCiAccess(env(), async () => { calls++; return response({ value: jwt(claims()) }); }, stage => observed.push(stage));
+    assert.deepEqual(observed, ['CI_ENV_VALIDATE', 'OIDC_TARGET_VALIDATE', 'OIDC_REQUEST', 'OIDC_CLAIMS_VALIDATE', 'CI_ACCESS_READY']);
+    assert.equal(calls, 1); assert.equal(access.isAuthenticated(), false);
+});
+
+test('CI guards reject wrong event/repo/ref/workflow/environment/SHA and absent apply before I/O', async () => {
+    assertCiEnvironment(env());
+    for (const key of ['GITHUB_ACTIONS', 'GITHUB_EVENT_NAME', 'GITHUB_REPOSITORY', 'GITHUB_REPOSITORY_ID',
+        'GITHUB_REF', 'GITHUB_WORKFLOW_REF', 'ISSUE118_GITHUB_ENVIRONMENT', 'ISSUE118_APPLY', 'ISSUE118_EXPECTED_RUNNER_SHA']) {
+        let calls = 0;
+        await assert.rejects(createCiAccess({ ...env(), [key]: 'wrong' }, async () => { calls++; }), code('CI_IDENTITY_REFUSED'));
+        assert.equal(calls, 0);
+    }
+    for (const key of ['DEBUG', 'PWDEBUG', 'NODE_OPTIONS', 'NODE_DEBUG', 'CLERK_API_URL', 'CLERK_FAPI', 'CLERK_TESTING_TOKEN',
+        'CLERK_TESTING_DEBUG', 'DATABASE_URL', 'DIRECT_URL']) assert.throws(() => assertCiEnvironment({ ...env(), [key]: 'synthetic' }), code('CI_AMBIENT_CONFIGURATION_REFUSED'));
+    assert.throws(() => assertCiEnvironment({ ...env(), ACTIONS_STEP_DEBUG: 'true' }), code('CI_DEBUG_REFUSED'));
+    for (const secret of ['', 'sk_live_SYNTHETIC', syntheticSecret + '\n']) assert.throws(() => assertCiEnvironment({ ...env(), ISSUE118_TEST_CLERK_SECRET_KEY: secret }), code('TEST_CLERK_KEY_REQUIRED'));
+});
+
+test('same-run rerun or missing attempt is refused before OIDC, Clerk or new fixture work', async () => {
+    for (const attempt of ['2', '3', '0', '', undefined]) {
+        let calls = 0;
+        await assert.rejects(createCiAccess({ ...env(), GITHUB_RUN_ATTEMPT: attempt }, async () => { calls++; }), code('CI_IDENTITY_REFUSED'));
+        assert.equal(calls, 0);
+    }
+});
+
+test('local JWT deny guard requires all exact claims/time but does not claim signature verification', () => {
+    assert.equal(assertOidcClaims(jwt(claims())).split('.').length, 3);
+    for (const field of ['iss', 'aud', 'sub', 'repository', 'repository_id', 'ref', 'workflow_ref', 'environment']) {
+        assert.throws(() => assertOidcClaims(jwt({ ...claims(), [field]: 'wrong' })), code('OIDC_CLAIMS_REFUSED'));
+    }
+    for (const change of [{ exp: 0 }, { iat: Date.now() / 1000 + 60 }, { iat: 0 }]) assert.throws(() => assertOidcClaims(jwt({ ...claims(), ...change })), code('OIDC_TIME_REFUSED'));
+    for (const body of [null, [], 'synthetic']) assert.throws(() => assertOidcClaims(jwt(body)), code('OIDC_CLAIMS_INVALID'));
+});
+
+test('OIDC request target refuses credentials, HTTP, host suffix spoof, ports and fragments', () => {
+    assert.equal(new URL(oidcRequestUrl(env().ACTIONS_ID_TOKEN_REQUEST_URL)).searchParams.get('audience'), ciIdentity.audience);
+    for (const url of ['https://actions.githubusercontent.com.attacker.invalid/idtoken', 'http://run.actions.githubusercontent.com/idtoken',
+        'https://user:fake@run.actions.githubusercontent.com/idtoken', 'https://run.actions.githubusercontent.com/idtoken#fragment',
+        'https://run.actions.githubusercontent.com:123/idtoken']) assert.throws(() => oidcRequestUrl(url), code('OIDC_REQUEST_TARGET_REFUSED'));
+});
+
+test('candidate accepts opaque and suspicious same-host paths; this is an explicit destination-path expansion', () => {
+    for (const path of ['/', '/other', '/idToken', '/idtoken/', '/admin/delete', '/a/../anything',
+        '//other.invalid/path', '/%2e%2e/other', '/path?next=https%3A%2F%2Fevil.invalid%2F']) {
+        const value = 'https://run.actions.githubusercontent.com' + path;
+        const url = new URL(oidcRequestUrl(value));
+        assert.equal(url.origin, 'https://run.actions.githubusercontent.com');
+        assert.equal(url.searchParams.get('audience'), ciIdentity.audience);
+        assert.equal(inspectOidcRequestTarget(value).guardAccepts, true);
+    }
+    for (const value of ['https://evil.invalid/anything', 'https://actions.githubusercontent.com/anything',
+        'https://run.actions.githubusercontent.com.evil.invalid/anything', 'http://run.actions.githubusercontent.com/anything',
+        'https://u:p@run.actions.githubusercontent.com/anything', 'https://run.actions.githubusercontent.com:444/anything',
+        'https://run.actions.githubusercontent.com/anything#fragment'])
+        assert.throws(() => oidcRequestUrl(value), code('OIDC_REQUEST_TARGET_REFUSED'));
+});
+
+test('candidate still sends one request only, never Clerk key, and rejects redirect or wrong claims after sending', async () => {
+    for (const redirected of [true, false]) {
+        let calls = 0;
+        const configuration = { ...env(), ACTIONS_ID_TOKEN_REQUEST_URL: 'https://run.actions.githubusercontent.com/unrelated?next=https://evil.invalid/' };
+        await assert.rejects(createCiAccess(configuration, async (url, options) => {
+            calls++;
+            assert.equal(new URL(url).origin, 'https://run.actions.githubusercontent.com');
+            assert.equal(options.redirect, 'error'); assert.ok(options.signal instanceof AbortSignal);
+            assert.deepEqual(options.headers, { Authorization: 'bearer SYNTHETIC_REQUEST_CREDENTIAL' });
+            assert.ok(!JSON.stringify(options).includes(syntheticSecret));
+            return redirected ? { ok: false } : response({ value: jwt({ ...claims(), ref: 'wrong' }) });
+        }), code(redirected ? 'OIDC_REQUEST_FAILED' : 'OIDC_CLAIMS_REFUSED'));
+        assert.equal(calls, 1); // A wrong-claims response cannot undo transmission to this allowed-host path.
+    }
+});
+
+test('one OIDC fetch uses redirect error and bounded signal; raw errors never leave boundary', async () => {
+    let calls = 0;
+    const access = await createCiAccess(env(), async (url, options) => {
+        calls++; assert.match(url, /audience=/); assert.equal(options.redirect, 'error'); assert.ok(options.signal instanceof AbortSignal);
+        return response({ value: jwt(claims()) });
+    });
+    assert.equal(calls, 1); assert.equal(access.isAuthenticated(), false);
+    let failures = 0;
+    await assert.rejects(createCiAccess(env(), async () => { failures++; throw Error('秘密 ' + syntheticSecret + ' https://u:p@invalid/'); }), code('OIDC_REQUEST_FAILED'));
+    assert.equal(failures, 1);
+});
+
+test('expired OIDC cannot be sent; a nonadvanced renewal is held without an app request', async t => {
+    const now = Date.now();
+    const issued = { ...claims(), exp: Math.floor(now / 1000) + 20 };
+    let tokenCalls = 0, previewCalls = 0;
+    const access = await createCiAccess(env(), async () => { tokenCalls++; return response({ value: jwt(issued) }); });
+    t.mock.method(Date, 'now', () => now + 30000);
+    await assert.rejects(async () => access.read({ fetch: async () => { previewCalls++; } }, target.origin + '/api/admin/shop'), code('OIDC_RENEWAL_HELD'));
+    assert.equal(tokenCalls, 2); assert.equal(previewCalls, 0);
+});
+
+test('public frontend must be exact test instance before any Backend API call', async () => {
+    assertClerkPublishableKey(publicKey);
+    for (const key of ['pk_live_' + publicKey.slice(8), 'pk_test_' + Buffer.from('other.clerk.accounts.dev$').toString('base64'), '']) assert.throws(() => assertClerkPublishableKey(key), code('CLERK_FRONTEND_REFUSED'));
+    let calls = 0;
+    const access = await createCiAccess(env(), async () => { calls++; return response({ value: jwt(claims()) }); });
+    const page = { goto: async () => {}, waitForFunction: async () => {}, evaluate: async () => 'pk_live_SYNTHETIC' };
+    await assert.rejects(authenticate(access, page), code('CI_AUTHENTICATION_FAILED'));
+    assert.equal(calls, 1);
+    await assert.rejects(authenticate(access, page), code('CI_AUTH_RETRY_REFUSED'));
+});
+
+function authFixture({ actor = managedActorIdentity.S1, userId = actor.ownerId, owner = actor.ownerId, backendFailure, signoutFailure = false,
+    setActiveFailure = false, createResponseLost = false, activationAckLost = false,sessionOwner=actor.ownerId,
+    sessionCreatedOffset=0,signoutNoRevoke=false,sessionReadFailsAt=0 } = {}) {
+    const calls = []; const visits = [];
+    let providerSession = false; let signOutCalls = 0,createdAt,sessionReads=0;
+    const sessionId='sess_Unit12345678901234567890';
+    const fetcher = async (url, options) => {
+        calls.push({ url, method: options.method || 'GET', body: options.body, redirect: options.redirect });
+        if (url.includes('actions.githubusercontent.com')) return response({ value: jwt(claims()) });
+        assert.equal(new URL(url).origin, 'https://api.clerk.com');
+        assert.equal(options.headers.Authorization, 'Bearer ' + syntheticSecret);
+        if (backendFailure && url.endsWith(backendFailure)) throw Error('raw ' + syntheticSecret);
+        if (url.endsWith('/users/' + actor.ownerId)) return response({ id: userId, email_addresses: [{ email_address: actor.ownerEmail }] });
+        if (url.endsWith('/testing_tokens')) return response({ token: 'SYNTHETIC_TESTING_TOKEN' });
+        if (url.endsWith('/sign_in_tokens')) { assert.deepEqual(JSON.parse(options.body), { user_id: actor.ownerId, expires_in_seconds: 120 }); return response({ token: 'SYNTHETIC_TICKET' }); }
+        if(url.endsWith('/sessions/'+sessionId)) {
+            assert.equal(options.method,'GET');if(++sessionReads===sessionReadFailsAt)throw Error(syntheticSecret);
+            return response({id:sessionId,user_id:sessionOwner,created_at:createdAt,status:providerSession?'active':'revoked',latest_activity:{ip_address:'DO_NOT_RECORD'}});
+        }
+        throw Error('unexpected test seam');
+    };
+    const clerk = { loaded: true, publishableKey: publicKey, user: null, session: null,
+        client: { signIn: { create: async value => {
+            assert.deepEqual({ ...value }, { strategy: 'ticket', ticket: 'SYNTHETIC_TICKET' }); providerSession = true;createdAt=Date.now()+sessionCreatedOffset;
+            if (createResponseLost) throw Error('lost create response ' + syntheticSecret);
+            return { status: 'complete', createdSessionId: sessionId };
+        } } },
+        setActive: async ({ session }) => {
+            assert.equal(session, sessionId);
+            if (setActiveFailure) throw Error('activation failure ' + syntheticSecret);
+            clerk.user = { id: owner }; clerk.session = { id: session };
+            if (activationAckLost) throw Error('lost activation acknowledgement ' + syntheticSecret);
+        },
+        signOut: async options => { if(options)assert.equal(options.sessionId,sessionId);signOutCalls++; if (signoutFailure) throw Error(syntheticSecret); clerk.user = null; clerk.session = null; if(!signoutNoRevoke)providerSession = false; } };
+    const page = { goto: async url => visits.push(url), waitForFunction: async () => {},
+        evaluate: async (fn, arg) => runInNewContext('(' + fn.toString() + ')(__arg)', { window: { Clerk: clerk }, __arg: arg }) };
+    return { calls, visits, page, fetcher, providerSession: () => providerSession, signOutCalls: () => signOutCalls };
+}
+
+test('managed B uses only its pinned existing user and ends its own tracked session; other roles fail before OIDC',async()=>{
+    for(const role of ['S2','OTHER','__proto__']){
+        let calls=0;
+        await assert.rejects(createCiAccess(env(),async()=>{calls++;},()=>{},{},role),code('CI_ACTOR_SCOPE_REFUSED'));
+        assert.equal(calls,0);
+    }
+    for(const lifecycle of [undefined,'LEGACY_UNTRACKED']) {
+        let calls=0;
+        await assert.rejects(createCiAccess({...env(),ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7',ISSUE118_SESSION_LIFECYCLE:lifecycle},async()=>{calls++;},()=>{},{},'S2'),code('CI_ACTOR_SCOPE_REFUSED'));
+        assert.equal(calls,0);
+    }
+    const f=authFixture({actor:managedActorIdentity.S2}),sessions=[];
+    const a=await createCiAccess({...env(),ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7',ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher,()=>{},
+        {session:r=>sessions.push(r)},'S2');
+    await authenticate(a,f.page);
+    assert.equal(a.sessionObservation().ownerId,managedActorIdentity.S2.ownerId);
+    assert.equal(await a.signOut(f.page),'SIGNOUT_CONFIRMED');
+    assert.equal(f.signOutCalls(),1);assert.equal(a.sessionObservation().canonicalReadAttempts,2);
+    assert.ok(!f.calls.some(c=>c.url.endsWith('/users/'+managedActorIdentity.S1.ownerId)));
+    assert.doesNotMatch(JSON.stringify(sessions),/sk_test_|SYNTHETIC_TICKET|DO_NOT_RECORD/);
+    const wrong=authFixture({actor:managedActorIdentity.S2,owner:managedActorIdentity.S1.ownerId});
+    const b=await createCiAccess({...env(),ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7',ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},wrong.fetcher,()=>{},{},'S2');
+    await assert.rejects(authenticate(b,wrong.page),code('CI_AUTHENTICATION_FAILED'));
+    assert.equal(b.isAuthenticated(),false);
+});
+
+test('read-close records its exact created session before activation and confirms only its provider termination',async()=>{
+    for(const lifecycleEnv of [{ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},{ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'}]){
+    const fixture=authFixture(),sessions=[];
+    const access=await createCiAccess({...env(),...lifecycleEnv},fixture.fetcher,()=>{},
+        {session:entry=>sessions.push(entry)});
+    assert.equal(access.sessionLifecycleMode(),'TRACKED_OWNER_SESSION');
+    await authenticate(access,fixture.page);
+    assert.ok(sessions.some(x=>x.id&&x.ownerVerified===false));
+    const created=access.sessionObservation();assert.equal(created.ownerVerified,true);assert.equal(created.eligibleForCleanup,true);
+    assert.ok(Number.isFinite(Date.parse(created.providerCreatedUtc)));assert.equal(created.canonicalReadAttempts,1);
+    assert.equal(await access.signOut(fixture.page),'SIGNOUT_CONFIRMED');
+    const ended=access.sessionObservation();assert.equal(ended.id,created.id);assert.equal(ended.providerCreatedUtc,created.providerCreatedUtc);
+    assert.equal(ended.providerStatus,'revoked');assert.equal(ended.providerTerminationConfirmed,true);assert.equal(ended.canonicalReadAttempts,2);
+    assert.equal(fixture.signOutCalls(),1);assert.equal(fixture.providerSession(),false);
+    assert.equal(await access.signOut(fixture.page),'SIGNOUT_UNVERIFIED');assert.equal(fixture.signOutCalls(),1);
+    assert.doesNotMatch(JSON.stringify(sessions),/DO_NOT_RECORD|SYNTHETIC_TICKET|SYNTHETIC_TESTING_TOKEN|sk_test_/);
+    const lookups=fixture.calls.filter(x=>x.url.includes('/sessions/'));assert.equal(lookups.length,2);
+    assert.ok(lookups.every(x=>x.url==='https://api.clerk.com/v1/sessions/'+created.id&&x.method==='GET'));
+    }
+});
+test('read-close partial activation can terminate only a recorded owned session; unknown creation or identity holds',async()=>{
+    for(const options of [{setActiveFailure:true},{activationAckLost:true},{createResponseLost:true},
+        {sessionOwner:'user_other'},{sessionCreatedOffset:-60000}]) {
+        const f=authFixture(options),a=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},f.fetcher);
+        await assert.rejects(authenticate(a,f.page),code('CI_AUTHENTICATION_FAILED'));
+        const eligible=!!a.sessionObservation()?.eligibleForCleanup;
+        assert.equal(await a.signOut(f.page),eligible?'SIGNOUT_CONFIRMED':'SIGNOUT_UNVERIFIED');
+        assert.equal(f.signOutCalls(),eligible?1:0);
+        const count=f.calls.length;await assert.rejects(a.authenticate(f.page),code('CI_AUTH_RETRY_REFUSED'));assert.equal(f.calls.length,count);
+    }
+});
+test('tracked signout waits for existing-client hydration and a failed wait cannot fake termination',async()=>{
+    for(const blocked of [false,true]){
+        const f=authFixture(),a=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},f.fetcher);
+        await authenticate(a,f.page);let waited=false,evaluated=false;
+        const evaluate=f.page.evaluate.bind(f.page);
+        f.page.waitForFunction=async(_predicate,args,options)=>{
+            assert.equal(args.id,a.sessionObservation().id);assert.equal(args.owner,ciIdentity.ownerId);assert.equal(options.timeout,10000);
+            await Promise.resolve();if(blocked)throw Error(syntheticSecret);waited=true;
+        };
+        f.page.evaluate=async(fn,args)=>{evaluated=true;assert.equal(waited,true);return evaluate(fn,args);};
+        assert.equal(await a.signOut(f.page),blocked?'SIGNOUT_UNVERIFIED':'SIGNOUT_CONFIRMED');
+        assert.equal(evaluated,!blocked);assert.equal(f.signOutCalls(),blocked?0:1);
+        assert.equal(a.sessionObservation().providerTerminationConfirmed,!blocked);
+    }
+});
+test('read-close local signout success, network failure or failed reconciliation cannot fake provider termination',async()=>{
+    for(const options of [{signoutNoRevoke:true},{signoutFailure:true},{sessionReadFailsAt:2}]) {
+        const f=authFixture(options),a=await createCiAccess({...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'},f.fetcher);
+        await authenticate(a,f.page);assert.equal(await a.signOut(f.page),'SIGNOUT_UNVERIFIED');
+        assert.equal(a.sessionObservation().providerTerminationConfirmed,false);assert.equal(f.signOutCalls(),1);
+        assert.equal(a.sessionObservation().canonicalReadAttempts,2);
+    }
+});
+
+test('synthetic main-frame SDK UI/JS canonical transfer is bounded and copies no browser credentials into its second GET', async () => {
+    const origin='https://'+ciIdentity.clerkDomain;
+    for(const [pkg,major,file,version] of [['ui','1','ui.browser.js','1.24.2'],['clerk-js','6','clerk.browser.js','6.24.0']]) {
+        const f=authFixture(), source=`${origin}/npm/@clerk/${pkg}@${major}/dist/${file}`,
+            destination=`${origin}/npm/@clerk/${pkg}@${version}/dist/${file}`;
+        let access,sourceCalls=0,fulfilled=0;const events=[];
+        f.page.goto=async url=>{if(url===target.origin+'/admin/login') await access.route({
+            request:()=>({url:()=>source,method:()=>'GET',resourceType:()=>'script',frame:()=>f.page.mainFrame(),
+                allHeaders:async()=>({Cookie:'SYNTHETIC_PRIVATE',Authorization:'SYNTHETIC_PRIVATE','x-vercel-trusted-oidc-idp-token':'SYNTHETIC_OIDC'})}),
+            fetch:async options=>{sourceCalls++;assert.equal(options.headers['x-vercel-trusted-oidc-idp-token'],undefined);
+                return {status:()=>307,headers:()=>({location:destination})};},
+            fulfill:async({response:r})=>{fulfilled++;assert.equal(r.status(),200);},abort:async()=>assert.fail('valid fixture should not abort')});};
+        access=await createCiAccess(env(),f.fetcher,()=>{},{scriptTransfer:p=>events.push(p)});
+        const model=wireAuthPage(access,f.page);
+        model.responses.push({status:()=>200,headers:()=>({})},{status:()=>200,headers:()=>({'content-type':'application/javascript; charset=utf-8'})});
+        await access.authenticate(f.page);assert.equal(sourceCalls,1);assert.equal(fulfilled,1);assert.equal(model.requests.length,2);
+        const canonical=model.requests[1];assert.equal(canonical.url,destination);
+        assert.deepEqual(canonical.options,{method:'GET',headers:{Accept:'application/javascript'},maxRedirects:0,maxRetries:0,timeout:20000});
+        assert.equal(events.at(-1).responseReady,true);assert.equal(events.at(-1).secondGetAttempted,true);
+        assert.doesNotMatch(JSON.stringify(events),/SYNTHETIC|https:|clerk\.browser|ui\.browser/);
+        assert.equal(await access.signOut(f.page),'SIGNOUT_CONFIRMED');
+    }
+});
+
+test('registered owned edit tab reuses its context for canonical SDK GET; unregistered tabs stay refused', async () => {
+    const origin='https://'+ciIdentity.clerkDomain;
+    for(const registered of [false,true]) {
+        const f=authFixture(),events=[];
+        const access=await createCiAccess({...env(),ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher,()=>{},
+            {managedReadReady:()=>{},scriptTransfer:p=>events.push(p)});
+        const model=wireAuthPage(access,f.page);await access.authenticate(f.page);
+        const frame={},id='cunitowned',page={context:()=>f.page.context(),mainFrame:()=>frame,isClosed:()=>false,
+            url:()=>target.origin+'/admin/menus/'+id+'/edit'};
+        const release=registered?access.registerManagedReadPage(page,id):()=>{};
+        const source=origin+'/npm/@clerk/clerk-js@6/dist/clerk.browser.js',destination=origin+'/npm/@clerk/clerk-js@6.24.0/dist/clerk.browser.js';
+        let fetched=0,fulfilled=0,aborted=0;
+        model.responses.push({status:()=>200,headers:()=>({'content-type':'application/javascript'})});
+        const before=model.requests.length,backendCalls=f.calls.length;
+        const route={request:()=>({url:()=>source,method:()=> 'GET',resourceType:()=> 'script',frame:()=>frame,
+            allHeaders:async()=>({Cookie:'SYNTHETIC_PRIVATE','x-vercel-trusted-oidc-idp-token':'SYNTHETIC_PRIVATE'})}),
+            fetch:async options=>{fetched++;assert.equal(options.maxRedirects,0);assert.equal(options.headers['x-vercel-trusted-oidc-idp-token'],undefined);
+                return{status:()=>307,headers:()=>({location:destination})};},
+            fulfill:async({response:r})=>{assert.equal(r.status(),200);fulfilled++;},abort:async()=>{aborted++;}};
+        if(registered)await access.route(route);else await assert.rejects(access.route(route),code('CI_ROUTE_FAILED'));
+        assert.equal(fetched,1);assert.equal(fulfilled,registered?1:0);assert.equal(aborted,registered?0:1);
+        assert.equal(model.requests.length-before,registered?1:0);assert.equal(f.calls.length,backendCalls);
+        if(registered){const second=model.requests.at(-1);assert.equal(second.url,destination);
+            assert.deepEqual(second.options,{method:'GET',headers:{Accept:'application/javascript'},maxRedirects:0,maxRetries:0,timeout:20000});
+            assert.equal(events.at(-1).responseReady,true);}
+        assert.doesNotMatch(JSON.stringify(events),/SYNTHETIC|https:|user_|cookie|Bearer/);release();
+    }
+});
+test('registered edit page release during second SDK GET holds without fulfilling or further requests', async () => {
+    const f=authFixture(),access=await createCiAccess({...env(),ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher,()=>{},{managedReadReady:()=>{}});
+    wireAuthPage(access,f.page);await access.authenticate(f.page);
+    const frame={},page={context:()=>f.page.context(),mainFrame:()=>frame,isClosed:()=>false,
+        url:()=>target.origin+'/admin/menus/cunitowned/edit'};
+    const release=access.registerManagedReadPage(page,'cunitowned'),context=f.page.context();let canonical=0,aborts=0;
+    context.request.fetch=async()=>{canonical++;release();return{status:()=>200,headers:()=>({'content-type':'application/javascript'})};};
+    await assert.rejects(access.route({request:()=>({url:()=> 'https://'+ciIdentity.clerkDomain+'/npm/@clerk/ui@1/dist/ui.browser.js',
+        method:()=> 'GET',resourceType:()=> 'script',frame:()=>frame,allHeaders:async()=>({})}),
+        fetch:async()=>({status:()=>307,headers:()=>({location:'https://'+ciIdentity.clerkDomain+'/npm/@clerk/ui@1.24.2/dist/ui.browser.js'})}),
+        fulfill:async()=>assert.fail('released page must not fulfill'),abort:async()=>{aborts++;}}),code('CI_ROUTE_FAILED'));
+    assert.equal(canonical,1);assert.equal(aborts,1);
+    assert.throws(()=>access.registerManagedReadPage(page,'cunitowned'),code('CI_TRANSPORT_HELD'));
+});
+test('phase or receipt changes while resolving a registered SDK transfer prevent its next GET or fulfill', async () => {
+    for(const change of ['PHASE','RECEIPT'])for(const point of ['BEFORE_CANONICAL','AFTER_CANONICAL']) {
+        const f=authFixture();let phase='APP_FLOW',fresh=true,canonical=0,aborts=0;
+        const ready=()=>{assert.equal(phase,'APP_FLOW');assert.equal(fresh,true);};
+        const access=await createCiAccess({...env(),ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher,()=>{},{managedReadReady:ready});
+        wireAuthPage(access,f.page);await access.authenticate(f.page);
+        const frame={},page={context:()=>f.page.context(),mainFrame:()=>frame,isClosed:()=>false,
+            url:()=>target.origin+'/admin/menus/cunitowned/edit'};
+        access.registerManagedReadPage(page,'cunitowned');
+        const changeScope=()=>{if(change==='PHASE')phase='SIGNOUT';else fresh=false;};
+        f.page.context().request.fetch=async()=>{canonical++;if(point==='AFTER_CANONICAL')changeScope();
+            return{status:()=>200,headers:()=>({'content-type':'application/javascript'})};};
+        await assert.rejects(access.route({request:()=>({url:()=> 'https://'+ciIdentity.clerkDomain+'/npm/@clerk/ui@1/dist/ui.browser.js',
+            method:()=> 'GET',resourceType:()=> 'script',frame:()=>frame,allHeaders:async()=>({})}),
+            fetch:async()=>{if(point==='BEFORE_CANONICAL')changeScope();return{status:()=>307,headers:()=>({location:'https://'+ciIdentity.clerkDomain+'/npm/@clerk/ui@1.24.2/dist/ui.browser.js'})};},
+            fulfill:async()=>assert.fail('stale scope must not fulfill'),abort:async()=>{aborts++;}}),code('CI_ROUTE_FAILED'));
+        assert.equal(canonical,point==='BEFORE_CANONICAL'?0:1);assert.equal(aborts,1);
+    }
+});
+test('managed tab registration needs an authenticated verified tracked session in the same context', async () => {
+    for(const tracked of [false,true]) {
+        const f=authFixture(),access=await createCiAccess({...env(),...(tracked?{ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'}:{})},f.fetcher,()=>{},{managedReadReady:()=>{}});
+        wireAuthPage(access,f.page);
+        const page={context:()=>f.page.context(),mainFrame:()=>({}),isClosed:()=>false,url:()=>target.origin+'/admin/menus/cunitowned/edit'};
+        assert.throws(()=>access.registerManagedReadPage(page,'cunitowned'),code('MANAGED_READ_PAGE_REFUSED'));
+        await access.authenticate(f.page);
+        if(!tracked)assert.throws(()=>access.registerManagedReadPage(page,'cunitowned'),code('MANAGED_READ_PAGE_REFUSED'));
+        else assert.throws(()=>access.registerManagedReadPage({...page,context:()=>({})},'cunitowned'),code('MANAGED_READ_PAGE_REFUSED'));
+    }
+    const f=authFixture(),access=await createCiAccess({...env(),ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher);
+    wireAuthPage(access,f.page);await access.authenticate(f.page);
+    assert.throws(()=>access.registerManagedReadPage({context:()=>f.page.context(),isClosed:()=>false},'cunitowned'),code('MANAGED_READ_PAGE_REFUSED'));
+});
+test('invalid SDK targets, second redirect, HTML and HTTP failure never start a third GET or Backend authentication', async () => {
+    const origin='https://'+ciIdentity.clerkDomain,source=origin+'/npm/@clerk/ui@1/dist/ui.browser.js';
+    for(const variant of ['foreign','crossmajor','query','wrongpath','xhr','subframe','post','unknown-source','second-redirect','html','http500']) {
+        const f=authFixture();let access,sourceCalls=0,aborts=0;
+        let destination=origin+'/npm/@clerk/ui@1.24.2/dist/ui.browser.js';
+        if(variant==='foreign')destination=destination.replace(origin,'https://cdn.jsdelivr.net');
+        if(variant==='crossmajor')destination=destination.replace('@1.24.2','@2.24.2');
+        if(variant==='query')destination+='?SYNTHETIC_PRIVATE';
+        if(variant==='wrongpath')destination=origin+'/v1/client';
+        f.page.goto=async url=>{if(url===target.origin+'/admin/login')await access.route({
+            request:()=>({url:()=>variant==='unknown-source'?origin+'/npm/@clerk/other@1/dist/browser.js':source,
+                method:()=>variant==='post'?'POST':'GET',resourceType:()=>variant==='xhr'?'xhr':'script',
+                frame:()=>variant==='subframe'?{}:f.page.mainFrame(),allHeaders:async()=>({})}),
+            fetch:async()=>{sourceCalls++;return{status:()=>307,headers:()=>({location:destination})};},
+            fulfill:async()=>assert.fail('invalid transfer must not fulfill'),abort:async()=>{aborts++;}});};
+        access=await createCiAccess(env(),f.fetcher);
+        const model=wireAuthPage(access,f.page);
+        model.responses.push({status:()=>200,headers:()=>({})},{status:()=>variant==='second-redirect'?307:variant==='http500'?500:200,
+            headers:()=>variant==='second-redirect'?{location:source}:{'content-type':variant==='html'?'text/html':'text/javascript'}});
+        await assert.rejects(access.authenticate(f.page),code('CI_AUTHENTICATION_FAILED'));
+        assert.equal(sourceCalls,1);assert.equal(aborts,1);assert.equal(f.calls.length,1);
+        assert.equal(model.requests.length,['foreign','crossmajor','query','wrongpath','xhr','subframe','post','unknown-source'].includes(variant)?1:2);
+        assert.equal(access.authenticationProgress().ownerLookupStarted,false);
+        assert.equal(access.authenticationProgress().sessionCreationAttempted,false);
+    }
+});
+
+test('authentication progress is boolean-only, monotone and distinguishes no token request from unacknowledged issuance', async () => {
+    const navigation = authFixture(); navigation.page.goto = async () => { throw Error(syntheticSecret); };
+    const notStarted = await createCiAccess(env(), navigation.fetcher);
+    await assert.rejects(authenticate(notStarted, navigation.page), code('CI_AUTHENTICATION_FAILED'));
+    assert.equal(notStarted.authenticationProgress().loginNavigationStarted, true);
+    assert.equal(notStarted.authenticationProgress().loginNavigationCompleted, false);
+    assert.equal(notStarted.authenticationProgress().testingTokenRequestStarted, false);
+    assert.equal(navigation.calls.length, 1); // OIDC only; no Backend API.
+    for (const endpoint of ['testing_tokens', 'sign_in_tokens']) {
+        const fixture = authFixture(); let providerIssued = false;
+        const snapshots = [];
+        const fetcher = async (url, options) => {
+            if (url.endsWith('/' + endpoint)) { providerIssued = true; throw Error(syntheticSecret + ' lost acknowledgement'); }
+            return fixture.fetcher(url, options);
+        };
+        const access = await createCiAccess(env(), fetcher, () => {}, { authentication: value => snapshots.push(value) });
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        const progress = access.authenticationProgress();
+        assert.equal(providerIssued, true); assert.equal(progress.ownerMatched, true);
+        assert.equal(progress.testingTokenRequestStarted, true);
+        assert.equal(progress.testingTokenReceived, endpoint === 'sign_in_tokens');
+        assert.equal(progress.signInTokenRequestStarted, endpoint === 'sign_in_tokens');
+        assert.equal(progress.signInTokenReceived, false); assert.equal(progress.sessionCreationAttempted, false);
+        assert.equal(await access.signOut(fixture.page), 'SESSION_CREATION_NOT_ATTEMPTED');
+        assert.ok(snapshots.every(value => Object.values(value).every(flag => typeof flag === 'boolean')));
+        assert.ok(!JSON.stringify(snapshots).includes('SYNTHETIC'));
+    }
+});
+
+test('successful and partial authentication keep existing session cleanup semantics with new progress fields', async () => {
+    for (const failed of [false, true]) {
+        const fixture = authFixture({ setActiveFailure: failed }); const snapshots = [];
+        const access = await createCiAccess(env(), fixture.fetcher, () => {}, { authentication: value => snapshots.push(value) });
+        if (failed) await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        else await authenticate(access, fixture.page);
+        const progress = access.authenticationProgress();
+        assert.equal(progress.testingTokenReceived, true); assert.equal(progress.signInTokenReceived, true);
+        assert.equal(progress.sessionCreationAttempted, true); assert.equal(progress.activationAcknowledged, !failed);
+        assert.equal(progress.adminNavigationCompleted, !failed);
+        progress.ownerMatched = false; assert.equal(access.authenticationProgress().ownerMatched, true);
+        assert.equal(await access.signOut(fixture.page), failed ? 'SIGNOUT_UNVERIFIED' : 'SIGNOUT_CONFIRMED');
+        assert.ok(!JSON.stringify(snapshots).includes('SYNTHETIC'));
+    }
+});
+
+test('diagnostic observer failures cannot leak raw exceptions or be mistaken for successful authentication', async () => {
+    const fixture = authFixture();
+    const access = await createCiAccess(env(), fixture.fetcher, () => {}, { authentication: () => { throw Error(syntheticSecret); } });
+    await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
+    assert.equal(fixture.calls.length, 1); assert.equal(access.authenticationProgress().testingTokenRequestStarted, false);
+    const route = { request: () => ({ url: () => target.origin, method: () => 'GET', allHeaders: async () => ({}) }),
+        fetch: async () => ({ status: () => 200 }), fulfill: async () => {}, abort: async () => {} };
+    await assert.rejects(routePreviewRequest(route, 'synthetic.payload.signature', () => { throw Error(syntheticSecret); }),
+        code('TRANSPORT_DIAGNOSTIC_FAILED'));
+});
+
+test('official temporary ticket flow is fixed owner A only, no session export, signout separate', async () => {
+    const fixture = authFixture(); const access = await createCiAccess(env(), fixture.fetcher);
+    await authenticate(access, fixture.page);
+    assert.equal(access.isAuthenticated(), true);
+    assert.deepEqual(fixture.visits, [target.origin + '/admin/login', target.origin + '/admin/shop']);
+    assert.equal(fixture.calls.length, 4); // OIDC, fixed-user GET, testing token, one 120s sign-in token.
+    assert.equal(await access.signOut(fixture.page), 'SIGNOUT_CONFIRMED');
+    assert.equal(access.isAuthenticated(), false);
+});
+
+test('wrong backend user, failed token issuance and wrong returned session owner fail closed without retry', async () => {
+    for (const [options, expectedCalls] of [[{ userId: 'user_other' }, 2], [{ backendFailure: '/testing_tokens' }, 3], [{ backendFailure: '/sign_in_tokens' }, 4], [{ owner: 'user_other' }, 4]]) {
+        const fixture = authFixture(options); const access = await createCiAccess(env(), fixture.fetcher);
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        assert.equal(fixture.calls.length, expectedCalls); assert.equal(access.isAuthenticated(), false);
+        assert.ok(!fixture.visits.includes(target.origin + '/admin/shop'));
+    }
+});
+
+test('signout failure stays unverified; no raw secret-bearing exception is retained', async () => {
+    const fixture = authFixture({ signoutFailure: true }); const access = await createCiAccess(env(), fixture.fetcher);
+    await authenticate(access, fixture.page);
+    assert.equal(await access.signOut(fixture.page), 'SIGNOUT_UNVERIFIED');
+});
+
+test('partial session creation or lost activation is UNVERIFIED even with no current local session', async () => {
+    for (const options of [{ setActiveFailure: true }, { createResponseLost: true }, { activationAckLost: true }]) {
+        const fixture = authFixture(options); const access = await createCiAccess(env(), fixture.fetcher);
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTHENTICATION_FAILED'));
+        assert.equal(fixture.providerSession(), true); assert.equal(fixture.calls.length, 4);
+        assert.equal(await access.signOut(fixture.page), 'SIGNOUT_UNVERIFIED');
+        if (options.activationAckLost) {
+            assert.equal(fixture.signOutCalls(), 1); assert.equal(fixture.providerSession(), false);
+        } else {
+            assert.equal(fixture.signOutCalls(), 0); assert.equal(fixture.providerSession(), true);
+        }
+        await assert.rejects(authenticate(access, fixture.page), code('CI_AUTH_RETRY_REFUSED'));
+        assert.equal(fixture.calls.length, 4);
+    }
+});
+
+test('Clerk/Blob forwarding strips Vercel header and forbids redirects/repeated sign-in POST', async () => {
+    const fixture = authFixture(); const access = await createCiAccess(env(), fixture.fetcher); await authenticate(access, fixture.page);
+    let forwarded = 0, aborted = 0; const tokenHeader = 'x-vercel-trusted-oidc-idp-token';
+    const route = { request: () => ({ url: () => 'https://' + ciIdentity.clerkDomain + '/v1/client/sign_ins', method: () => 'POST', allHeaders: async () => ({ [tokenHeader]: 'SYNTHETIC_OIDC' }) }),
+        fetch: async options => { forwarded++; assert.equal(options.maxRetries, 0); assert.equal(options.maxRedirects, 0); assert.ok(!Object.hasOwn(options.headers, tokenHeader)); assert.equal(new URL(options.url).searchParams.get('__clerk_testing_token'), 'SYNTHETIC_TESTING_TOKEN'); return { status: () => 200 }; },
+        fulfill: async () => {}, abort: async () => { aborted++; } };
+    await access.route(route); await assert.rejects(access.route(route), code('CI_ROUTE_FAILED'));
+    assert.equal(forwarded, 1); assert.equal(aborted, 1);
+    const redirect = { ...route, request: () => ({ url: () => 'https://' + ciIdentity.clerkDomain + '/v1/client', method: () => 'GET', allHeaders: async () => ({}) }), fetch: async () => ({ status: () => 302 }) };
+    const redirectAccess = await createCiAccess(env(), async () => response({ value: jwt(claims()) }));
+    await assert.rejects(redirectAccess.route(redirect), code('CI_ROUTE_FAILED'));
+    let unknownFetch = 0;
+    await assert.rejects(access.route({ ...route, request: () => ({ url: () => 'https://other.invalid/' }), fetch: async () => { unknownFetch++; } }), code('CI_ROUTE_FAILED'));
+    assert.equal(unknownFetch, 0);
+});
+
+test('readonly API interface refuses mutation before transport, provider URL/secret excluded', async () => {
+    const access = await createCiAccess(env(), async () => response({ value: jwt(claims()) }));
+    await assert.rejects(access.read({ fetch: async () => { throw Error(syntheticSecret); } }, target.origin + '/api/admin/shop'), code('PROTECTED_TRANSPORT_FAILED'));
+    let calls = 0;
+    await assert.rejects(access.read({ fetch: async () => { calls++; } }, 'https://other.invalid/'), code('CI_READ_TARGET_REFUSED'));
+    assert.equal(calls, 0);
+});
+
+test('dedicated workflow preserves original job and separately gates the unapproved FULL candidate', () => {
+    const yaml = readFileSync(new URL('../.github/workflows/issue118-live-e2e.yml', import.meta.url), 'utf8');
+    const parsed = createRequire(import.meta.url)('js-yaml').load(yaml);
+    assert.deepEqual(Object.keys(parsed.on), ['workflow_dispatch']);
+    assert.deepEqual(parsed.permissions, { contents: 'read' });
+    assert.deepEqual(Object.keys(parsed.jobs), ['live-t1','managed-full-resume']);
+    assert.deepEqual(parsed.jobs['live-t1'].permissions, { contents: 'read', 'id-token': 'write' });
+    const secretSteps = parsed.jobs['live-t1'].steps.filter(step => Object.values(step.env || {}).some(value => String(value).includes('secrets.')));
+    assert.equal(secretSteps.length, 3);
+    const t1 = secretSteps.find(step => step.run === 'node scripts/check-issue118-live-t1-browser.mjs --ci-apply');
+    assert.equal(t1.if, "inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'");
+    const readClose = secretSteps.find(step => step.run === 'node scripts/check-issue118-live-t1-browser.mjs --ci-read-close');
+    const managed=secretSteps.find(step=>step.run==='node scripts/check-issue118-live-t1-browser.mjs --ci-managed');
+    assert.equal(managed.if,"(inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')");
+    assert.equal(managed.env.ISSUE118_MANAGED_SCOPE,'MAX32_103_4_5_7');
+    assert.equal(managed.env.ISSUE118_SESSION_LIFECYCLE,'TRACKED_OWNER_SESSION');
+    assert.equal(managed.env.ISSUE118_TEST_CLERK_SECRET_KEY,t1.env.ISSUE118_TEST_CLERK_SECRET_KEY);
+    const preflight=parsed.jobs['live-t1'].steps.find(step=>step.name==='Check the external receipt before dependency install or secret delivery').run;
+    assert.ok(parsed.on.workflow_dispatch.inputs.confirmation.options.includes('APPROVE_MANAGED_KNOWN_CLEANUP'));
+    assert.match(preflight,/CONFIRMATION_MODE === 'APPROVE_MANAGED_KNOWN_CLEANUP'/);
+    assert.match(preflight,/assertManagedSessionBudget\(receipt,1\)/);
+    assert.match(preflight,/managedPriorSessionConsumption!==6 \|\| receipt.managedPriorMenuWrites!==37/);
+    assert.match(preflight,/assertManagedCleanupProof\(receipt.managedCleanupProof\)/);
+    assert.ok(preflight.indexOf('assertManagedCleanupProof(receipt.managedCleanupProof)')<preflight.indexOf('writeFileSync(join(process.env.RUNNER_TEMP'));
+    assert.equal(readClose.if, "inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
+    assert.equal(readClose.env.ISSUE118_DIAGNOSTIC_MODE, 'FIXTURE_READ_CLOSE_ONLY');
+    assert.equal(readClose.env.ISSUE118_TEST_CLERK_SECRET_KEY, t1.env.ISSUE118_TEST_CLERK_SECRET_KEY);
+    const diagnostic = parsed.jobs['live-t1'].steps.find(step => step.run === 'node scripts/check-issue118-oidc-target.mjs --diagnose-only');
+    assert.equal(diagnostic.if, "inputs.confirmation == 'DIAGNOSE_OIDC_TARGET_ONLY'");
+    assert.ok(!JSON.stringify(diagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(diagnostic.env, 'ISSUE118_APPLY'));
+    assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === 'Check the external receipt before dependency install or secret delivery').if,
+        "(inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')) || inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY' || inputs.confirmation == 'DIAGNOSE_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_LOGIN_PUBLIC_ASSETS_ONLY' || inputs.confirmation == 'DIAGNOSE_PINNED_PUBLIC_CODE_ONLY'");
+    assert.equal(parsed.jobs['live-t1'].steps.find(step => step.name === 'Prepare the existing isolated Playwright version (no app secrets)').if,
+        "(inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1' || (inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')) || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_HANDSHAKE_CLEAN_TARGET_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_SERVER_CALLBACK_ONLY' || inputs.confirmation == 'DIAGNOSE_DEPLOYED_KEY_CLASS_ONLY' || inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'");
+    const redirectDiagnostic = parsed.jobs['live-t1'].steps.find(step => step.run === 'node scripts/check-issue118-preview-redirect.mjs --redirect-only');
+    assert.equal(redirectDiagnostic.if, "inputs.confirmation == 'DIAGNOSE_PREVIEW_REDIRECT_ONLY'");
+    assert.ok(!JSON.stringify(redirectDiagnostic).includes('secrets.')); assert.ok(!Object.hasOwn(redirectDiagnostic.env, 'ISSUE118_APPLY'));
+    assert.match(yaml, /workflow_dispatch:/); assert.ok(!/\n  (push|pull_request|schedule|workflow_call):/.test(yaml));
+    assert.equal((yaml.match(/id-token: write/g) || []).length, 2);
+    assert.deepEqual(parsed.jobs['managed-full-resume'].permissions,{contents:'read',actions:'read','id-token':'write'});
+    assert.match(parsed.jobs['managed-full-resume'].if,/inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE'/);
+    assert.equal(parsed.jobs['live-t1'].if.includes('APPROVE_FULL_RESUME_CANDIDATE'),false);
+    assert.match(yaml, /environment: clearallergy-e2e-test/); assert.match(yaml, /cancel-in-progress: false/);
+    assert.match(yaml, /inputs.expected_runner_sha == github.sha/);
+    assert.match(parsed.jobs['live-t1'].if, /github\.run_attempt == 1/);
+    assert.equal((yaml.match(/secrets\./g) || []).length, 5);
+    assert.ok(!yaml.includes('DATABASE_URL')); assert.ok(!yaml.includes('DIRECT_URL'));
+    assert.ok(!yaml.includes('storageState')); assert.ok(!yaml.includes('continue-on-error'));
+    const runner = readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs', import.meta.url), 'utf8');
+    assert.match(runner, /if \(ciTransportFailed\) throw Error\("CI_TRANSPORT_HELD"\)/);
+    assert.match(runner, /else if \(menuId && ciTransportFailed\)/);
+    assert.match(runner, /authenticationCleanup !== "SIGNOUT_UNVERIFIED"/);
+});
+
+test('actual CI entry refuses absent context and missing external receipt before browser/auth setup', () => {
+    for (const arg of ['--ci-apply', '--ci-read-close','--ci-managed']) for (const fakeEnv of [{}, env(), {...env(),ISSUE118_DIAGNOSTIC_MODE:'FIXTURE_READ_CLOSE_ONLY'}]) {
+        const child = spawnSync(process.execPath, ['scripts/check-issue118-live-t1-browser.mjs', arg], {
+            env: { SystemRoot: process.env.SystemRoot, ...fakeEnv }, encoding: 'utf8', windowsHide: true,
+        });
+        assert.equal(child.status, 1);
+        assert.equal(child.stdout, '');
+        assert.equal(child.stderr.trim(), 'ISSUE118_PREFLIGHT_FAILED_NO_RAW_ERROR');
+        assert.ok(!child.stderr.includes(syntheticSecret));
+    }
+});
