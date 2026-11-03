@@ -1,7 +1,7 @@
 // LOCAL preparation. No default live execution; explicit fresh FULL approval required.
 import {createHash} from 'node:crypto';
 import {gunzipSync,gzipSync} from 'node:zlib';
-import {readFileSync,writeFileSync,mkdirSync,lstatSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,lstatSync,readdirSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
@@ -17,7 +17,7 @@ export function decodeManagedFullInput(text){
         const raw=gunzipSync(Buffer.from(text,'base64url'),{maxOutputLength:450000});
         const value=JSON.parse(raw.toString('utf8'));need(Buffer.from(canonical(value)).length<=450000);
         need(value&&Object.keys(value).every(k=>['authorization','identityReceipt','checkpointReceipt','snapshot','terminal','creationOperationIds',
-            'operation','serviceRunId','fullCheckpoint','continuationReceipt','prefixCheckpoint','prefixReceipt','cleanupCheckpoint','cleanupReceipt','executionApproval'].includes(k)));
+            'operation','serviceRunId','fullCheckpoint','continuationReceipt','prefixCheckpoint','prefixReceipt','cleanupCheckpoint','cleanupReceipt','rebaseCheckpoint','rebaseReceipt','executionApproval'].includes(k)));
         return value;
     }catch{refuse();}
 }
@@ -32,7 +32,7 @@ export async function admitManagedFullInput(input,env=process.env){
             &&env.GITHUB_SHA===env.ISSUE118_EXPECTED_RUNNER_SHA&&/^\d{1,20}$/.test(env.GITHUB_RUN_ID||'')
             &&/^\d{1,10}$/.test(env.GITHUB_RUN_NUMBER||'')&&!env.DEBUG&&!env.PWDEBUG&&!env.NODE_OPTIONS);
         const a=input.executionApproval;
-        if(input.operation!=='EXACT_T2_CLEANUP8')need(input.authorization&&Object.keys(input.authorization).every(k=>['status','scope','limits','oldClaimsSha256','creationIdsSha256','verifiedBy','evidenceReference','approvedUtc','snapshotSha256','terminalSha256'].includes(k)));
+        if(input.operation!=='EXACT_T2_CLEANUP8')need(input.authorization&&Object.keys(input.authorization).every(k=>['status','scope','limits','oldClaimsSha256','creationIdsSha256','verifiedBy','evidenceReference','approvedUtc','snapshotSha256','terminalSha256','rebaseSha256'].includes(k)));
         need(a&&Object.keys(a).length===9&&Object.keys(a).every(k=>['status','scope','verifiedBy','evidenceReference','actionsReadApproved','singleAttempt','runnerSha','operation','inputSha256'].includes(k)));
         need(a&&a.status==='APPROVED'&&a.scope==='FULL_RESUME_WITH_ACTIONS_READ'
             &&a.evidenceReference===input.authorization?.evidenceReference&&a.verifiedBy==='human'
@@ -48,7 +48,7 @@ export async function admitManagedFullInput(input,env=process.env){
 // Read-only GitHub metadata only, no fallback/retry or raw provider errors.
 // Existing global workflow concurrency serializes claim checks. A consumed claim
 // is never automatically retried, including a failed pre-auth run.
-export async function verifyManagedFullGithubProvenance({input,env=process.env,fetchImpl=fetch,sourcePayload,failedSourcePayload}={}){
+export async function verifyManagedFullGithubProvenance({input,env=process.env,fetchImpl=fetch,sourcePayload,failedSourcePayload,rebasePayload}={}){
     try{
         const admission=await admitManagedFullInput(input,env),token=env.GH_TOKEN;
         need(typeof token==='string'&&token.length>0);
@@ -90,7 +90,15 @@ export async function verifyManagedFullGithubProvenance({input,env=process.env,f
                 need(Number.isFinite(start)&&Number.isFinite(end)&&start<=end&&minute+60000>start&&minute<=end);
             }else need(failedSourcePayload===undefined);
         }else need(sourcePayload===undefined);
-        return {provenanceVerified:true,claimKey:admission.checkpointKey,currentRunId:env.GITHUB_RUN_ID,sourceVerified:!!(admission.restored||admission.prefix||admission.cleanup)};
+        if(admission.rebased){
+            const x=input.rebaseCheckpoint,s=x.source,run=await get('/actions/runs/'+s.githubRunId),prior=assertExact8CleanupInput(x.cleanupInput,Date.parse(s.startedUtc));
+            need(run.status==='completed'&&run.run_attempt===1&&run.event==='workflow_dispatch'&&run.head_branch==='test/issue118-live-t1-20261030'&&run.path==='.github/workflows/issue118-live-e2e.yml'
+                &&run.head_sha===s.runnerSha&&run.run_number<current.run_number&&run.display_title==='Issue118 FULL '+prior.checkpointKey&&run.created_at===s.startedUtc&&run.updated_at===s.finishedUtc);
+            const list=await get('/actions/runs/'+s.githubRunId+'/artifacts?per_page=100');need(list.total_count<100&&Array.isArray(list.artifacts));
+            const matches=list.artifacts.filter(a=>a.name==='issue118-full-'+s.githubRunId&&!a.expired&&a.digest==='sha256:'+s.artifactSha256);need(matches.length===1&&matches[0].workflow_run?.id===Number(s.githubRunId));
+            need(rebasePayload&&canonical(rebasePayload)===canonical({result:x.result,stopEvents:x.stopEvents}));
+        }else need(rebasePayload===undefined);
+        return {provenanceVerified:true,claimKey:admission.checkpointKey,currentRunId:env.GITHUB_RUN_ID,sourceVerified:!!(admission.restored||admission.prefix||admission.cleanup||admission.rebased)};
     }catch{refuse();}
 }
 export async function runManagedFullCli({argv=process.argv.slice(2),env=process.env,fetchImpl=fetch,execute=executeManagedApprovedResume,executeCleanup=executeExact8Cleanup}={}){
@@ -98,7 +106,10 @@ export async function runManagedFullCli({argv=process.argv.slice(2),env=process.
     const input=decodeManagedFullInput(env.ISSUE118_FULL_INPUT),admission=await admitManagedFullInput(input,env);
     const sourcePayload=admission.restored||admission.prefix||admission.cleanup?JSON.parse(readFileSync(join(resolve(env.ISSUE118_SOURCE_ARTIFACT_DIRECTORY||''),admission.cleanup?'result.json':admission.restored?'full-checkpoint-payload.json':'t2-prefix-payload.json'),'utf8')):undefined;
     const failedSourcePayload=admission.cleanup?JSON.parse(readFileSync(join(resolve(env.ISSUE118_FAILED_CLEANUP_ARTIFACT_DIRECTORY||''),'result.json'),'utf8')):undefined;
-    const provenance=await verifyManagedFullGithubProvenance({input,env,fetchImpl,sourcePayload,failedSourcePayload});
+    let rebasePayload;if(admission.rebased){const directory=resolve(env.ISSUE118_REBASE_ARTIFACT_DIRECTORY||''),claims=join(directory,'claims');
+        const stopEvents=readdirSync(claims).filter(f=>/^cleanup-event-\d+\.json$/.test(f)).sort((a,b)=>Number(a.match(/\d+/)[0])-Number(b.match(/\d+/)[0])).map(f=>JSON.parse(readFileSync(join(claims,f),'utf8'))).filter(x=>x.stage==='CLEANUP_PRIVATE_API_CONFIRMED');
+        rebasePayload={result:JSON.parse(readFileSync(join(directory,'result.json'),'utf8')),stopEvents};}
+    const provenance=await verifyManagedFullGithubProvenance({input,env,fetchImpl,sourcePayload,failedSourcePayload,rebasePayload});
     if(argv[0]==='--preflight')return {status:'FULL_PREFLIGHT_NO_AUTH',...provenance};
     need(env.ISSUE118_APPLY==='true');const finalOnly=admission.restored?.nextArmIndex===6;if(!finalOnly)assertCiEnvironment(env);
     need(typeof env.CLEARALLERGY_BROWSER_OUTPUT==='string'&&env.CLEARALLERGY_BROWSER_OUTPUT.length>0);

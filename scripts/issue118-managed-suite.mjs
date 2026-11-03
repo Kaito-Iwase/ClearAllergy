@@ -4,7 +4,7 @@
 import { prepareOriginalBatchRun,target } from './check-issue118-live-t1-browser.mjs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import {completionScope,planManagedT2Completion,validateT2PrefixCheckpoint} from './issue118-t2-reobserve.mjs';
+import {completionScope,rebasedCompletionScope,isCompletionScope,planManagedT2Completion,validateT2PrefixCheckpoint} from './issue118-t2-reobserve.mjs';
 
 export const suiteLimits = Object.freeze({ menus:32, createAttempts:33, menuWrites:103,
     shopWrites:4, blobUploads:5, sessions:7, denialRequests:10 });
@@ -169,7 +169,7 @@ export function planManaged414953Recovery({snapshot,terminal,standaloneBRecovery
             'A further failure during recovery is not covered: HOLD and a new explicit budget decision are required.']};
 }
 // Callable local bridge only. CLI/workflow and suiteLimits do not enable it.
-export function validateManagedFullCheckpoint({snapshot,terminal,approval,creationOperationIds,fullCheckpoint,continuationReceipt,now=Date.now()}={}){
+export function validateManagedFullCheckpoint({snapshot,terminal,approval,creationOperationIds,fullCheckpoint,continuationReceipt,rebaseCheckpoint,rebaseReceipt,now=Date.now()}={}){
     let predicateStage='DATA';const refuse=()=>{const e=Error('MANAGED_FULL_CHECKPOINT_REFUSED');e.predicateStage=predicateStage;throw e;},need=v=>{if(!v)refuse();};
     try{
         let nodes=0;const data=(v,depth=0)=>{need(++nodes<30000&&depth<20);
@@ -185,9 +185,11 @@ export function validateManagedFullCheckpoint({snapshot,terminal,approval,creati
         exact(x.source,['githubRunId','runnerSha','artifactSha256','jobTerminal','pendingRequests','sessionsClosed']);
         need(/^\d{1,20}$/.test(x.source.githubRunId)&&/^[a-f0-9]{40}$/.test(x.source.runnerSha)&&hex(x.source.artifactSha256)
             &&x.source.jobTerminal===true&&x.source.pendingRequests===0&&x.source.sessionsClosed===true);
-        const fullT2=approval.scope===completionScope,plan=(fullT2?planManagedT2Completion:planManaged414953Recovery)({snapshot,terminal});need((approval.scope==='RESUME_414953_FULL_MANAGED'||fullT2)&&approval.status==='APPROVED'
+        const fullT2=isCompletionScope(approval.scope),rebased=approval.scope===rebasedCompletionScope;
+        need(rebased===(rebaseCheckpoint!==undefined)&&rebased===(rebaseReceipt!==undefined));
+        const plan=(fullT2?planManagedT2Completion:planManaged414953Recovery)({snapshot,terminal,rebaseCheckpoint,rebaseReceipt,now,historical:true});need((approval.scope==='RESUME_414953_FULL_MANAGED'||fullT2)&&approval.status==='APPROVED'
             &&canonical(approval.limits)===canonical(plan.reservedMaximum)&&approval.oldClaimsSha256===plan.inherited.claimsSha256
-            &&approval.creationIdsSha256===sha(creationOperationIds));
+            &&approval.creationIdsSha256===sha(creationOperationIds)&&(!rebased||approval.rebaseSha256===plan.rebaseBasis.hash));
         predicateStage='STATE_SCHEMA';
         exact(s,['checkpointVersion','applicationSha','deployment','approvedScope','serviceRunId','status','livePass','coverage','publicPropagation',
             'originalHold','inheritedClaimsSha256','inheritedOperationClaimIds','inheritedRequestIds','counts','newClaims','knownFixtures','stopReservations',
@@ -201,7 +203,7 @@ export function validateManagedFullCheckpoint({snapshot,terminal,approval,creati
             &&canonical(s.inheritedRequestIds)===canonical(plan.inherited.consumedRequestIds));
         need(canonical(s.completedStages)===canonical(['T4_OBSERVER','CONTROLS_OBSERVATIONS','DENIALS'])&&Array.isArray(s.serviceArms)
             &&s.serviceArms.length>=1&&s.serviceArms.length<=6&&Array.isArray(s.newClaims)&&s.newClaims.length<=150);
-        const prefix=fullT2?validateT2PrefixCheckpoint({snapshot,terminal,authorization:approval,prefixCheckpoint:s.t2Prefix?.checkpoint,prefixReceipt:s.t2Prefix?.receipt,now,historical:true}):null;
+        const prefix=fullT2?validateT2PrefixCheckpoint({snapshot,terminal,authorization:approval,prefixCheckpoint:s.t2Prefix?.checkpoint,prefixReceipt:s.t2Prefix?.receipt,rebaseCheckpoint,rebaseReceipt,now,historical:true}):null;
         need(fullT2||s.t2Prefix===null);
         const armOrder=[['MENU_CREATE','MENU_SAVE','STOP','MENU_UPLOAD','SHOP_UPLOAD','SHOP_SAVE'].flatMap(k=>[k+'_DELIVER']),
             ['MENU_CREATE','MENU_SAVE','STOP','MENU_UPLOAD','SHOP_UPLOAD','SHOP_SAVE'].map(k=>k+'_BLOCK_BEFORE_FORWARD')].flat();
@@ -215,9 +217,9 @@ export function validateManagedFullCheckpoint({snapshot,terminal,approval,creati
         const selected=arms.slice(0,k).flat();need(Array.isArray(s.serviceObservations)&&s.serviceObservations.length===selected.length);
         s.serviceObservations.forEach((o,i)=>{exact(o,['cellId','status']);need(o.cellId===selected[i]&&o.status===(o.cellId.endsWith('WITHHOLD_AFTER_RESPONSE')?'HOLD':'OBSERVED_NOT_INDEPENDENTLY_ATTESTED'));});
         predicateStage='CORE_T3';const known=new Map(snapshot.fixtures.map(f=>[f.id,{...f}])),prior=new Map(snapshot.claims.map(c=>[c.id,c])),versions=new Map(terminal.menus.map(m=>[m.id,m.version]));
-        const counts={menus:11,createAttempts:11,menuWrites:prefix?78:42,shopWrites:0,blobUploads:0,sessions:(prefix?10:8)+k,denialRequests:0};
+        const counts={menus:11,createAttempts:11,menuWrites:prefix?prefix.controller.counts.menuWrites:plan.inherited.menuWrites,shopWrites:0,blobUploads:0,sessions:(prefix?prefix.controller.counts.sessions:plan.inherited.sessions)+1+k,denialRequests:0};
         if(prefix)for(const r of prefix.rows)versions.set(r.id,r.version);
-        const requestIds=new Set([...terminal.consumedRequestIds,...(prefix?prefix.controller.claims.map(c=>c.requestId):[])]);
+        const requestIds=new Set([...plan.inherited.consumedRequestIds,...(prefix?prefix.controller.claims.map(c=>c.requestId):[])]);
         const claimedIds=new Set(prior.keys()),createdIds=new Set(known.keys()),creationIds=new Set(plan.inherited.creationOperationIds),coreCreated=new Map(),t3Created=new Map();
         for(const c of snapshot.claims){const m=/^T3_(M0[12])_CREATE$/.exec(c.id);if(m)t3Created.set(m[1],c.createdId);}
         let cursor=0;const addCreated=c=>{need(menuId(c.createdId)&&!forbiddenMenu(c.createdId)&&!createdIds.has(c.createdId)&&uuid(c.resource.creationOperationId)&&!creationIds.has(c.resource.creationOperationId));
@@ -299,7 +301,7 @@ export function validateManagedFullCheckpoint({snapshot,terminal,approval,creati
         need(p.closedOwnerPrivateBindingsMatch===true&&p.closedOwnerPrivateBindingsSha256===sha(s.closedOwnerPrivateBindings)
             &&canonical(p.closedOwnerPrivateIds)===canonical(s.closedOwnerPrivateBindings.map(b=>b.id)));
         for(const b of s.closedOwnerPrivateBindings)need(b.owner==='S2'&&canonical(rows.find(r=>r.id===b.id))===canonical(b));
-        predicateStage='SESSIONS';exact(x.sessionLedger,['version','baselineConsumed','attempts']);need(x.sessionLedger.version===1&&x.sessionLedger.baselineConsumed===7&&x.sessionLedger.attempts.length===k+(prefix?3:1));
+        predicateStage='SESSIONS';exact(x.sessionLedger,['version','baselineConsumed','attempts']);need(x.sessionLedger.version===1&&x.sessionLedger.baselineConsumed===plan.inherited.sessions&&x.sessionLedger.attempts.length===k+(prefix?3:1));
         if(prefix)need(canonical(x.sessionLedger.attempts.slice(0,2))===canonical(prefix.sessionLedger.attempts));
         const sessionIds=new Set();x.sessionLedger.attempts.forEach((a,i)=>{exact(a,['index','owner','sessionId','providerCreatedUtc','providerStatus','terminated','localClosed','sourceGithubRunId','runnerSha']);
             need(a.index===i+1&&a.owner===((i===1||prefix&&i===3)?'S2':'S1')&&/^sess_[A-Za-z0-9]{1,128}$/.test(a.sessionId)&&!sessionIds.has(a.sessionId)
@@ -339,26 +341,29 @@ export function validateManagedFullCheckpoint({snapshot,terminal,approval,creati
     }catch{refuse();}
 }
 
-export function prepareManaged414953Resume({snapshot,terminal,approval,creationOperationIds,ports,fullCheckpoint,continuationReceipt,prefixCheckpoint,prefixReceipt}={}) {
+export function prepareManaged414953Resume({snapshot,terminal,approval,creationOperationIds,ports,fullCheckpoint,continuationReceipt,prefixCheckpoint,prefixReceipt,rebaseCheckpoint,rebaseReceipt}={}) {
     const reject=code=>{throw Error(code);},must=(v,code='RESUME_414953_REFUSED')=>{if(!v)reject(code);};
-    const fullT2=approval?.scope===completionScope,plan=(fullT2?planManagedT2Completion:planManaged414953Recovery)({snapshot,terminal});
+    const fullT2=isCompletionScope(approval?.scope),rebased=approval?.scope===rebasedCompletionScope;
+    must(rebased===(rebaseCheckpoint!==undefined)&&rebased===(rebaseReceipt!==undefined),'RESUME_414953_APPROVAL_REQUIRED');
+    const plan=(fullT2?planManagedT2Completion:planManaged414953Recovery)({snapshot,terminal,rebaseCheckpoint,rebaseReceipt,historical:fullCheckpoint!==undefined||prefixCheckpoint!==undefined});
     const prefixData=fullCheckpoint?.controller?.t2Prefix??(prefixCheckpoint?{checkpoint:prefixCheckpoint,receipt:prefixReceipt}:null);
-    const prefix=fullT2?validateT2PrefixCheckpoint({snapshot,terminal,authorization:approval,prefixCheckpoint:prefixData?.checkpoint,prefixReceipt:prefixData?.receipt,historical:fullCheckpoint!==undefined}):null;
-    must(approval?.status==='APPROVED'&&['RESUME_414953_B4_T3_ONLY','RESUME_414953_FULL_MANAGED',completionScope].includes(approval.scope),'RESUME_414953_APPROVAL_REQUIRED');
-    must(canonical(approval.limits)===canonical(plan.reservedMaximum)&&approval.oldClaimsSha256===plan.inherited.claimsSha256,'RESUME_414953_APPROVAL_REQUIRED');
+    const prefix=fullT2?validateT2PrefixCheckpoint({snapshot,terminal,authorization:approval,prefixCheckpoint:prefixData?.checkpoint,prefixReceipt:prefixData?.receipt,rebaseCheckpoint,rebaseReceipt,historical:fullCheckpoint!==undefined}):null;
+    must(approval?.status==='APPROVED'&&['RESUME_414953_B4_T3_ONLY','RESUME_414953_FULL_MANAGED',completionScope,rebasedCompletionScope].includes(approval.scope),'RESUME_414953_APPROVAL_REQUIRED');
+    must(canonical(approval.limits)===canonical(plan.reservedMaximum)&&approval.oldClaimsSha256===plan.inherited.claimsSha256&&(!rebased||approval.rebaseSha256===plan.rebaseBasis.hash),'RESUME_414953_APPROVAL_REQUIRED');
     const newKeys=['M03','M04','M05','M06','M07','M08'],newIds=structuredClone(creationOperationIds);
     must(newIds&&Object.keys(newIds).length===6&&newKeys.every(k=>uuid(newIds[k]))
         &&new Set(Object.values(newIds)).size===6&&Object.values(newIds).every(id=>!plan.inherited.creationOperationIds.includes(id)));
     must(approval.creationIdsSha256===createHash('sha256').update(canonical(newIds)).digest('hex'),'RESUME_414953_APPROVAL_REQUIRED');
-    const restored=fullCheckpoint===undefined?null:validateManagedFullCheckpoint({snapshot,terminal,approval,creationOperationIds,fullCheckpoint,continuationReceipt});
+    const restored=fullCheckpoint===undefined?null:validateManagedFullCheckpoint({snapshot,terminal,approval,creationOperationIds,fullCheckpoint,continuationReceipt,rebaseCheckpoint,rebaseReceipt});
     const required=['verifyApproval','verifyCheckpoint','reserveRecoveryBudget','installSendGuard','claimOperation','readMenu','write','observeT3Evidence'];
     must(required.every(name=>typeof ports?.[name]==='function'),'RESUME_414953_PORT_NOT_IMPLEMENTED');
     const original=structuredClone(snapshot),baseline=structuredClone(terminal),approved=structuredClone(approval),limit=structuredClone(approval.limits);
     must(baseline.menus.every(m=>Number.isSafeInteger(m.version)&&m.version>=0&&Number.isSafeInteger(m.foodVersion)&&m.foodVersion>=0));
     const known=new Map(original.fixtures.map(f=>[f.id,{...f}])),states=new Map(),newClaims=[],stopReservations=new Set(baseline.menus.filter(m=>m.isPublished).map(m=>m.id));
-    const counts={menus:11,createAttempts:11,menuWrites:prefix?78:42,shopWrites:0,blobUploads:0,sessions:prefix?9:7};
+    const counts={menus:11,createAttempts:11,menuWrites:prefix?prefix.controller.counts.menuWrites:plan.inherited.menuWrites,shopWrites:0,blobUploads:0,sessions:prefix?prefix.controller.counts.sessions:plan.inherited.sessions};
+    const coreSessionTotal=counts.sessions+2,extraMenuReserve=rebased?0:1;
     if(prefix){stopReservations.clear();for(const r of prefix.rows){const m=baseline.menus.find(m=>m.id===r.id);Object.assign(m,r);}}
-    const seenRequestIds=new Set([...terminal.consumedRequestIds,...(prefix?prefix.controller.claims.map(c=>c.requestId):[])]);
+    const seenRequestIds=new Set([...plan.inherited.consumedRequestIds,...(prefix?prefix.controller.claims.map(c=>c.requestId):[])]);
     const byKey=new Map(),inheritedKeys=new Map();for(const c of original.claims.filter(c=>c.kind==='MENU_CREATE')){
         const match=/^(T[23])_(M0[1-8])_CREATE$/.exec(c.id);if(match){inheritedKeys.set(c.createdId,{scenario:match[1],key:match[2]});if(match[1]==='T3')byKey.set(match[2],c.createdId);}
     }
@@ -373,7 +378,7 @@ export function prepareManaged414953Resume({snapshot,terminal,approval,creationO
         inheritedRequestIds:[...plan.inherited.consumedRequestIds],counts:{...counts},newClaims:structuredClone(newClaims),
         knownFixtures:[...known.values()].map(f=>({...f})),stopReservations:[...stopReservations],
         sessionReservations:{normal:{S1:1,S2:1},recovery:{S1:1,S2:1},actualConsumption:'ROOT_TRACKED_NOT_ATTESTED'},
-        automaticRetry:false,automaticCleanup:false,remainingNotImplemented:['RESUME_414953_FULL_MANAGED',completionScope].includes(approved.scope)?[]
+        automaticRetry:false,automaticCleanup:false,remainingNotImplemented:['RESUME_414953_FULL_MANAGED',completionScope,rebasedCompletionScope].includes(approved.scope)?[]
             :['T4_OBSERVER','CONTROLS_OBSERVATIONS','DENIALS','SERVICE_BROWSER_OBSERVERS'],
         remainingNotRun:['T4_OBSERVER','CONTROLS_OBSERVATIONS','DENIALS','SERVICE_BROWSER_OBSERVERS'].filter(s=>!completedStages.includes(s)),
         evidenceGaps:prefix?[]:['T2_PUBLIC_PROPAGATION_AND_INTERMEDIATE_UI'],serviceArms:structuredClone(serviceArms),
@@ -399,7 +404,7 @@ export function prepareManaged414953Resume({snapshot,terminal,approval,creationO
         async authorize(value){
             if(!current)return authorizeRemainder(value);
             try{const intent=current;must(initialized&&!held&&intent?.live&&!intent.claimed&&!intent.authorizing&&same(value,intent.claim));intent.authorizing=true;
-            must(counts.menuWrites+1+stopReservations.size-(intent.actionKind==='STOP'?1:0)+1<=limit.menuWrites);
+            must(counts.menuWrites+1+stopReservations.size-(intent.actionKind==='STOP'?1:0)+(intent.actionKind==='PUBLISH'?1:extraMenuReserve)<=limit.menuWrites);
             if(intent.actionKind==='CREATE')must(counts.menus<limit.menus&&counts.createAttempts<limit.createAttempts);
             if(intent.actionKind==='PUBLISH'){
                 must(await ports.reserveRecoveryBudget({type:'STOP_WRITE',scope:approved.scope,menuId:intent.resource.menuId,owner:intent.claim.owner,
@@ -487,7 +492,7 @@ export function prepareManaged414953Resume({snapshot,terminal,approval,creationO
     const authorizeRemainder=async value=>{
         let authorizationStage='BINDING';
         try{
-            must(initialized&&!held&&remainderUsed&&remainderStage&&['RESUME_414953_FULL_MANAGED',completionScope].includes(approved.scope));
+            must(initialized&&!held&&remainderUsed&&remainderStage&&['RESUME_414953_FULL_MANAGED',completionScope,rebasedCompletionScope].includes(approved.scope));
             must(!remainderAuthorizing&&!remainderOutstanding);remainderAuthorizing=true;
             must(value&&Object.keys(value).every(k=>['id','kind','owner','mode','cellId','resource'].includes(k))&&safeKey(value.id));
             must(!original.claims.some(c=>c.id===value.id)&&!newClaims.some(c=>c.id===value.id)&&!remainderPending.has(value.id));
@@ -513,7 +518,7 @@ export function prepareManaged414953Resume({snapshot,terminal,approval,creationO
             if(publish){must(await ports.reserveRecoveryBudget({type:'STOP_WRITE',scope:approved.scope,menuId:claim.resource.menuId,owner:claim.owner,sourceClaimId:claim.id,slots:1})===true);
                 stopReservations.add(claim.resource.menuId);}
             authorizationStage='BUDGET';const delta=deltaFor(claim.kind,claim.mode),isStop=claim.kind==='MENU_WRITE'&&claim.resource.method==='POST';
-            must(counts.menuWrites+(delta.menuWrites||0)+stopReservations.size-(isStop?1:0)+1<=limit.menuWrites);
+            must(counts.menuWrites+(delta.menuWrites||0)+stopReservations.size-(isStop?1:0)+extraMenuReserve<=limit.menuWrites);
             must(counts.shopWrites+(delta.shopWrites||0)+1<=limit.shopWrites&&counts.blobUploads+(delta.blobUploads||0)<=limit.blobUploads);
             must(counts.createAttempts+(delta.createAttempts||0)<=limit.createAttempts&&(counts.denialRequests||0)+(delta.denialRequests||0)<=10);
             const slot={claim,stage,delta,claimed:false,consumed:false};remainderPending.set(claim.id,slot);
@@ -530,7 +535,7 @@ export function prepareManaged414953Resume({snapshot,terminal,approval,creationO
             &&!remainderAuthorizing&&remainderOutstanding===slot.claim.id
             &&slot.claim.mode!=='BLOCK_BEFORE_FORWARD'&&same(value.resource,slot.claim.resource));
             const isStop=slot.claim.kind==='MENU_WRITE'&&slot.claim.resource.method==='POST';
-            must(counts.menuWrites+(slot.delta.menuWrites||0)+stopReservations.size-(isStop?1:0)+1<=limit.menuWrites
+            must(counts.menuWrites+(slot.delta.menuWrites||0)+stopReservations.size-(isStop?1:0)+extraMenuReserve<=limit.menuWrites
                 &&counts.shopWrites+(slot.delta.shopWrites||0)+1<=limit.shopWrites
                 &&counts.blobUploads+(slot.delta.blobUploads||0)<=limit.blobUploads
                 &&counts.createAttempts+(slot.delta.createAttempts||0)<=limit.createAttempts
@@ -566,7 +571,7 @@ export function prepareManaged414953Resume({snapshot,terminal,approval,creationO
         must(stopReservations.size===0);
     };
     const executeRemainder=async({runId}={})=>{
-        must(['RESUME_414953_FULL_MANAGED',completionScope].includes(approved.scope),'RESUME_REMAINDER_APPROVAL_REQUIRED');
+        must(['RESUME_414953_FULL_MANAGED',completionScope,rebasedCompletionScope].includes(approved.scope),'RESUME_REMAINDER_APPROVAL_REQUIRED');
         must(initialized&&!held&&!remainderUsed&&['T3_API_SEQUENCE_PRIVATE_NOT_ATTESTED_T4_NOT_IMPLEMENTED','RESTORED_SERVICE_TERMINAL_READY'].includes(phase)&&uuid(runId));
         must(!activeServiceRunId||activeServiceRunId===runId);activeServiceRunId=runId;
         const needed=['runT4','runControls','runDenials','runServiceCellLazy','closeServiceBrowser','verifyResourceBeforeForward',
@@ -602,12 +607,12 @@ export function prepareManaged414953Resume({snapshot,terminal,approval,creationO
                 const cellIds=armCells[index];
                 must(index===0||closedOwnerSqlVerified);
                 const arm={id:'RESUME_SERVICE_'+(index+1),zone:'SERVICE',status:'ACTIVE',terminalVerified:false,operationIds:[]};serviceArms.push(arm);
-                must((prefix?11:9)+index+2<=limit.sessions);
+                must(coreSessionTotal+index+2<=limit.sessions);
                 phase='SERVICE_ACTOR_GATE';const actor=await ports.prepareServiceActor({armId:arm.id,existingActor:index===0,
                     resumeCheckpoint:{knownFixtures:[...known.values()],newClaims:structuredClone(newClaims),terminalCreationBindings:structuredClone(terminalCreationBindings)}});
                 serviceActorAcquired=true;activeServiceArm=arm.id;serviceBrowserCloseAttempted=false;serviceActorFinishAttempted=false;
                 must(actor?.owner==='S1'&&actor.identityVerified===true&&actor.sessionConsumedBeforeAuthentication===true
-                    &&actor.globalConsumedSessions===(prefix?11:9)+index&&same(actor.recoveryReservations,{S1:1,S2:1}));counts.sessions=actor.globalConsumedSessions;
+                    &&actor.globalConsumedSessions===coreSessionTotal+index&&same(actor.recoveryReservations,{S1:1,S2:1}));counts.sessions=actor.globalConsumedSessions;
                 await checkPrivate(true);
                 if(index===5){const source=newClaims.find(c=>c.cellId==='SHOP_SAVE_WITHHOLD_AFTER_RESPONSE'&&c.resource.purpose==='PRIMARY');
                     must(source&&serviceArms.find(a=>a.id===source.arm)?.terminalVerified===true);
@@ -657,7 +662,7 @@ export function prepareManaged414953Resume({snapshot,terminal,approval,creationO
                 arm.terminalVerified=true;for(const id of arm.operationIds){const c=newClaims.find(c=>c.id===id);if(c.createdId)terminalCreationBindings.push({id:c.createdId,operationId:c.id,
                     creationOperationId:c.resource.creationOperationId,owner:c.owner,armId:arm.id,resourcesSha256});}
             }
-            must(counts.menus===32&&counts.createAttempts===33&&counts.menuWrites===(prefix?137:105)&&counts.shopWrites===4&&counts.blobUploads===5&&counts.denialRequests===10);
+            must(counts.menus===32&&counts.createAttempts===33&&counts.menuWrites===plan.normalExpected.menuWrites&&counts.shopWrites===4&&counts.blobUploads===5&&counts.denialRequests===10);
             completedStages.push('SERVICE_BROWSER_OBSERVERS');
             phase='REMAINDER_API_OBSERVATIONS_NOT_INDEPENDENTLY_ATTESTED';
         }catch{if(!held)hold('HOLD_REMAINDER_RESULT_OR_INDEPENDENT_TERMINAL');}

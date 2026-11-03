@@ -1,5 +1,5 @@
 import test from 'node:test';
-import {completionScope,completionLimits,prepareT2Reobservation,t2ExpectedFood,t2Hash} from '../scripts/issue118-t2-reobserve.mjs';
+import {completionScope,completionLimits,rebasedCompletionScope,rebasedCompletionLimits,prepareT2Reobservation,t2ExpectedFood,t2Projection,t2Hash} from '../scripts/issue118-t2-reobserve.mjs';
 import assert from 'node:assert/strict';
 import {prepareManagedSuite,serviceCells,suiteLimits,planManaged414953Recovery,prepareManaged414953Resume,validateManagedFullCheckpoint} from '../scripts/issue118-managed-suite.mjs';
 import {createRequire} from 'node:module';
@@ -877,7 +877,7 @@ function fullDataCheckpoint(f,controller,serviceRunId){
             publicationConfirmedFoodVersion:last.currentCell==='STOP_WITHHOLD_AFTER_RESPONSE'?29:null,foodSha256:sha(food),reviewsSha256:sha([])});
     }
     const checkpoint={version:1,controller:state,preparationState:prep,source:{githubRunId:String(91000+k),runnerSha:'a'.repeat(40),artifactSha256:'b'.repeat(64),jobTerminal:true,pendingRequests:0,sessionsClosed:true},
-        sessionLedger:{version:1,baselineConsumed:7,attempts:Array.from({length:k+(state.t2Prefix?3:1)},(_,i)=>state.t2Prefix&&i<2?structuredClone(state.t2Prefix.checkpoint.sessionLedger.attempts[i]):({index:i+1,owner:i===1||state.t2Prefix&&i===3?'S2':'S1',sessionId:'sess_checkpoint'+i,
+        sessionLedger:{version:1,baselineConsumed:state.approvedScope===rebasedCompletionScope?12:7,attempts:Array.from({length:k+(state.t2Prefix?3:1)},(_,i)=>state.t2Prefix&&i<2?structuredClone(state.t2Prefix.checkpoint.sessionLedger.attempts[i]):({index:i+1,owner:i===1||state.t2Prefix&&i===3?'S2':'S1',sessionId:'sess_checkpoint'+i,
             providerCreatedUtc:new Date(Date.now()-10000).toISOString(),providerStatus:'removed',terminated:true,localClosed:true,sourceGithubRunId:String(91000+Math.max(1,i)),runnerSha:'a'.repeat(40)}))}};
     const bindings=state.newClaims.filter(c=>c.arm===last.id).map(c=>({operationId:c.id,kind:c.kind,mode:c.mode,owner:c.owner,resource:c.resource}));
     const receipt={source:'INDEPENDENT_READ_ONLY',readOnly:true,project:'patient-heart-55595249',branch:'br-flat-wildflower-aoeragrs',database:'clearallergy_main19',
@@ -1009,7 +1009,39 @@ test('restored source provenance compares immutable artifact payload before auth
     }
 });
 
-async function withT2Prefix(f){
+// Synthetic historical receipts only. The actual T2 controller produces the
+// first16 claims; modeled cleanup then supplies the immutable66/12 boundary.
+async function modelRebasedCleanup(f,ports){
+    const input=f.input,utc=()=>new Date().toISOString(),ownerOf=id=>input.snapshot.fixtures.find(x=>x.id===id).owner;
+    const source=createRequire(import.meta.url)('tsx/cjs/api').require('../scripts/issue118-batch-stop.ts',import.meta.url);
+    for(const key of ['M01','M02']){const id=input.snapshot.claims.find(c=>c.id==='T3_'+key+'_CREATE').createdId,m=f.menus.get(id),{allergenStatusBySlug,...fields}=source.projectOriginalPayloads('39390038-ddea-409d-bbe3-0faee2293ed6').expectedByMenu[key];Object.assign(m,fields);m.allergens=Object.entries(allergenStatusBySlug).map(([slug,status])=>({slug,status}));}
+    input.terminal.menus.forEach(m=>{m.publicationConfirmedFoodVersion=f.menus.get(m.id).publicationConfirmedFoodVersion;});
+    const observe=ports.observeT2;ports.observeT2=async args=>{if(args.phase==='BASELINE')throw Error('SYNTHETIC_BASELINE_HOLD');return observe(args);};
+    const old=prepareT2Reobservation({snapshot:input.snapshot,terminal:input.terminal,authorization:input.approval,runId:randomUUID(),ports});await old.initialize();const controller=await old.execute();ports.observeT2=observe;
+    assert.equal(controller.counts.menuWrites,58);assert.equal(controller.claims.length,16);assert.equal(controller.status,'HOLD_T2_REOBSERVATION_NO_RETRY_OR_CLEANUP');
+    const now=utc(),created=new Date(Date.now()-1000).toISOString(),sessions=['S1','S2'].map(owner=>({owner,sessionIdentity:{id:'sess_Original'+owner,ownerId:managedActorIdentity[owner].ownerId,providerCreatedUtc:created,ownerVerified:true,providerTerminationConfirmed:true,providerStatus:'removed'}}));
+    const original={target,livePass:false,sessionConsumption:9,evidencePersistenceComplete:true,controller,sessionAttempts:sessions,sessionFinalizations:sessions.map(s=>({...s,complete:true,localClosed:true}))};
+    const cleanupCheckpoint={version:2,result:original,source:{githubRunId:'90001',runnerSha:'a'.repeat(40),artifactSha256:'b'.repeat(64),jobTerminal:true,pendingRequests:0},failedAttempt:{source:{githubRunId:'90002',runnerSha:'a'.repeat(40),artifactSha256:'c'.repeat(64),jobTerminal:true,pendingRequests:0},
+        result:{status:'HOLD_EXACT8_CLEANUP',scope:'EXACT_T2_CLEANUP8',livePass:false,sourceRunId:'90001',counts:{menus:11,menuWrites:58,sessions:10,shopWrites:0,blobUploads:0},sessionAttempts:[{index:10,owner:'S2',consumedBeforeAuthentication:true,sessionIdentity:null,finalization:null}],owners:[],evidencePersistenceComplete:true,automaticRetry:false,automaticCleanup:false,independentDatabase:'NOT_ATTESTED'},
+        closure:{owner:'S2',sessionId:'sess_PreviousUncertainB',method:'DASHBOARD_REVOKED_RELOAD_ABSENT',terminated:true,uniqueInSourceRunWindow:true,createdMinuteUtc:new Date(Math.floor((Date.now()-120000)/60000)*60000).toISOString(),observedUtc:now,loadedDevices:true,targetRows:0,priorWindowsRows:1}}};
+    const rows=()=>[...f.menus].map(([id,m])=>({...t2Projection(m,ownerOf(id)),ownerMatches:true})),t2ids=input.snapshot.claims.filter(c=>c.id.startsWith('T2_')&&c.kind==='MENU_CREATE').map(c=>c.createdId);
+    const cleanupInput={operation:'EXACT_T2_CLEANUP8',authorization:{status:'APPROVED',scope:'EXACT_T2_CLEANUP8',verifiedBy:'human',evidenceReference:'Sentinel_'+('2'.repeat(32)),approvedUtc:now,limits:{priorMenuWrites:58,priorSessions:10,maximumMenuWrites:66,maximumSessions:12,maximumStops:8,maximumNewSessions:2,globalMenuWrites:138,globalSessions:18},sourceSha256:t2Hash(cleanupCheckpoint)},identityReceipt:{...Object.fromEntries(['project','projectId','origin','deployment','source','alias'].map(k=>[k,target[k]])),environment:'Preview',status:'Ready',observedUtc:now,verifiedBy:'cli_metadata_observer',evidenceReference:'SYNTHETIC_ONLY',protectionVerified:true,protectionMode:'ALL_DEPLOYMENTS',productionTarget:false},cleanupCheckpoint,
+        cleanupReceipt:{source:'INDEPENDENT_READ_ONLY',readOnly:true,verifiedBy:'cli_metadata_observer',project:'patient-heart-55595249',branch:'br-flat-wildflower-aoeragrs',database:'clearallergy_main19',role:'neondb_owner',applicationSha:target.source,deployment:target.deployment,sourceSha256:t2Hash(cleanupCheckpoint),knownTerminal:true,unknownResolved:true,exclusive:true,pendingRequests:0,menuWrites:58,sessionConsumption:10,allNineSessionsClosed:true,requestIds:[...input.terminal.consumedRequestIds,...controller.claims.map(c=>c.requestId)],rows:rows().filter(r=>t2ids.includes(r.id)),sessionClosures:sessions.map(s=>({owner:s.owner,sessionId:s.sessionIdentity.id,providerCreatedUtc:created,method:'PROVIDER_TERMINAL',terminated:true,localClosed:true,observedUtc:now})),sqlObservedUtc:now,observedUtc:now},executionApproval:{}};
+    cleanupInput.executionApproval={status:'APPROVED',scope:'FULL_RESUME_WITH_ACTIONS_READ',verifiedBy:'human',evidenceReference:cleanupInput.authorization.evidenceReference,actionsReadApproved:true,singleAttempt:true,runnerSha:'a'.repeat(40),operation:cleanupInput.operation,inputSha256:t2Hash(Object.fromEntries(Object.entries(cleanupInput).filter(([k])=>k!=='executionApproval')))};
+    const started=utc(),stopEvents=[],owners=[],sessionAttempts=[];
+    for(const [i,owner]of ['S2','S1'].entries()){
+        const fixtures=[];for(const id of t2ids.filter(id=>ownerOf(id)===owner)){const m=f.menus.get(id);assert.equal(m.isPublished,true);m.version++;m.isPublished=false;fixtures.push({id,state:'PRIVATE_API_CONFIRMED',stopAttempted:true,version:m.version});stopEvents.push({owner,stage:'CLEANUP_PRIVATE_API_CONFIRMED',id,status:200,requestId:randomUUID()});}
+        owners.push({owner,status:'KNOWN_FIXTURES_PRIVATE_API_CONFIRMED',stopAttempts:4,fixtures,failureStage:null,automaticRetry:false,automaticCleanup:false,independentDatabase:'EXTERNAL_ATTESTER_REQUIRED'});
+        const sessionIdentity={id:'sess_Cleanup'+owner,ownerId:managedActorIdentity[owner].ownerId,providerCreatedUtc:utc(),ownerVerified:true,providerTerminationConfirmed:true,providerStatus:'removed'};
+        sessionAttempts.push({index:11+i,owner,consumedBeforeAuthentication:true,sessionIdentity,finalization:{complete:true,authenticationCleanup:'SIGNOUT_CONFIRMED',sessionIdentity,localClosed:true}});
+    }
+    const result={status:'EXACT8_PRIVATE_API_CONFIRMED_PENDING_SQL',scope:'EXACT_T2_CLEANUP8',livePass:false,sourceRunId:'90001',counts:{menus:11,menuWrites:66,sessions:12,shopWrites:0,blobUploads:0},sessionAttempts,owners,evidencePersistenceComplete:true,automaticRetry:false,automaticCleanup:false,independentDatabase:'NOT_ATTESTED'};
+    const rebaseCheckpoint={version:1,cleanupInput,result,stopEvents,source:{githubRunId:'90003',runnerSha:'a'.repeat(40),artifactSha256:'d'.repeat(64),jobTerminal:true,pendingRequests:0,sessionsClosed:true,startedUtc:started,finishedUtc:utc()}};
+    const rebaseReceipt={source:'INDEPENDENT_READ_ONLY',readOnly:true,verifiedBy:'cli_metadata_observer',project:'patient-heart-55595249',branch:'br-flat-wildflower-aoeragrs',database:'clearallergy_main19',role:'neondb_owner',applicationSha:target.source,deployment:target.deployment,rebaseSha256:t2Hash(rebaseCheckpoint),unknownResolved:true,exclusive:true,pendingRequests:0,menuWrites:66,sessionConsumption:12,allTwelveSessionsClosed:true,allHistoryMatched:true,rows:rows(),requestIds:[...cleanupInput.cleanupReceipt.requestIds,...stopEvents.map(c=>c.requestId)],sqlObservedUtc:utc(),observedUtc:utc()};
+    input.rebaseCheckpoint=rebaseCheckpoint;input.rebaseReceipt=rebaseReceipt;input.approval={...input.approval,scope:rebasedCompletionScope,limits:{...rebasedCompletionLimits},rebaseSha256:t2Hash(rebaseCheckpoint)};
+}
+
+async function withT2Prefix(f,rebased=false){
     const input=f.input;input.approval.scope=completionScope;input.approval.limits={...completionLimits};
     for(let n=1;n<=8;n++){const key='M0'+n,id=input.snapshot.claims.find(c=>c.id==='T2_'+key+'_CREATE').createdId,m=f.menus.get(id);
         const {allergenStatusBySlug,...fields}=t2ExpectedFood(key,['M01','M02','M05','M06'].includes(key));Object.assign(m,fields);m.allergens=Object.entries(allergenStatusBySlug).map(([slug,status])=>({slug,status}));}
@@ -1019,16 +1051,17 @@ async function withT2Prefix(f){
             else{const {allergenStatusBySlug,...fields}=t2ExpectedFood(command.key,command.phase==='CORRECT');Object.assign(m,fields);m.allergens=Object.entries(allergenStatusBySlug).map(([slug,status])=>({slug,status}));m.version+=59;m.foodVersion+=59;m.publicationConfirmedFoodVersion=null;}
             return {status:200,requestId:randomUUID(),menu:structuredClone(m),uiObserved:command.ui};},
         observeT2:async({phase,fixtures,evidenceIds})=>({phase,evidenceIds,rows:fixtures.map(f=>({id:f.id,key:f.key,owner:f.owner,isPublished:f.menu.isPublished,
-            ownerFoodMatched:true,ownerRevisionMatched:true,adminFieldsMatched:true,adminPublicationMatched:true,publicApiStatus:f.menu.isPublished?200:404,publicFieldsMatched:true,publicDomMatched:true,shopMembershipMatched:true}))})};
-    const prefix=prepareT2Reobservation({snapshot:input.snapshot,terminal:input.terminal,authorization:input.approval,runId:randomUUID(),ports});await prefix.initialize();
+            ownerFoodMatched:true,ownerRevisionMatched:true,adminFieldsMatched:true,adminPublicationMatched:true,publicApiStatus:f.menu.isPublished?200:404,publicFieldsMatched:true,publicDomMatched:true,shopMembershipMatched:true,...(phase==='PRE_WRITE_PRIVATE'?{savedPanelMatched:true}:{})}))})};
+    if(rebased)await modelRebasedCleanup(f,ports);
+    const prefix=prepareT2Reobservation({snapshot:input.snapshot,terminal:input.terminal,authorization:input.approval,runId:randomUUID(),ports,...(rebased?{rebaseCheckpoint:input.rebaseCheckpoint,rebaseReceipt:input.rebaseReceipt}:{})});await prefix.initialize();
     const state=await prefix.execute();assert.equal(state.status,'T2_PRIVATE_PENDING_INDEPENDENT_SQL');
     const source={githubRunId:'91000',runnerSha:'a'.repeat(40),artifactSha256:'c'.repeat(64),jobTerminal:true,pendingRequests:0,sessionsClosed:true};
-    const checkpoint={version:1,controller:state,source,sessionLedger:{version:1,baselineConsumed:7,attempts:['S1','S2'].map((owner,i)=>({index:i+1,owner,sessionId:'sess_t2prefix'+i,
+    const checkpoint={version:1,controller:state,source,sessionLedger:{version:1,baselineConsumed:rebased?12:7,attempts:['S1','S2'].map((owner,i)=>({index:i+1,owner,sessionId:'sess_t2prefix'+i,
         providerCreatedUtc:new Date(Date.now()-10000).toISOString(),providerStatus:'removed',terminated:true,localClosed:true,sourceGithubRunId:source.githubRunId,runnerSha:source.runnerSha}))}};
     const receipt={source:'INDEPENDENT_READ_ONLY',readOnly:true,project:'patient-heart-55595249',branch:'br-flat-wildflower-aoeragrs',database:'clearallergy_main19',applicationSha:target.source,deployment:target.deployment,
-        prefixSha256:t2Hash(checkpoint),unknownResolved:true,sessionsClosed:true,pendingRequests:0,menuWrites:78,globalSessionConsumption:9,allHistoryMatched:true,exclusive:true,rows:state.finalRows,requestIds:state.claims.map(c=>c.requestId),observedUtc:new Date().toISOString()};
+        prefixSha256:t2Hash(checkpoint),unknownResolved:true,sessionsClosed:true,pendingRequests:0,menuWrites:rebased?94:78,globalSessionConsumption:rebased?14:9,allHistoryMatched:true,exclusive:true,rows:state.finalRows,requestIds:state.claims.map(c=>c.requestId),observedUtc:new Date().toISOString()};
     input.prefixCheckpoint=checkpoint;input.prefixReceipt=receipt;const prepare=input.ports.prepareServiceActor;
-    input.ports.prepareServiceActor=async args=>{const r=await prepare(args);return {...r,globalConsumedSessions:r.globalConsumedSessions+2};};return f;
+    input.ports.prepareServiceActor=async args=>{const r=await prepare(args);return {...r,globalConsumedSessions:r.globalConsumedSessions+(rebased?7:2)};};return f;
 }
 test('T2 prefix plus six FULL cross-job restorations keep36 prefix claims, skip B4 replay, and reach137/16 with old103/7 unchanged',async()=>{
     const f=await withT2Prefix(remainderFixture('OK',true)),runId=randomUUID();f.input.ports.verifyServiceTerminal=async()=>false;
@@ -1042,5 +1075,36 @@ test('T2 prefix plus six FULL cross-job restorations keep36 prefix claims, skip 
         if(k===6){assert.equal(r.counts.menuWrites,137);assert.equal(r.counts.sessions,16);assert.equal(r.counts.menus,32);assert.equal(r.counts.shopWrites,4);assert.equal(r.counts.blobUploads,5);assert.deepEqual(r.evidenceGaps,[]);assert.equal(r.livePass,false);}
     }
     assert.deepEqual(f.input.prefixCheckpoint,prefixBefore);assert.equal(f.log.filter(x=>x.startsWith('forward:STOP:')&&['M05','M06','M07','M08'].some(k=>x.endsWith(k))).length,4);
+    assert.equal(suiteLimits.menuWrites,103);assert.equal(suiteLimits.sessions,7);
+});
+
+test('rebased66/12 to94/14 prefix restores six FULL arms to153/21 without replay or counter rollback',async()=>{
+    const f=await withT2Prefix(remainderFixture('OK',true),true),runId=randomUUID();f.input.ports.verifyServiceTerminal=async()=>false;
+    const basisBefore=structuredClone(f.input.rebaseCheckpoint),prefixBefore=structuredClone(f.input.prefixCheckpoint);
+    assert.equal(prefixBefore.controller.claims.length,28);assert.equal(prefixBefore.controller.counts.menuWrites,94);assert.equal(prefixBefore.controller.counts.sessions,14);
+    assert.equal(prefixBefore.sessionLedger.baselineConsumed,12);assert.ok(prefixBefore.controller.claims.every(c=>!c.id.includes('RESET')&&!c.id.includes('CREATE')&&!c.id.includes('B_CLEANUP')));
+    let run=prepareManaged414953Resume(f.input);await run.initialize();const core=await run.executeT3();assert.equal(core.counts.menuWrites,116);assert.equal(core.newClaims.length,22);
+    assert.equal(f.log.filter(x=>x.startsWith('forward:CREATE:')).length,6);assert.ok(!f.log.some(x=>/^forward:CREATE:M0[12]$/.test(x)));
+    await run.executeRemainder({runId});
+    for(let k=1;k<=6;k++){
+        const bundle=fullDataCheckpoint(f,run,runId),verified=validateManagedFullCheckpoint({...f.input,...bundle});assert.equal(verified.nextArmIndex,k);
+        assert.equal(bundle.fullCheckpoint.sessionLedger.baselineConsumed,12);assert.equal(bundle.fullCheckpoint.sessionLedger.attempts.length,k+3);
+        assert.equal(bundle.fullCheckpoint.controller.t2Prefix.checkpoint.controller.claims.length,28);assert.equal(bundle.fullCheckpoint.controller.counts.sessions,15+k);
+        if(k===1){
+            for(const mutate of [b=>b.fullCheckpoint.controller.counts.menuWrites--,b=>b.fullCheckpoint.sessionLedger.baselineConsumed=7,
+                b=>{b.fullCheckpoint.controller.t2Prefix.checkpoint.controller.counts.menuWrites=78;b.fullCheckpoint.controller.t2Prefix.receipt.prefixSha256=t2Hash(b.fullCheckpoint.controller.t2Prefix.checkpoint);}]){
+                const bad=structuredClone(bundle);mutate(bad);bad.continuationReceipt.fullCheckpointSha256=t2Hash(bad.fullCheckpoint);
+                assert.throws(()=>validateManagedFullCheckpoint({...f.input,...bad}),/MANAGED_FULL_CHECKPOINT_REFUSED/);
+            }
+            const forged={...f.input,rebaseCheckpoint:structuredClone(f.input.rebaseCheckpoint),rebaseReceipt:structuredClone(f.input.rebaseReceipt),approval:structuredClone(f.input.approval)};
+            forged.rebaseCheckpoint.result.counts.menuWrites=65;forged.rebaseReceipt.rebaseSha256=t2Hash(forged.rebaseCheckpoint);forged.approval.rebaseSha256=t2Hash(forged.rebaseCheckpoint);
+            assert.throws(()=>validateManagedFullCheckpoint({...forged,...bundle}),/MANAGED_FULL_CHECKPOINT_REFUSED/);
+        }
+        const next=prepareManaged414953Resume({...f.input,...bundle});await next.initialize();const r=await next.executeRemainder({runId});run=next;
+        if(k===6){assert.equal(r.counts.menuWrites,153);assert.equal(r.counts.sessions,21);assert.equal(f.input.approval.limits.sessions-r.counts.sessions,2);
+            assert.equal(r.counts.menus,32);assert.equal(r.counts.shopWrites,4);assert.equal(r.counts.blobUploads,5);assert.equal(r.counts.denialRequests,10);assert.deepEqual(r.evidenceGaps,[]);assert.equal(r.livePass,false);}
+    }
+    assert.deepEqual(f.input.rebaseCheckpoint,basisBefore);assert.deepEqual(f.input.prefixCheckpoint,prefixBefore);
+    assert.equal(f.log.filter(x=>x.startsWith('forward:STOP:')&&['M05','M06','M07','M08'].some(k=>x.endsWith(k))).length,4);
     assert.equal(suiteLimits.menuWrites,103);assert.equal(suiteLimits.sessions,7);
 });

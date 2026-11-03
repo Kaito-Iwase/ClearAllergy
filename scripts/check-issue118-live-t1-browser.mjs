@@ -874,10 +874,20 @@ export function createManagedRuntimePorts({actors,batchInput,claimDirectory,t1Fi
                 assert.deepEqual(source.fixturePayload(menu),payload);
                 if(checkpoint){
                     assert.equal(checkpoint.id,id);assert.equal(checkpoint.owner,owner);assert.equal(checkpoint.ownerMatches,true);
-                    assert.equal(checkpoint.shopId,managedActorIdentity[owner].shopId);
                     for(const field of ['version','foodVersion','reviewedFoodVersion','publicationConfirmedFoodVersion','isPublished'])assert.equal(menu[field],checkpoint[field]);
-                    assert.deepEqual(source.fixturePayload(menu),checkpoint.food);
-                    assert.equal(checkpoint.reviews,'0');assert.equal(checkpoint.resolutions,'0');assert.equal(menu.foodReviews.length,0);
+                    if(checkpoint.food===undefined){
+                        // A verified T2 prefix carries a complete food/review digest,
+                        // not a second raw food object. Match that same content before
+                        // the controller can authorize any subsequent request.
+                        const keys=['id','owner','ownerMatches','version','foodVersion','isPublished','reviewedFoodVersion','publicationConfirmedFoodVersion','foodSha256','reviewsSha256'];
+                        assert.equal(Object.keys(checkpoint).length,keys.length);assert.ok(keys.every(k=>Object.hasOwn(checkpoint,k)));
+                        assert.match(checkpoint.foodSha256,/^[a-f0-9]{64}$/);assert.match(checkpoint.reviewsSha256,/^[a-f0-9]{64}$/);
+                        assert.equal(managedResumeHash(source.fixturePayload(menu)),checkpoint.foodSha256);assert.equal(managedResumeHash(menu.foodReviews),checkpoint.reviewsSha256);
+                    }else{
+                        assert.equal(checkpoint.shopId,managedActorIdentity[owner].shopId);assert.deepEqual(source.fixturePayload(menu),checkpoint.food);
+                        assert.equal(checkpoint.reviews,'0');assert.equal(checkpoint.resolutions,'0');
+                    }
+                    assert.equal(menu.foodReviews.length,0);
                 }
                 return {menu,checkpointMatches:!!checkpoint};
             }catch{held=true;throw Error('MANAGED_RECOVERY_READ_HELD');}
@@ -1597,7 +1607,7 @@ const managedResumeSessionPermits=new WeakSet();
 export async function openManagedOwnedActor({role,chromium,env,identityReceipt,record=()=>{},sessionPermit}){
     assert.equal(liveTargetPinsVerified,true);assert.ok(['S1','S2'].includes(role));assertIdentityReceipt(identityReceipt);
     let actorEnv=env;
-    if(['RESUME_414953_FULL_MANAGED','RESUME_414953_T2_FULL'].includes(env.ISSUE118_MANAGED_SCOPE)){
+    if(['RESUME_414953_FULL_MANAGED','RESUME_414953_T2_FULL','RESUME_416276_FULL'].includes(env.ISSUE118_MANAGED_SCOPE)){
         assert.ok(managedResumeSessionPermits.has(sessionPermit)&&sessionPermit.owner===role);
         managedResumeSessionPermits.delete(sessionPermit);
         // The SDK adapter's legacy flag authorizes the same fixed A/B identities;
@@ -1655,16 +1665,18 @@ const managedResumeCanonical=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&
 const managedResumeHash=v=>createHash('sha256').update(managedResumeCanonical(v)).digest('hex');
 // Admission is data-only and runs before creating a directory, actor, OIDC client
 // or temporary Clerk session. The explicit FULL candidate CLI repeats it before auth.
-export async function assertManagedResumeActivation({authorization,identityReceipt,checkpointReceipt,snapshot,terminal,creationOperationIds,fullCheckpoint,continuationReceipt,prefixCheckpoint,prefixReceipt,operation,now=Date.now()}={}){
+export async function assertManagedResumeActivation({authorization,identityReceipt,checkpointReceipt,snapshot,terminal,creationOperationIds,fullCheckpoint,continuationReceipt,prefixCheckpoint,prefixReceipt,rebaseCheckpoint,rebaseReceipt,operation,now=Date.now()}={}){
     try{
         const {planManaged414953Recovery,validateManagedFullCheckpoint}=await import('./issue118-managed-suite.mjs');
-        const {completionScope,planManagedT2Completion,validateT2PrefixCheckpoint}=await import('./issue118-t2-reobserve.mjs');
-        const fullT2=authorization?.scope===completionScope;
-        const plan=(fullT2?planManagedT2Completion:planManaged414953Recovery)({snapshot,terminal});
+        const {rebasedCompletionScope,isCompletionScope,planManagedT2Completion,validateT2PrefixCheckpoint}=await import('./issue118-t2-reobserve.mjs');
+        const fullT2=isCompletionScope(authorization?.scope),rebased=authorization?.scope===rebasedCompletionScope;
+        if(!rebased){assert.equal(rebaseCheckpoint,undefined);assert.equal(rebaseReceipt,undefined);}
+        const rebaseArgs=rebased?{rebaseCheckpoint,rebaseReceipt,historical:fullCheckpoint!==undefined||prefixCheckpoint!==undefined}:{};
+        const plan=(fullT2?planManagedT2Completion:planManaged414953Recovery)({snapshot,terminal,...rebaseArgs});
         assertIdentityReceipt(identityReceipt,now);
         assert.equal(identityReceipt.protectionVerified,true);assert.equal(identityReceipt.protectionMode,'ALL_DEPLOYMENTS');
         assert.equal(identityReceipt.productionTarget,false);
-        assert.equal(authorization?.status,'APPROVED');assert.ok(['RESUME_414953_FULL_MANAGED',completionScope].includes(authorization.scope));
+        assert.equal(authorization?.status,'APPROVED');assert.ok(authorization.scope==='RESUME_414953_FULL_MANAGED'||fullT2);
         assert.equal(authorization.verifiedBy,'human');assert.match(authorization.evidenceReference,/^Sentinel_[a-f0-9]{32,64}$/);
         assert.ok(Number.isFinite(Date.parse(authorization.approvedUtc))&&Date.parse(authorization.approvedUtc)<=now);
         assert.deepEqual(authorization.limits,plan.reservedMaximum);
@@ -1672,6 +1684,7 @@ export async function assertManagedResumeActivation({authorization,identityRecei
         assert.equal(authorization.snapshotSha256,managedResumeHash(snapshot));
         assert.equal(authorization.terminalSha256,managedResumeHash(terminal));
         assert.equal(authorization.creationIdsSha256,managedResumeHash(creationOperationIds));
+        if(rebased)assert.equal(authorization.rebaseSha256,plan.rebaseBasis.hash);
         const keys=['M03','M04','M05','M06','M07','M08'];assert.deepEqual(Object.keys(creationOperationIds).sort(),keys);
         const ids=Object.values(creationOperationIds);assert.equal(new Set(ids).size,6);
         assert.ok(ids.every(id=>typeof id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)&&!plan.inherited.creationOperationIds.includes(id)));
@@ -1684,19 +1697,19 @@ export async function assertManagedResumeActivation({authorization,identityRecei
         assert.equal(p.terminalSha256,authorization.terminalSha256);assert.equal(p.oldClaimsSha256,authorization.oldClaimsSha256);
         assert.equal(p.requestIdsSha256,managedResumeHash([...terminal.consumedRequestIds].sort()));
         const sql=Date.parse(p.sqlObservedUtc),observed=Date.parse(p.observedUtc);
-        assert.ok(Number.isFinite(sql)&&Number.isFinite(observed)&&sql>=Date.parse('2026-11-02T18:42:53.901Z')&&sql<=observed&&observed<=now&&(fullCheckpoint!==undefined||prefixCheckpoint!==undefined||now-sql<=3600000));
+        assert.ok(Number.isFinite(sql)&&Number.isFinite(observed)&&sql>=Date.parse('2026-11-02T18:42:53.901Z')&&sql<=observed&&observed<=now&&(rebased||fullCheckpoint!==undefined||prefixCheckpoint!==undefined||now-sql<=3600000));
         assert.equal(terminal.consumedSessions,7);assert.equal(terminal.confirmedMenuWrites,42);
         if(operation==='T2_REOBSERVE_PREFIX')assert.ok(fullT2&&prefixCheckpoint===undefined&&prefixReceipt===undefined&&fullCheckpoint===undefined&&continuationReceipt===undefined);
         if(fullT2&&operation==='CORE_AND_SERVICE')assert.ok(prefixCheckpoint!==undefined&&prefixReceipt!==undefined&&fullCheckpoint===undefined&&continuationReceipt===undefined);
         if(operation==='SERVICE_NEXT')assert.ok(fullCheckpoint!==undefined&&continuationReceipt!==undefined&&prefixCheckpoint===undefined&&prefixReceipt===undefined);
         const prefixData=fullCheckpoint?.controller?.t2Prefix??(prefixCheckpoint?{checkpoint:prefixCheckpoint,receipt:prefixReceipt}:null);
-        const prefix=fullT2&&prefixData?validateT2PrefixCheckpoint({snapshot,terminal,authorization,prefixCheckpoint:prefixData.checkpoint,prefixReceipt:prefixData.receipt,now,historical:fullCheckpoint!==undefined}):null;
+        const prefix=fullT2&&prefixData?validateT2PrefixCheckpoint({snapshot,terminal,authorization,prefixCheckpoint:prefixData.checkpoint,prefixReceipt:prefixData.receipt,rebaseCheckpoint,rebaseReceipt,now,historical:fullCheckpoint!==undefined}):null;
         assert.ok(!fullT2||prefix||operation==='T2_REOBSERVE_PREFIX');assert.ok(fullT2||!prefixData);
-        const restored=fullCheckpoint===undefined?null:validateManagedFullCheckpoint({snapshot,terminal,approval:authorization,creationOperationIds,fullCheckpoint,continuationReceipt,now});
-        return {scope:authorization.scope,limits:structuredClone(plan.reservedMaximum),plan,restored,prefix,prefixData,
+        const restored=fullCheckpoint===undefined?null:validateManagedFullCheckpoint({snapshot,terminal,approval:authorization,creationOperationIds,fullCheckpoint,continuationReceipt,rebaseCheckpoint,rebaseReceipt,now});
+        return {scope:authorization.scope,limits:structuredClone(plan.reservedMaximum),plan,restored,prefix,prefixData,completion:fullT2,rebased,baselineConsumed:rebased?12:7,
             checkpointKey:managedResumeHash({snapshot:authorization.snapshotSha256,terminal:authorization.terminalSha256,approval:authorization.evidenceReference,
-                stage:restored?restored.controller.serviceArms.at(-1).id:operation==='T2_REOBSERVE_PREFIX'?'T2_PREFIX':prefix?'CORE_AFTER_T2':'INITIAL_CORE'}),
-            initialCounts:restored?structuredClone(restored.controller.counts):prefix?structuredClone(prefix.controller.counts):{menus:11,menuWrites:42,shopWrites:0,blobUploads:0,sessions:7}};
+                stage:restored?restored.controller.serviceArms.at(-1).id:operation==='T2_REOBSERVE_PREFIX'?'T2_PREFIX':prefix?'CORE_AFTER_T2':'INITIAL_CORE',rebase:rebased?authorization.rebaseSha256:undefined}),
+            initialCounts:restored?structuredClone(restored.controller.counts):prefix?structuredClone(prefix.controller.counts):{menus:11,menuWrites:rebased?66:42,shopWrites:0,blobUploads:0,sessions:rebased?12:7}};
     }catch{throw Error('MANAGED_RESUME_ACTIVATION_NOT_APPROVED_OR_FRESH');}
 }
 
@@ -1704,10 +1717,10 @@ export async function assertManagedResumeActivation({authorization,identityRecei
 // Overrides substitute the transport factories, never the admission or budget
 // checks. The candidate CLI additionally requires a new explicit approval and provenance.
 export async function executeManagedApprovedResume(input={}){
-    const {authorization,identityReceipt,snapshot,terminal,creationOperationIds,claimDirectory,
+    const {authorization,identityReceipt,snapshot,terminal,creationOperationIds,claimDirectory,rebaseCheckpoint,rebaseReceipt,
         chromium,env=process.env,image,serviceRunId,preparationState={},terminalReader,dependencies={}}=input;
     const admission=await assertManagedResumeActivation(input);
-    if((input.operation??'CORE_AND_SERVICE')!==(admission.restored?'SERVICE_NEXT':input.operation==='T2_REOBSERVE_PREFIX'&&authorization.scope==='RESUME_414953_T2_FULL'?'T2_REOBSERVE_PREFIX':'CORE_AND_SERVICE'))throw Error('MANAGED_RESUME_STAGE_NOT_IMPLEMENTED');
+    if((input.operation??'CORE_AND_SERVICE')!==(admission.restored?'SERVICE_NEXT':input.operation==='T2_REOBSERVE_PREFIX'&&admission.completion?'T2_REOBSERVE_PREFIX':'CORE_AND_SERVICE'))throw Error('MANAGED_RESUME_STAGE_NOT_IMPLEMENTED');
     if(typeof claimDirectory!=='string'||claimDirectory.length===0)throw Error('MANAGED_RESUME_CLAIM_DIRECTORY_REQUIRED');
     const {serviceBrowserImage}=await import('./issue118-managed-service-browser.mjs');
     if(!Buffer.isBuffer(image?.buffer)||image.buffer.length!==serviceBrowserImage.bytes
@@ -1855,7 +1868,7 @@ export async function executeManagedApprovedResume(input={}){
         assert.ok(lstatSync(directory).isDirectory()&&!lstatSync(directory).isSymbolicLink());
         assert.ok(persist('resume-admission',{scope:authorization.scope,checkpointKey:admission.checkpointKey,evidenceReference:authorization.evidenceReference,
             limits:admission.limits,oldClaimsSha256:authorization.oldClaimsSha256,originalSnapshotSha256:authorization.snapshotSha256,originalTerminalSha256:authorization.terminalSha256}));
-        controller=prefixOnly?(await import('./issue118-t2-reobserve.mjs')).prepareT2Reobservation({snapshot,terminal,authorization,runId:serviceRunId,ports}):prepareManaged414953Resume({snapshot,terminal,approval:authorization,creationOperationIds,ports,fullCheckpoint:input.fullCheckpoint,continuationReceipt:input.continuationReceipt,prefixCheckpoint:input.prefixCheckpoint,prefixReceipt:input.prefixReceipt});
+        controller=prefixOnly?(await import('./issue118-t2-reobserve.mjs')).prepareT2Reobservation({snapshot,terminal,authorization,runId:serviceRunId,ports,rebaseCheckpoint,rebaseReceipt}):prepareManaged414953Resume({snapshot,terminal,approval:authorization,creationOperationIds,ports,fullCheckpoint:input.fullCheckpoint,continuationReceipt:input.continuationReceipt,prefixCheckpoint:input.prefixCheckpoint,prefixReceipt:input.prefixReceipt,rebaseCheckpoint,rebaseReceipt});
         await controller.initialize();
         if(!restored){actorA=await open('S1');actorB=await open('S2');await bindRuntime();
             report.core=prefixOnly?await controller.execute():await controller.executeT3();
@@ -1874,7 +1887,7 @@ export async function executeManagedApprovedResume(input={}){
         report.actualServicePass=false;report.independentDatabase='NOT_ATTESTED';
         const priorAttempts=restored?restored.sessionLedger.attempts:admission.prefix?admission.prefix.sessionLedger.attempts:[];
         report.fullCheckpointPayload={version:1,controller:report.controller,preparationState:structuredClone(serviceState),
-            sessionLedger:{version:1,baselineConsumed:7,attempts:[...priorAttempts,...report.sessionAttempts.map((a,i)=>{
+            sessionLedger:{version:1,baselineConsumed:admission.baselineConsumed,attempts:[...priorAttempts,...report.sessionAttempts.map((a,i)=>{
                 const end=report.sessionFinalizations.find(e=>e.sessionIdentity?.id===a.sessionIdentity?.id),sid=end?.sessionIdentity;
                 return {index:priorAttempts.length+i+1,owner:a.owner,sessionId:sid?.id??null,providerCreatedUtc:sid?.providerCreatedUtc??null,
                     providerStatus:sid?.providerStatus??'OTHER',terminated:sid?.providerTerminationConfirmed===true&&end?.complete===true,
