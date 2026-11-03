@@ -231,7 +231,7 @@ test('installed Clerk activation/signout hooks exercise real offline POST/refres
     let browser,context,closed;
     const deadline=async promise=>{let timer;try{return await Promise.race([promise,new Promise((_yes,no)=>{timer=setTimeout(()=>no(Error('OFFLINE_LIFECYCLE_DEADLINE')),10000);})]);}finally{clearTimeout(timer);}};
     try{
-        browser=await chromium.launch({headless:true,channel:'chromium'});context=await browser.newContext({serviceWorkers:'block'});
+        browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{channel:'chromium'})});context=await browser.newContext({serviceWorkers:'block'});
         await context.route('**/*',async route=>{
             const result=await policy(route.request(),()=>phase);
             if(result.decision==='SUPPRESS_PINNED_TELEMETRY'){suppressed++;await route.fulfill({status:204,body:''});return;}
@@ -324,7 +324,7 @@ test('real Chromium loopback controls separate normal completion, context interr
             const probeUrl = local + '/offline-readonly-control';
             result.stage = 'BROWSER_LAUNCH';
             browserLaunchAttempted = true;
-            browser = await chromium.launch({ headless: true, channel: 'chromium' });
+            browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{channel:'chromium'}) });
             contextCreateAttempted = true;
             context = await browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' });
             await context.route('**/*', async route => {

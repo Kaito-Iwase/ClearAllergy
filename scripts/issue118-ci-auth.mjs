@@ -2,6 +2,7 @@
 import { routePreviewRequest, protectedPreviewFetch, previewOrigin, transportObservation, clerkFrontendRedirectObservation, resolveClerkSdkCanonicalScript,
     transportException, observeTransport } from './issue118-preview-transport.mjs';
 import { createInitialHandshakeCandidate } from './issue118-initial-handshake-candidate.mjs';
+import { createManagedReadPageScope } from './issue118-managed-read-page.mjs';
 
 export const ciIdentity = Object.freeze({
     repository: 'Kaito-Iwase/ClearAllergy', repositoryId: '1144262510',
@@ -132,6 +133,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
     let sessionRecord,signoutAttempted=false,sessionReads=0;
     const emitSession=()=>{try{observers.session?.(structuredClone(sessionRecord));}catch{fail('SESSION_DIAGNOSTIC_FAILED');}};
     let ticketRequests = 0;
+    let managedReadPages;
     let initialHandshake, initialPage, initialDocumentWindow = false, handshakeObservationFailed = false, routeHeld = false;
     const assertTransportOpen = () => { if (routeHeld||oidcRenewalFailed) fail('CI_TRANSPORT_HELD'); };
     const progress = Object.fromEntries(['loginNavigationStarted', 'loginNavigationCompleted', 'clerkLoaded',
@@ -172,6 +174,18 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
         data.created_at<=Date.now()+30000&&(!sessionRecord.providerCreatedUtc||new Date(data.created_at).toISOString()===sessionRecord.providerCreatedUtc);
     return {
         token,ensureToken,
+        registerManagedReadPage(page, menuId) {
+            const assertReady = () => {
+                assertTransportOpen();
+                if (!authenticated || signoutAttempted || !trackedReadClose || !sessionRecord?.ownerVerified || !sessionRecord.eligibleForCleanup ||
+                    sessionRecord.ownerId !== ownerIdentity.ownerId) fail('MANAGED_READ_PAGE_REFUSED');
+                if (typeof observers.managedReadReady !== 'function' || observers.managedReadReady() !== undefined) fail('MANAGED_READ_PAGE_REFUSED');
+            };
+            assertReady();
+            managedReadPages ??= createManagedReadPageScope({ context: initialPage.context(), shopId: ownerIdentity.shopId, assertReady });
+            return managedReadPages.register(page, menuId);
+        },
+        allowsManagedRead: request => managedReadPages?.allowsRead(request) === true,
         oidcLifecycle:()=>({issuances:oidcIssuances,renewalFailed:oidcRenewalFailed,maximumIssuances:6}),
         sessionLifecycleMode:()=>trackedReadClose?'TRACKED_OWNER_SESSION':'LEGACY_UNTRACKED',
         read: async (api, url) => {const parsed=new URL(url);if(parsed.origin!==previewOrigin||parsed.username||parsed.password)fail('CI_READ_TARGET_REFUSED');
@@ -226,21 +240,27 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                                 clerkOrigin: 'https://' + ciIdentity.clerkDomain });
                             try { observers.frontendRedirect?.(observation); } catch { fail('AUTH_DIAGNOSTIC_FAILED'); }
                             // Only public main-frame SDK scripts, not API/XHR, may canonicalize once.
-                            if (status === 307 && resourceType === 'script' && initialPage &&
-                                typeof request.frame === 'function' && request.frame() === initialPage.mainFrame()) {
+                            const registeredPage = managedReadPages?.scriptPage(request);
+                            const initialFrame = initialPage && typeof request.frame === 'function' && request.frame() === initialPage.mainFrame();
+                            if (status === 307 && resourceType === 'script' && (initialFrame || registeredPage)) {
+                                const scriptPage = initialFrame ? initialPage : registeredPage;
+                                const assertScriptScope = () => {
+                                    assertTransportOpen();
+                                    if (!initialFrame) managedReadPages.assertScriptPage(request, scriptPage);
+                                };
                                 const resolved = await resolveClerkSdkCanonicalScript(url.href, redirectHeaders);
                                 const transfer = { ...resolved.observation, secondGetAttempted: false, secondStatusReadCompleted: false,
                                     secondResponseIs200: false, secondHeadersReadCompleted: false, javascriptMime: false, secondLocationAbsent: false, responseReady: false };
                                 const observe = () => { try { observers.scriptTransfer?.({ ...transfer }); } catch { fail('AUTH_DIAGNOSTIC_FAILED'); } };
                                 observe();
                                 if (!resolved.observation.targetAllowed || !resolved.url) fail('CI_SDK_SCRIPT_TARGET_REFUSED');
-                                assertTransportOpen(); transfer.secondGetAttempted = true; observe();
+                                assertScriptScope(); transfer.secondGetAttempted = true; observe();
                                 // Same context's correctly scoped Cookie jar; no explicit browser headers,
                                 // Cookie, Authorization, OIDC, testing token, Origin or Referer are copied.
-                                assertTransportOpen();
-                                response = await initialPage.context().request.fetch(resolved.url, { method: 'GET',
+                                assertScriptScope();
+                                response = await scriptPage.context().request.fetch(resolved.url, { method: 'GET',
                                     headers: { Accept: 'application/javascript' }, maxRedirects: 0, maxRetries: 0, timeout: 20000 });
-                                assertTransportOpen(); status = response.status(); transfer.secondStatusReadCompleted = true;
+                                assertScriptScope(); status = response.status(); transfer.secondStatusReadCompleted = true;
                                 transfer.secondResponseIs200 = status === 200; observe();
                                 const finalHeaders = response.headers(); transfer.secondHeadersReadCompleted = true;
                                 transfer.javascriptMime = /^(?:application|text)\/(?:javascript|ecmascript)(?:;|$)/i.test(finalHeaders['content-type'] || '');
@@ -248,6 +268,7 @@ export async function createCiAccess(env, fetcher = fetch, onStage = () => {}, o
                                 transfer.responseReady = transfer.secondResponseIs200 && transfer.javascriptMime && transfer.secondLocationAbsent;
                                 observe();
                                 if (!transfer.responseReady) fail('CI_SDK_SCRIPT_RESPONSE_REFUSED');
+                                assertScriptScope();
                                 flags.redirectRejected = false;
                             }
                         }

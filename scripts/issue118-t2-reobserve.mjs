@@ -252,10 +252,11 @@ const bounded=async promise=>{let timer;try{return await Promise.race([promise,n
 // Uses the real existing edit/confirmation UI, but this handler is the sole
 // mutation sender. No route.continue header inheritance or response substitution.
 export async function dispatchT2Ui({actor,command,data,permit,resource,boundary,verify}){
-    let page,handler,used=false,resolveResult,rejectResult,failed=false;
+    let page,handler,releasePage,used=false,resolveResult,rejectResult,failed=false;
     const result=new Promise((resolve,reject)=>{resolveResult=resolve;rejectResult=reject;});result.catch(()=>{});
     try{
         page=await actor.context.newPage();const url=target.origin+'/admin/menus/'+command.id+'/edit';
+        await verify();releasePage=actor.access.registerManagedReadPage(page,command.id);
         page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(20000);
         const nav=await page.goto(url,{waitUntil:'load',timeout:20000});need(nav?.status()===200&&page.url()===url);
         await page.waitForFunction(id=>window.Clerk?.user?.id===id,actor.expectedUserId);
@@ -295,10 +296,10 @@ export async function dispatchT2Ui({actor,command,data,permit,resource,boundary,
         const drained=await actor.lifecycle.tracker.drain(),state=actor.lifecycle.tracker.snapshot();need(!failed&&used&&drained.status==='QUIET_CONFIRMED'&&state.pending===0&&state.started===state.settled);
         return response;
     }catch{throw Error('T2_UI_HELD_NO_RETRY');}
-    finally{if(page){try{if(handler)await page.unroute('**/api/admin/**',handler);await page.close({runBeforeUnload:false});need(page.isClosed());}catch{throw Error('T2_UI_CLOSE_UNVERIFIED');}}}
+    finally{releasePage?.();if(page){try{if(handler)await page.unroute('**/api/admin/**',handler);await page.close({runBeforeUnload:false});need(page.isClosed());}catch{throw Error('T2_UI_CLOSE_UNVERIFIED');}}}
 }
 export async function observeT2RuntimePhase({phase,fixtures,evidenceIds,actors,readOwner,verify,recordStep=()=>{}}){
-    const rows=[],pages=[];let lastStep,firstFailure;
+    const rows=[],pages=[],releases=[];let lastStep,firstFailure;
     const step=(name,key,httpStatus=null)=>{lastStep=safeObservationStep({step:name,menuKey:key,httpStatus,failed:false});recordStep({...lastStep});};
     const fail=()=>{if(!firstFailure&&lastStep){firstFailure={...lastStep,failed:true};recordStep({...firstFailure});}};
     try{
@@ -306,6 +307,7 @@ export async function observeT2RuntimePhase({phase,fixtures,evidenceIds,actors,r
             step('OWNER_API_READ',f.key);
             const m=await readOwner(f.id,f.owner),expected=f.menu;need(canonical(t2Projection(m,f.owner))===canonical(t2Projection(expected,f.owner)));
             step('PAGE_CREATE',f.key);const page=await actor.context.newPage();pages.push(page);page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(20000);const edit=target.origin+'/admin/menus/'+f.id+'/edit';
+            const releasePage=actor.access.registerManagedReadPage(page,f.id);releases.push(releasePage);
             step('ADMIN_NAV',f.key);const r=await page.goto(edit,{waitUntil:'load',timeout:20000});step('ADMIN_NAV',f.key,r?.status()??null);need(r?.status()===200&&page.url()===edit);
             step('ADMIN_IDENTITY',f.key);
             await page.waitForFunction(id=>window.Clerk?.loaded===true&&window.Clerk.user?.id===id,actor.expectedUserId,{timeout:20000});
@@ -337,10 +339,10 @@ export async function observeT2RuntimePhase({phase,fixtures,evidenceIds,actors,r
             step('SHOP_MEMBERSHIP',f.key);const member=await page.locator('a[href="/shops/'+actor.binding.shopId+'/menus/'+f.id+'"]').count()>0;
             rows.push({id:f.id,key:f.key,owner:f.owner,isPublished:m.isPublished,ownerFoodMatched:true,ownerRevisionMatched:true,
                 adminFieldsMatched:fields,adminPublicationMatched:adminPublication,publicApiStatus:status,publicFieldsMatched:publicFields,publicDomMatched:dom,shopMembershipMatched:member===m.isPublished,...(phase==='PRE_WRITE_PRIVATE'?{savedPanelMatched}:{})});
-            step('PAGE_CLOSE',f.key);await page.close({runBeforeUnload:false});need(page.isClosed());step('FINISHED',f.key);
+            step('PAGE_CLOSE',f.key);releasePage();await page.close({runBeforeUnload:false});need(page.isClosed());step('FINISHED',f.key);
         }
         if(fixtures.length){const key=fixtures.at(-1).key;for(const owner of new Set(fixtures.map(f=>f.owner))){step('ROUTE_DRAIN',key);const tracker=actors.get(owner)?.lifecycle?.tracker;need(tracker);const drained=await tracker.drain(),state=tracker.snapshot();need(drained.status==='QUIET_CONFIRMED'&&state.pending===0&&state.started===state.settled);}step('FINISHED',key);}
         return {phase,evidenceIds,rows};
     }catch{fail();throw Error('T2_OBSERVATION_HELD');}
-    finally{for(const p of pages)if(!p.isClosed()){try{step('PAGE_CLOSE',lastStep.menuKey);await p.close({runBeforeUnload:false});need(p.isClosed());}catch{fail();throw Error('T2_OBSERVATION_CLOSE_UNVERIFIED');}}}
+    finally{for(const release of releases)release();for(const p of pages)if(!p.isClosed()){try{step('PAGE_CLOSE',lastStep.menuKey);await p.close({runBeforeUnload:false});need(p.isClosed());}catch{fail();throw Error('T2_OBSERVATION_CLOSE_UNVERIFIED');}}}
 }

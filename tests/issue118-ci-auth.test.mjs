@@ -101,10 +101,11 @@ function wireAuthPage(access, page) {
         const frame = {}, visits = [], originalGoto = page.goto;
         const state = { access, requests: [], responses: [], fulfills: 0, aborts: 0 };
         page.mainFrame = () => frame;
-        page.context = () => ({ request: { fetch: async (url, options) => {
+        const context = { request: { fetch: async (url, options) => {
             state.requests.push({ url, options });
             return state.responses.shift() || { status: () => 200, headers: () => ({}) };
-        } } });
+        } } };
+        page.context = () => context;
         page.goto = async url => {
             visits.push(url);
             if (url === target.origin + '/admin/login') try { await state.access.route({
@@ -621,6 +622,81 @@ test('synthetic main-frame SDK UI/JS canonical transfer is bounded and copies no
     }
 });
 
+test('registered owned edit tab reuses its context for canonical SDK GET; unregistered tabs stay refused', async () => {
+    const origin='https://'+ciIdentity.clerkDomain;
+    for(const registered of [false,true]) {
+        const f=authFixture(),events=[];
+        const access=await createCiAccess({...env(),ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher,()=>{},
+            {managedReadReady:()=>{},scriptTransfer:p=>events.push(p)});
+        const model=wireAuthPage(access,f.page);await access.authenticate(f.page);
+        const frame={},id='cunitowned',page={context:()=>f.page.context(),mainFrame:()=>frame,isClosed:()=>false,
+            url:()=>target.origin+'/admin/menus/'+id+'/edit'};
+        const release=registered?access.registerManagedReadPage(page,id):()=>{};
+        const source=origin+'/npm/@clerk/clerk-js@6/dist/clerk.browser.js',destination=origin+'/npm/@clerk/clerk-js@6.24.0/dist/clerk.browser.js';
+        let fetched=0,fulfilled=0,aborted=0;
+        model.responses.push({status:()=>200,headers:()=>({'content-type':'application/javascript'})});
+        const before=model.requests.length,backendCalls=f.calls.length;
+        const route={request:()=>({url:()=>source,method:()=> 'GET',resourceType:()=> 'script',frame:()=>frame,
+            allHeaders:async()=>({Cookie:'SYNTHETIC_PRIVATE','x-vercel-trusted-oidc-idp-token':'SYNTHETIC_PRIVATE'})}),
+            fetch:async options=>{fetched++;assert.equal(options.maxRedirects,0);assert.equal(options.headers['x-vercel-trusted-oidc-idp-token'],undefined);
+                return{status:()=>307,headers:()=>({location:destination})};},
+            fulfill:async({response:r})=>{assert.equal(r.status(),200);fulfilled++;},abort:async()=>{aborted++;}};
+        if(registered)await access.route(route);else await assert.rejects(access.route(route),code('CI_ROUTE_FAILED'));
+        assert.equal(fetched,1);assert.equal(fulfilled,registered?1:0);assert.equal(aborted,registered?0:1);
+        assert.equal(model.requests.length-before,registered?1:0);assert.equal(f.calls.length,backendCalls);
+        if(registered){const second=model.requests.at(-1);assert.equal(second.url,destination);
+            assert.deepEqual(second.options,{method:'GET',headers:{Accept:'application/javascript'},maxRedirects:0,maxRetries:0,timeout:20000});
+            assert.equal(events.at(-1).responseReady,true);}
+        assert.doesNotMatch(JSON.stringify(events),/SYNTHETIC|https:|user_|cookie|Bearer/);release();
+    }
+});
+test('registered edit page release during second SDK GET holds without fulfilling or further requests', async () => {
+    const f=authFixture(),access=await createCiAccess({...env(),ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher,()=>{},{managedReadReady:()=>{}});
+    wireAuthPage(access,f.page);await access.authenticate(f.page);
+    const frame={},page={context:()=>f.page.context(),mainFrame:()=>frame,isClosed:()=>false,
+        url:()=>target.origin+'/admin/menus/cunitowned/edit'};
+    const release=access.registerManagedReadPage(page,'cunitowned'),context=f.page.context();let canonical=0,aborts=0;
+    context.request.fetch=async()=>{canonical++;release();return{status:()=>200,headers:()=>({'content-type':'application/javascript'})};};
+    await assert.rejects(access.route({request:()=>({url:()=> 'https://'+ciIdentity.clerkDomain+'/npm/@clerk/ui@1/dist/ui.browser.js',
+        method:()=> 'GET',resourceType:()=> 'script',frame:()=>frame,allHeaders:async()=>({})}),
+        fetch:async()=>({status:()=>307,headers:()=>({location:'https://'+ciIdentity.clerkDomain+'/npm/@clerk/ui@1.24.2/dist/ui.browser.js'})}),
+        fulfill:async()=>assert.fail('released page must not fulfill'),abort:async()=>{aborts++;}}),code('CI_ROUTE_FAILED'));
+    assert.equal(canonical,1);assert.equal(aborts,1);
+    assert.throws(()=>access.registerManagedReadPage(page,'cunitowned'),code('CI_TRANSPORT_HELD'));
+});
+test('phase or receipt changes while resolving a registered SDK transfer prevent its next GET or fulfill', async () => {
+    for(const change of ['PHASE','RECEIPT'])for(const point of ['BEFORE_CANONICAL','AFTER_CANONICAL']) {
+        const f=authFixture();let phase='APP_FLOW',fresh=true,canonical=0,aborts=0;
+        const ready=()=>{assert.equal(phase,'APP_FLOW');assert.equal(fresh,true);};
+        const access=await createCiAccess({...env(),ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher,()=>{},{managedReadReady:ready});
+        wireAuthPage(access,f.page);await access.authenticate(f.page);
+        const frame={},page={context:()=>f.page.context(),mainFrame:()=>frame,isClosed:()=>false,
+            url:()=>target.origin+'/admin/menus/cunitowned/edit'};
+        access.registerManagedReadPage(page,'cunitowned');
+        const changeScope=()=>{if(change==='PHASE')phase='SIGNOUT';else fresh=false;};
+        f.page.context().request.fetch=async()=>{canonical++;if(point==='AFTER_CANONICAL')changeScope();
+            return{status:()=>200,headers:()=>({'content-type':'application/javascript'})};};
+        await assert.rejects(access.route({request:()=>({url:()=> 'https://'+ciIdentity.clerkDomain+'/npm/@clerk/ui@1/dist/ui.browser.js',
+            method:()=> 'GET',resourceType:()=> 'script',frame:()=>frame,allHeaders:async()=>({})}),
+            fetch:async()=>{if(point==='BEFORE_CANONICAL')changeScope();return{status:()=>307,headers:()=>({location:'https://'+ciIdentity.clerkDomain+'/npm/@clerk/ui@1.24.2/dist/ui.browser.js'})};},
+            fulfill:async()=>assert.fail('stale scope must not fulfill'),abort:async()=>{aborts++;}}),code('CI_ROUTE_FAILED'));
+        assert.equal(canonical,point==='BEFORE_CANONICAL'?0:1);assert.equal(aborts,1);
+    }
+});
+test('managed tab registration needs an authenticated verified tracked session in the same context', async () => {
+    for(const tracked of [false,true]) {
+        const f=authFixture(),access=await createCiAccess({...env(),...(tracked?{ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'}:{})},f.fetcher,()=>{},{managedReadReady:()=>{}});
+        wireAuthPage(access,f.page);
+        const page={context:()=>f.page.context(),mainFrame:()=>({}),isClosed:()=>false,url:()=>target.origin+'/admin/menus/cunitowned/edit'};
+        assert.throws(()=>access.registerManagedReadPage(page,'cunitowned'),code('MANAGED_READ_PAGE_REFUSED'));
+        await access.authenticate(f.page);
+        if(!tracked)assert.throws(()=>access.registerManagedReadPage(page,'cunitowned'),code('MANAGED_READ_PAGE_REFUSED'));
+        else assert.throws(()=>access.registerManagedReadPage({...page,context:()=>({})},'cunitowned'),code('MANAGED_READ_PAGE_REFUSED'));
+    }
+    const f=authFixture(),access=await createCiAccess({...env(),ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},f.fetcher);
+    wireAuthPage(access,f.page);await access.authenticate(f.page);
+    assert.throws(()=>access.registerManagedReadPage({context:()=>f.page.context(),isClosed:()=>false},'cunitowned'),code('MANAGED_READ_PAGE_REFUSED'));
+});
 test('invalid SDK targets, second redirect, HTML and HTTP failure never start a third GET or Backend authentication', async () => {
     const origin='https://'+ciIdentity.clerkDomain,source=origin+'/npm/@clerk/ui@1/dist/ui.browser.js';
     for(const variant of ['foreign','crossmajor','query','wrongpath','xhr','subframe','post','unknown-source','second-redirect','html','http500']) {
@@ -814,7 +890,7 @@ test('dedicated workflow preserves original job and separately gates the unappro
     assert.match(yaml, /environment: clearallergy-e2e-test/); assert.match(yaml, /cancel-in-progress: false/);
     assert.match(yaml, /inputs.expected_runner_sha == github.sha/);
     assert.match(parsed.jobs['live-t1'].if, /github\.run_attempt == 1/);
-    assert.equal((yaml.match(/secrets\./g) || []).length, 4);
+    assert.equal((yaml.match(/secrets\./g) || []).length, 5);
     assert.ok(!yaml.includes('DATABASE_URL')); assert.ok(!yaml.includes('DIRECT_URL'));
     assert.ok(!yaml.includes('storageState')); assert.ok(!yaml.includes('continue-on-error'));
     const runner = readFileSync(new URL('../scripts/check-issue118-live-t1-browser.mjs', import.meta.url), 'utf8');

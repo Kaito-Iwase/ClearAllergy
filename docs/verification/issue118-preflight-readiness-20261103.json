@@ -1,0 +1,201 @@
+{
+  "status": "HOLD_BEFORE_AUTHENTICATED_PREFLIGHT",
+  "observedUtc": "2026-11-03T23:09:41.000Z",
+  "livePass": false,
+  "liveApplicationWrites": 0,
+  "newProviderSessions": 0,
+  "providerMetadata": {
+    "deployment": {
+      "id": "dpl_14PXhbZ9EnKuiL2kTQwbuU7d5ebo",
+      "projectId": "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK",
+      "projectName": "clear-allergy-e2e",
+      "url": "clear-allergy-e2e-qs7v9eaim-kaitoexe00-9350s-projects.vercel.app",
+      "readyState": "READY",
+      "source": "cli",
+      "gitSha": "8bf5bea476d5cf5a8dd6ac38713a2d393d7460b1",
+      "gitRef": "test/staging",
+      "target": null
+    },
+    "project": {
+      "id": "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK",
+      "name": "clear-allergy-e2e",
+      "ssoEnabled": true,
+      "ssoDeploymentType": "all"
+    },
+    "aliases": [],
+    "collectionMethod": "VERCEL_MCP_READ_ONLY",
+    "productionTargetBasis": "target=null; fixed e2e Preview identity confirmed by delegating thread"
+  },
+  "githubRun": {
+    "id": 41637959671,
+    "runNumber": 38,
+    "runAttempt": 1,
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "failure",
+    "runnerSha": "b5a3c2c76bb0c5153f8cd09171124be22049b8e2",
+    "branch": "test/issue118-live-t1-20261030",
+    "workflowPath": ".github/workflows/issue118-live-e2e.yml",
+    "claimTitle": "Issue118 FULL 86648b4ca9755294b73e1eeff6260b9c1d90f628e91e74cdee896bd6abdcc6d6",
+    "createdUtc": "2026-11-03T12:42:21Z",
+    "finishedUtc": "2026-11-03T12:44:36Z"
+  },
+  "artifactMetadata": {
+    "id": 13231827089,
+    "runId": 41637959671,
+    "name": "issue118-full-41637959671",
+    "bytes": 8454,
+    "digest": "sha256:90bfad48839acc7dbdb188f4de9a9b7e123c2e82e061ceabc2d31dea08e9a932",
+    "expired": false,
+    "runnerSha": "b5a3c2c76bb0c5153f8cd09171124be22049b8e2",
+    "createdUtc": "2026-11-03T12:44:33Z"
+  },
+  "artifactBytes": {
+    "availableLocally": false,
+    "parentReportedHashVerified": true,
+    "independentlyHashedHere": false,
+    "materializationState": "NETWORK_TUNNEL_403",
+    "downloadReattempted": false
+  },
+  "comparisonFile": {
+    "path": "/workspace/shared/issue118-readonly-reconcile/comparison.json",
+    "availableHere": false,
+    "state": "NOT_FOUND_IN_THIS_ENVIRONMENT"
+  },
+  "databaseReconciliation": {
+    "source": "PARENT_DELEGATION",
+    "observedUtc": "2026-11-03T23:05:09.000Z",
+    "database": "clearallergy_main19",
+    "fixtures": 11,
+    "privateFixtures": 11,
+    "rowsMatchedArtifact": true,
+    "successfulAudits": 66,
+    "laterAudits": 0,
+    "independentlyExecutedHere": false,
+    "rowLevelComparisonAvailableHere": false,
+    "otherDatabase": {
+      "name": "neondb",
+      "rows": 0,
+      "usableAsEvidence": false
+    },
+    "auditScope": "11_SOURCE_FIXTURES_ONLY"
+  },
+  "budget": {
+    "consumedMenuWrites": 66,
+    "maximumMenuWrites": 153,
+    "consumedSessions": 14,
+    "maximumSessions": 23,
+    "proposedReadOnlySessionCharge": {
+      "owner": "S1",
+      "sessions": 1,
+      "prior": 14,
+      "result": 15,
+      "withinCap": true,
+      "claimed": false,
+      "authorizedExecutableEntry": false,
+      "durableChargeRequiredBeforeAuthentication": true,
+      "failureRefundAllowed": false
+    },
+    "refundPriorFailures": false,
+    "futureRecoverySessionsReserved": 2,
+    "ordinarySlotsAfterProposedPreflight": 6,
+    "remainingMenuWrites": 87,
+    "fullRemainderFit": "UNVERIFIED_WITHOUT_CURRENT_EXECUTION_MANIFEST"
+  },
+  "sessionClosure": {
+    "S1": {
+      "evidence": "USER_REPORTED_DEVELOPMENT_REVOKE_ALL_DEVICES",
+      "providerIndependentlyVerifiedHere": false,
+      "revokeReattempted": false,
+      "acceptedConversationEvidence": true,
+      "providerProofMissingIsNotSoleBlocker": true
+    },
+    "S2": {
+      "evidence": "UNRECONCILED",
+      "providerIndependentlyVerifiedHere": false,
+      "revokeReattempted": false
+    }
+  },
+  "executionPath": {
+    "remoteRunnerSha": "b5a3c2c76bb0c5153f8cd09171124be22049b8e2",
+    "localPatchPublished": false,
+    "callable": "runManagedReadonlyPreflight",
+    "callableRequiresExistingAdmittedActor": true,
+    "remoteWorkflowHasReadOnlyAEntry": false,
+    "existingFullModeCanWrite": true,
+    "existingReadCloseModeSessionCap": 7,
+    "extendedAdmissionHistoricalBaselineSessions": 12,
+    "latestConsumedCheckpointClaim": "86648b4ca9755294b73e1eeff6260b9c1d90f628e91e74cdee896bd6abdcc6d6",
+    "reuseConsumedClaimAllowed": false,
+    "cliFullPreflightMeans": "NO_AUTH_ADMISSION_ONLY"
+  },
+  "requiredBeforeAuthentication": [
+    "Non-secret immutable result/claims payload and structured row comparison accessible to this execution environment",
+    "Current 14-session charge/closure ledger with S1 user report distinguished from provider proof and S2 unknown preserved",
+    "New A-only claim and durable14->15 charge before authentication, bound to latest run/artifact/SQL/reviewed runner SHA; preserve2 recovery slots; no refund on failure; no FULL or old-read-close fallback",
+    "An authorized reviewed source delivery/execution path for the local patched callable; current no-push restriction remains",
+    "Genuine fresh clearallergy-e2e-test workflow context at reviewed runner SHA, with existing CI-only secret and OIDC; no local impersonation or secret export"
+  ],
+  "authorization": {
+    "readOnlyPreflightApprovedByDelegation": true,
+    "externalPushAllowed": false,
+    "prUpdateAllowed": false,
+    "configurationChangeAllowed": false,
+    "persistentCredentialCreationAllowed": false,
+    "clerkSafetyStopBypassAllowed": false,
+    "explicitBudgetApproval": {
+      "proposalReference": "Sentinel_55739085c014819190e6476618507501",
+      "userApprovalReference": "Sentinel_6ed8010ed9fc8191bbd2f2c19d2215e5",
+      "userReply": "いいよ",
+      "source": "TRUSTED_TOP_LEVEL_DELEGATION_TRANSCRIPT",
+      "scope": "SAME_TEST_ENVIRONMENT_REMAINING_T2_T4_CONTROLS_AUTHORIZATION_CONCURRENCY_AND_NETWORK_FAILURE_TRIALS",
+      "menuWritesCap": 153,
+      "ordinaryLoginEstimate": 21,
+      "futureRecoveryReserve": 2,
+      "sessionsCap": 23,
+      "approvedUtc": null,
+      "approvalTimeInvented": false,
+      "capEvidenceInsufficiencyResolved": true,
+      "noDuplicateReplay": true,
+      "noSafetyGuaranteeClaim": true
+    }
+  },
+  "readinessCriteria": {
+    "metadataPins": "VERIFIED_WITH_PROVIDER_TOOLS",
+    "githubTerminalAttempt": "VERIFIED_WITH_PROVIDER_TOOL",
+    "artifactDigestMetadata": "VERIFIED_WITH_GITHUB_TOOL",
+    "sqlRows": "PARENT_ATTESTED_ONLY",
+    "binaryPayload": "BLOCKED_NETWORK_403",
+    "priorSessionClosures": "PARTIAL_USER_REPORT_AND_UNRECONCILED_B",
+    "singleUseClaim": "NOT_CREATED",
+    "liveCiContext": "NOT_PRESENT",
+    "authenticatedPreflight": "NOT_ATTEMPTED",
+    "budgetExtensionAuthority": "EXPLICIT_USER_APPROVAL_VERIFIED",
+    "workflowRunMetadata": "ALL_89_DISPATCH_ROWS_AND_38_SCOPED_RUNS_RETRIEVED"
+  },
+  "additionalApprovalReceivedUtc": "2026-11-03T23:28:26.000Z",
+  "unavailableSessionEvidence": [
+    "EARLIEST_SEVEN_ORIGINAL_RECEIPTS",
+    "OLD_B_FOLLOWUP_UI_RECEIPT",
+    "SLOT10_UI_RECEIPT",
+    "LATEST_A_PROVIDER_INDEPENDENT_CONFIRMATION"
+  ],
+  "previousRejection": {
+    "reportedBy": "PARENT_DELEGATION",
+    "statedReason": "BUDGET_EXTENSION_EVIDENCE_MISSING",
+    "newRelevantApprovalReference": "Sentinel_6ed8010ed9fc8191bbd2f2c19d2215e5",
+    "exactActionAndOutcomeAvailableHere": false,
+    "sameActionRetriedHere": false
+  },
+  "workflowRunMetadataLedger": {
+    "file": "issue118-run-metadata-20261103.json",
+    "allDispatchRowsRetrieved": 89,
+    "scopedWorkflowRows": 38,
+    "activeScopedRuns": 0,
+    "allScopedAttemptOne": true,
+    "runMetadataComplete": true,
+    "operationAndSessionLedgerComplete": false,
+    "configuredGlobalConcurrencyGroup": "clearallergy-main19-live-fixtures",
+    "runtimeConcurrencyLockHeld": false
+  }
+}

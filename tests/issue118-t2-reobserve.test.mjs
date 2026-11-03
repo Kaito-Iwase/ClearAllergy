@@ -1,6 +1,7 @@
 // Real candidate controller/runtime with memory HTTP + Playwright-shaped UI only.
 // No real browser, authentication, DB, Blob or external network.
 import test from 'node:test';import assert from 'node:assert/strict';
+import {runManagedReadonlyPreflight} from '../scripts/issue118-readonly-preflight.mjs';
 import {createRequire} from 'node:module';import {randomUUID} from 'node:crypto';
 import {mkdtempSync,rmSync,readFileSync,readdirSync,writeFileSync,mkdirSync} from 'node:fs';import {tmpdir} from 'node:os';import {join,resolve,sep} from 'node:path';
 import {completionScope,completionLimits,rebasedCompletionScope,rebasedCompletionLimits,t2Commands,t2ExpectedFood,t2Projection,t2Hash,planManagedT2Completion,validateT2PrefixCheckpoint,validateManagedRebase} from '../scripts/issue118-t2-reobserve.mjs';
@@ -68,7 +69,9 @@ function fixture(fault='NONE'){
     route:async(_pattern,fn)=>{handler=fn;},unroute:async()=>{handler=undefined;},close:async()=>{if(fault==='PAGE_CLOSE_FAILURE'&&url===target.origin+'/shops/'+identity.shopId||fault==='FIELD_AND_CLOSE_FAILURE'&&url.includes('/admin/menus/'))throw Error('sk_test_SYNTHETIC_PRIVATE');closed=true;}};pages.push(page);return page;};
   context.newPage=async()=>createPage();context.pages=()=>pages.filter(p=>p.context()===context&&!p.isClosed());const page=createPage();page.evaluate=async()=>({id:identity.ownerId,pk});
   const session={id:'sess_T2'+owner,ownerId:identity.ownerId,ownerVerified:true,eligibleForCleanup:true,providerCreatedUtc:now,providerStatus:'active',providerTerminationConfirmed:false};
+  // This existing controller fixture models UI/API only; transport is tested separately.
   const access={token,read:async(_api,url)=>api(url),sessionLifecycleMode:()=> 'TRACKED_OWNER_SESSION',sessionObservation:()=>structuredClone(session),signOut:async()=>{Object.assign(session,{providerStatus:'removed',providerTerminationConfirmed:true,frontendSignOutAcknowledged:true,canonicalReadAttempts:2});return 'SIGNOUT_CONFIRMED';}};
+  access.registerManagedReadPage=()=>()=>{};
   const actor={owner,expectedUserId:identity.ownerId,binding:{owner,shopId:identity.shopId},page,context,access,lifecycle:{browser,tracker},finalize:()=>finalizeOwnedCiActor({access,page,context,browser,expectedOwnerId:identity.ownerId,drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot(),attempts:{browserLaunchAttempted:true,contextCreateAttempted:true}})};return actor;
  });
  const input={snapshot,terminal,authorization,creationOperationIds,identityReceipt,checkpointReceipt,operation:'T2_REOBSERVE_PREFIX',serviceRunId:randomUUID(),claimDirectory:directory,image:{buffer:readFileSync(new URL('../public/images/cion_notxt.png',import.meta.url))},env:{GITHUB_RUN_ID:'999001',GITHUB_SHA:'a'.repeat(40)},dependencies:{openActor:async({role,record})=>{seen.push(role);const actor=actors.find(a=>a.owner===role);record({owner:role,stage:'OWNER_AND_SHOP_VERIFIED',sessionIdentity:actor.access.sessionObservation()});return actor;}}};
@@ -106,6 +109,47 @@ test('rebased66/12 source is immutable; legacy reset/create and forged stale ope
  }finally{h.cleanup();}
 });
 
+test('prepared A-only preflight observes private UI and APIs with zero writes, auth, creation or controller claims',async()=>{
+ for(const fault of ['NONE','ADMIN_NAV_FAILURE','PUBLIC500','SAVED_PANEL_FALSE','FIELD_AND_CLOSE_FAILURE','NON_GET','MISSING_AUTH_STAGE','SESSION_CHANGED',
+  'LATE_ROUTE','DRAIN_ROUTE','DRAIN_RECEIPT','EVIDENCE']) {
+  const h=await rebasedFixture(fault);try{
+   const base=h.actors.find(a=>a.owner==='S1'),session={...base.access.sessionObservation(),providerStatus:'active',ownerVerified:true,eligibleForCleanup:true};
+   const progress={loginNavigationStarted:true,loginNavigationCompleted:true,clerkLoaded:true,frontendMatched:true,ownerLookupStarted:true,ownerMatched:true,
+    testingTokenRequestStarted:true,testingTokenReceived:true,signInTokenRequestStarted:true,signInTokenReceived:true,sessionCreationAttempted:true,
+    activationAcknowledged:true,adminNavigationStarted:true,adminNavigationCompleted:true};
+   if(fault==='MISSING_AUTH_STAGE')progress.activationAcknowledged=false;
+   let routeFailed=false;
+   const actor={...base,routeFailed:()=>routeFailed,access:{...base.access,isAuthenticated:()=>true,authenticationProgress:()=>progress,sessionObservation:()=>session}};
+   const originalDrain=actor.lifecycle.tracker.drain;let drainCalls=0;
+   actor.lifecycle.tracker.drain=async()=>{const r=await originalDrain();if(++drainCalls===2){
+    if(fault==='DRAIN_ROUTE')routeFailed=true;if(fault==='DRAIN_RECEIPT')h.input.identityReceipt.observedUtc=new Date(Date.now()-3601000).toISOString();}return r;};
+   let barrier,installs=0,removes=0,blocked=0;
+   actor.context.route=async(_pattern,handler)=>{barrier=handler;installs++;};actor.context.unroute=async(_pattern,handler)=>{assert.equal(barrier,handler);removes++;};
+   const originalGoto=actor.page.goto;actor.page.goto=async url=>{
+    if(fault==='NON_GET')await barrier({request:()=>({method:()=> 'PUT',url:()=>target.origin+'/api/admin/shop'}),abort:async()=>{blocked++;}});
+    return originalGoto(url);
+   };
+   actor.page.evaluate=async fn=>String(fn).includes('ownerMatched')?{loaded:true,ownerMatched:true,pk:'pk_test_'+Buffer.from(ciIdentity.clerkDomain+'$').toString('base64')}:
+    String(fn).includes('session?.id')&&!String(fn).includes('sessionId:')?(fault==='SESSION_CHANGED'?'sess_OtherSameOwner':session.id):
+    {id:managedActorIdentity.S1.ownerId,pk:'pk_test_'+Buffer.from(ciIdentity.clerkDomain+'$').toString('base64'),sessionId:session.id};
+   const fixtures=[...new Map(t2Commands(h.input.snapshot,true).filter(c=>c.owner==='S1').map(c=>[c.id,{id:c.id,key:c.key,owner:c.owner,menu:structuredClone(h.menus.get(c.id))}])).values()];
+   const before=h.calls.length,claims=h.input.snapshot.claims.map(c=>c.id);
+   const r=await runManagedReadonlyPreflight({actor,identityReceipt:h.input.identityReceipt,snapshot:h.input.snapshot,fixtures,
+    record:r=>{if(fault==='EVIDENCE')throw Error('SYNTHETIC_PRIVATE');
+     if(fault==='LATE_ROUTE'&&r.observationSteps.filter(s=>s.step==='FINISHED').length===5)routeFailed=true;}});
+   assert.equal(r.status,fault==='NONE'?'READONLY_PREFLIGHT_COMPLETED_NOT_LIVE_SUITE_PASS':'HOLD_READONLY_PREFLIGHT',JSON.stringify(r));
+   assert.equal(r.livePass,false);assert.equal(r.createsSession,false);assert.equal(h.calls.slice(before).filter(c=>c.method!=='GET').length,0);
+   assert.deepEqual(h.input.snapshot.claims.map(c=>c.id),claims);assert.equal(h.seen.length,0);
+   if(fault==='NONE'){assert.equal(r.readPhaseComplete,true);assert.equal(r.observationSteps.filter(s=>s.step==='FINISHED').length,5);}
+   if(fault==='MISSING_AUTH_STAGE'||fault==='EVIDENCE'){assert.equal(installs,0);assert.equal(removes,0);}
+   else{assert.equal(installs,1);assert.equal(removes,1);}
+   if(fault==='NON_GET'){assert.equal(blocked,1);assert.equal(r.applicationWriteAttempts,1);assert.equal(r.firstFailure,'READONLY_NON_GET_BLOCKED');}
+   if(fault==='LATE_ROUTE')assert.equal(r.firstFailure,'FINAL_OWNER_BASIS');
+   if(fault==='DRAIN_ROUTE'||fault==='DRAIN_RECEIPT')assert.equal(r.firstFailure,'FINAL_READINESS');
+   assert.doesNotMatch(JSON.stringify(r),/SYNTHETIC_PRIVATE|https:|sess_|user_|Bearer/);
+  }finally{h.cleanup();}
+ }
+});
 test('same rebased entry preflights private8 before 28 new forwards, observes five phases, closes sessions and exports94/14',async()=>{
  const h=await rebasedFixture();try{const before=h.input.snapshot.claims.map(x=>x.id),r=await executeManagedApprovedResume(h.input);assert.equal(r.controller.status,'T2_PRIVATE_PENDING_INDEPENDENT_SQL');assert.equal(r.t2CheckpointExportable,true);assert.equal(r.sessionConsumption,14);assert.equal(r.controller.counts.menuWrites,94);assert.equal(h.calls.filter(x=>x.method!=='GET').length,28);assert.equal(r.controller.claims.length,28);assert.ok(r.controller.claims.every(x=>!x.id.includes('RESET')&&!x.id.includes('CREATE')&&!x.id.includes('B_CLEANUP')));assert.equal(r.controller.preflight.phase,'PRE_WRITE_PRIVATE');assert.ok(r.controller.preflight.rows.every(x=>!x.isPublished&&x.savedPanelMatched&&x.publicApiStatus===404));assert.equal(r.controller.observations.length,5);assert.ok(r.controller.finalRows.every(x=>!x.isPublished));assert.ok(r.sessionsComplete);assert.deepEqual(h.input.snapshot.claims.map(x=>x.id),before);assert.equal(r.t2PrefixPayload.sessionLedger.baselineConsumed,12);
   const prefix=makePrefix(r,h.input);assert.equal(validateT2PrefixCheckpoint(prefix).controller.counts.menuWrites,94);const a=await assertManagedResumeActivation({...h.input,operation:'CORE_AND_SERVICE',...prefix});assert.equal(a.initialCounts.menuWrites,94);assert.equal(a.initialCounts.sessions,14);

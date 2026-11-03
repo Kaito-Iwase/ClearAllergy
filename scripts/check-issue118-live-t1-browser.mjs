@@ -1607,7 +1607,7 @@ const managedResumeSessionPermits=new WeakSet();
 export async function openManagedOwnedActor({role,chromium,env,identityReceipt,record=()=>{},sessionPermit}){
     assert.equal(liveTargetPinsVerified,true);assert.ok(['S1','S2'].includes(role));assertIdentityReceipt(identityReceipt);
     let actorEnv=env;
-    if(['RESUME_414953_FULL_MANAGED','RESUME_414953_T2_FULL','RESUME_416276_FULL'].includes(env.ISSUE118_MANAGED_SCOPE)){
+    if(['RESUME_414953_FULL_MANAGED','RESUME_414953_T2_FULL','RESUME_416276_FULL','READONLY_A_PREFLIGHT_14_TO_15'].includes(env.ISSUE118_MANAGED_SCOPE)){
         assert.ok(managedResumeSessionPermits.has(sessionPermit)&&sessionPermit.owner===role);
         managedResumeSessionPermits.delete(sessionPermit);
         // The SDK adapter's legacy flag authorizes the same fixed A/B identities;
@@ -1622,10 +1622,11 @@ export async function openManagedOwnedActor({role,chromium,env,identityReceipt,r
     const setupStage=code=>{observation.stage=code;emit();};
     const stages=code=>{phase=code;setupStage(code);};
     const ready=()=>{const s=access.sessionObservation();assert.ok(s?.eligibleForCleanup&&s.ownerVerified);assert.equal(s.ownerId,identity.ownerId);};
-    const policy=createVerifiedReadCloseAuthPolicyCandidate(identityReceipt,ready);
+    const policy=createVerifiedReadCloseAuthPolicyCandidate(identityReceipt,ready,request=>access?.allowsManagedRead(request)===true);
     try{
         access=await createCiAccess({...actorEnv,ISSUE118_SESSION_LIFECYCLE:'TRACKED_OWNER_SESSION'},fetch,setupStage,
-            {session:s=>{observation.sessionIdentity=s;emit();},authentication:a=>{observation.authentication=a;emit();},
+            {managedReadReady:()=>{assert.equal(phase,'APP_FLOW');assertIdentityReceipt(identityReceipt);ready();},
+                session:s=>{observation.sessionIdentity=s;emit();},authentication:a=>{observation.authentication=a;emit();},
                 transport:t=>{if(t.exception!=='NONE'&&t.exception!=='POLICY_REFUSED')routeFailed=true;},
                 handshake:h=>{observation.handshake=h;emit();}},role);
         browser=await chromium.launch({headless:true,channel:'chromium'});
@@ -1658,6 +1659,21 @@ export async function openManagedOwnedActor({role,chromium,env,identityReceipt,r
             drainRoutes:()=>tracker.drain(),readRouteState:()=>tracker.snapshot(),attempts:{browserLaunchAttempted:!!browser,contextCreateAttempted:!!context},onStage:stages})
             :await closeIsolatedBrowser(context,browser,{browserLaunchAttempted:!!browser,contextCreateAttempted:!!context});
         emit();throw Error('MANAGED_ACTOR_GATE_HELD');}
+}
+
+// Only the separately admitted A-only entry may issue this one actor permit.
+// It has no FULL/controller fallback and never issues an S2 permit.
+export async function openReadonlyPreflightActor({chromium,env,identityReceipt,charge,record}){
+    assertCiEnvironment(env);
+    assert.equal(env.ISSUE118_READONLY_MODE,'READONLY_A_PREFLIGHT_14_TO_15');
+    assert.equal(charge?.status,'SESSION_CHARGE_CONSUMED_NO_REFUND');assert.equal(charge.owner,'S1');
+    assert.equal(charge.before,14);assert.equal(charge.after,15);assert.equal(charge.maximum,23);assert.equal(charge.recoveryReserve,2);
+    assert.equal(charge.runId,env.GITHUB_RUN_ID);assert.equal(charge.runnerSha,env.GITHUB_SHA);
+    assert.equal(charge.approvalReference,'Sentinel_3224f9754e248191b437d1cda6f6d180');
+    const permit=Object.freeze({owner:'S1',index:15});managedResumeSessionPermits.add(permit);
+    try{return await openManagedOwnedActor({role:'S1',chromium,env:{...env,ISSUE118_MANAGED_SCOPE:'READONLY_A_PREFLIGHT_14_TO_15'},
+        identityReceipt,record,sessionPermit:permit});}
+    finally{managedResumeSessionPermits.delete(permit);}
 }
 
 const managedResumeCanonical=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)
@@ -2152,11 +2168,11 @@ export function assertReadCloseSignoutReady(report) {
         /^sess_[A-Za-z0-9]{1,128}$/.test(session.id||'')&&Number.isFinite(Date.parse(session.providerCreatedUtc)));
     assert.equal(report.authenticationProgress?.activationAcknowledged,true);
 }
-export function createVerifiedReadCloseAuthPolicyCandidate(receipt,assertSignoutReady=()=>{throw Error('SIGNOUT_CONTEXT_UNVERIFIED');}) {
+export function createVerifiedReadCloseAuthPolicyCandidate(receipt,assertSignoutReady=()=>{throw Error('SIGNOUT_CONTEXT_UNVERIFIED');},managedReadAllowed=()=>false) {
     const fixedReceipt=structuredClone(receipt);assertIdentityReceipt(fixedReceipt);
     assert.equal(target.source,verifiedReadCloseAction.source);assert.equal(target.deployment,verifiedReadCloseAction.deployment);
     return createReadCloseAuthPolicyCandidate({actionReference:verifiedReadCloseAction.reference,
-        telemetryScripts:['/_vercel/insights/script.js'],assertContext:()=>assertIdentityReceipt(fixedReceipt),assertSignoutReady});
+        telemetryScripts:['/_vercel/insights/script.js'],assertContext:()=>assertIdentityReceipt(fixedReceipt),assertSignoutReady,managedReadAllowed});
 }
 const readClosePredicateNames = ['isApp', 'isPost', 'authPhase', 'signoutPhase', 'signoutReady', 'exactLoginTarget', 'exactShopTarget', 'authAuditApi', 'menuApi',
     'queryPresent', 'legacyTelemetryShape', 'pinnedTelemetry', 'headersRead', 'nextActionPresent',
@@ -2181,7 +2197,7 @@ export function recordReadCloseHandlerFailure(report,entry,phase,error) {
     report.firstRouteHandlerFailure??={sequence:entry?.sequence??null,started:entry?.started,
         observed:transportLifecycleSnapshot(phase),code,request:entry};
 }
-export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryPaths = [],telemetryScripts=[],assertContext=()=>{},assertSignoutReady } = {}) {
+export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryPaths = [],telemetryScripts=[],assertContext=()=>{},assertSignoutReady,managedReadAllowed=()=>false } = {}) {
     const actionPinned = typeof actionReference === 'string' && /^[a-f0-9]{40,128}$/.test(actionReference);
     const telemetry = new Set((Array.isArray(telemetryPaths) ? telemetryPaths : []).filter(path => typeof path === 'string' &&
         /^\/(?:_vercel\/insights|[A-Za-z0-9_-]{8,64})\/(?:view|event)$/.test(path)));
@@ -2219,7 +2235,7 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             if (observation.isPost && observation.pinnedTelemetry && !observation.queryPresent) {
                 observation.inspectionComplete = true; result.decision = 'SUPPRESS_PINNED_TELEMETRY'; return result;
             }
-            if (readCloseRequestAllowed(method, raw)) {
+            if (readCloseRequestAllowed(method, raw) || method==='GET' && getPhase()==='APP_FLOW' && managedReadAllowed(request)===true) {
                 observation.inspectionComplete = true; result.decision = 'USE_EXISTING_TRANSPORT'; return result;
             }
             // Diagnose refused document POSTs too, without granting their phase/target.
@@ -2265,7 +2281,7 @@ export function createReadCloseAuthPolicyCandidate({ actionReference, telemetryP
             if(sentRequests.has(request)||request.method()!=='POST'||getPhase()!==grant.phase||request.url()!==grant.url||request.postData()!=='[]')
                 throw Error('READ_CLOSE_PRE_SEND_REFUSED');
             sentRequests.add(request);
-        }else if(request.method()!=='GET'||!readCloseRequestAllowed('GET',request.url()))throw Error('READ_CLOSE_PRE_SEND_REFUSED');
+        }else if(request.method()!=='GET'||!(readCloseRequestAllowed('GET',request.url())||getPhase()==='APP_FLOW'&&managedReadAllowed(request)===true))throw Error('READ_CLOSE_PRE_SEND_REFUSED');
     };
     return policy;
 }

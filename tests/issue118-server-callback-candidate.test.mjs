@@ -364,7 +364,7 @@ test('workflow mode cannot reach existing live job and has zero permissions, sec
         ["(inputs.confirmation == 'APPROVE_MANAGED_SUITE' || inputs.confirmation == 'APPROVE_MANAGED_SERVICE_ARM' || inputs.confirmation == 'APPROVE_MANAGED_KNOWN_CLEANUP')","inputs.confirmation == 'APPROVE_NEW_FIXTURE_T1'", "inputs.confirmation == 'DIAGNOSE_FIXTURE_READ_CLOSE_ONLY'"].sort());
     assert.equal(workflow.jobs['managed-full-resume'].if.includes(disabledMode),false);
     assert.match(workflow.jobs['managed-full-resume'].if,/inputs.confirmation == 'APPROVE_FULL_RESUME_CANDIDATE'/);
-    assert.equal((file.match(/id-token: write/g) || []).length, 2); assert.equal((file.match(/secrets\./g) || []).length, 4);
+    assert.equal((file.match(/id-token: write/g) || []).length, 2); assert.equal((file.match(/secrets\./g) || []).length, 5); // Same key, additional A-only step; no new permissions.
     assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
     const runner = readFileSync(new URL('../scripts/browser-runner.mjs', import.meta.url), 'utf8');
     assert.ok(runner.includes('tests/issue118-server-callback-candidate.test.mjs'));
