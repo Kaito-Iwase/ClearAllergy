@@ -1,0 +1,37 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    # Version updates only; security updates have a separate GitHub limit.
+    open-pull-requests-limit: 2
+    groups:
+      next:
+        applies-to: "version-updates"
+        patterns: ["next", "@next/env", "eslint-config-next"]
+        update-types: ["minor", "patch"]
+      prisma:
+        applies-to: "version-updates"
+        patterns: ["prisma", "@prisma/client"]
+        update-types: ["minor", "patch"]
+      clerk:
+        applies-to: "version-updates"
+        patterns: ["@clerk/backend", "@clerk/nextjs"]
+        update-types: ["minor", "patch"]
+      react:
+        applies-to: "version-updates"
+        patterns: ["react", "react-dom"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 1

@@ -354,11 +354,22 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
 
 <a id="dependabot-deploy-guard"></a>
-### Dependabot導入前の自動デプロイ抑止
+### Dependabotの自動デプロイ抑止
 
-`vercel.json` の `git.deploymentEnabled` は既存の抑止対象を保持し、`dependabot/**`、元の準備ブランチ `chore/ca-dependabot-deploy-guard-20261026`、main採用用ブランチ `chore/dependabot-guard-main-20261028` を `false` にします。[Vercel公式仕様](https://vercel.com/docs/project-configuration/git-configuration)はminimatch構文を使い、未指定ブランチは `true`、複数一致時は `true` が優先です。main/developや通常ブランチの自動デプロイ条件は変更しません。Git連携の自動デプロイを抑止するもので、手動deployを禁止する設定ではありません。
+`vercel.json` の `git.deploymentEnabled` は既存の抑止対象を保持し、`dependabot/**` と設定準備ブランチ `chore/dependabot-config-20261103` を `false` にします。[Vercel公式仕様](https://vercel.com/docs/project-configuration/git-configuration)はminimatch構文を使い、未指定ブランチは `true`、複数一致時は `true` が優先です。main/developや通常ブランチの自動デプロイ条件は変更しません。Git連携の自動デプロイを抑止するもので、手動deployを禁止する設定ではありません。
 
-[元PR #108](https://github.com/Kaito-Iwase/ClearAllergy/pull/108)の必要差分をmainへ限定採用します。採用先PRのmerge SHA・必須CI・実配備/skip・Productionの読取確認を元PRから辿れる形で残します。ローカルのパターン検査と実Vercel上の抑止観測は区別し、未観測の対象branchまで確認済みと扱いません。Dependabot security updatesの有効化とversion updates設定は、このguardのmain反映と対象branchの抑止確認後に別承認で行います。今回のguard採用にDependabotの有効化、GitHub保護設定変更、手動deployは含みません。
+[元PR #108](https://github.com/Kaito-Iwase/ClearAllergy/pull/108)のguardは[採用先PR #117](https://github.com/Kaito-Iwase/ClearAllergy/pull/117)でmainへ反映済みです。ローカルのパターン検査と実Vercel上の抑止観測は区別し、未観測の対象branchまで確認済みと扱いません。設定導入PRのpush前にも対象branchの抑止条件を確認します。`clear-allergy` と `clear-allergy-e2e` は同じリポジトリに接続しており、mainは両ProjectのProduction追跡先です。設定だけのmain変更でも自動配備が起こり得るため、main反映とGitHub管理設定の有効化は承認範囲を確認して行います。
+
+<a id="dependabot-updates"></a>
+### Dependabotの更新PR
+
+[`.github/dependabot.yml`](../../.github/dependabot.yml)はnpmのルート依存とGitHub Actionsを毎週月曜09:00（Asia/Tokyo）に確認します。通常のversion updatesで同時に開くPRはnpmが2件、Actionsが1件までです。設定はdefault branchへ反映してから有効になります。Draft PRの作成だけでは稼働開始になりません。
+
+npmのminor/patchはNext.js（`next` / `@next/env` / `eslint-config-next`）、Prisma（`prisma` / `@prisma/client`）、Clerk（`@clerk/backend` / `@clerk/nextjs`）、React（`react` / `react-dom`）の関係ごとにまとめます。majorは一律除外せず個別PRで判断します。Actionsやその他の依存は個別とし、devDependenciesも実行・ビルドへの影響を確認します。`@vercel/blob`、`bcrypt`、`hono`、`zod`なども一括で安全扱いしません。ローカルの `fast-glob` 互換層やNext/Prisma等のoverridesを更新のついでに外しません。
+
+security updatesにはGitHub側のDependabot alertsとsecurity updatesの有効化が別途必要です。YAMLだけでは管理設定を有効にしません。security updatesは通常更新の週次scheduleを待たず、アドバイザリを契機にdefault branchへ作成され、通常PR上限とは別の固定10件上限です。今回のgroupsはversion updatesだけに適用し、security updates全体を一つにまとめません。仕様は[GitHubの設定リファレンス](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#open-pull-requests-limit-)と[security PRの説明](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-pull-requests)を参照します。既存の週次 `dependency-audit.yml` は監査であり、更新PRの作成とは別です。
+
+各更新PRでは、変更前後の版・アドバイザリや変更内容・影響範囲、CIの対象SHAと結果、追加で必要な検証、未検証事項と採用保留理由を短く残します。Next/ESLint/ローカルglobはlint・build、Prismaは生成・schemaと隔離DB、Clerkは認証・所有権、Reactは画面回帰も確認対象です。通常CIはread-only token・架空Clerk・使い捨てPostgreSQLのまま使い、botへ実DBやClerk秘密鍵を渡しません。`pull_request_target`やwrite tokenへ切り替えず、自動approve・auto-mergeも設定しません。設定の導入と、生成された依存更新PRの採用・配備は別に判断します。
 
 ### 公開前と障害時の確認
 
