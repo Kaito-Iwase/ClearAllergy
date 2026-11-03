@@ -368,7 +368,9 @@ jobs:
               || x.executionApproval.actionsReadApproved!==true || x.executionApproval.runnerSha!==process.env.GITHUB_SHA) throw Error();
             const id=(x.fullCheckpoint?.source??x.prefixCheckpoint?.source??x.cleanupCheckpoint?.source)?.githubRunId;
             if(id!==undefined&&!/^\d{1,20}$/.test(id)) throw Error();
-            appendFileSync(process.env.GITHUB_OUTPUT,'source_run='+String(id??'')+'\nfinal_only='+String(x.fullCheckpoint?.controller?.serviceArms?.length===6)+'\n');
+            const failed=x.cleanupCheckpoint?.failedAttempt?.source?.githubRunId;
+            if(failed!==undefined&&!/^\d{1,20}$/.test(failed)) throw Error();
+            appendFileSync(process.env.GITHUB_OUTPUT,'source_run='+String(id??'')+'\nfailed_run='+String(failed??'')+'\nfinal_only='+String(x.fullCheckpoint?.controller?.serviceArms?.length===6)+'\n');
           } catch {console.error('FULL_BUNDLE_REFUSED_NO_AUTH');process.exitCode=1;}
           NODE
       - name: Read the exact prior immutable run artifact; no credentials/session data
@@ -379,6 +381,14 @@ jobs:
           run-id: ${{ steps.source.outputs.source_run }}
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/issue118-full-source
+      - name: Read the exact charged cleanup attempt; no new authentication
+        if: steps.source.outputs.failed_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: issue118-full-${{ steps.source.outputs.failed_run }}
+          run-id: ${{ steps.source.outputs.failed_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/issue118-failed-cleanup-source
       - name: Locked dependencies only; no browser or Clerk secret
         run: |
           npm install --prefix "$RUNNER_TEMP/issue118-npm" --ignore-scripts --no-audit --no-fund --save-exact npm@11.18.0
@@ -387,6 +397,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE118_SOURCE_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-full-source
+          ISSUE118_FAILED_CLEANUP_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-failed-cleanup-source
         run: node scripts/issue118-managed-full-entry.mjs --preflight
       - name: Prepare fixed browser version after admission
         if: steps.source.outputs.final_only != 'true'
@@ -397,6 +408,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE118_SOURCE_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-full-source
+          ISSUE118_FAILED_CLEANUP_ARTIFACT_DIRECTORY: ${{ runner.temp }}/issue118-failed-cleanup-source
           ISSUE118_APPLY: 'true'
           ISSUE118_TEST_CLERK_SECRET_KEY: ${{ steps.source.outputs.final_only != 'true' && secrets.ISSUE118_TEST_CLERK_SECRET_KEY || '' }}
           CLEARALLERGY_BROWSER_OUTPUT: ${{ runner.temp }}/issue118-full-result

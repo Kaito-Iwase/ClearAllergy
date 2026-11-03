@@ -1353,8 +1353,8 @@ export function assertExact8CleanupInput(input,now=Date.now()){
         assert.equal(e.status,'APPROVED');assert.equal(e.scope,'FULL_RESUME_WITH_ACTIONS_READ');assert.equal(e.verifiedBy,'human');assert.equal(e.evidenceReference,a.evidenceReference);
         assert.equal(e.actionsReadApproved,true);assert.equal(e.singleAttempt,true);assert.match(e.runnerSha,/^[a-f0-9]{40}$/);assert.equal(e.operation,input.operation);
         assert.equal(e.inputSha256,hash(Object.fromEntries(Object.entries(input).filter(([k])=>k!=='executionApproval'))));
-        assert.deepEqual(a.limits,{priorMenuWrites:58,priorSessions:9,maximumMenuWrites:66,maximumSessions:11,maximumStops:8,maximumNewSessions:2,globalMenuWrites:138,globalSessions:18});
-        exact(cp,['version','result','source']);assert.equal(cp.version,1);assert.equal(a.sourceSha256,hash(cp));
+        assert.deepEqual(a.limits,{priorMenuWrites:58,priorSessions:10,maximumMenuWrites:66,maximumSessions:12,maximumStops:8,maximumNewSessions:2,globalMenuWrites:138,globalSessions:18});
+        exact(cp,['version','result','source','failedAttempt']);assert.equal(cp.version,2);assert.equal(a.sourceSha256,hash(cp));
         exact(cp.source,['githubRunId','runnerSha','artifactSha256','jobTerminal','pendingRequests']);
         assert.match(cp.source.githubRunId,/^\d{1,20}$/);assert.match(cp.source.runnerSha,/^[a-f0-9]{40}$/);assert.match(cp.source.artifactSha256,/^[a-f0-9]{64}$/);
         assert.equal(cp.source.jobTerminal,true);assert.equal(cp.source.pendingRequests,0);
@@ -1385,7 +1385,7 @@ export function assertExact8CleanupInput(input,now=Date.now()){
         assert.equal(p.project,'patient-heart-55595249');assert.equal(p.branch,'br-flat-wildflower-aoeragrs');assert.equal(p.database,'clearallergy_main19');assert.equal(p.role,'neondb_owner');
         assert.equal(p.applicationSha,target.source);assert.equal(p.deployment,target.deployment);assert.equal(p.sourceSha256,hash(cp));
         for(const k of ['knownTerminal','unknownResolved','exclusive','allNineSessionsClosed'])assert.equal(p[k],true);
-        assert.equal(p.pendingRequests,0);assert.equal(p.menuWrites,58);assert.equal(p.sessionConsumption,9);
+        assert.equal(p.pendingRequests,0);assert.equal(p.menuWrites,58);assert.equal(p.sessionConsumption,10);
         const sql=Date.parse(p.sqlObservedUtc),at=Date.parse(p.observedUtc);assert.ok(Number.isFinite(sql)&&Number.isFinite(at)&&sql<=at&&at<=now&&now-sql<=3600000);
         assert.equal(p.requestIds.length,58);assert.equal(new Set(p.requestIds).size,58);assert.ok(p.requestIds.every(x=>/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(x)));assert.ok([...requests].every(x=>p.requestIds.includes(x)));
         assert.equal(p.rows.length,8);assert.equal(new Set(p.rows.map(x=>x.id)).size,8);const owners={S1:[],S2:[]};
@@ -1398,6 +1398,19 @@ export function assertExact8CleanupInput(input,now=Date.now()){
             assert.ok(['PROVIDER_TERMINAL','DASHBOARD_REVOKED_RELOAD_ABSENT'].includes(e.method));if(e.method==='PROVIDER_TERMINAL')assert.equal(s.providerTerminationConfirmed,true);
             const created=Date.parse(s.providerCreatedUtc),ended=Date.parse(e.observedUtc);assert.ok(Number.isFinite(created)&&Number.isFinite(ended)&&created<=ended&&ended<=at&&created<=sql);
         }
+        // Preserve the additional charged authentication attempt; the original
+        // nine-session source is still verified separately and is never reset.
+        const failed=cp.failedAttempt;exact(failed,['result','source','closure']);
+        exact(failed.source,['githubRunId','runnerSha','artifactSha256','jobTerminal','pendingRequests']);
+        assert.match(failed.source.githubRunId,/^\d{1,20}$/);assert.notEqual(failed.source.githubRunId,cp.source.githubRunId);assert.match(failed.source.runnerSha,/^[a-f0-9]{40}$/);assert.match(failed.source.artifactSha256,/^[a-f0-9]{64}$/);assert.equal(failed.source.jobTerminal,true);assert.equal(failed.source.pendingRequests,0);
+        const f=failed.result;exact(f,['status','scope','livePass','sourceRunId','counts','sessionAttempts','owners','evidencePersistenceComplete','automaticRetry','automaticCleanup','independentDatabase']);
+        assert.equal(f.status,'HOLD_EXACT8_CLEANUP');assert.equal(f.scope,'EXACT_T2_CLEANUP8');assert.equal(f.livePass,false);assert.equal(f.sourceRunId,cp.source.githubRunId);
+        assert.deepEqual(f.counts,{menus:11,menuWrites:58,sessions:10,shopWrites:0,blobUploads:0});assert.deepEqual(f.owners,[]);assert.equal(f.evidencePersistenceComplete,true);assert.equal(f.automaticRetry,false);assert.equal(f.automaticCleanup,false);assert.equal(f.independentDatabase,'NOT_ATTESTED');
+        assert.deepEqual(f.sessionAttempts,[{index:10,owner:'S2',consumedBeforeAuthentication:true,sessionIdentity:null,finalization:null}]);
+        const z=failed.closure;exact(z,['owner','sessionId','method','terminated','uniqueInSourceRunWindow','createdMinuteUtc','observedUtc','loadedDevices','targetRows','priorWindowsRows']);
+        assert.equal(z.owner,'S2');assert.match(z.sessionId,/^sess_[A-Za-z0-9]{1,128}$/);assert.ok(!sessionIds.has(z.sessionId));assert.equal(z.method,'DASHBOARD_REVOKED_RELOAD_ABSENT');
+        assert.equal(z.terminated,true);assert.equal(z.uniqueInSourceRunWindow,true);assert.equal(z.loadedDevices,true);assert.equal(z.targetRows,0);assert.equal(z.priorWindowsRows,1);
+        const minute=Date.parse(z.createdMinuteUtc),ended=Date.parse(z.observedUtc);assert.ok(Number.isFinite(minute)&&minute%60000===0&&Number.isFinite(ended)&&minute<=ended&&ended<=sql);
         return {cleanup:true,owners,requestIds:[...p.requestIds],source:structuredClone(cp.source),checkpointKey:hash({operation:input.operation,source:a.sourceSha256,approval:a.evidenceReference}),limits:structuredClone(a.limits)};
     }catch{throw Error('EXACT8_CLEANUP_ADMISSION_REFUSED');}
 }
@@ -1406,24 +1419,28 @@ export async function executeExact8Cleanup(input,{env=process.env,chromium,claim
     const frozen=structuredClone(input),admission=assertExact8CleanupInput(frozen);assert.equal(env.GITHUB_SHA,frozen.executionApproval.runnerSha);assert.equal(typeof claimDirectory,'string');
     const directory=resolve(claimDirectory);mkdirSync(directory,{recursive:false});assert.equal(lstatSync(directory).isSymbolicLink(),false);
     const report={status:'HOLD_EXACT8_CLEANUP',scope:'EXACT_T2_CLEANUP8',livePass:false,sourceRunId:admission.source.githubRunId,
-        counts:{menus:11,menuWrites:58,sessions:9,shopWrites:0,blobUploads:0},sessionAttempts:[],owners:[],evidencePersistenceComplete:true,automaticRetry:false,automaticCleanup:false,independentDatabase:'NOT_ATTESTED'};
-    const requestIds=new Set(admission.requestIds),intents=new Set(),sessionIds=new Set(frozen.cleanupCheckpoint.result.sessionAttempts.map(x=>x.sessionIdentity.id));let event=0;
+        counts:{menus:11,menuWrites:58,sessions:10,shopWrites:0,blobUploads:0},sessionAttempts:[],owners:[],evidencePersistenceComplete:true,automaticRetry:false,automaticCleanup:false,independentDatabase:'NOT_ATTESTED'};
+    const requestIds=new Set(admission.requestIds),intents=new Set(),sessionIds=new Set([...frozen.cleanupCheckpoint.result.sessionAttempts.map(x=>x.sessionIdentity.id),frozen.cleanupCheckpoint.failedAttempt.closure.sessionId]);let event=0;
     const persist=(name,value)=>{let fd;try{fd=openSync(join(directory,name+'.json'),'wx',0o600);writeFileSync(fd,JSON.stringify(value));fsyncSync(fd);}catch{report.evidencePersistenceComplete=false;throw Error('EXACT8_JOURNAL_HELD');}finally{if(fd!==undefined)closeSync(fd);}};
     const safeSession=(s,role)=>{if(!s||s.ownerId!==managedActorIdentity[role].ownerId||!/^sess_[A-Za-z0-9]{1,128}$/.test(s.id||''))return null;
         return {id:s.id,ownerId:s.ownerId,providerCreatedUtc:Number.isFinite(Date.parse(s.providerCreatedUtc))?s.providerCreatedUtc:null,ownerVerified:s.ownerVerified===true,
             providerTerminationConfirmed:s.providerTerminationConfirmed===true,providerStatus:['active','pending','ended','revoked','removed','expired','abandoned','replaced'].includes(s.providerStatus)?s.providerStatus:'OTHER'};};
     try{persist('admission',{operation:frozen.operation,claim:admission.checkpointKey,limits:admission.limits,sourceRunId:admission.source.githubRunId});
-        for(const owner of ['S2','S1']){assertExact8CleanupInput(frozen);assert.equal(report.counts.sessions<11,true);
+        for(const owner of ['S2','S1']){assertExact8CleanupInput(frozen);assert.equal(report.counts.sessions<12,true);
             const index=report.counts.sessions+1,slot={index,owner,consumedBeforeAuthentication:true,sessionIdentity:null,finalization:null};report.counts.sessions++;report.sessionAttempts.push(slot);
             persist('session-attempt-'+index,{index,owner,consumedBeforeAuthentication:true});let actor;
             const record=value=>{const s=safeSession(value?.sessionIdentity||value?.finalization?.sessionIdentity,owner);if(s){
                     if(slot.sessionIdentity)assert.equal(s.id,slot.sessionIdentity.id);else{assert.equal(sessionIds.has(s.id),false);sessionIds.add(s.id);}
-                    const created=Date.parse(s.providerCreatedUtc);assert.ok(Number.isFinite(created)&&created>=Date.parse(frozen.cleanupReceipt.sqlObservedUtc)-30000&&created<=Date.now()+30000);slot.sessionIdentity=s;}
+                    // Clerk emits the created ID before the canonical lookup supplies
+                    // created_at/owner verification. Retain that partial ID for cleanup;
+                    // it grants no permission to read or stop a menu.
+                    if(s.ownerVerified||s.providerCreatedUtc!==null){const created=Date.parse(s.providerCreatedUtc);assert.ok(Number.isFinite(created)&&created>=Date.parse(frozen.cleanupReceipt.sqlObservedUtc)-30000&&created<=Date.now()+30000);}slot.sessionIdentity=s;}
                 if(value?.finalization)slot.finalization={complete:value.finalization.complete===true,authenticationCleanup:value.finalization.authenticationCleanup==='SIGNOUT_CONFIRMED'?'SIGNOUT_CONFIRMED':'SIGNOUT_UNVERIFIED',sessionIdentity:s,localClosed:value.finalization.localClose?.allLocalClosed===true};
                 persist('session-observation-'+(++event),{owner,sessionIdentity:slot.sessionIdentity,finalization:slot.finalization,stage:/^[A-Z0-9_]{1,100}$/.test(value?.stage||'')?value.stage:'OTHER'});};
             try{actor=await openActor({role:owner,chromium,env:{...env,ISSUE118_MANAGED_SCOPE:'MAX32_103_4_5_7'},identityReceipt:frozen.identityReceipt,record});
+                assert.ok(slot.sessionIdentity?.ownerVerified&&Number.isFinite(Date.parse(slot.sessionIdentity.providerCreatedUtc)));
                 // Legacy SDK scope selects the already-approved identities only;
-                // exact admission and the durable 9 -> 10/11 charge own this budget.
+                // exact admission and the durable 10 -> 11/12 charge own this budget.
                 const result=await executeManagedFixtureCleanup({actor,proof:null,record:async x=>{
                     if(x.stage==='CLEANUP_STOP_INTENT'){assert.equal(intents.has(x.id),false);assert.equal(report.counts.menuWrites<66,true);intents.add(x.id);report.counts.menuWrites++;}
                     persist('cleanup-event-'+(++event),{owner,...x});}},
@@ -1437,7 +1454,7 @@ export async function executeExact8Cleanup(input,{env=process.env,chromium,claim
             assert.equal(slot.finalization?.complete,true);assert.equal(slot.finalization.localClosed,true);assert.equal(slot.finalization.authenticationCleanup,'SIGNOUT_CONFIRMED');
             assert.equal(slot.sessionIdentity?.ownerVerified,true);assert.equal(slot.sessionIdentity?.providerTerminationConfirmed,true);assert.ok(Number.isFinite(Date.parse(slot.sessionIdentity?.providerCreatedUtc)));
         }
-        assert.equal(report.counts.menuWrites,66);assert.equal(report.counts.sessions,11);assert.equal(report.evidencePersistenceComplete,true);report.status='EXACT8_PRIVATE_API_CONFIRMED_PENDING_SQL';
+        assert.equal(report.counts.menuWrites,66);assert.equal(report.counts.sessions,12);assert.equal(report.evidencePersistenceComplete,true);report.status='EXACT8_PRIVATE_API_CONFIRMED_PENDING_SQL';
     }catch{report.status=report.evidencePersistenceComplete?'HOLD_EXACT8_CLEANUP':'HOLD_EXACT8_PERSISTENCE';}
     return report;
 }

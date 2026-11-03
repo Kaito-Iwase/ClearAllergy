@@ -48,7 +48,7 @@ export async function admitManagedFullInput(input,env=process.env){
 // Read-only GitHub metadata only, no fallback/retry or raw provider errors.
 // Existing global workflow concurrency serializes claim checks. A consumed claim
 // is never automatically retried, including a failed pre-auth run.
-export async function verifyManagedFullGithubProvenance({input,env=process.env,fetchImpl=fetch,sourcePayload}={}){
+export async function verifyManagedFullGithubProvenance({input,env=process.env,fetchImpl=fetch,sourcePayload,failedSourcePayload}={}){
     try{
         const admission=await admitManagedFullInput(input,env),token=env.GH_TOKEN;
         need(typeof token==='string'&&token.length>0);
@@ -79,6 +79,16 @@ export async function verifyManagedFullGithubProvenance({input,env=process.env,f
             const matches=artifacts.artifacts.filter(a=>a.name==='issue118-full-'+source.githubRunId&&!a.expired&&a.digest==='sha256:'+source.artifactSha256);
             need(matches.length===1&&matches[0].workflow_run?.id===Number(source.githubRunId));
             need(sourcePayload&&canonical(sourcePayload)===canonical(admission.cleanup?wrapper.result:Object.fromEntries(Object.entries(wrapper).filter(([k])=>k!=='source'))));
+            if(admission.cleanup){
+                const failed=wrapper.failedAttempt,s=failed.source,previous=await get('/actions/runs/'+s.githubRunId);
+                need(previous.status==='completed'&&previous.run_attempt===1&&previous.event==='workflow_dispatch'&&previous.head_branch==='test/issue118-live-t1-20261030'
+                    &&previous.head_sha===s.runnerSha&&previous.path==='.github/workflows/issue118-live-e2e.yml'&&previous.run_number>run.run_number&&previous.run_number<current.run_number);
+                const list=await get('/actions/runs/'+s.githubRunId+'/artifacts?per_page=100');need(list.total_count<100&&Array.isArray(list.artifacts));
+                const matched=list.artifacts.filter(a=>a.name==='issue118-full-'+s.githubRunId&&!a.expired&&a.digest==='sha256:'+s.artifactSha256);need(matched.length===1&&matched[0].workflow_run?.id===Number(s.githubRunId));
+                need(failedSourcePayload&&canonical(failedSourcePayload)===canonical(failed.result));
+                const minute=Date.parse(failed.closure.createdMinuteUtc),start=Date.parse(previous.created_at),end=Date.parse(previous.updated_at);
+                need(Number.isFinite(start)&&Number.isFinite(end)&&start<=end&&minute+60000>start&&minute<=end);
+            }else need(failedSourcePayload===undefined);
         }else need(sourcePayload===undefined);
         return {provenanceVerified:true,claimKey:admission.checkpointKey,currentRunId:env.GITHUB_RUN_ID,sourceVerified:!!(admission.restored||admission.prefix||admission.cleanup)};
     }catch{refuse();}
@@ -87,7 +97,8 @@ export async function runManagedFullCli({argv=process.argv.slice(2),env=process.
     need(argv.length===1&&['--preflight','--apply'].includes(argv[0]));
     const input=decodeManagedFullInput(env.ISSUE118_FULL_INPUT),admission=await admitManagedFullInput(input,env);
     const sourcePayload=admission.restored||admission.prefix||admission.cleanup?JSON.parse(readFileSync(join(resolve(env.ISSUE118_SOURCE_ARTIFACT_DIRECTORY||''),admission.cleanup?'result.json':admission.restored?'full-checkpoint-payload.json':'t2-prefix-payload.json'),'utf8')):undefined;
-    const provenance=await verifyManagedFullGithubProvenance({input,env,fetchImpl,sourcePayload});
+    const failedSourcePayload=admission.cleanup?JSON.parse(readFileSync(join(resolve(env.ISSUE118_FAILED_CLEANUP_ARTIFACT_DIRECTORY||''),'result.json'),'utf8')):undefined;
+    const provenance=await verifyManagedFullGithubProvenance({input,env,fetchImpl,sourcePayload,failedSourcePayload});
     if(argv[0]==='--preflight')return {status:'FULL_PREFLIGHT_NO_AUTH',...provenance};
     need(env.ISSUE118_APPLY==='true');const finalOnly=admission.restored?.nextArmIndex===6;if(!finalOnly)assertCiEnvironment(env);
     need(typeof env.CLEARALLERGY_BROWSER_OUTPUT==='string'&&env.CLEARALLERGY_BROWSER_OUTPUT.length>0);
