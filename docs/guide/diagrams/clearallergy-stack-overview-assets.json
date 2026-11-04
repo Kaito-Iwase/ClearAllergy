@@ -1,0 +1,120 @@
+{
+  "upstreamCommit": "1ed53e3e9525364ae5d82e0430f2bb3f7ef4c838",
+  "icons": {
+    "clerk": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/clerk-icon-light.svg",
+      "file": "clerk.svg",
+      "bytes": 827,
+      "dark_file": "clerk_dark.svg",
+      "dark_url": "https://svgl.app/library/clerk-icon-dark.svg",
+      "sha256": "4833dd802dd55468cf9113f4f40831380a3e8f431ccc7c2b0a34866430ca2af3"
+    },
+    "docker": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/docker.svg",
+      "file": "docker.svg",
+      "bytes": 1488,
+      "sha256": "29e91bf0593f02cf32efc849f2e9707dfddd4684b4d72b2a2b6a89da9626c60d"
+    },
+    "github": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/github_light.svg",
+      "file": "github.svg",
+      "bytes": 997,
+      "dark_file": "github_dark.svg",
+      "dark_url": "https://svgl.app/library/github_dark.svg",
+      "sha256": "64568845c83d5e840e6a1fb7af1939fed14709636427ce9be2fbcdc14ac5e021"
+    },
+    "hono": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/hono.svg",
+      "file": "hono.svg",
+      "bytes": 957,
+      "sha256": "a557ab8856080d16ba8a5a2b3d04ef60e1bfa66eada2abe292d69bdb94988c48"
+    },
+    "nextjs": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/nextjs_icon_dark.svg",
+      "file": "nextjs.svg",
+      "bytes": 1091,
+      "sha256": "efa7511b383927ea64c2e44c918bc40146c648fbc16e0389df87df5263e492eb"
+    },
+    "nodejs": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/nodejs.svg",
+      "file": "nodejs.svg",
+      "bytes": 2491,
+      "sha256": "6cd865951598a8a16dd3d588bd93c9d96b3b415a7162d6a1cf63089a2769ed0f"
+    },
+    "postgresql": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/postgresql.svg",
+      "file": "postgresql.svg",
+      "bytes": 3944,
+      "sha256": "dc6bb4376a5cf235b19a8871f3219c2b98d97e4469309c8bbecb86ff1811f506"
+    },
+    "prisma": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/prisma.svg",
+      "file": "prisma.svg",
+      "bytes": 565,
+      "dark_file": "prisma_dark.svg",
+      "dark_url": "https://svgl.app/library/prisma_dark.svg",
+      "sha256": "ae59021bf39c95cff16bfdd634d2e266e9ad4f152fc1f014509d56b120a81c1f"
+    },
+    "react": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/react_light.svg",
+      "file": "react.svg",
+      "bytes": 6534,
+      "dark_file": "react_dark.svg",
+      "dark_url": "https://svgl.app/library/react_dark.svg",
+      "sha256": "0e3b3b606248d4868b5f0c63c30f27929e94724591e28cbd6852ccb649857998"
+    },
+    "shield": {
+      "source": "lucide",
+      "url": "https://cdn.jsdelivr.net/npm/lucide-static/icons/shield-check.svg",
+      "file": "shield.svg",
+      "bytes": 495,
+      "sha256": "29b99649e6a0ec95e8a41ec3fb5cd00bafcb88c78c2b0934b3bd9e49afa263e8"
+    },
+    "storage": {
+      "source": "lucide",
+      "url": "https://cdn.jsdelivr.net/npm/lucide-static/icons/hard-drive.svg",
+      "file": "storage.svg",
+      "bytes": 537,
+      "sha256": "78a840ac7e2bb959962414b4d3ea746349bf21f111336555117c823671aa5522"
+    },
+    "tailwindcss": {
+      "source": "devicon",
+      "url": "https://raw.githubusercontent.com/devicons/devicon/master/icons/tailwindcss/tailwindcss-original.svg",
+      "file": "tailwindcss.svg",
+      "bytes": 689,
+      "sha256": "f8cec54589553807eb603bcaf4e056aa090196211698b056542e3cc62a2f3448"
+    },
+    "typescript": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/typescript.svg",
+      "file": "typescript.svg",
+      "bytes": 1744,
+      "sha256": "a72e88ebd02b5e28708e7dfb3ca09c5bc524482f3d0b6a3df3053ed5d51a5f6b"
+    },
+    "vercel": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/vercel.svg",
+      "file": "vercel.svg",
+      "bytes": 169,
+      "dark_file": "vercel_dark.svg",
+      "dark_url": "https://svgl.app/library/vercel_dark.svg",
+      "sha256": "565f40e56abbd9c9f31e113c45e90ce456cc112d4811f2f49d1d5041fe501b7c"
+    },
+    "zod": {
+      "source": "svgl",
+      "url": "https://svgl.app/library/zod.svg",
+      "file": "zod.svg",
+      "bytes": 1127,
+      "sha256": "368f4b87287244576e9eef4ecf06edee952da9cfc40ac1162c5d152a2b675a58"
+    }
+  }
+}

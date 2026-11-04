@@ -11,6 +11,8 @@ Server Componentはサーバー上でデータ取得・画面生成を行うReac
 
 [図を拡大](diagrams/clearallergy-architecture.svg) · [draw.io編集用](diagrams/clearallergy-architecture.drawio)
 
+ロゴ付きの[技術スタック俯瞰図](diagrams/clearallergy-stack-overview.md)は、対象SHAの実装を照合した補助資料です。HTMLとライト／ダークPNG、各接続の根拠、候補・未確認の区別を掲載しています。仕様の説明は本書と共通ルール、正式図の編集原本は既存draw.ioを正本とします。
+
 ブラウザ、Next.jsアプリ、外部サービスの境界と、公開閲覧・管理操作の主要な処理経路を示しています。公開ページの初期表示はServer ComponentからPrismaで取得し、管理画面の保存はRoute HandlerとHonoのAPIを通します。公開・管理で共用するアレルゲンの状態・公開判定と、Clerkによる認証・アプリによる店舗所有権確認は、それぞれ役割を分けています。
 
 Vercel・Neonは想定する配備構成です。図はリポジトリの実装をもとにした説明であり、実際の配備先・接続先・サービス設定・稼働状況の確認記録ではありません。Google Placesの管理用店舗候補検索、公開API、管理ページの初期取得、ログなどは概要図から省略しています。詳細は本書と[変更対応表](change-map.md)を参照してください。

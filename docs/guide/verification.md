@@ -43,6 +43,8 @@ F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIの
 
 ## 日付付きの検証記録
 
+技術スタック俯瞰図のSkill導入・実コード照合・ライト／ダーク描画は[2026-11-04の記録](../verification/stack-diagram-20261104.md)を参照してください。補助図と文書の確認で、製品の動作や本番接続の検証ではありません。
+
 以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。
 
 PR #102のUTC日時契約は、[当初の検証](../verification/utc-timestamp-contract-20261024.md)、[main統合候補](../verification/utc-timestamp-pr102-20261103.md)、[最新mainへの追補検証](../verification/utc-timestamp-pr102-latest-main-20261103.md)を参照してください。今回の追補はmain `9e22cc237d00cb4f33d6740855db55f60128a0c0` に対する未commitのローカル候補で、main・Productionへの採用、GitHub CI成功、配備の記録ではありません。
