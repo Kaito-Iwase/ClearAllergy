@@ -4,6 +4,7 @@
 // menuId を使って「どのメニューを更新するか」を API に伝えます。
 
 import React from "react";
+import { parseUploadedImageUrl } from "@/lib/validators/upload-response";
 import SavedMenuPublicationPanel from "./SavedMenuPublicationPanel";
 import { loadSavedMenu, type SavedMenuRevision } from "../saved-menu";
 import type { SavedMenu } from "../schemas/menu-response";
@@ -48,12 +49,6 @@ type Allergen = {
     nameJa: string;
     nameEn: string;
     sortOrder: number;
-};
-
-type UploadResponse = {
-    url?: string;
-    pathname?: string;
-    error?: string;
 };
 
 const SAVE_ERROR_MESSAGE =
@@ -306,17 +301,14 @@ export default function MenuEditClient(props: {
                 );
             }
 
-            const data = (await res.json().catch(() => null)) as
-                | UploadResponse
-                | null;
-
-            if (!data?.url) {
+            const url = parseUploadedImageUrl(await res.json().catch(() => null));
+            if (!url) {
                 throw new Error(UPLOAD_ERROR_MESSAGE);
             }
 
-            setImageUrl(data.url);
-            uploadedFile.current = { file: selectedFile, url: data.url };
-            return data.url;
+            setImageUrl(url);
+            uploadedFile.current = { file: selectedFile, url };
+            return url;
         } finally {
             setUploading(false);
         }
