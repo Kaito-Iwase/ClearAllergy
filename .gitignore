@@ -56,6 +56,13 @@ docs/guide/*
 docs/guide/diagrams/*
 !docs/guide/diagrams/clearallergy-architecture.drawio
 !docs/guide/diagrams/clearallergy-architecture.svg
+!docs/guide/diagrams/clearallergy-stack-overview.md
+!docs/guide/diagrams/clearallergy-stack-overview.html
+!docs/guide/diagrams/clearallergy-stack-overview.png
+!docs/guide/diagrams/clearallergy-stack-overview-dark.png
+!docs/guide/diagrams/clearallergy-stack-overview-assets.json
+!docs/guide/diagrams/clearallergy-stack-overview-LICENSES.txt
+!docs/guide/diagrams/render-stack-overview.mjs
 !docs/research/
 !docs/research/**
 !docs/agentic-development.md
