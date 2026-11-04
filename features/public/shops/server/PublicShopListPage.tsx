@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { readPublicSnapshot } from "./public-read-snapshot";
+import { createPublicAllergenLinkResolver } from "./public-allergen-links";
 import { readPublicDataOrFallback } from "@/lib/public-db";
 import PublicShopListClient from "@/features/public/shops/components/PublicShopListClient";
 import { createStatusBySlug, isMenuPublishable, isMenuPublicationCurrent } from "@/lib/allergens";
@@ -52,9 +53,7 @@ export default async function PublicShopListPage() {
                                     allergenLinks: {
                                         select: {
                                             status: true,
-                                            allergen: {
-                                                select: { slug: true },
-                                            },
+                                            allergenId: true,
                                         },
                                     },
                                 },
@@ -72,11 +71,21 @@ export default async function PublicShopListPage() {
                     }),
                     tx.allergen.findMany({
                         orderBy: { sortOrder: "asc" },
-                        select: { slug: true, nameJa: true },
+                        select: { id: true, slug: true, nameJa: true },
                     }),
                 ]);
 
-                return { shops, allergenMaster };
+                const resolveLinks = createPublicAllergenLinkResolver(allergenMaster);
+                return {
+                    shops: shops.map(shop => ({
+                        ...shop,
+                        menus: shop.menus.map(menu => ({
+                            ...menu,
+                            allergenLinks: resolveLinks(menu.allergenLinks),
+                        })),
+                    })),
+                    allergenMaster: allergenMaster.map(({ slug, nameJa }) => ({ slug, nameJa })),
+                };
             }),
             {
                 shops: [],

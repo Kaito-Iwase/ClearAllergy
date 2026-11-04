@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { assertCiDatabaseTarget } from "./ci-environment";
 import { prisma } from "../lib/db";
@@ -17,6 +17,78 @@ const cli = createRequire(import.meta.url).resolve("prisma/build/index.js");
 function deploy(schema: string) {
     const result = spawnSync(process.execPath, [cli, "migrate", "deploy", "--schema", schema], { stdio: "inherit", windowsHide: true });
     assert.equal(result.status, 0, "Disposable migration failed");
+}
+async function catalog(db: PrismaClient) {
+    return {
+        columns: await db.$queryRaw`SELECT to_jsonb(c) - 'column_default' AS definition
+            FROM information_schema.columns c WHERE table_schema='public' ORDER BY table_name, ordinal_position`,
+        defaults: await db.$queryRaw<Array<{ key: string; value: string | null }>>`SELECT table_name || '.' || column_name AS key, column_default AS value
+            FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name, ordinal_position`,
+        relations: await db.$queryRaw`SELECT c.oid::text, c.relname, c.relfilenode::text, c.relowner::text, c.relacl::text, c.relrowsecurity
+            FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' ORDER BY c.oid`,
+        constraints: await db.$queryRaw`SELECT c.oid::text, pg_get_constraintdef(c.oid) AS definition
+            FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' ORDER BY c.oid`,
+        indexes: await db.$queryRaw`SELECT * FROM pg_indexes WHERE schemaname='public' ORDER BY tablename,indexname`,
+        triggers: await db.$queryRaw`SELECT t.oid::text, t.tgenabled::text, pg_get_triggerdef(t.oid) AS definition
+            FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname='public' ORDER BY t.oid`,
+        functions: await db.$queryRaw<Array<{ name: string; source: string; attributes: unknown }>>`SELECT p.proname AS name, p.prosrc AS source,
+            to_jsonb(p) - 'prosrc' AS attributes FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+            WHERE n.nspname='public' ORDER BY p.oid`,
+    };
+}
+function withoutUtcConversion(source: string) {
+    return source.replace(/\(CURRENT_TIMESTAMP AT TIME ZONE 'UTC'\)/gi, 'CURRENT_TIMESTAMP')
+        .replace(/clock_timestamp\(\) AT TIME ZONE 'UTC'/gi, 'clock_timestamp()');
+}
+async function blockedDeployRollsBack(db: PrismaClient, before: Awaited<ReturnType<typeof catalog>>) {
+    // Hold the second ALTER's table: the first ALTER must also roll back.
+    await db.$transaction(async tx => {
+        await tx.$queryRaw`SELECT 1 FROM "Shop" LIMIT 1`;
+        const started = Date.now();
+        const child = spawn(process.execPath, [cli, "migrate", "deploy"], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+        let output = "", finished = false, timedOut = false, observedLock = false;
+        child.stdout.on("data", value => { output += String(value); });
+        child.stderr.on("data", value => { output += String(value); });
+        let spawnError: Error | undefined;
+        const completion = new Promise<number | null>(resolve => {
+            child.once("error", error => { spawnError = error; finished = true; resolve(null); });
+            child.once("close", code => { finished = true; resolve(code); });
+        });
+        const timer = setTimeout(() => { timedOut = true; child.kill(); }, 25_000);
+        let code: number | null;
+        try {
+            while (!finished && !observedLock) {
+                const [row] = await db.$queryRaw<Array<{ waiting: boolean }>>`SELECT EXISTS (
+                    SELECT 1 FROM pg_locks l JOIN pg_class c ON c.oid=l.relation
+                    WHERE c.relname='Shop' AND l.mode='AccessExclusiveLock' AND NOT l.granted
+                    AND l.database=(SELECT oid FROM pg_database WHERE datname=current_database())
+                ) AS waiting`;
+                observedLock = row.waiting;
+                if (!observedLock && !finished) await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            code = await completion;
+        } catch (error) {
+            child.kill();
+            await completion;
+            throw error;
+        } finally { clearTimeout(timer); }
+        assert.equal(spawnError, undefined, "Migration process must start successfully");
+        assert.notEqual(code, 0, "Conflicting DDL must fail");
+        assert.equal(timedOut, false, "Migration must fail by lock_timeout, not process timeout");
+        assert.equal(observedLock, true, "Observe the real ALTER waiting for ACCESS EXCLUSIVE on the held table");
+        // Prisma 6 can mask the original 55P03 while attempting to log the
+        // failure inside the aborted explicit transaction (25P02).
+        assert.match(output, /55P03|lock timeout|current transaction is aborted/i);
+        assert.ok(Date.now() - started >= 4500, "Observe the configured lock wait before the failure");
+        assert.ok(Date.now() - started < 25_000, "DDL wait must be bounded");
+    }, { timeout: 30_000 });
+    assert.deepEqual(await catalog(db), before, "Failed migration rolls back defaults, functions and all schema metadata");
+    const resolveFailure = spawnSync(process.execPath, [cli, "migrate", "resolve", "--rolled-back", migrationName], {
+        stdio: "inherit", windowsHide: true,
+    });
+    assert.equal(resolveFailure.status, 0, "Resolve only this deliberately failed migration on this disposable DB");
+    console.log("PASS: DDL lock timeout rolls back the earlier ALTER; synthetic failure resolved before retry");
 }
 async function timezone(tx: Prisma.TransactionClient, zone: string) {
     await tx.$queryRaw`SELECT set_config('TimeZone', ${zone}, true)`;
@@ -62,6 +134,10 @@ async function main() {
     try {
         const [{ count }] = await db.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM information_schema.tables WHERE table_schema='public'`;
         assert.equal(Number(count), 0, "Requires an empty disposable CI DB; never resets an existing database");
+        if (process.env.CLEARALLERGY_CI_TIMEZONE) {
+            const [setting] = await db.$queryRaw<Array<{ zone: string }>>`SELECT current_setting('TimeZone') AS zone`;
+            assert.equal(setting.zone, process.env.CLEARALLERGY_CI_TIMEZONE, "Fresh connections must use the matrix server timezone");
+        }
         const temporary = mkdtempSync(join(tmpdir(), "ca-utc-migration-"));
         const oldSchema = join(temporary, "prisma", "schema.prisma");
         mkdirSync(join(temporary, "prisma", "migrations"), { recursive: true });
@@ -80,8 +156,40 @@ async function main() {
             }
             console.log(`PASS: baseline ${zone} event-time evidence captured (${zone === "UTC" ? "correct" : "+9 hours"})`);
         }
+        // Ambiguous LA fall-back hours, spring-forward boundary, leap day,
+        // null expiry and a future value must survive with their original bits.
+        for (const instant of ["2026-03-08T09:59:59.999Z", "2026-03-08T10:00:00.000Z",
+            "2026-11-01T08:30:00.000Z", "2026-11-01T09:30:00.000Z", "2024-02-29T00:00:00.000Z", "2099-01-01T00:00:00.000Z"]) {
+            const date = new Date(instant);
+            const user = await db.user.create({ data: { createdAt: date, updatedAt: date } });
+            const shop = await db.shop.create({ data: { name: "Synthetic historical timestamp", userId: user.id, createdAt: date, updatedAt: date } });
+            await db.adminInvite.create({ data: { shopId: shop.id, email: `historical-${user.id}@example.invalid`, invitedByClerkUserId: "synthetic",
+                createdAt: date, updatedAt: date, expiresAt: instant.startsWith("2099") ? null : date } });
+            await db.auditLog.create({ data: { actorUserId: user.id, action: "synthetic_history", targetType: "shop", targetId: shop.id,
+                success: true, createdAt: date } });
+        }
         const historical = await snapshot(db);
+        // Exercise preservation of an explicit ACL, not only default NULL ACLs.
+        await db.$executeRaw`REVOKE EXECUTE ON FUNCTION ca_food_review_bound() FROM PUBLIC`;
+        const schemaBefore = await catalog(db);
+        await blockedDeployRollsBack(db, schemaBefore);
+        assert.deepEqual(await snapshot(db), historical, "Failed DDL changes no historical row");
         deploy(resolve("prisma/schema.prisma"));
+        const schemaAfter = await catalog(db);
+        const changedDefaults = schemaBefore.defaults.filter((row, index) => row.value !== schemaAfter.defaults[index].value);
+        assert.equal(changedDefaults.length, 10, "Exactly ten defaults change");
+        const changedFunctions = schemaBefore.functions.filter((row, index) => row.source !== schemaAfter.functions[index].source);
+        assert.equal(changedFunctions.length, 8, "Exactly eight functions change");
+        assert.deepEqual({ ...schemaAfter, defaults: undefined, functions: schemaAfter.functions.map(row => ({ ...row, source: withoutUtcConversion(row.source) })) },
+            { ...schemaBefore, defaults: undefined, functions: schemaBefore.functions.map(row => ({ ...row, source: withoutUtcConversion(row.source) })) },
+            "Types, constraints, indexes, trigger bindings, relation storage, ownership, grants and non-time function logic are unchanged");
+        console.log("PASS: exactly 10 defaults/8 function bodies change; schema, privileges and physical tables unchanged");
+        const diff = spawnSync(process.execPath, [cli, "migrate", "diff", "--from-url", process.env.DATABASE_URL!,
+            "--to-schema-datamodel", resolve("prisma/schema.prisma"), "--script"], { encoding: "utf8", windowsHide: true, timeout: 30_000 });
+        assert.equal(diff.status, 0, "Prisma must compare the disposable catalog with the current schema");
+        assert.doesNotMatch(diff.stdout, /ALTER COLUMN "(?:createdAt|recordedAt|resolvedAt|confirmedAt)"/i,
+            "Prisma must not propose recreating UTC defaults because of catalog cast normalization: " + diff.stdout);
+        console.log("PASS: Prisma migration diff proposes no UTC timestamp default changes");
         assert.deepEqual(await snapshot(db), historical, "Migration must preserve every existing application row, including incorrect historical timestamps");
         deploy(resolve("prisma/schema.prisma"));
         assert.deepEqual(await snapshot(db), historical, "Repeated deploy changes no existing values or publication state");
@@ -91,6 +199,20 @@ async function main() {
             FROM information_schema.columns WHERE table_schema='public' AND column_name IN ('createdAt','recordedAt','resolvedAt','confirmedAt')`;
         assert.equal(defaults.length, tables.length);
         assert.ok(defaults.every(row => /^(?:\(CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text\)|timezone\('UTC'::text, CURRENT_TIMESTAMP\))$/.test(row.column_default)), "All current DB-generated timestamp defaults use UTC: " + JSON.stringify(defaults));
+        for (const zone of zones) await db.$transaction(async tx => {
+            await timezone(tx, zone);
+            for (const instant of ["2026-03-08T09:59:59.999Z", "2026-03-08T10:00:00.000Z", "2026-11-01T08:30:00.000Z", "2026-11-01T09:30:00.000Z"]) {
+                for (const { column_default } of defaults) {
+                    // Evaluate the installed catalog expression at fixed instants;
+                    // the only substituted input is its transaction clock.
+                    const expression = column_default.replace('CURRENT_TIMESTAMP', '$1::timestamptz');
+                    const [row] = await tx.$queryRawUnsafe<Array<{ epoch: number }>>(
+                        `SELECT (EXTRACT(EPOCH FROM (${expression})) * 1000)::double precision AS epoch`, new Date(instant));
+                    assert.equal(row.epoch, new Date(instant).getTime(), "Installed default preserves the instant across DST: " + zone);
+                }
+            }
+        });
+        console.log("PASS: installed defaults retain UTC instants through LA spring-forward and both repeated fall-back hours");
         const types = await db.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM information_schema.columns WHERE table_schema='public'
             AND data_type='timestamp without time zone' AND datetime_precision=3`;
         assert.equal(Number(types[0].count), 20, "Existing timestamp types/precision retained");
@@ -190,6 +312,6 @@ main().catch(error => {
     // Synthetic-only target; print assertion context, never raw connection/provider errors.
     console.error(error instanceof assert.AssertionError ? error.message :
         error instanceof InvitationError ? `Synthetic invitation regression failed (${error.status}).` :
-            "UTC regression failed; inspect the last completed check on the disposable target.");
+            `UTC regression failed (${typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : 'unknown'}); inspect the last completed check on the disposable target.`);
     process.exitCode = 1;
 });

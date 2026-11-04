@@ -2,9 +2,23 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
+      "ci/issue118-workflow-registration": false,
       "fix/issue-triage-20261024": false,
       "fix/utc-db-timestamps-20261024": false,
-      "chore/harness-evidence-20261024": false
+      "chore/harness-evidence-20261024": false,
+      "chore/harness-p0-evidence-20261024": false,
+      "fix/next-security-20261024": false,
+      "fix/runtime-dependency-security-20261024": false,
+      "ci/public-read-snapshot-pilot-20261028": false,
+      "test/public-caller-transactions-20261028": false,
+      "docs/commit-pr-conventions-20261028": false,
+      "docs/shop-account-main-20261028": false,
+      "fix/html-error-main-20261028": false,
+      "dependabot/**": false,
+      "chore/dependabot-config-20261103": false,
+      "chore/ca-dependabot-deploy-guard-20261026": false,
+      "chore/dependabot-guard-main-20261028": false,
+      "perf/public-read-main-20261028": false
     }
   }
 }

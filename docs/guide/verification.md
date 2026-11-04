@@ -1,6 +1,78 @@
-# 文書の根拠と確認範囲
+# 検証・採用状況と確認範囲
+
+[READMEへ](../../README.md) · [変更対応表](change-map.md) · [保守ルール](maintenance.md)
+
+<a id="adoption-status"></a>
+## 開発基盤v1の採用範囲と証跡
+
+この節を採用状態の案内の正本とし、製品の状態・公開・権限の仕様は[共通ルール](rules.md)に置きます。コードがあること、対象SHAの検証が成功したこと、mainへの統合、Productionへの反映は別の状態です。日付付きの検証記録は当時の証拠であり、現在の配備版を示すものではありません。
+
+2026-10-28のユーザー合意では、F3をmainへ独立採用し、F1/F4は検証済み候補として保持します。開発基盤v1の正式な完成条件原本は先行作業の有限探索で特定できなかったため、公開4入口のtx回帰・既存snapshot回帰・mainのPR/必須CI・文書と対象SHAの対応という合意済み条件で判定します。候補全体の採用、#105のHOLD解除、DB migration、保護設定変更は含みません。
+
+### main採用範囲
+
+| 対象 | この版の内容と統合状態 | 検証の根拠・境界 |
+| --- | --- | --- |
+| 公開読取snapshot回帰 | [PR #109](https://github.com/Kaito-Iwase/ClearAllergy/pull/109)でmain採用済み。既存CIの独立stepで実行 | `scripts/check-public-read-snapshot.ts`。実SQLの負例・snapshotの正例を検査。実callerのtx利用とは別の検証層 |
+| F2: main保護 | ruleset `26009324`の読取確認。PR必須、required check `Test, lint, typecheck, and build`、strict有効、approval 0、force/delete禁止 | [main ruleset](https://github.com/Kaito-Iwase/ClearAllergy/rules/26009324)。本PRで設定変更せず、merge直前にも実効状態を確認する |
+| コミット・PR規約 | [PR #113](https://github.com/Kaito-Iwase/ClearAllergy/pull/113)でmain採用済み、merge `12d61d01837f81072864408cf0b2c5b168e6f36e` | [規約の正本](development.md#commit-pr-conventions)。英語type・日本語説明、過去SHA保持。commitlint・新CI・設定変更は含まない |
+| F3: 公開4入口のtx利用 | この版で追加するmain独立採用対象。[PR #111](https://github.com/Kaito-Iwase/ClearAllergy/pull/111)がopenの間はmain未採用、merged後は同PRのmerge SHA以降が採用版 | `tests/public-read-callers.test.ts`は実route exportを通す4件。`scripts/check-public-caller-mutations.mjs`は10境界を1か所ずつ元clientへ戻して失敗を要求。[初回測定](../verification/public-read-callers-20261028.md)と追従後のPR証跡を区別 |
+
+PR #111の初回HEAD `9c459656f591de4f260b428bdab04d893509dd23`は[CI 40635474303](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40635474303)で256/256、lint・型検査・build・既存DB/browserがPASS、独立レビュー1回PASS・重大指摘0でした。これは最新mainへの追従後のCI結果ではありません。追従後のHEAD・CI run・実checkout SHA・artifact、変更した追従/文書差分の確認はPR #111本文に結び付け、古い結果で代用しません。製品コード・schema・依存を変えず、既存のレビュー上限を維持します。
+
+この版のmain採用範囲を完成と判定する条件は、PR #111の当該HEADに対する必須CIと差分確認の成功、承認済みsquash merge、merge SHAのmain CI成功、同SHAのProduction Readyと公開4入口の読取確認です。merge前のCI成功だけで完成扱いにせず、最終実績は同PRの「統合後の確認結果」へ記録します。
+
+### 別ブランチで検証済み・main未採用
+
+| 対象 | 固定HEADと確認済み結果 | 未採用の理由・限界 |
+| --- | --- | --- |
+| F1 [PR #110](https://github.com/Kaito-Iwase/ClearAllergy/pull/110) | `8fcd810e98ac5cead1786449b503631decd100bd`、[CI 40632251353](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40632251353)、294/294・lint/typecheck/build・既存DB/browser PASS、限定独立レビューPASS | 未採用の統合候補に対する受入判定の修正。ユーザーの最終採用方針で候補として保持する。mainへ同機能を導入した結果ではなく、候補全体の採用根拠にも広げない |
+| F4 [PR #112](https://github.com/Kaito-Iwase/ClearAllergy/pull/112) | `01f7c2e80648836c6347ff19ce37f9b123f96851`、[CI 40640388044](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40640388044)、299/299・通常gate・既存DB/browser PASS。独立レビューと同一枠の修正差分確認PASS | F1を前提とする候補側評価。固定3課題×2条件の6試行は両条件とも期待結果3/3、通常完遂1/1、誤停止0/1、検証漏れ0/2。差は観測せず、一般的改善・因果効果は主張しない。Skills要因は未評価。ユーザー方針でmain未採用 |
+
+### 未検証・HOLDを維持する範囲
+
+- [PR #105](https://github.com/Kaito-Iwase/ClearAllergy/pull/105)と統合候補全体は未採用・HOLDのままです。既存review上限、追加UIの403、P0未確認をF1/F4の限定PASSで解消済みにしません。拒否されたworkflow送信の別経路実行や権限拡大も行いません。
+- 大学回線からのNeon接続は既存HOLDを維持し、再接続・INITを行いません。CIの使い捨てPostgreSQLでの成功は外部DB接続の確認ではありません。
+- 公開HTTPの読取確認は、実Clerk・Blob書込、管理者操作、食品の安全性、すべての閲覧者へのキャッシュ反映、利用者の理解度を検証するものではありません。これらの未検証範囲と、明示的なHOLDを区別します。
+
+### Productionの確認実績
+
+PR #111追従開始時の確認済みProductionは、PR #113の自動配備 `EoepJefp4mGi8HK4ZnRdxAT8baDv` / SHA `12d61d01837f81072864408cf0b2c5b168e6f36e`、Readyです。[main CI 40643203526](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40643203526)は同SHAで252/252・通常gate・隔離DB/browserが成功しました。2026-10-28 06:25 UTCに公開店舗一覧・店舗詳細・メニュー詳細・公開メニューAPIの認証なしGETがすべてHTTP 200で、対応する内容も確認済みです。詳細は[PR #113のマージ後の結果](https://github.com/Kaito-Iwase/ClearAllergy/pull/113)を参照してください。このProduction実績はF3採用前です。
+
+F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIのSHA、公開4入口の結果を記録し、上記の規約導入時点の結果と分けます。main更新は自動Production配備を起動するため、ユーザーの個別承認範囲を確認し、異常時は追加変更を止めます。rollbackは別承認です。ブランチ固有の配備抑止をmainの配備抑止と解釈しません。
+
+## 日付付きの検証記録
+
+以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。
+
+PR #102のUTC日時契約は、[当初の検証](../verification/utc-timestamp-contract-20261024.md)、[main統合候補](../verification/utc-timestamp-pr102-20261103.md)、[最新mainへの追補検証](../verification/utc-timestamp-pr102-latest-main-20261103.md)を参照してください。今回の追補はmain `9e22cc237d00cb4f33d6740855db55f60128a0c0` に対する未commitのローカル候補で、main・Productionへの採用、GitHub CI成功、配備の記録ではありません。
+
+PR #96の公開店舗読取の重複取得削減を最新mainへ限定採用する差分とF3 fixtureの追従は、[2026-10-28の検証記録](../verification/public-shop-read-performance-20261028.md)を参照してください。過去候補のSELECT本数比較を今回の測定や本番速度の保証に読み替えません。採用先PRのmerge SHA・最終CI・Production結果は元PR #96から辿る証跡に結び付け、未採用の統合候補全体とは区別します。
+
+PR #101のHTML障害応答修復を最新mainへ限定採用する差分と、元PRの名前・価格ブラウザケースの保持は、[2026-10-28の検証記録](../verification/api-html-error-20261028.md)を参照してください。統合候補全体の採用ではありません。採用先PRのmerge SHA・最終CI・Production結果は元PR #101から辿る最終証跡を正本とし、過去候補の結果で代用しません。
+
+公開4入口のtransaction client接続を検査するF3回帰は、[実callerの検証記録](../verification/public-read-callers-20261028.md)を参照してください。実route exportからDB境界の代用品までを通し、10種類の元clientへの誤置換を検出します。以下のsnapshot pilotによる実SQL回帰とは検証層を分けます。
+
+<a id="snapshot-ci-pilot"></a>
+## 2026-10-28 公開読取snapshot回帰のCI接続パイロット
+
+main `0b6ed291b2fd853230c7efdeeb1e061815404a81` を基準に、既存 `scripts/check-public-read-snapshot.ts` を通常CIのfixture準備直後へ独立stepとして接続しました。PR #109の変更は `.github/workflows/ci.yml`、本ガイド、`docs/guide/development.md`、`vercel.json` の4ファイルです。製品コード、schema、script、依存、job/check名、公開条件は変更せず、PR #96/#105や未公開の広いP1 workflow差分・統合候補を取り込んだものではありません。
+
+初回実測の対象headは `d636d20f2130186b016c4efed33ff18d5a735dfc`、CI実checkoutはmainとの一時merge `40ddf5bea94b63a64f778bbfc953496301209f9b` で、両者のtreeは `ae7868585d1ee7f1b33ceb64c480c8937c78e7bf` と一致しました。[通常CI run 40618362779](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/40618362779) は2026-10-28の `pull_request` event、attempt 1でSUCCESSです。既存job `Test, lint, typecheck, and build` は2分10秒で完了し、単体テスト252件、lint/typecheck/build、既存DB・browser検査も成功しました。CIはNode 22.23.4、PostgreSQL 17.11の使い捨てserviceを使用し、npm 11.18.0への整合stepも成功しました。Neon・Clerk・Blobや本番共有DBへ接続した結果ではありません。
+
+snapshot独立stepは02:01:33–02:01:34 UTC（API記録で約1秒、上限3分）に成功しました。実SQLへの割込みによる負例（旧食品＋新FREE）と正例（snapshot内の旧食品＋旧CONTAINS）のPASS行、両variantの実子SELECT割込み成立assert、訂正後の新規公開読取がnullになることを確認しました。通常finallyの完了はawaitされたcleanupとstep成功から確認し、job最後のcontainer削除も成功しました。削除後の個別残存SQL監査と、強制timeout時のcleanupは未検証です。artifact `12786650112` は `prototype-browser-40ddf5bea94b63a64f778bbfc953496301209f9b`（4,525,766 bytes）として保存されました。artifact内容は別途取得・精査していません。
+
+この初回記録は1回の実測で、反復再現性を保証しません。後続の文書同期commitはそのcommitのCI結果を別に照合し、この初回head/runの記録を上書きしません。実行条件・保証範囲は[開発手順](development.md#checks)を参照してください。公開前のローカル準備ではNode 24.19.0/npm 11.9.0を使用し、workflowのYAML解析・既存定義との照合、文書リンク51件、`git diff --check`、`npm run lint` がPASSでした。生成済みPrisma ClientとPG17がなくローカルの実DB・全体typecheck/test/buildは未実行でしたが、上記CI結果とは区別します。既知403の取得再試行や接続guardの迂回は行っていません。
+
+Vercelは2026-10-28 02:13 UTCのユーザー提供一覧の表示範囲で、従来の `ee117a` Previewと `0b6ed291` Productionが維持され、`d636d20` の新配備は見られませんでした。Skippedイベント・branch別全履歴は未確認であり、この一覧だけで全配備履歴を保証しません。`vercel.json` はpilot branch `ci/public-read-snapshot-pilot-20261028` の `deploymentEnabled: false` を追加し、既存6件のfalseと他設定を保持しています。このguardはbranch廃止後に別途整理します。削除すると当該branchが自動配備対象へ戻り得るため、現時点では保持します。mainへのmerge可否と、既存Production連携による配備の実行許可は別判断です。
+
+このstepだけでは公開3ページ・公開メニューAPIの実callerすべてのtx利用、HTTP・画面・cache、P0全phaseを保証しません。選択検査の成功と必要受入条件全体の充足を分離する判定は統合候補採用前の別gate、CI必須化は別の設定承認です。公開読取変更前の実caller検証と、正常な小変更が範囲内の受入条件を満たして完了できるcontrolを区別して残します。既存のHOLD・review上限は解除しません。
 
 2026-10-23の保存後の同じページでの公開確認は、[実装・検証記録](../verification/saved-menu-publication-20261023.md)を参照してください。保存済み版の読取・公開、未設定時の修正、二重送信・競合・失敗時の表示を対象にし、公開条件やDB契約は変更しません。隔離画面・CIと本番の読取確認を区別します。
+
+2026-10-24のZod/Undici/Honoの追加更新は[対象条件・限定override・検証境界](../verification/runtime-dependency-security-20261024.md)を参照してください。Next更新の別差分です。
+
+2026-10-24のNext.js16.4.1更新は[対象条件・検証記録](../verification/next-security-20261024.md)を参照してください。旧記録の成功を今回の検証へ流用しません。
 
 2026-10-19のNext.js依存脆弱性のローカル修正は、[独立checkoutでの更新・検証記録](../verification/next-security-20261019.md)を参照してください。main `b3613a1` から16.3.8へ最小更新した結果で、本番配備版・侵害の有無・実認証の確認ではありません。
 
@@ -69,7 +141,7 @@ Dockerは通常起動で復旧し、今回専用PostgreSQL17へ既存16 migratio
 - **UNVERIFIED**：アプリの再起動・ブラウザ操作・実DB／外部サービス接続・コード用の検証コマンド。文書と文書管理の変更に限定し、実行環境やデータを変更していない。
 
 <a id="issues"></a>
-## 現在の制約・不一致・未確認
+## 制約・不一致・未確認の記録
 
 2026-10-16 JST、main `cd502b` の隔離された実UIで、原材料変更または変更申告のみを保存する2条件について、公開する旨の確認文とPUTの公開設定falseの不一致を再現しました。先に疑ったUNKNOWN追加の条件は実際の状態遷移で反証しました。コードは未修正で、公開漏れ・実DB・実認証の再現ではありません。[6条件の実行記録と修復時の受入条件](../verification/material-change-confirmation-20261016.md)を参照してください。
 

@@ -1,8 +1,8 @@
 # 起動・確認・変更の進め方
 
-[READMEへ](../../README.md) · [内部処理](architecture.md) · [変更対応表](change-map.md) · [文書の保守](maintenance.md)
+[READMEへ](../../README.md) · [内部処理](architecture.md) · [変更対応表](change-map.md) · [文書の保守](maintenance.md) · [コミット・PRの書き方](#commit-pr-conventions)
 
-ここに載せるコマンドはリポジトリの設定から整理した手順です。今回すべてを実行した記録ではありません。[確認範囲](verification.md)に実施と未実施を分けています。以下のコードブロックは**PowerShellで実行する手順**で、アプリのソース抜粋ではありません。
+ここに載せるコマンドはリポジトリの設定から整理した手順です。今回すべてを実行した記録ではありません。[確認範囲](verification.md)に実施と未実施を分けています。起動・検証・運用のコマンドブロックは**PowerShellで実行する手順**で、アプリのソース抜粋ではありません。コミットメッセージのコードブロックは書式例です。
 
 過去の依存更新と公開判断に関する記録：
 
@@ -208,6 +208,120 @@ node scripts/browser-runner.mjs ui
 - 権限：未ログイン、別店舗、閲覧専用の各条件で拒否を確認する。運営招待は外部メール送信を伴うため別途許可された試験対象が必要。
 - 失敗時：DB障害と0件、設定の保存失敗、画像失敗、未保存移動の違いを確認する。実データを壊して障害を作らない。
 
+<a id="commit-pr-conventions"></a>
+### コミット・PRの書き方
+
+コミットメッセージとPRタイトルは、変更の意図と影響を後から追えるよう、英語のtypeと日本語の説明で書きます。基本構文は [Conventional Commits 1.0.0](https://www.conventionalcommits.org/ja/v1.0.0/) に従います。日本語、小文字のtype、以下の分類と長さの目安はClearAllergyの運用規約です。
+
+```text
+<type>[任意の(scope)][互換性破壊時の!]: <日本語の説明>
+
+<必要に応じて、理由・影響・検証を日本語で記載>
+
+<必要なIssue参照・互換性破壊の説明>
+```
+
+#### typeは変更の目的で選ぶ
+
+| type | 選ぶ基準 |
+| --- | --- |
+| `feat` | 利用者や呼び出し元が使える機能・能力を追加する |
+| `fix` | 利用者に表れる誤動作、契約違反、脆弱性を修正する。関連テストや文書も同じ目的なら含める |
+| `docs` | 文書・説明だけを変更する |
+| `test` | 回帰テスト、テスト用データ、評価・検証手順を追加・修正する。製品の振る舞いの修正が主目的なら `fix` を使う |
+| `refactor` | 外部から見た振る舞いを変えず、コードの構造を整理する |
+| `perf` | 性能を改善する。本文やPRに測定条件・結果、または未測定の範囲を示す |
+| `build` | ビルド・パッケージング・開発用ツールチェーンや依存関係を変更する |
+| `ci` | GitHub Actionsなど継続的な検証・自動実行の手順や実行環境を変更する |
+| `chore` | 上記に当てはまらない保守・運用準備を行う。内容が曖昧な変更をまとめるためには使わない |
+
+整形だけの変更には `style`、既存変更を戻すコミットには `revert` も使えます。`style` は画面デザイン変更の意味ではありません。`revert` の本文には戻すコミットのSHA、理由、影響を記載します。日本語の `設定:`、`修正:`、`検証:`、`テスト:` をtypeとして使いません。
+
+拡張子や「設定ファイルを編集した」という理由だけではtypeを決めません。たとえば、誤った本番URLによるリンク不具合の是正は `fix`、通常のビルド用Node更新は `build`、CIジョブのNode更新は `ci`、自動デプロイ抑止の導入準備は `chore` です。依存更新でも脆弱性の解消が主目的なら `fix` を選びます。機能追加とそのテスト・文書のように同じ目的に必要な変更はまとめ、独立した目的は別コミットにします。
+
+#### scopeと件名
+
+scopeは任意です。対象を絞ると読みやすい場合に、既存の機能名・モジュール名など短い英語の識別子を使います（例: `public`、`admin`、`api`、`deps`）。複数領域にまたがる場合や説明だけで明らかな場合は省略します。担当者名・一時的な作業番号・長いファイルパスをscopeにせず、新しい分類表を増やす必要もありません。
+
+コロンの後に半角スペースを1つ置き、何をどう変えるかを日本語で1行にまとめます。「修正した」「対応しました」という作業報告より、「保存競合時に入力内容を保持する」のように結果が分かる説明を優先します。「修正」「更新」「各種対応」「WIP」だけで終えません。末尾の句点は付けません。
+
+件名はtype・scopeを含めておおむね50文字を目安とします。これは機械的な上限ではありません。意味を削らないと収まらない場合は、長い背景を本文へ移し、必要な識別子は保持します。日本語の表示幅と英字の文字数は同じではないため、英語資料の50/72文字規則をそのまま失敗条件にしません。
+
+説明・本文は日本語にし、API名、コード識別子、ファイル名、コマンド、SHA、URL、`BREAKING CHANGE` などの固定語は翻訳しません。
+
+#### 本文・Issue参照・互換性破壊
+
+件名だけでは判断理由・影響が分からない変更には、空行を挟んで本文を付けます。従来の問題、選んだ対応の理由、利用者・呼び出し元・運用への影響、実施した検証と未実施の範囲を書きます。小さい誤字修正のように件名で十分な変更に定型文の水増しは不要です。本文の文字数下限は設けず、段落や箇条書きで読みやすくします。
+
+関連Issueがある場合は末尾に `Refs: #番号` を記載します。存在しないIssueを作り上げず、表記のためだけのIssue作成も不要です。`Closes` / `Fixes` / `Resolves` は、対象Issue全体の完了とクローズの意図が確認できる場合に限ります。部分対応・検証候補では自動クローズの語を使いません。
+
+互換性を壊す変更は、typeまたはscopeの直後、コロンの直前に `!` を付け、本文末尾に `BREAKING CHANGE: 日本語の説明` を記載します。Conventional Commits自体は片方の表記でも認めていますが、CAでは一覧での発見と移行説明の両方を残すため、両方を使います。何が互換でなくなるか、影響を受ける利用者・呼び出し元、必要な移行手順を具体的に示します。変更量の大きさや内部整理だけでは `!` を付けません。安全仕様変更・DB migration等の承認境界は別に維持します。
+
+#### PRタイトル・本文とマージ時の確認
+
+PRタイトルも同じ形式にし、最終差分全体の主目的を表します。調査の途中経過や最後のコミットだけを要約せず、範囲が変わったらタイトルと本文を実際の変更へ合わせます。F1/F3等の作業番号は必要なら補足に留め、変更内容が分かる説明を省略しません。
+
+PR本文は既存テンプレートに従い、日本語で問題・判断・検証・独立レビュー・リスク・文書更新を説明します。base/head SHA、実コマンド、実行環境、件数、CI run・checkout SHA・成果物への参照を対象の証跡と結び付けます。未確認を成功へ言い換えず、古いSHAの検証結果を現在のHEADの結果として扱いません。自己レビューと独立レビューは区別し、既存のレビュー回数上限を増やしません。
+
+squashを使うことが別途承認された場合は、マージ画面の最終コミット件名と本文を確認します。PRタイトルと同じ意味の英語type・日本語説明にし、必要な理由、Issue参照、互換性破壊の説明を残します。GitHubの既定値はリポジトリ設定とコミット数に依存するため、PRタイトルがそのまま採用されると決めつけません。この規約はマージ方式の変更やmerge・配備の承認を与えるものではありません。
+
+新しく作成するメッセージに適用し、過去の表記統一だけを目的としたamend・reword・rebase・force-pushは行いません。GitHub等が生成する既存のmergeメッセージや過去コミットは保持します。`[skip ci]` 等で必要な検証を省略せず、秘密情報、未確認の結果を成功とする記載、実施していないレビューを実施済みとする記載はメッセージへ含めません。
+
+#### 例
+
+| 避ける例 | 推奨例 | 理由 |
+| --- | --- | --- |
+| `設定: Vercelを設定` | `chore: Dependabot導入前のVercel自動デプロイ抑止を準備` | typeは英語にし、準備の目的を示す |
+| `test: テスト追加` | `test: 公開4入口のトランザクションクライアント利用を検証する` | 検査対象と狙いが分かる |
+| `chore: 設定変更` | `fix: 公開QRコードのリンク先に残るlocalhostを除く` | ファイル種別より修正目的を示す |
+| `style: 保存ボタンを追加` | `feat: メニュー編集画面に保存ボタンを追加する` | 画面の機能追加を整形扱いしない |
+| `fix: update` | `fix: 保存競合時に編集中の入力を保持する` | 日本語で変更後の振る舞いを示す |
+| `docs: 文書更新` | `docs: 開発用DBと本番DBの使い分けを説明する` | 文書の内容が分かる |
+
+本文を含む例（[PR #111](https://github.com/Kaito-Iwase/ClearAllergy/pull/111)のF3実測内容を用いた表記例であり、このガイドへの記載は同PRの統合や既存コミットの書換えを意味しません）:
+
+```text
+test: 公開4入口のトランザクションクライアント利用を検証する
+
+既存のAPIテストは元のPrismaクライアントをコールバックへ渡すため、
+呼び出し元が誤って元のクライアントへ戻っても検出できない。
+実際のルートを呼び、別のトランザクションクライアントによる読取を検査する。
+
+正例4件と、10境界を個別に戻した負例の失敗を確認した。
+製品コードは変更しない。実SQLの分離性は既存の専用DB回帰で別に確認する。
+
+Refs: #100
+```
+
+互換性破壊の構文例（架空の例であり、変更の提案・承認ではありません）:
+
+```text
+feat(api)!: 公開APIのページ指定をカーソル方式へ変更する
+
+BREAKING CHANGE: pageパラメータの受付を終了する。
+呼び出し元はnextCursorを保存し、次の要求のcursorへ渡す必要がある。
+```
+
+#### 参考にした一次資料とCAでの選択
+
+2026-10-28に確認した公開資料です。仕様の構文とCA固有の運用判断を分けます。
+
+以下は各公開リポジトリ・チーム文書の規則または実設定であり、Google・Microsoft・OpenAIの全社規約とは扱わない。履歴だけを規約の証拠にしていない。
+
+| 対象と一次資料 | 確認できた内容 | CAへ採る点／採らない点 |
+| --- | --- | --- |
+| [Conventional Commits 1.0.0](https://www.conventionalcommits.org/ja/v1.0.0/) | typeと説明、任意scope・本文・footer、feat/fix、互換性破壊の `!` または `BREAKING CHANGE`。それ以外のtypeも許容する | 構文の基礎を採る。日本語、type小文字、長さ、本文の書き分けはCAの選択と明記する。形式採用を自動リリース導入と結び付けない |
+| [Angularのコミット規約](https://github.com/angular/angular/blob/b81b37d58b966882c6cea7cf1f76e990bb2059e9/contributing-docs/commit-message-guidelines.md)（Google系公開OSS、angular/angular） | typeの用途、任意scope、動機・前後の挙動、breaking時の移行説明を定める。docs以外は本文必須・20文字以上。scopeにパッケージ名を使う | typeの意味、whyと影響、移行説明を採る。Angular固有のscope一覧、本文20文字の下限、docs以外への一律本文必須はCAへ移植しない |
+| [Microsoft ISE Engineering PlaybookのGit guidance](https://github.com/microsoft/code-with-engineering-playbook/blob/main/docs/source-control/git-guidance/README.md#commit-best-practices) | 論理単位の小さい変更、必要性・影響の説明、件名50文字・本文72文字、任意本文・trailers。Conventional Commitsは選べる例として紹介する | 意図と副作用を残すことを採る。英語中心の文字幅を日本語へ機械的に適用せず、CAは50文字を目安にする。これはISE向け公開playbookで、Microsoft全社の強制規約ではない |
+| [Microsoft FASTのCONTRIBUTING](https://github.com/microsoft/fast/blob/1d0ba188764c422101fb21141d36eb8addf654b4/CONTRIBUTING.md#merging-a-pull-request) | マージ時のコミットタイトルにPRタイトルを使い、Conventional Commitsへ合わせる。互換性破壊の移行文書も要求する。リリース用change fileは別に管理する | PRタイトルを変更全体の意図へ合わせ、最終squashメッセージを確認する運用を採る。CAのマージ方法を勝手に固定しない。Beachballやchange fileは導入しない |
+| [OpenAI Python SDKのrelease-please設定](https://github.com/openai/openai-python/blob/fa67521e1c59f11fb5cba7ef8b9b35b5fcac2ae4/release-please-config.json)、[CONTRIBUTING](https://github.com/openai/openai-python/blob/fa67521e1c59f11fb5cba7ef8b9b35b5fcac2ae4/CONTRIBUTING.md)、[AGENTS](https://github.com/openai/openai-python/blob/fa67521e1c59f11fb5cba7ef8b9b35b5fcac2ae4/AGENTS.md) | 実設定にfeat/fix/perf/revert/chore/docs/style/refactor/test/build/ciの分類があり、test・ciはchangelogで非表示。確認した2文書には件名長・scope・言語を一律に定めるコミット規約はない | typeがリリース用途に使われる実例として参照する。設定の存在を全コミットへの強制規約・OpenAI全社規約と呼ばない。CAにrelease-please、自動version付与、非表示分類を導入しない |
+| [OpenAI Codexのcontributing](https://github.com/openai/codex/blob/main/docs/contributing.md) | 読取時点の文書にはコミットメッセージ規約がない | 「OpenAIのコミット規約」として引用できる根拠にはしない。非公開の内部規約は不明 |
+| [GitのSubmittingPatches](https://github.com/git/git/blob/37b3475fb530c14109211faca33716a173db61ed/Documentation/SubmittingPatches) | 変更のwhy、従来の問題、選択理由・代替案を残す。件名50文字はsoft limit、areaを付ける慣行、論理単位の変更を勧める | 将来の保守に必要な理由を採る。Git固有のarea-prefixでCAのtype-prefixを置き換えない。メール投稿・署名等の別運用は持ち込まない |
+
+Microsoft VS Codeの `CONTRIBUTING.md` と公式 `How to Contribute` Wiki、TypeScriptの `CONTRIBUTING.md` も確認したが、その確認範囲には件名のtype・言語を統一する規則を見つけなかった。これらを「Microsoftは規約を持たない」という主張には広げない。補助比較として [microsoft/awesome-rayfin](https://github.com/microsoft/awesome-rayfin/blob/main/CONTRIBUTING.md#commit-messages) にはConventional Commitsと任意scopeが明記され、CIをchoreへ分類する。Angularのci分類と異なるため、typeの細分化は各repoの決定であることも確認できる。
+
+GitHubの既定squashメッセージと変更可能な項目は[公式説明](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/configuring-commit-squashing-for-pull-requests)で照合した。
+
 <a id="operations"></a>
 ## 5. 運用スクリプトとCI/CD
 
@@ -229,7 +343,7 @@ CI定義は `.github/workflows/ci.yml`。main/develop向けPR、両ブランチ�
 
 依存検査は別の `.github/workflows/dependency-audit.yml` が担当します。main/develop向けの依存ファイル・当該workflow変更PR、毎週月曜03:27 UTC（12:27 JST）、手動実行が入口です。`npm audit --ignore-scripts --audit-level=high` で既知の高・重大の問題を検出すると失敗します。自動修正やパッケージ更新はしません。通信障害の失敗と検出された脆弱性を区別して調べます。対象はdevを含むアプリlockfileで、Node配布のnpm CLI・OS・隔離Playwrightの脆弱性まで修正した証拠ではありません。
 
-Next.jsのlint設定は全ルールを維持します。`@next/eslint-plugin-next@16.3.8` のルートディレクトリ検索だけ、`scripts/next-root-glob` のローカル互換層へoverrideします。既存tinyglobby 0.2.17を使い、ディレクトリの自動展開を無効にして絶対パス・末尾区切りを正規化します。パターンは65,536文字・入れ子128段までとし、超過と未対応の範囲brace（波括弧による範囲指定。`app{1..12}` 等）は検査失敗です。範囲は明示した配列か選択braceへ置き換えてください。`.npmrc` の `install-links=true` をinstall/ciで共有し、Dockerはローカルpackageをnpm ciの前にCOPYします。一般のfast-glob代替として使わず、Next plugin更新時には利用API・rootDir検索・内部リンク検知とclean install/auditを再確認してください。保守対象はこのリポジトリです。検証は `tests/next-root-glob.test.ts` と `tests/npm-cli.test.ts` から追えます。
+Next.jsのlint設定は全ルールを維持します。`@next/eslint-plugin-next@16.4.1` のルートディレクトリ検索だけ、`scripts/next-root-glob` のローカル互換層へoverrideします。既存tinyglobby 0.2.17を使い、ディレクトリの自動展開を無効にして絶対パス・末尾区切りを正規化します。パターンは65,536文字・入れ子128段までとし、超過と未対応の範囲brace（波括弧による範囲指定。`app{1..12}` 等）は検査失敗です。範囲は明示した配列か選択braceへ置き換えてください。`.npmrc` の `install-links=true` をinstall/ciで共有し、Dockerはローカルpackageをnpm ciの前にCOPYします。一般のfast-glob代替として使わず、Next plugin更新時には利用API・rootDir検索・内部リンク検知とclean install/auditを再確認してください。保守対象はこのリポジトリです。検証は `tests/next-root-glob.test.ts` と `tests/npm-cli.test.ts` から追えます。
 
 ### 要求IDから障害を調べる
 
@@ -238,6 +352,24 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 招待取消が502ならローカルでは取消済みの可能性があるため、画面を再読込して取消再試行の表示を確認します。受諾と競合した409は確定済み状態を再確認し、受諾済みを取消扱いに上書きしません。補償取消の失敗や通信結果が不明な場合は、権限を持つ運営者がDBの対象招待とClerkを照合します。自動で解決済みと判断せず、外部データの修正は対象・副作用を確認して行います。
 
 このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
+
+<a id="dependabot-deploy-guard"></a>
+### Dependabotの自動デプロイ抑止
+
+`vercel.json` の `git.deploymentEnabled` は既存の抑止対象を保持し、`dependabot/**` と設定準備ブランチ `chore/dependabot-config-20261103` を `false` にします。[Vercel公式仕様](https://vercel.com/docs/project-configuration/git-configuration)はminimatch構文を使い、未指定ブランチは `true`、複数一致時は `true` が優先です。main/developや通常ブランチの自動デプロイ条件は変更しません。Git連携の自動デプロイを抑止するもので、手動deployを禁止する設定ではありません。
+
+[元PR #108](https://github.com/Kaito-Iwase/ClearAllergy/pull/108)のguardは[採用先PR #117](https://github.com/Kaito-Iwase/ClearAllergy/pull/117)でmainへ反映済みです。ローカルのパターン検査と実Vercel上の抑止観測は区別し、未観測の対象branchまで確認済みと扱いません。設定導入PRのpush前にも対象branchの抑止条件を確認します。`clear-allergy` と `clear-allergy-e2e` は同じリポジトリに接続しており、mainは両ProjectのProduction追跡先です。設定だけのmain変更でも自動配備が起こり得るため、main反映とGitHub管理設定の有効化は承認範囲を確認して行います。
+
+<a id="dependabot-updates"></a>
+### Dependabotの更新PR
+
+[`.github/dependabot.yml`](../../.github/dependabot.yml)はnpmのルート依存とGitHub Actionsを毎週月曜09:00（Asia/Tokyo）に確認します。通常のversion updatesで同時に開くPRはnpmが2件、Actionsが1件までです。設定はdefault branchへ反映してから有効になります。Draft PRの作成だけでは稼働開始になりません。
+
+npmのminor/patchはNext.js（`next` / `@next/env` / `eslint-config-next`）、Prisma（`prisma` / `@prisma/client`）、Clerk（`@clerk/backend` / `@clerk/nextjs`）、React（`react` / `react-dom`）の関係ごとにまとめます。majorは一律除外せず個別PRで判断します。Actionsやその他の依存は個別とし、devDependenciesも実行・ビルドへの影響を確認します。`@vercel/blob`、`bcrypt`、`hono`、`zod`なども一括で安全扱いしません。ローカルの `fast-glob` 互換層やNext/Prisma等のoverridesを更新のついでに外しません。
+
+security updatesにはGitHub側のDependabot alertsとsecurity updatesの有効化が別途必要です。YAMLだけでは管理設定を有効にしません。security updatesは通常更新の週次scheduleを待たず、アドバイザリを契機にdefault branchへ作成され、通常PR上限とは別の固定10件上限です。今回のgroupsはversion updatesだけに適用し、security updates全体を一つにまとめません。仕様は[GitHubの設定リファレンス](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#open-pull-requests-limit-)と[security PRの説明](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-pull-requests)を参照します。既存の週次 `dependency-audit.yml` は監査であり、更新PRの作成とは別です。
+
+各更新PRでは、変更前後の版・アドバイザリや変更内容・影響範囲、CIの対象SHAと結果、追加で必要な検証、未検証事項と採用保留理由を短く残します。Next/ESLint/ローカルglobはlint・build、Prismaは生成・schemaと隔離DB、Clerkは認証・所有権、Reactは画面回帰も確認対象です。通常CIはread-only token・架空Clerk・使い捨てPostgreSQLのまま使い、botへ実DBやClerk秘密鍵を渡しません。`pull_request_target`やwrite tokenへ切り替えず、自動approve・auto-mergeも設定しません。設定の導入と、生成された依存更新PRの採用・配備は別に判断します。
 
 ### 公開前と障害時の確認
 
@@ -254,9 +386,9 @@ API障害はレスポンスの `X-Request-Id` から `request_completed` / `oper
 
 `20261024000000_utc_timestamp_contract` は既存列型を維持し、10 列の DB default と 8 関数の日時生成を明示 UTC にそろえます。Prisma の default 定義も同じ SQL に合わせます。アプリから日時を渡すだけでは、DB トリガーが上書きする記録時刻は直せないため、新しい migration が必要です。`checkedAt` の CHECK、食品版・公開確認・行ロック・履歴不変の制約は変えません。招待受諾の生 SQL も UTC にそろえ、期限や所有権のルールは維持します。[日時の契約](rules.md#timestamps)が正本です。
 
-`node --import tsx scripts/check-utc-timestamp-migration.ts` は既存 CI 接続ガードと空 DB 検査後に、旧 migration を適用し、UTC/JST の時刻差を再現してから新 migration を適用します。全アプリテーブルの既存行・日時・公開状態の不変、再適用、UTC/JST/米国時間の実記録時刻、同一瞬間の ISO、未来 5 分境界、停止時の監査・更新日時、実招待受諾関数の期限判定を検査します。最後に実 `backfill-pistachio-allergen.ts` を架空 DB で動かし、新規リンクの UTC 日時・UNKNOWN・既存リンク不変を確認します。この運用 writer の日時式も明示 UTC です。外部認証・Blob は呼びません。生成した架空行は使い捨て DB に残るため、既存 DB に流用せず、実行後はその DB を停止・破棄します。公開・並行更新の既存回帰は `check-ci-database.ts`、`check-publication-database.ts`、`check-public-read-snapshot.ts`、`check-shop-database.ts`、`check-owned-menu-database.ts` で別に確認します。CI 接続の変更は含みません。[ローカル結果と限界](../verification/utc-timestamp-contract-20261024.md)を参照してください。
+`node --import tsx scripts/check-utc-timestamp-migration.ts` は既存 CI 接続ガードと空 DB 検査後に、旧 migration を適用し、UTC/JST の時刻差を再現してから新 migration を適用します。全アプリテーブルの既存行・日時・公開状態の不変、再適用、UTC/JST/米国時間の実記録時刻、同一瞬間の ISO、未来 5 分境界、停止時の監査・更新日時、実招待受諾関数の期限判定を検査します。DST の欠ける時刻・重複する時刻と過去値を検査し、列型・制約・インデックス・トリガー・所有者・権限・物理テーブル識別子も比較します。最後に実 `backfill-pistachio-allergen.ts` を架空 DB で動かし、新規リンクの UTC 日時・UNKNOWN・既存リンク不変を確認します。この運用 writer の日時式も明示 UTC です。外部認証・Blob は呼びません。生成した架空行は使い捨て DB に残るため、既存 DB に流用せず、実行後はその DB を停止・破棄します。公開・並行更新の既存回帰は `check-ci-database.ts`、`check-publication-database.ts`、`check-public-read-snapshot.ts`、`check-shop-database.ts`、`check-owned-menu-database.ts` で別に確認します。CI では通常 build と別の `utc-timestamps` job が空の PostgreSQL 17 を UTC/JST/LA の3構成で作成し、接続時の timezone を照合して実行します。通常の `npm test` には含まれません。[当初のローカル結果](../verification/utc-timestamp-contract-20261024.md)と[main統合後の検証](../verification/utc-timestamp-pr102-20261103.md)と[最新mainへの追補](../verification/utc-timestamp-pr102-latest-main-20261103.md)を参照してください。
 
-既存 migration は編集せず、既存行を更新・時差補正しません。本番適用前には対象 SHA、既存 migration 履歴、バックアップ/復元先、DDL ロックと許容停止時間、新旧アプリの同時稼働を確認してください。DB default の変更と関数置換にはロックが必要です。旧アプリの UTC Date/JSON は互換ですが、招待 SQL は同じリリースで更新し、運用・直接 SQL の writer も UTC に統一します。過去値が正しいかはこの migration だけでは判断できません。
+既存 migration は編集せず、既存行を更新・時差補正しません。本番適用前には対象 SHA、既存 migration 履歴、バックアップ/復元先、DDL ロックと許容停止時間、新旧アプリの同時稼働を確認してください。DB default の変更は ACCESS EXCLUSIVE ロックを取り、読む処理も待機させます。今回の migration は transaction 内の `SET LOCAL lock_timeout = '5s'` によりロック取得待ちを制限します。回帰では2番目の ALTER を妨げ、先行 ALTER を含めて全体が戻ることを検査します。意図した失敗を `migrate resolve --rolled-back` で記録するのは、この空の使い捨て DB のテスト内だけです。本番失敗の自動解決手順ではありません。旧アプリの UTC Date/JSON は互換ですが、招待 SQL は同じリリースで更新し、運用・直接 SQL の writer も UTC に統一します。過去値が正しいかはこの migration だけでは判断できません。過去の誤った未来値を残すため、移行前後の日時の大小だけで履歴順序を推定しません。
 
 切戻しで旧 migration を改変・削除したり、履歴を一括更新したりしません。アプリだけを戻しても DB 関数/default は残り、旧招待 SQL の時差問題は戻ります。必要な切戻しは対象環境の書込みを管理し、適用済み定義と互換性を確認した別の forward migration として準備します。今回のローカル検証は本番適用の承認や本番データの補正を含みません。
 
@@ -276,7 +408,13 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 
 `scripts/food-review-fixture.ts` はCI／専用テスト接続ガードを通る架空メニューだけに、実食品の証拠ではない旨を記した合成記録を作ります。通常seedや既存実データへは適用しません。通常seedの公開フラグだけでは新条件を満たさず、DBで停止されます。既存の専用テストデータも移行で停止するので、内容を照合して専用fixtureを準備してください。
 
-`node --import tsx scripts/check-public-read-snapshot.ts` はCI専用接続ガード付きDBと架空fixtureを使い、一時loopback TCPプロキシで実Prismaの子SELECTを止め、別接続の食品訂正を確定してから解放します。旧食品＋新FREEが混ざる反例と、本番用 `readPublicSnapshot` のRepeatableReadで旧食品＋旧CONTAINSを維持すること、次の取得で停止を反映することを検査します。SQLの結果や時刻をmockする検査ではありません。プロキシ・Prisma接続を閉じ、今回作った店舗だけを削除します。schema/migrationは変更しません。既存の公開データ取得が複数SQLに分かれても、全4入口と補足を同じtransaction clientへ揃えます。`tests/public-read-snapshot.test.ts` はtransaction完了不能と通常処理エラーの区別、既存取得不能表示への受渡しを代用品で検査します。
+`node --import tsx scripts/check-public-read-snapshot.ts` はCI専用接続ガード付きDBと架空fixtureを使い、一時loopback TCPプロキシで実Prismaの子SELECTを止め、別接続の食品訂正を確定してから解放します。通常CIでは `Prepare isolated fictional data` 直後の独立step `Check public read snapshot consistency` から実行し、既存PostgreSQL 17 serviceを使います。step上限は3分、既存job上限は25分で、失敗・timeoutを無視する設定は付けません。既存job/check名は変えず、P0のphase/summarizeや追加browser回帰は接続しません。
+
+成功条件は、snapshotなしで旧食品＋新FREEが混ざる負例と、本番用 `readPublicSnapshot` のRepeatableReadで旧食品＋旧CONTAINSを維持する正例の両方が成立し、各variantで実際の子SELECTを割り込んだassertを通り、訂正後の新しい公開読取がnullになることです。SQLの結果や時刻をmockする検査ではありません。通常終了時はプロキシ・Prisma接続を閉じ、今回作った店舗だけを削除します。強制timeout時のcleanup完了までは保証せず、CI serviceはjob終了時に破棄します。schema/migration・通常seedは変更しません。単独実行も同じcommandを使いますが、生成済みPrisma ClientとCI専用の使い捨てDB・fixtureを先に用意し、実サービスの接続情報を渡しません。
+
+このscriptは自身の読取callbackとsnapshot helperを検査します。実callerの接続は `tests/public-read-callers.test.ts` が `/shops`、`/shops/[shopId]`、`/shops/[shopId]/menus/[menuId]`、`GET /api/menus/:menuId` の実route exportから検査します。元のPrisma clientの読取を拒否し、別のtransaction clientで本体・マスタ・店舗補足を読むことを確認します。通常の `npm test` に含まれます。`node scripts/check-public-caller-mutations.mjs` は使い捨てソースコピーで10か所を個別に元clientへ戻し、各テストがclient逸脱により失敗することと復元後の成功を確認します。実DB・環境ファイルは不要ですが、生成済みPrisma Client・依存と一時ディレクトリへのlink作成権限が必要です。[再現手順と測定範囲](../verification/public-read-callers-20261028.md)を参照してください。これらはHTTP・画面描画・cache・既に開いた画面の更新の保証ではありません。`tests/public-read-snapshot.test.ts` はtransaction完了不能と通常処理エラーの区別、既存取得不能表示への受渡しを代用品で検査します。
+
+対象head SHA・lockfile・実Node/npm・PostgreSQL版、負例/正例の固定PASS行、終了状態、step所要時間を同じ実行結果に結び付けます。3分は初期上限で、実測時間・反復再現性は実行後に記録します。選択した検査の成功と必要受入条件全体の充足を区別し、このstepを接続しただけでCI必須化や公開4入口・P0全phaseの保証済みとはしません。今回の実施・未実施は[確認範囲](verification.md#snapshot-ci-pilot)を参照してください。
 
 `scripts/food-review-database-regression.ts` と `scripts/admin-menu-database-regression.ts` は、競合保存・古い全体フォーム・直接DB更新・記録失敗の巻戻し・マスタ変更・公開停止・キャッシュ例外・作成再送を検査します。確認記録の直接INSERTによる未解決事項の追加、過去／未来版の拒否、DB生成snapshotと日時、訂正ロック待ち後の古い確認拒否も検査します。入口は上記の `check-test-database.ts` / `check-ci-database.ts` です。独立の `check-owned-menu-database.ts` も最終版を送り、所有店舗条件を検査します。実認証の `check-test-browser.mjs` は非公開保存と別公開・版付きcleanupに対応していますが、実Clerk・Blobの書込を伴うので今回未実行です。合成記録と成功した検査は、実食品の正確性や現場運用を実証しません。今回の結果は[食品確認記録の検証](../verification/menu-food-review-20261009.md)に記録します。
 
@@ -310,3 +448,7 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 認証境界の変更ではContext7で[Vercelの要求ヘッダー](https://vercel.com/docs/headers/request-headers)、[Next.jsのデータ保護](https://nextjs.org/docs/app/guides/data-security)、Clerkのサーバー認証とセッション有効化の資料を確認しています。資料の説明と、このリポジトリのカスタムAPIで実装した検査、実際の配備設定は分けて確認します。
 
 未解決解除は `node --import tsx scripts/check-publication-database.ts` からも検証します。専用CI接続先のガード後に、その実行が所有する一時店舗で、旧履歴不変・現行版束縛・UNKNOWN維持・別公開・削除失効・並行訂正を確認し、後始末します。
+
+### Runtime依存の限定override
+
+`@vercel/cli-config@0.2.0` 配下のZodはroot4.6.6へ合わせます。旧exact pinの公式advisory対策であり、Vercel SDK・認証設定の更新ではありません。上流consumer/Zodを更新するときはoverride削除可否と純粋schemaのparse/encode互換性を `tests/runtime-dependency-compat.test.ts` で再確認してください。[範囲・隔離・残gate](../verification/runtime-dependency-security-20261024.md)を参照してください。

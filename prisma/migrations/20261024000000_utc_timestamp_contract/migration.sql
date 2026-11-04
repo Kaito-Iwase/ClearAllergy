@@ -1,7 +1,10 @@
 -- Store instants as UTC in the existing TIMESTAMP(3) columns, independent of
 -- the connection TimeZone. No historical row, column type, publication rule,
--- lock or append-only constraint is changed. No server/session setting changes.
+-- lock or append-only constraint is changed. No database/session TimeZone change.
 BEGIN;
+-- Fail rather than leave application traffic queued behind an unbounded DDL wait.
+-- Transaction-local only; a failed deployment rolls back every change below.
+SET LOCAL lock_timeout = '5s';
 ALTER TABLE "User" ALTER COLUMN "createdAt" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC');
 ALTER TABLE "Shop" ALTER COLUMN "createdAt" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC');
 ALTER TABLE "AdminInvite" ALTER COLUMN "createdAt" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC');

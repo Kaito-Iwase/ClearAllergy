@@ -4,6 +4,7 @@ import { PrismaClient, type Prisma } from "@prisma/client";
 import { assertCiDatabaseTarget } from "./ci-environment";
 import { publishReviewedFixture } from "./food-review-fixture";
 import { readPublicSnapshot } from "../features/public/shops/server/public-read-snapshot";
+import { createPublicAllergenLinkResolver } from "../features/public/shops/server/public-allergen-links";
 
 // A loopback-only wire gate pauses the real ORM's child SELECT, commits a real
 // correction on another connection, then releases it. No mocked query result.
@@ -56,11 +57,14 @@ async function main() {
             const proxyUrl = new URL(target); proxyUrl.hostname = "127.0.0.1"; proxyUrl.port = String(address.port);
             const reader = new PrismaClient({ datasourceUrl: proxyUrl.href });
             try {
-                const read = (tx: Prisma.TransactionClient) => tx.menuItem.findFirstOrThrow({
+                const read = async (tx: Prisma.TransactionClient) => {
+                    const [readMenu, master] = await Promise.all([tx.menuItem.findFirstOrThrow({
                     where: { id: menu.id, isPublished: true, shop: { isActive: true } },
                     select: { name: true, foodVersion: true, reviewedFoodVersion: true,
-                        allergenLinks: { select: { status: true, allergen: { select: { slug: true } } } } },
-                });
+                        allergenLinks: { select: { status: true, allergenId: true } } },
+                    }), tx.allergen.findMany({ select: { id: true, slug: true } })]);
+                    return { ...readMenu, allergenLinks: createPublicAllergenLinkResolver(master)(readMenu.allergenLinks) };
+                };
                 const observed = consistent ? await readPublicSnapshot(read, reader) : await read(reader);
                 if (failure) throw failure;
                 assert.equal(gated, true, "Must intercept the actual child SELECT after the parent read");

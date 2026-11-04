@@ -3,6 +3,7 @@
 ## 文書の入口と変更の完了条件
 
 - 初めて読む場合は [READMEの読む順番](README.md#reading-order) から進む。コード変更前には [変更対応表](docs/guide/change-map.md) と関連仕様を読み、呼び出し元も検索して影響範囲を確認する。
+- main採用範囲・未採用候補・HOLD・Productionの確認状況は[検証・採用状況](docs/guide/verification.md#adoption-status)を参照する。日付付き検証記録や別候補のPASSを、現在のmain・Productionの結果に読み替えない。
 - 「影響を受ける範囲」「実際に変更する範囲」「確認のみの範囲」を分け、依頼と無関係な変更を広げない。
 - 仕様・構成・操作方法・検証コマンドが変わる場合は、[変更対応表](docs/guide/change-map.md)から影響する文書を選び、[文書更新先と完了条件](docs/guide/maintenance.md#update-map)に従って、必要なdocsを同じ変更内で更新する。
 - 現行説明は古い記述への追記だけで済ませず、本文を整合させる。現行仕様と過去の記録を区別し、実装上の動作だけを理由に不具合を承認済み仕様にしない。
@@ -223,6 +224,8 @@ Server Componentsを基本とし、状態・副作用・イベント・ブラウ
 - シェルの違いによる実行エラーと、コードの不具合を区別する。READMEのBash構文をPowerShellへそのまま渡さない。
 
 ## Git・作業範囲
+
+- コミットメッセージ・PRタイトルは英語のtypeと日本語の説明で書く。本文、scope、互換性破壊、Issue参照、squash時の確認は[開発手順の表記規約](docs/guide/development.md#commit-pr-conventions)に従う。既存履歴を表記統一のために書き換えない。
 
 - 無関係な未コミット変更を破棄・上書き・一括整形しない。
 - 明示的な依頼なしに、commit、push、merge、force-push、`git reset --hard`、変更を破棄するcheckoutを実行しない。

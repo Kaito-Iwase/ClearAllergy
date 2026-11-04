@@ -25,8 +25,7 @@ function isMachineReadableText(text: string): boolean {
     return (
         text.startsWith("{") ||
         text.startsWith("[") ||
-        text.startsWith("<!DOCTYPE") ||
-        text.startsWith("<html")
+        /^<(?:!doctype\b|!--|\/?[a-z][a-z0-9-]*(?:\s|\/?>))/i.test(text)
     );
 }
 
@@ -34,6 +33,10 @@ export async function getApiErrorMessage(
     response: Response,
     fallbackMessage: string,
 ): Promise<string> {
+    const mediaType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+    if (mediaType === "text/html" || mediaType === "application/xhtml+xml") {
+        return fallbackMessage;
+    }
     const rawText = await response.text().catch(() => "");
     const trimmed = rawText.trim();
 
