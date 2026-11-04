@@ -15,6 +15,55 @@ permissions:
   contents: read
 
 jobs:
+  utc-timestamps:
+    name: UTC migration (${{ matrix.timezone }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        timezone: [UTC, Asia/Tokyo, America/Los_Angeles]
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: clearallergy_ci
+          POSTGRES_PASSWORD: local_ci_only
+          POSTGRES_DB: clearallergy_ci
+          TZ: ${{ matrix.timezone }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearallergy_ci -d clearallergy_ci"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
+      DIRECT_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
+      CLEARALLERGY_CI_FIXTURES: "true"
+      CLEARALLERGY_CI_TIMEZONE: ${{ matrix.timezone }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Align npm with Docker
+        run: npm install --global npm@11.18.0
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      # The upgrade regression requires an untouched database. The build job's
+      # publication upgrade/fixtures must never run on this job's service.
+      - name: Check UTC migration on an empty disposable database
+        run: node --import tsx scripts/check-utc-timestamp-migration.ts
+
   build:
     name: Test, lint, typecheck, and build
     runs-on: ubuntu-latest

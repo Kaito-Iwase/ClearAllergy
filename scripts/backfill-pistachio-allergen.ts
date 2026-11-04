@@ -30,8 +30,8 @@ async function main() {
             "MenuItem"."id",
             ${allergen.id},
             ${AllergenStatus.UNKNOWN}::"AllergenStatus",
-            CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP
+            (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+            (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
         FROM "MenuItem"
         ON CONFLICT ("menuItemId", "allergenId") DO NOTHING
     `;

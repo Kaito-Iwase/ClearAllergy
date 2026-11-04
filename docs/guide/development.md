@@ -381,6 +381,17 @@ API障害はレスポンスの `X-Request-Id` から `request_completed` / `oper
 
 復旧では既知の正常SHAへのアプリの切戻しとDB復元を分けます。アプリを戻しても適用済みmigrationや変更データは戻りません。Neonのバックアップ保持・復元先・復元権限を確認し、復元訓練は許可された隔離DBで実施します。本番リセットや逆向きSQLを即席で実行しません。
 
+<a id="utc-timestamps"></a>
+### UTC 日時契約の移行と検証
+
+`20261024000000_utc_timestamp_contract` は既存列型を維持し、10 列の DB default と 8 関数の日時生成を明示 UTC にそろえます。Prisma の default 定義も同じ SQL に合わせます。アプリから日時を渡すだけでは、DB トリガーが上書きする記録時刻は直せないため、新しい migration が必要です。`checkedAt` の CHECK、食品版・公開確認・行ロック・履歴不変の制約は変えません。招待受諾の生 SQL も UTC にそろえ、期限や所有権のルールは維持します。[日時の契約](rules.md#timestamps)が正本です。
+
+`node --import tsx scripts/check-utc-timestamp-migration.ts` は既存 CI 接続ガードと空 DB 検査後に、旧 migration を適用し、UTC/JST の時刻差を再現してから新 migration を適用します。全アプリテーブルの既存行・日時・公開状態の不変、再適用、UTC/JST/米国時間の実記録時刻、同一瞬間の ISO、未来 5 分境界、停止時の監査・更新日時、実招待受諾関数の期限判定を検査します。DST の欠ける時刻・重複する時刻と過去値を検査し、列型・制約・インデックス・トリガー・所有者・権限・物理テーブル識別子も比較します。最後に実 `backfill-pistachio-allergen.ts` を架空 DB で動かし、新規リンクの UTC 日時・UNKNOWN・既存リンク不変を確認します。この運用 writer の日時式も明示 UTC です。外部認証・Blob は呼びません。生成した架空行は使い捨て DB に残るため、既存 DB に流用せず、実行後はその DB を停止・破棄します。公開・並行更新の既存回帰は `check-ci-database.ts`、`check-publication-database.ts`、`check-public-read-snapshot.ts`、`check-shop-database.ts`、`check-owned-menu-database.ts` で別に確認します。CI では通常 build と別の `utc-timestamps` job が空の PostgreSQL 17 を UTC/JST/LA の3構成で作成し、接続時の timezone を照合して実行します。通常の `npm test` には含まれません。[当初のローカル結果](../verification/utc-timestamp-contract-20261024.md)と[main統合後の検証](../verification/utc-timestamp-pr102-20261103.md)と[最新mainへの追補](../verification/utc-timestamp-pr102-latest-main-20261103.md)を参照してください。
+
+既存 migration は編集せず、既存行を更新・時差補正しません。本番適用前には対象 SHA、既存 migration 履歴、バックアップ/復元先、DDL ロックと許容停止時間、新旧アプリの同時稼働を確認してください。DB default の変更は ACCESS EXCLUSIVE ロックを取り、読む処理も待機させます。今回の migration は transaction 内の `SET LOCAL lock_timeout = '5s'` によりロック取得待ちを制限します。回帰では2番目の ALTER を妨げ、先行 ALTER を含めて全体が戻ることを検査します。意図した失敗を `migrate resolve --rolled-back` で記録するのは、この空の使い捨て DB のテスト内だけです。本番失敗の自動解決手順ではありません。旧アプリの UTC Date/JSON は互換ですが、招待 SQL は同じリリースで更新し、運用・直接 SQL の writer も UTC に統一します。過去値が正しいかはこの migration だけでは判断できません。過去の誤った未来値を残すため、移行前後の日時の大小だけで履歴順序を推定しません。
+
+切戻しで旧 migration を改変・削除したり、履歴を一括更新したりしません。アプリだけを戻しても DB 関数/default は残り、旧招待 SQL の時差問題は戻ります。必要な切戻しは対象環境の書込みを管理し、適用済み定義と互換性を確認した別の forward migration として準備します。今回のローカル検証は本番適用の承認や本番データの補正を含みません。
+
 ### 二段階公開の移行と検証
 
 新migrationは `20261021000000_two_step_publication` と `20261021010000_food_issue_resolution`。公開操作を旧食品確認から分離するため、schema・trigger・API・公開read・UIを一緒に変更します。旧migrationは書き換えません。既に公開中の有効な実在旧記録だけを保持し、非公開を自動公開しません。切替・rollback・新旧サーバー混在は本番適用前の別確認事項です。未解決解除は別の `20261021010000_food_issue_resolution` で追加します。旧確認記録は保持し、明示解除と別公開を検証します。本番切替は別承認です。
