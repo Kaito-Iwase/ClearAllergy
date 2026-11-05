@@ -2,7 +2,7 @@
 
 [検証・採用状況](../guide/verification.md#practical-e2e-status) · [E2E実行手順](../guide/e2e.md)
 
-この文書は公開準備・Windows検証時点の記録です。下記の未コミット・外部未実施はその時点の状態で、後続の公開とCI結果は対象PRの最終SHAで別に確認します。
+前半は公開準備・Windows検証時点の記録で、後半に公開後のLinux実測を追記しています。前半の未コミット・外部未実施は当時の状態です。後続の文書同期commitのCIは対象PRのSHAで別に確認します。
 
 推奨PR baseは、GitHub connectorとGitの読み取りで確認したremote main `51adcb23945b80bb34b110d2d0f263d29629a821`。remote `test/staging` は `6293d5a02758f72a7cf00201fec239afc6b699eb` でした。旧PR #120はDraft、head466dc743/base test/stagingのままです。新候補は専用bare repositoryから作成した独立branch `test/practical-e2e-main-20261105`、baseとHEADは51adcb23945b、変更は未コミットです。remote確認後に公開操作はしていません。公開直前にはremoteの移動を再確認します。
 
@@ -60,7 +60,7 @@ CIはmainのUTC/JST/LA独立jobと専用空DB、checkout@v7、main/develop trigg
 
 mainの現行文書は両Vercel ProjectのProduction追跡先がmainと説明しています。新branchのfalseはmainへmergeした後の配備を止めません。テスト用変更だけでもmergeが本番再配備を誘発し得るため、merge・Productionへの影響は別承認です。live設定は今回読み取っていません。
 
-## 残る確認と証跡
+## Windows準備時点の未確認・証跡
 
 Linux/pin版Node・npm、無除外npm test、通常製品build、CI全job・branch保護、実Clerk/Blob、配備抑止のlive動作は未確認です。Windows local-PG wrapperもこの新baseでは再実行せず、prepared共通経路の成功と区別します。
 
@@ -71,3 +71,15 @@ Linux/pin版Node・npm、無除外npm test、通常製品build、CI全job・bran
 ## 公開後のCI定義修正
 
 Draft PR #128の初回head `b8f612bed8d794f39611e6cb464c0611efe59de0` ではDependency auditが成功し、CIはrun42028680835でjob開始前に失敗しました。job-level envの `runner.temp` 参照は[GitHubのcontext利用範囲](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts)で許可されていないため、その参照を取り除き、ブラウザー導入前のstepが `$RUNNER_TEMP` から絶対pathを `$GITHUB_ENV` へ書く形に修正しました。既存browser回帰と新E2Eは同じ保存先を引き続き使います。テスト・認証境界・配備停止・UTC独立jobは変えていません。修正後の最終headとLinux実行結果はPRのrunへ結び付けて追跡します。
+
+## 公開後のLinux CI実測（head 5dbba923）
+
+head `5dbba923cf0c4bec4889ffef07ba9c701e99b31d`、base `51adcb23945b80bb34b110d2d0f263d29629a821` の[CI run42030085365](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42030085365)は全4job成功、[Dependency audit run42030085234](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42030085234)も成功しました。実checkoutはPR merge候補 `f079371fe36e034e238bae1b1a7a6aaf14117286` です。Ubuntu26.04.1／Node22.23.4、npm11.18.0整合step、PostgreSQL17 serviceで、無除外の単体299/299、lint・型検査・実DB検査・通常製品build・旧browser回帰を通過しています。Windows準備時点の未確認事項とは別の実測です。
+
+新E2Eはrun `ci-fa86c01b-7656-4832-8b98-52a6d6365195` で9/9 PASS、20.8秒。Clerk境界だけを模擬し、1件の500応答を注入する範囲は変えていません。run監査17行の限定削除、既存4モデルのfingerprint保持、サービスDB保持、所有POSIX process group停止、TEMP削除をreceiptで確認しました。client127.0.0.1と実SQL server172.18.0.2も別々に照合しました。
+
+[artifact13416231574](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42030085365/artifacts/13416231574)のZIP（4,537,557bytes、SHA256 `f5651a03003df423531e21f3db07c44eb64b53feb24334126b4e8e0aed7a65a8`）を照合し、Playwright logとlifecycleを精査しました。元記録はworktreeの親の `e2e-publication-20261105/` に保存しています。
+
+2026-11-05 12:57 UTCのVercel APIでは、本branchの配備はclear-allergy／clear-allergy-e2eとも0件で、既存Productionのdeployment IDとmain51adcbのSHAは公開前と同じでした。観測期間の事実で、将来の別経路配備まで保証しません。Draftを維持し、main merge・auto merge・手動deployは行っていません。
+
+実Clerk/Blob・新規店舗登録/招待・実配備のcache伝播・Windows通常製品buildの失敗原因は引き続き未検証または未解決です。この文書が示す成功は固定head5dbba923の実測で、後続の文書同期commitのCI結果は対象PRで別に確認します。

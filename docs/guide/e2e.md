@@ -69,7 +69,7 @@ npm run test:e2e:ci -- --allow-font-download
 
 `test-results/ci-<run ID>/`へ `lifecycle.json` と各コマンドのログ・結果を保存します。成功判定にはspec結果だけでなく、新規fixtureの後始末、既存行fingerprintの一致、所有Next/process groupと一時コピーの終了が必要です。サービスDBは保持します。後始末が不確定なら失敗として一時領域を残し、他のCIデータを手動削除しません。
 
-CI定義には、通常の製品buildと従来の公開回帰を残したまま、この9件を認証境界差替えbuildの別stepとして追加しています。各経路の結果は、対象baseとrun IDに結び付いた記録で確認してください。Ubuntu／GitHub Actionsは未実行で、共通経路のWindows実測をLinux CI成功へ読み替えません。run ID・後始末・unitの制限を含む結果は[検証・採用状況](verification.md#practical-e2e-status)を参照してください。
+CI定義には、通常の製品buildと従来の公開回帰を残したまま、この9件を認証境界差替えbuildの別stepとして追加しています。各経路の結果は、対象baseとrun IDに結び付いた記録で確認してください。head `5dbba923` のUbuntu／GitHub Actions実行は、通常製品build・単体299件・新E2E9件を含めて成功しています。対象headとrunを確認し、Windowsの実測とは分けて扱います。run ID・後始末・unitの制限を含む結果は[検証・採用状況](verification.md#practical-e2e-status)を参照してください。
 
 ## 検証対象
 
@@ -104,4 +104,4 @@ CI定義には、通常の製品buildと従来の公開回帰を残したまま�
 
 画像/Blob upload、新規Clerkアカウント・店舗の初回登録、招待の作成・取消、実サービスでのキャッシュ伝播はこの初期suiteに含めません。管理specの開始時点でA/Bは店舗作成済みであり、UIからの店舗初回登録には別のfixtureと後始末が必要です。画像試験は既存 `admin` runner側に実Blob書込と別cleanupがあるため、無断で重複実行しません。
 
-環境やブラウザーが準備できず実行できない場合はUNVERIFIEDです。`--list`、構文、単体テスト、lintの成功だけでブラウザーE2EをPASSにしません。認証境界を模擬した実Next/API/PG/Chromiumと、実Clerk・Linuxの結果は分けて記録します。1件の500応答注入、実Clerk未検証、Linux CI未実行を分け、通常製品buildや広いunit全体の成功へ拡張しません。外部操作を禁止された作業では実Clerk版admin projectを実行しないでください。local/ci版も未準備の依存・フォントを取得してよい理由にはなりません。
+環境やブラウザーが準備できず実行できない場合はUNVERIFIEDです。`--list`、構文、単体テスト、lintの成功だけでブラウザーE2EをPASSにしません。Clerk境界を模擬する範囲、1件の500応答注入、実Clerk未検証を明記し、実行した環境・head・runごとに結果を記録します。E2E単独の成功を、実行していない別の検査の成功へ拡張しません。外部操作を禁止された作業では実Clerk版admin projectを実行しないでください。local/ci版も未準備の依存・フォントを取得してよい理由にはなりません。
