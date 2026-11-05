@@ -165,14 +165,19 @@ export const test = base.extend({
 });
 export { expect };
 
-export async function publish(menu) {
+export async function publish(menu, expectedVersion) {
     const panel = menu.page.getByRole('region', { name: '保存しました', exact: true });
     const responsePromise = menu.page.waitForResponse(r => new URL(r.url()).pathname === menu.api && r.request().method() === 'PUT');
     await panel.getByRole('button', { name: 'この内容で公開', exact: true }).click();
     const response = await responsePromise;
     expect(response.status()).toBe(200);
     expect(response.request().postDataJSON().publicationAction).toBe('publish');
-    expect((await response.json()).menu.isPublished).toBe(true);
+    if (expectedVersion !== undefined) {
+        expect(response.request().postDataJSON()).toEqual({ expectedVersion, publicationAction: 'publish' });
+    }
+    const result = (await response.json()).menu;
+    expect(result.isPublished).toBe(true);
+    return result;
 }
 
 export async function readMenu(menu) {

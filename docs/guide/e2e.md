@@ -35,7 +35,7 @@ npm.cmd run test:e2e -- --project=public --headed
 
 ## 実Clerkを使わないローカル実行
 
-Windows上でPostgreSQLの実行ファイル、同じlockfileに対応する生成済みPrisma Client/engine、既存Playwright 1.61.0とChromiumが揃っている場合は、9件を新規の使い捨てDBで実行できます。Dockerや実Clerkアカウントは使いません。依存・Prisma・ブラウザー・PostgreSQLの自動取得は行いません。
+Windows上でPostgreSQLの実行ファイル、同じlockfileに対応する生成済みPrisma Client/engine、既存Playwright 1.61.0とChromiumが揃っている場合は、11件を新規の使い捨てDBで実行できます。Dockerや実Clerkアカウントは使いません。依存・Prisma・ブラウザー・PostgreSQLの自動取得は行いません。
 
 ```powershell
 $env:E2E_PG_BIN = 'C:\tools\pgsql\bin' # 既存のinitdb/pg_ctl/createdb
@@ -65,11 +65,11 @@ npm run test:e2e:ci -- --allow-font-download
 
 `run-ci.mjs` は共有 `run-fixture.mjs` を使い、既存アプリ依存・実行platform用の生成済みClientとengine・隔離ブラウザーを新しいアプリコピーで再利用します。Windows用engineの固定指定、PGプロセスの起動・停止、migrate、`setup-ci-env.ts` の再実行は行いません。既存サービスの停止・削除やDBリセットも行いません。実Clerkへの接続やClerkアカウントの作成は不要です。
 
-この実行の前後で既存User/Shop/MenuItem/AuditLog行のfingerprintを照合し、新しいrun IDのA/Bとそのテストデータだけを作成・削除します。User削除で匿名化される監査ログも、今回作ったUser IDに限って先に削除し、既存AuditLogのfingerprint一致と新規監査行の残留なしを要求します。他の同時書込みを検知した場合も成功にせず、共有fixtureの利用を止めて確認してください。公開4件は既存CIの架空公開店舗を使い、管理5件は新規A/Bを使います。spec前に `/e2e-fixture-check` でrun ID・baseURL・実DB identityを照合してから、所有者操作へ進みます。
+この実行の前後で既存User/Shop/MenuItem/AuditLog行のfingerprintを照合し、新しいrun IDのA/Bとそのテストデータだけを作成・削除します。User削除で匿名化される監査ログも、今回作ったUser IDに限って先に削除し、既存AuditLogのfingerprint一致と新規監査行の残留なしを要求します。他の同時書込みを検知した場合も成功にせず、共有fixtureの利用を止めて確認してください。公開4件は既存CIの架空公開店舗を使い、管理7件は新規A/Bを使います。spec前に `/e2e-fixture-check` でrun ID・baseURL・実DB identityを照合してから、所有者操作へ進みます。
 
 `test-results/ci-<run ID>/`へ `lifecycle.json` と各コマンドのログ・結果を保存します。成功判定にはspec結果だけでなく、新規fixtureの後始末、既存行fingerprintの一致、所有Next/process groupと一時コピーの終了が必要です。サービスDBは保持します。後始末が不確定なら失敗として一時領域を残し、他のCIデータを手動削除しません。
 
-CI定義には、通常の製品buildと従来の公開回帰を残したまま、この9件を認証境界差替えbuildの別stepとして追加しています。各経路の結果は、対象baseとrun IDに結び付いた記録で確認してください。head `5dbba923` のUbuntu／GitHub Actions実行は、通常製品build・単体299件・新E2E9件を含めて成功しています。対象headとrunを確認し、Windowsの実測とは分けて扱います。run ID・後始末・unitの制限を含む結果は[検証・採用状況](verification.md#practical-e2e-status)を参照してください。
+CI定義には、通常の製品buildと従来の公開回帰を残したまま、全11件を認証境界差替えbuildの別stepとして追加しています。各経路の結果は、対象baseとrun IDに結び付いた記録で確認してください。head `5dbba923` のUbuntu／GitHub Actions実行は、通常製品build・単体299件・新E2E9件を含めて成功しています。対象headとrunを確認し、Windowsの実測とは分けて扱います。 食品訂正・UNKNOWNの追加2件はPR #128の `1a8fa046` 後の追補です。この2件を含む11件のローカル結果と公開後のhead別CIの扱いは[追補検証](../verification/e2e-food-states-20261105.md)を参照してください。run ID・後始末・unitの制限を含む結果は[検証・採用状況](verification.md#practical-e2e-status)を参照してください。
 
 ## 検証対象
 
@@ -79,10 +79,12 @@ CI定義には、通常の製品buildと従来の公開回帰を残したまま�
 | admin | 店舗説明の保存・再読込、メニュー新規非公開保存→別操作で公開、他店の取得・編集・削除・停止拒否 | 既定は実Clerkの開発用認証・実アプリ・専用DB。明示local/ci実行はClerk境界だけ模擬 |
 | admin | A/B各店舗の旧画面の編集PUTを409拒否し入力保持。同じ旧画面からSTOPを200で受理し、匿名API404を確認 | 各店舗で別タブの価格保存を実行し、本物の版競合を作る。STOPには古い版の照合を要求しない |
 | admin | 保存500でも編集中の入力が残り、DBは変わらない | この1ケースの失敗応答だけを明示的に注入する。DB障害の再現試験ではない |
+| admin | 公開中の食品訂正を非公開保存し、保存内容を確認して別操作で再公開。CONTAINS・MAY_CONTAIN・FREEを公開APIと同じ品目行の表示で照合 | 実保存API・実DB。管理GETを永続化の観測に使い、公開PUTの保存版・本文も検査する |
+| admin | 公開中からUNKNOWN保存で非公開となり、未設定の品目名・件数・公開ボタン不在、最新版での公開PUT400を検査 | UNKNOWNを公開させず、公開API404・新規ページの対象なしを検査。防御的なUNKNOWN表示分類は既存unitで検査する |
 
 新規公開は、架空メニューの全品目を入力して非公開保存し、サーバーから取得した保存済み版に別の公開操作を行います。実食品の安全確認を代用するものではありません。公開条件やAPIの期待値を緩めていません。競合2件とSTOP2件は独立した期待値です。
 
-停止後は公開APIの404を要求し、HTMLではnot-found見出しを待ってから、公開前に表示した固有のメニュー名・架空原材料が本文に残らないことを検査します。[公開読取の仕様](rules.md#publication)と[Nextのnot-found規約](https://github.com/vercel/next.js/blob/v16.2.9/docs/01-app/03-api-reference/03-file-conventions/not-found.mdx)では、ストリーミング後のnot-foundはHTTP200になる場合があります。HTML輸送statusだけで公開情報の残留を判定しません。
+停止後は公開APIの404を要求し、HTMLではnot-found見出しを待ってから、公開前に表示した固有のメニュー名・架空原材料が本文に残らないことを検査します。[公開読取の仕様](rules.md#publication)と[Nextのnot-found規約](https://github.com/vercel/next.js/blob/v16.2.9/docs/01-app/03-api-reference/03-file-conventions/not-found.mdx)では、ストリーミング後のnot-foundはHTTP200になる場合があります。HTML輸送statusだけで公開情報の残留を判定しません。 停止・訂正後のページ確認は新規ナビゲーションです。開いたままの画面への自動到達を保証せず、食品訂正テストのheld-page添付も観察だけです。[鮮度の比較案](../research/product/public-view-freshness-options-20261105.md)は未採用で、製品の取得中・失敗時表示は変更していません。
 
 ## 認証とデータの前提
 
@@ -98,7 +100,7 @@ CI定義には、通常の製品buildと従来の公開回帰を残したまま�
 
 ## 既存試験との関係と限界
 
-公開specは既存 `check-first-use-browser.mjs` の代表操作を、小さく選択して実行・再実行できる形にしています。既存CIの広い公開回帰は追加coverageとして残します。新9件は別の認証境界モックbuildで実行し、通常の製品buildも維持します。CIのplaceholder Clerkで実Clerk版adminを動かすのではなく、`test:e2e:ci` が試験コピー内だけに認証doubleを配線します。
+公開specは既存 `check-first-use-browser.mjs` の代表操作を、小さく選択して実行・再実行できる形にしています。既存CIの広い公開回帰は追加coverageとして残します。全11件は別の認証境界モックbuildで実行し、通常の製品buildも維持します。CIのplaceholder Clerkで実Clerk版adminを動かすのではなく、`test:e2e:ci` が試験コピー内だけに認証doubleを配線します。
 
 既存の `publication` / `allergens` / `composition` / `qr` は部品・模擬APIの検査を含みます。これらの成功やspecの列挙を、実アプリ＋認証＋DB E2Eの成功とは扱いません。Issue #118のPreview/OIDC/承認台帳・再開ランナーも別運用のままです。
 

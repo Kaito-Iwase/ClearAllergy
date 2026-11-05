@@ -75,6 +75,136 @@ test('メニュー: 模擬500の保存失敗でも入力を保持する', async 
     expect(await readMenu(menu)).toEqual(before);
 });
 
+const representativeAllergens = [
+    { slug: 'egg', name: '卵', status: 'CONTAINS', input: '含む', label: '含む' },
+    { slug: 'wheat', name: '小麦', status: 'MAY_CONTAIN', input: '含む可能性あり・要確認', label: '含む可能性あり・要確認' },
+    { slug: 'milk', name: '乳', status: 'FREE', input: '原材料に含まない登録', label: '原材料に含まない' },
+];
+
+async function saveEditedMenu(menu) {
+    const saved = menu.page.waitForResponse(r => new URL(r.url()).pathname === menu.api && r.request().method() === 'PUT');
+    await menu.page.getByRole('button', { name: '保存する', exact: true }).click();
+    const response = await saved;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON().publicationAction).toBeUndefined();
+    await expect(menu.page.getByRole('region', { name: '保存しました', exact: true })).toBeVisible();
+    return readMenu(menu);
+}
+
+async function expectWithdrawn(menu, request, page) {
+    expect((await request.get(menu.publicAPI, { maxRedirects: 0 })).status()).toBe(404);
+    await page.goto(`/shops/${menu.shopId}/menus/${menu.id}`);
+    // A fresh navigation can be streamed HTML200; inspect the semantic result.
+    await expect(page.getByRole('heading', { name: 'ページが見つかりません', exact: true })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(menu.name);
+    await expect(page.locator('body')).not.toContainText(menu.ingredients);
+}
+
+test('食品訂正: 非公開保存→保存済み内容の確認→別操作の再公開が公開表示につながる', async ({ createMenu, request, page }, testInfo) => {
+    const menu = await createMenu();
+    await publish(menu);
+    const before = await readMenu(menu);
+    expect(before.isPublished).toBe(true);
+    expect(before.publicationConfirmedFoodVersion).toBe(before.foodVersion);
+    const publicURL = `/shops/${menu.shopId}/menus/${menu.id}`;
+    await page.goto(publicURL);
+    await expect(page.getByText(menu.ingredients, { exact: true })).toBeVisible();
+
+    await menu.page.goto(menu.editURL);
+    const correctedIngredients = `${menu.ingredients} 訂正後の架空原材料`;
+    await menu.page.getByLabel(/原材料名/).fill(correctedIngredients);
+    for (const item of representativeAllergens) {
+        const button = menu.page.getByRole('group', { name: item.name, exact: true }).getByRole('button', { name: item.input, exact: true });
+        await button.click();
+        await expect(button).toHaveAttribute('aria-pressed', 'true');
+    }
+    const saved = await saveEditedMenu(menu);
+    expect(saved.ingredients).toBe(correctedIngredients);
+    expect(saved.version).toBeGreaterThan(before.version);
+    expect(saved.foodVersion).toBeGreaterThan(before.foodVersion);
+    expect(saved.publicationConfirmedFoodVersion).toBeNull();
+    expect(saved.isPublished).toBe(false);
+    expect(saved.foodReviews).toEqual(before.foodReviews);
+    for (const item of representativeAllergens) {
+        expect(saved.allergens.find(row => row.slug === item.slug)?.status, `owner DB read ${item.slug}`).toBe(item.status);
+    }
+    // Observation only: a held page is not a fresh read. Do not make stale DOM
+    // retention an acceptance condition or claim background/resume coverage.
+    const heldPageObservation = { trigger: 'food-save-committed', navigationSinceSave: false,
+        previousIngredientsVisible: await page.getByText(menu.ingredients, { exact: true }).isVisible(),
+        automaticRefreshGuaranteed: false };
+    // The default list reporter does not persist in-memory attachments. Keep
+    // this non-sensitive boolean observation in the retained console log too.
+    console.info('[held-page-observation]', JSON.stringify(heldPageObservation));
+    await testInfo.attach('held-page-observation.json', {
+        contentType: 'application/json', body: JSON.stringify(heldPageObservation),
+    });
+    await expectWithdrawn(menu, request, page);
+    await expect(page.locator('body')).not.toContainText(correctedIngredients);
+
+    const panel = menu.page.getByRole('region', { name: '保存しました', exact: true });
+    await expect(panel.getByText('現在は非公開です。', { exact: true })).toBeVisible();
+    await panel.locator('summary').click();
+    await expect(panel.getByText(correctedIngredients, { exact: true })).toBeVisible();
+    for (const item of representativeAllergens) {
+        await expect(panel.getByRole('listitem').filter({ hasText: `${item.name}：` })).toHaveText(`${item.name}：${item.status === 'FREE' ? item.input : item.label}`);
+    }
+    await publish(menu, saved.version);
+    const published = await readMenu(menu);
+    expect(published.isPublished).toBe(true);
+    expect(published.foodVersion).toBe(saved.foodVersion);
+    expect(published.publicationConfirmedFoodVersion).toBe(saved.foodVersion);
+    expect(published.ingredients).toBe(correctedIngredients);
+    expect(published.allergens).toEqual(saved.allergens);
+    expect(published.foodReviews).toEqual(before.foodReviews);
+
+    const response = await request.get(menu.publicAPI, { maxRedirects: 0 });
+    expect(response.status()).toBe(200);
+    const publicMenu = (await response.json()).menu;
+    expect(publicMenu.ingredients).toBe(correctedIngredients);
+    for (const item of representativeAllergens) {
+        expect(publicMenu.allergens.find(row => row.slug === item.slug)?.status, `public API ${item.slug}`).toBe(item.status);
+        expect(publicMenu.allergenDisplayItems.find(row => row.slug === item.slug)?.status).toBe(item.status);
+    }
+    await page.goto(publicURL);
+    await expect(page.getByText(correctedIngredients, { exact: true })).toBeVisible();
+    await expect(page.getByText(menu.ingredients, { exact: true })).toHaveCount(0);
+    for (const item of representativeAllergens) {
+        // Check the label in the very same item row, not anywhere on the page.
+        const row = page.locator('div').filter({ has: page.locator(':scope > span').filter({ hasText: new RegExp(`^${item.name}$`) }) });
+        await expect(row).toHaveCount(1);
+        await expect(row.getByText(item.label, { exact: true })).toBeVisible();
+        await expect(row.getByText('未入力・未確認', { exact: true })).toHaveCount(0);
+    }
+});
+
+test('UNKNOWN: 公開中から未設定を保存すると非公開となり最新版の公開要求も拒否する', async ({ createMenu, request, page }) => {
+    const menu = await createMenu();
+    await publish(menu);
+    const before = await readMenu(menu);
+    expect(before.isPublished).toBe(true);
+    expect((await request.get(menu.publicAPI, { maxRedirects: 0 })).status()).toBe(200);
+    await menu.page.goto(menu.editURL);
+    await menu.page.getByRole('group', { name: '卵', exact: true }).getByRole('button', { name: '未設定', exact: true }).click();
+    const saved = await saveEditedMenu(menu);
+    expect(saved.allergens.find(row => row.slug === 'egg')?.status).toBe('UNKNOWN');
+    expect(saved.foodVersion).toBeGreaterThan(before.foodVersion);
+    expect(saved.publicationConfirmedFoodVersion).toBeNull();
+    expect(saved.isPublished).toBe(false);
+    const panel = menu.page.getByRole('region', { name: '保存しました', exact: true });
+    const blocked = panel.getByRole('status').filter({ hasText: '未設定が1品目あるため公開できません。' });
+    await expect(blocked).toBeVisible();
+    await expect(blocked.getByText('卵', { exact: true })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'この内容で公開', exact: true })).toHaveCount(0);
+    const refused = await menu.context.request.put(menu.api, { maxRedirects: 0,
+        headers: { Origin: new URL(menu.page.url()).origin },
+        data: { expectedVersion: saved.version, publicationAction: 'publish' },
+    });
+    expect(refused.status()).toBe(400);
+    expect(await readMenu(menu)).toEqual(saved);
+    await expectWithdrawn(menu, request, page);
+});
+
 for (const role of ['a', 'b']) {
     test(`店舗${role.toUpperCase()}: 古い編集PUTは409、同じ古い画面の公開停止は200`, async ({ createMenu, request, page }) => {
         const menu = await createMenu(role);

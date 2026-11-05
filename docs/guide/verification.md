@@ -52,6 +52,13 @@ F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIの
 
 Windowsの通常製品buildはフォント接続とTurbopack子Node起動で失敗した記録を保持します。一方、head `5dbba923cf0c4bec4889ffef07ba9c701e99b31d` の[Linux CI](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42030085365)は、実checkout `f079371fe36e034e238bae1b1a7a6aaf14117286` でUTC3timezone・単体299/299（除外なし）・lint・型検査・実DB・通常製品build・既存browser・新E2E9/9が成功しました。[依存監査](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42030085234)も成功しています。Node22.23.4とnpm11.18.0整合stepを使用した結果で、Windowsの失敗原因が解消したとは扱いません。実Clerk/Blob、実配備環境でのcache伝播は未検証です。旧466基準の結果は流用していません。文書同期後の各commitも、そのSHAのPR CIで別に確認します。
 
+<a id="food-state-e2e-status"></a>
+## 2026-11-05 食品訂正・状態表示のE2E追補候補
+
+PR #128のhead `1a8fa04699b0472b43ba930138055c5c3bde0b95` から独立branch `test/e2e-food-states-20261105` で2件を追加し、既存[PR #128](https://github.com/Kaito-Iwase/ClearAllergy/pull/128)へ反映する追補です。[追補検証](../verification/e2e-food-states-20261105.md)は、食品訂正→非公開保存→保存済み確認→別公開と、CONTAINS/MAY_CONTAIN/FREEの公開API・品目行の表示、UNKNOWNの公開拒否を対象にします。公開条件・製品コードは変更していません。最終差分は旧9件を含め11/11成功（run `ci-d4f749ea-f01a-4e6b-ac13-a8efc209e694`、37.0秒）です。DB回帰37グループ、通常設定のNext build、lint・型検査も成功しました。unitは指定1件除外・所有TEMP/TMP指定で298件成功し、既定sandbox一時パスでは既存3件の失敗を変更前でも再現しています。除外なしの通常 `npm test` 成功とは区別します。この数値はWindowsローカル結果です。追補公開後のLinux CI・監査はPR #128の最新head・runで別に確認し、過去の9件成功と区別します。実Clerk・実サービスは未検証です。
+
+開いた画面の鮮度は[未採用比較案](../research/product/public-view-freshness-options-20261105.md)として独立批評を反映しました。取得中・失敗時の表示や期限等の製品判断を残し、最大遅延や全閲覧者への自動到達を保証しません。製品の復帰時挙動は変更していません。
+
 ## 日付付きの検証記録
 
 以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。
