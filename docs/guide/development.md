@@ -152,6 +152,8 @@ node scripts/check-shop-save-browser.mjs
 
 同じ作業ツリー（worktree）のビルド済みCSS（画面の見た目を指定するスタイル）が必要です。Webpackの `.next/static/css` と既定の `.next/static/chunks` を読めます。既存Windows依存をジャンクション（ディレクトリの参照リンク）で共有してTurbopackが作業ルートの外として拒否する環境では、同じスキーマの生成済みClientを確認したうえで `npm.cmd --ignore-scripts run build -- --webpack` を使い、共有Clientの再生成を省略したことを記録します。通常の独立環境・CIは従来の `npm run build` とPrisma生成を使います。[今回の結果と限界](../verification/shop-save-contract-20261015.md)を参照してください。
 
+通常のPlaywright E2Eは[専用手順](e2e.md)に従います。`npm.cmd run test:e2e -- --list` は列挙だけ、`test:e2e:local -- --allow-font-download` はWindowsの所有PG、`test:e2e:ci -- --allow-font-download` は準備済みCI DBとブラウザーを使う入口です。local/ciは認証境界だけを模擬し、実Next・API・DBを通します。既存の実Clerk/Blob用admin runnerとは区別してください。確認状況は[検証記録](verification.md#practical-e2e-status)を参照してください。
+
 ブラウザ回帰は `scripts/browser-runner.mjs` でPlaywright 1.61.0とChromiumを隔離して用意します。アプリの依存とlockfileは変更しません。既定の保存先はOSの一時ディレクトリ内の `clearallergy-browser-1.61.0` で、`CLEARALLERGY_BROWSER_RUNNER_DIR` で変更できます。初回の `install` はネットワークから検証ツールを取得するため、利用可能な環境で実行します。アプリの既存依存が必要です。
 
 ```powershell

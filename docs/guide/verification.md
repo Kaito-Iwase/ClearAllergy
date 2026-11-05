@@ -41,6 +41,17 @@ PR #111追従開始時の確認済みProductionは、PR #113の自動配備 `Eoe
 
 F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIのSHA、公開4入口の結果を記録し、上記の規約導入時点の結果と分けます。main更新は自動Production配備を起動するため、ユーザーの個別承認範囲を確認し、異常時は追加変更を止めます。rollbackは別承認です。ブランチ固有の配備抑止をmainの配備抑止と解釈しません。
 
+<a id="practical-e2e-status"></a>
+## 2026-11-05 main基準の通常Playwright E2E候補
+
+最新remote main `51adcb23945b80bb34b110d2d0f263d29629a821` を確認して作成した独立branch `test/practical-e2e-main-20261105` のmain向け通常E2E候補です。公開とCIの最終状態は対象PRのSHAに結び付けて確認し、main採用・Production反映と区別します。旧PR #120の76ファイル差分、専用runner、workflowの実処理は取り込みません。mainにはtimeoutの対象service guardが存在しないため、その固定message修正も移しません。
+
+既存のUTC migration独立job・main/developのCI起動条件・checkout版・通常製品buildと公開回帰を保持し、新E2Eは準備済みのサービスDB・ブラウザーを使う別stepにします。新branchだけVercel Git配備をfalseにし、既存の配備設定とmainのProduction追跡方針を保持します。この設定のlive動作は未実行です。mainへのmergeは別途Production再配備を誘発し得るため、公開branchの配備抑止をmergeの許可と読み替えません。
+
+[main基準の検証記録](../verification/practical-e2e-main-20261105.md)に対象と限界をまとめています。旧Clientをコピーせず、既存CLI/engineからmain用Clientをローカル生成してschema一致を確認しました。Windowsのprepared CI共通経路は9/9 PASS（26.8秒）、既存User/Shop/MenuItem/AuditLogを保持し、run所有の監査17行も後始末しました。単体回帰はhardlink名除外指定付き298件PASS、lint・型検査も成功しました。
+
+通常製品buildは、公式フォント接続失敗と、正式アクセス後のTurbopack子Node起動失敗を記録し、成功とはしていません。認証alias付きcopyのbuild成功と区別します。Linux／Actions・pinされたNode/npm・無除外npm test・通常製品build・実Clerk/Blob・live配備抑止は未確認です。旧466基準の9/9や373件をこの候補へ流用しません。
+
 ## 日付付きの検証記録
 
 以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。

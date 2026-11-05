@@ -89,13 +89,15 @@ jobs:
       DATABASE_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
       DIRECT_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
       CLEARALLERGY_CI_FIXTURES: "true"
-      # ビルド用の非実在キー。CIの画面確認は公開ページに限定する。
+      # 通常build・公開回帰用の非実在キー。管理E2Eは別コピーの認証境界だけを模擬する。
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlYXJhbGxlcmd5LWNpLmNsZXJrLmFjY291bnRzLmRldiQ
       CLERK_SECRET_KEY: sk_test_ci_placeholder_not_a_real_key
       PORTFOLIO_MODE: "true"
       ADMIN_REGISTRATION_MODE: "disabled"
       ENABLE_CLERK_ADMIN_AUTH: "false"
       NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      # Share the existing isolated browser assets with the E2E copy.
+      CLEARALLERGY_BROWSER_RUNNER_DIR: ${{ runner.temp }}/clearallergy-browser-1.61.0
 
     steps:
       - name: Checkout
@@ -179,11 +181,17 @@ jobs:
         if: failure()
         run: node --import tsx scripts/collect-ci-diagnostics.ts "$RUNNER_TEMP/clearallergy-app.log" "$RUNNER_TEMP/clearallergy-browser-results/app-log-summary.json"
 
+      - name: Check owner flows with real routes and PostgreSQL in Chromium
+        # Clerk boundary only; uses the prepared service DB and installed browser.
+        run: npm run test:e2e:ci -- --allow-font-download
+
       - name: Save browser evidence
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: prototype-browser-${{ github.sha }}
-          path: ${{ runner.temp }}/clearallergy-browser-results
+          path: |
+            ${{ runner.temp }}/clearallergy-browser-results
+            test-results/ci-*
           if-no-files-found: ignore
           retention-days: 7
