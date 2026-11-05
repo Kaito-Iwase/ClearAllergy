@@ -6,7 +6,7 @@
 
 PR #128のhead `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` を基点とした、独立branch `test/public-freshness-prototype-20261105` のDraft公開候補です。PR #128やmainにこの試作を反映していません。製品方針・表示文言・本番採用の承認とは分けます。既存PR用worktree、元の食品E2E候補、canonicalの別作業を保護します。
 
-PRのbaseは未mergeの#128のbranch `test/practical-e2e-main-20261105` とし、そのE2E基盤を重複差分にしません。自動CI／依存監査のpull_request対象へこのbaseだけを追加し、headのVercel Git配備をexact falseにします。main/developの従来trigger・既存guard・監査基準は維持します。[公開準備の敵対的セルフレビュー](public-freshness-pr-review-20261105.md)に依存関係と未確認を記録します。
+公開先は[Draft PR #129](https://github.com/Kaito-Iwase/ClearAllergy/pull/129)です。baseは未mergeの#128のbranch `test/practical-e2e-main-20261105` とし、そのE2E基盤を重複差分にしません。自動CI／依存監査のpull_request対象へこのbaseだけを追加し、headのVercel Git配備をexact falseにします。main/developの従来trigger・既存guard・監査基準は維持します。[公開準備の敵対的セルフレビュー](public-freshness-pr-review-20261105.md)に依存関係と未確認を記録します。
 
 対象は店舗一覧・店舗詳細・メニュー詳細です。初期SSRと手動／復帰時の再取得に同じserver loaderを使い、食品本文・店舗情報・マスタ・店舗内補足を完全なsnapshotとしてReactへ渡します。3 loaderのRepeatableRead、公開条件、同一transaction内の補足取得を維持します。価格や本体更新日時だけで別メニュー由来の補足を検出する方式ではありません。
 
@@ -65,13 +65,26 @@ PRのbaseは未mergeの#128のbranch `test/practical-e2e-main-20261105` とし�
 
 freshness projectだけ、Playwright既定の `--disable-back-forward-cache` がある場合にその一引数を外して復元を試みます。ブラウザーのsandbox等を変更する設定ではありません。資料はPlaywright1.61.1、実依存は1.61.0で、実行結果を分けます。[launchOptions／ignoreDefaultArgs](https://github.com/microsoft/playwright/blob/v1.61.1/docs/src/test-api/class-testoptions.md)
 
+<a id="linux-ci-7feb5c1"></a>
+## 公開後のLinux CI（測定対象head 7feb5c1）
+
+公開head `7feb5c136e52dd29afa54a7c9387c35ab910b7d4` の[CI 42129411078](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42129411078)は全4job成功しました。実checkoutは#128へのPR merge候補 `b7bfa54abb2f73aecd2181af8c853ad2e6cdcc85` です。mainへのmergeではありません。単体317/317・skip0、lint・型検査・Prisma生成/validate・実DB・通常のnpm build（prebuildを含む）・既存の公開回帰が成功しました。
+
+Linuxの実Next・使い捨てDB・既存CIブラウザとClerk境界模擬のrun `ci-b6e6e2bb-68ba-4ae0-890e-2af89dd8f1a7` は17 PASS・native BFCache1 SKIP、54.2秒でした。既存11件の本文は保持しています。nativeは実復元されずpersisted=falseで、Windowsと同じ未実証の扱いです。監査58行除去、既存4model fingerprint保持、共有service DB保持、所有process group停止・一時領域削除をlifecycleで確認し、job終了時のcontainer停止も成功しました。
+
+[artifact 13462607696](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42129411078/artifacts/13462607696)の6,574,608 bytesとSHA256 `f1131d321e1da749eb895c5b5a29d405bf012479a55d60380bdda839937f0760`をGitHub digestへ照合し、spec log・lifecycleを読みました。[依存監査 42129411082](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42129411082)も既存high閾値で成功しましたが、minimatch起点の開発依存moderate8件が報告されており、脆弱性ゼロではありません。依存版は変更していません。
+
+2026-11-05 23:34:32 UTCのVercel読み取りでは、`clear-allergy`と`clear-allergy-e2e`の本branch配備は両方0件でした。Productionは従前と同じmain `51adcb23945b80bb34b110d2d0f263d29629a821`、Readyで、IDはそれぞれ `dpl_BwzZHdde7UuMnctfrU4CtAnPW2oS` と `dpl_GcKXLERckVxBp1VHvySdf9oxnM6B` です。観測範囲の事実で、mainや手動配備まで抑止する保証ではありません。
+
+この記録の追補は文書だけで、測定済みの製品コード・テスト・CI設定は変更しません。後続headのChecksはPRの対象SHAと照合し、上記runを別headで実行したことにはしません。
+
 ## 採用判断・未確認
 
 - 表示保持と遮蔽、文言、対象範囲、取得中の操作、利用者理解は候補のままです。友人テスト・専門レビューは未実施。
 - visibleのままの継続閲覧、JS未実行、停止されたプロセス、オフライン、復帰イベント前の旧画面paint、他端末・印刷等への配送は保証しません。
 - polling・push・数値TTL・最大許容遅延は実装していません。一要求は同じDB snapshot内で複数SQLを伴い得ます。要求数をDB負荷と同一視せず、本番の閲覧数・接続保持・遅延分布・負荷上限は未測定です。
 - HTML404やログインHTMLだけでは正常な対象なしとしません。取得結果のDOM commitは、paint完了・利用者の認知・食品の正しさの証拠ではありません。
-- native BFCache、全ブラウザー／OSの復帰、実Clerk／Preview／Blob、実サービス・本番、Linux CIは未確認です。
+- native BFCache、全ブラウザー／OSの復帰、実Clerk／Preview／Blob、実サービス・本番は未確認です。Linux CIの確認範囲は上の特定head・runに限定します。
 - 新しい公開snapshot API・本文client view化・候補文言の製品採用は別判断です。後続のユーザー指示でDraft PR公開とCI確認のみ承認されました。merge／本番操作／配備は行いません。
 
 既存構成図は初期表示と主要処理の概要で、公開APIを省略対象として明記しています。初期SSR→同じsnapshot→共通公開判定の経路を照合し、図の既存説明を維持します。再取得候補は[内部処理](../guide/architecture.md#freshness-prototype)で別に説明します。schema・migration・依存版・認証規則・共通公開条件は変更しておらず、rules／AGENTSの本文変更は不要です。

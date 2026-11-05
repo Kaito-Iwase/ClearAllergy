@@ -41,3 +41,9 @@ Aは利用者比較の暫定既定候補です。旧FREEの誤読が続き、B�
 - 最初に公開するcommitから正確なhead branchの `git.deploymentEnabled=false` を含めます。既存guardは保持し、main/developの既定動作・Project設定を変更しません。公式仕様と設定の照合は実際の非配備観測とは別であり、push後に両Projectのbranch/SHA配備一覧とProduction IDを確認します。merge・手動deployの抑止ではありません。
 
 設定・文書の追加を除く測定済み実装の変更は、この公開準備時点ではありません。新たな不具合を確認した場合は原因・最小修正・再検証を追記し、受入条件を弱めません。Draft作成・CI成功は、製品方針の確定・main merge・本番配備の承認ではありません。
+
+## 公開後の結合確認
+
+[Draft PR #129](https://github.com/Kaito-Iwase/ClearAllergy/pull/129)を#128宛に作成しました。head `7feb5c136e52dd29afa54a7c9387c35ab910b7d4` とbase `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` のmerge候補 `b7bfa54abb2f73aecd2181af8c853ad2e6cdcc85` で、自動CI全4job・high閾値の依存監査が成功しています。Linux unit317/317・skip0と、既存11件を含むE2E17 PASS・native1 SKIPを確認しました。[具体的なrun・artifact・cleanup・非配備観測](public-freshness-prototype-20261105.md#linux-ci-7feb5c1)を参照してください。
+
+公開準備後のfocused22件も再実行して22/22・skip0、文書リンク365件・40ファイルscope・diff/check・exact branch falseと既存guard不変を確認しました。設定の最初の文字列照合はCRLF checkoutとLF blobの差で失敗し、改行を正規化して内容一致を検査すると成功しました。製品の不具合ではなく、製品コードの修正は伴いません。別途の独立レビュー完了をこの自己レビューから主張しません。

@@ -64,7 +64,7 @@ PR #128のhead `1a8fa04699b0472b43ba930138055c5c3bde0b95` から独立branch `te
 
 PR #128 head `bcc4c0cd` から作った `test/public-freshness-prototype-20261105` の未採用Draft候補です。公開3画面の共有loader／完全JSON snapshot／手動・復帰取得／状態表示／旧情報の参照・遮蔽を実装しています。[追補記録](../verification/public-freshness-prototype-20261105.md)の最初の実Next・使い捨てDB・既存Chromium実行は17 PASS・native BFCache1 SKIP、unit316件（既知EPERM指定1件除外・所有TEMP/TMP指定）と10負例が成功しました。最終差分のrun `ci-9f927481-4e8c-4143-9ef0-5d95ca19d2cf` も17 PASS・native1 SKIP。通常Next設定build、全体lint・型検査、最終unit316件、既存部品browser17グループも成功しました。icon-fontの現物とnative BFCache復元は未確認です。
 
-native復元はno-store等により使われず、合成イベント・実SPA成功と区別します。画面の文言・表示方針・期限・採用は未決です。今回候補のLinux CI・実Clerk・本番・配備は未確認で、PR #128の成功を流用しません。元PR branchへのpushや更新は行いません。
+native復元はno-store等により使われず、合成イベント・実SPA成功と区別します。画面の文言・表示方針・期限・採用は未決です。[Draft PR #129](https://github.com/Kaito-Iwase/ClearAllergy/pull/129)の公開head `7feb5c1` はLinux CI全4job成功、unit317/317・skip0、E2E17 PASS・native1 SKIPでした。実checkout・run・artifactと非配備観測は[公開後の記録](../verification/public-freshness-prototype-20261105.md#linux-ci-7feb5c1)へ分けます。実Clerk・本番・native復元は未確認で、PR #128の成功を流用しません。元PR branchへのpushや更新は行いません。
 
 ## 日付付きの検証記録
 
