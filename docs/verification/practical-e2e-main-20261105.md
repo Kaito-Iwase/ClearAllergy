@@ -67,3 +67,7 @@ Linux/pin版Node・npm、無除外npm test、通常製品build、CI全job・bran
 独立read-only reviewはround1で監査ログ残留を指摘し、上記の限定cleanupと残留照合を追加したround2ではP1/P2なしでした。実行後のreceiptを含む最終照合も保存記録に残します。
 
 元ログは今回作業領域の親 `e2e-standalone-preparation-20261105/`、実E2Eはworktree `test-results/ci-635bf824-8463-4923-8444-caf656d2c4c8/` に保存しています。この文書にも対象・結果・未確認を記載しています。commit/push/PR作成/更新/Actions起動/merge/配備は行っていません。
+
+## 公開後のCI定義修正
+
+Draft PR #128の初回head `b8f612bed8d794f39611e6cb464c0611efe59de0` ではDependency auditが成功し、CIはrun42028680835でjob開始前に失敗しました。job-level envの `runner.temp` 参照は[GitHubのcontext利用範囲](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts)で許可されていないため、その参照を取り除き、ブラウザー導入前のstepが `$RUNNER_TEMP` から絶対pathを `$GITHUB_ENV` へ書く形に修正しました。既存browser回帰と新E2Eは同じ保存先を引き続き使います。テスト・認証境界・配備停止・UTC独立jobは変えていません。修正後の最終headとLinux実行結果はPRのrunへ結び付けて追跡します。
