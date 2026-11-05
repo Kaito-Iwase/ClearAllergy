@@ -25,6 +25,18 @@
 `admin` は `scripts/check-test-browser.mjs` を使い、専用テスト環境の実Clerk・DB・Blobを必要とします。CIの公開画面回帰の成功を、実認証や外部サービス連携の確認済みとは扱いません。今回の観察・修正・確認範囲は [UI/UX精査記録](ui-ux-review.md) を参照してください。
 
 <a id="pages"></a>
+## 未採用のローカル鮮度候補の入口
+
+`test/public-freshness-prototype-20261105` はPR #128 head bcc4c0cdからの独立候補です。公開3ページの初期取得は `server/public-shop-list-data.ts` / `public-shop-detail-data.ts` / `public-menu-detail-data.ts` の共有loaderへ移し、同じ公開条件・RepeatableRead・補足を使います。既存caller4件と10負例のsource参照はloaderへ追従し、検出条件を維持しています。
+
+| 候補の入口 | 実装・検証 |
+| --- | --- |
+| `GET /api/public-snapshot` | `app/api/public-snapshot/route.ts` →共有loader。kind/ID/要求IDを限定し公開whitelistを返す。`tests/public-freshness-api.test.ts`、`freshness/contracts.ts` |
+| 三画面の再取得と表示 | `PublicFreshnessSurface.tsx` / `PublicFreshnessNavigation.tsx` / `freshness/revalidation.ts` / `freshness/presentation.tsx`。`tests/public-freshness.test.ts`、`e2e/freshness.spec.mjs` |
+| 内容と適用proof | `PublicShopDetailView.tsx` / `PublicMenuDetailView.tsx` と既存list/menu本文。shopはmenu・検索要約の両方を待つ。FREE要約抑制と注意保持は `MenuAllergenSummary.tsx` / `SelectedAllergenResultCardsClient.tsx` |
+
+[実装・実行結果](../verification/public-freshness-prototype-20261105.md)と[操作候補](product.md#freshness-prototype)を参照します。現行採用範囲や実サービスの到達保証へ読み替えません。
+
 ## 全ページの入口
 
 `(public)` や `(dashboard)` はURLに含まれません。角括弧は動的な部分、`[[...name]]` は基点も含む可変パスです。個々の店舗IDを一覧に載せません。

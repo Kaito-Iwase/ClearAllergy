@@ -1,5 +1,7 @@
 "use client";
 
+import { usePublicApplyProof } from "../freshness/presentation";
+
 import Link from "next/link";
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -101,6 +103,7 @@ export default function PublicShopListClient({
     allergens: PublicAllergen[];
     isDatabaseAvailable: boolean;
 }) {
+    usePublicApplyProof("list");
     const router = useRouter();
     const searchParams = useSearchParams();
     const [area, setArea] = React.useState(searchParams.get("area") ?? "");

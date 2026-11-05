@@ -6,6 +6,7 @@ import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
 // このコンポーネントは、選択中アレルゲンとメニューの登録上の判定結果だけを表示します。
 
 import React from "react";
+import { usePreviousPublicInformation } from "../freshness/presentation";
 import AllergenPreferenceMatchNotice from "./AllergenPreferenceMatchNotice";
 import {
     classifySelectedAllergenStatuses,
@@ -87,6 +88,7 @@ export default function SelectedAllergenResultCardsClient({
     statusBySlug: Record<string, AllergenStatus>;
     storeHandledAllergenSlugs?: string[];
 }) {
+    const previous = usePreviousPublicInformation();
     const { preferences: { highlightSlugs, excludedSlugs, includeMayContain }, loaded } = useUserAllergenPreferences();
 
 
@@ -180,7 +182,8 @@ export default function SelectedAllergenResultCardsClient({
                     <AllergenChips allergens={unknownAllergens} label="未入力・未確認" className="border-gray-300 bg-white text-gray-900" />
                 </AllergenInfoCard>
             ) : null}
-            {!hasRiskResults &&
+            {previous && freeAllergens.length > 0 && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">未再確認のため、条件に合うかの要約は表示していません。詳細の登録状態も以前取得した情報です。</p>}
+            {!previous && !hasRiskResults &&
             !hasUnknownResults &&
             freeAllergens.length > 0 ? (
                 <AllergenInfoCard

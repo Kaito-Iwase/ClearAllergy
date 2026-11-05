@@ -1,5 +1,7 @@
 "use client";
 
+import { usePublicApplyProof } from "../freshness/presentation";
+
 import { STORE_ALLERGEN_NOTE } from "@/lib/public-prototype";
 import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
 
@@ -61,6 +63,7 @@ export default function ShopMenuListClient({
     allergenMaster: AllergenMasterItem[];
     storeHandledAllergenSlugs?: string[];
 }) {
+    usePublicApplyProof("shop-menus");
     const router = useRouter();
     const searchParams = useSearchParams();
     const q = (searchParams.get("q") ?? "").trim();

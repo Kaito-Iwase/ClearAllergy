@@ -454,3 +454,7 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 ### Runtime依存の限定override
 
 `@vercel/cli-config@0.2.0` 配下のZodはroot4.6.6へ合わせます。旧exact pinの公式advisory対策であり、Vercel SDK・認証設定の更新ではありません。上流consumer/Zodを更新するときはoverride削除可否と純粋schemaのparse/encode互換性を `tests/runtime-dependency-compat.test.ts` で再確認してください。[範囲・隔離・残gate](../verification/runtime-dependency-security-20261024.md)を参照してください。
+
+### 公開鮮度のローカル試作を検証する場合
+
+未採用の `test/public-freshness-prototype-20261105` には追加のfreshness projectがあります。基本PR #128の11件と分け、[E2E手順](e2e.md#freshness-prototype)と[結果・未確認](../verification/public-freshness-prototype-20261105.md)に従って、許可済みの架空DB・認証境界の範囲で実行します。native BFCacheが使われなかった場合を成功件数へ含めません。既存のlint/typecheck/test/build、公開読取4入口と10負例の条件は維持します。

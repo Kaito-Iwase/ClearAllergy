@@ -19,6 +19,25 @@ Vercel・Neonは想定する配備構成です。図はリポジトリの実装�
 
 `diagrams/clearallergy-architecture.drawio` が編集用の原本、同名の `.svg` がREADMEなどに表示する画像です。SVGは、拡大しても輪郭が崩れない画像形式です。draw.ioで原本を開き、編集後はSVGも更新します。SVGは外部画像・外部フォント・スクリプトに依存せず、draw.ioの編集データも埋め込んでいます。図を変更する際は、公開ページ・管理API・共通判定・DB・画像の実装と照合し、本文と両方のファイルを同じ作業で整合させてください。
 
+<a id="freshness-prototype"></a>
+## 未採用のローカル候補：完全snapshotの再取得
+
+この試作branchは公開3ページのquery・公開判定・DTO変換を `server/public-*-data.ts` へ分離し、初期SSRと新しい `GET /api/public-snapshot` で共用します。UI本文は検証済みの完全snapshotを一括適用し、店舗名・件数・全状態・他メニュー由来の補足を混在させません。server pageは維持し、初期取得後に変わる本文だけをclient viewへ分離しています。構成図は初期表示と主要処理の概要として照合し、省略している公開APIの候補経路を以下に分けます。
+
+```mermaid
+flowchart LR
+  Page[公開3ページの初期SSR] --> Loader[共有server loader]
+  Client[復帰・手動再取得] --> API[公開snapshot GET]
+  API --> Loader
+  Loader --> Snapshot[RepeatableRead・同一txの補足・公開条件]
+  Snapshot --> DTO[公開whitelist DTO]
+  DTO --> View[一括React view・内容のDOM適用proof]
+```
+
+相関IDとresource key、取消・要求世代を照合し、旧後着を破棄します。正常な対象なしと取得不能を分け、型不一致・HTML・表示失敗を確認成功にしません。list/menuの本文とshopのmenu・要約の両方のcommitを待ちます。取得失敗は登録状態を変えず、旧情報表示は参照／遮蔽の比較候補です。数値TTL・polling・配送保証はありません。既存の公開メニューAPIは維持しています。
+
+これはmain未採用の候補で、[操作と結果](../verification/public-freshness-prototype-20261105.md)の範囲を超える稼働・安全保証ではありません。
+
 ## ファイルの役割を先に理解する
 
 | 場所・技術 | このアプリでの役割 |
@@ -37,7 +56,7 @@ Vercel・Neonは想定する配備構成です。図はリポジトリの実装�
 ## 店舗・メニューを見る処理
 
 1. `app/(public)/shops/page.tsx` などが対応する `features/public/shops/server/` のページを呼ぶ。
-2. ページが `readPublicDataOrFallback` と `readPublicSnapshot` の中でPrismaを使い、店舗・公開メニュー・品目マスタを取得する。認識したDB接続障害と公開読取のトランザクション（複数のDB操作をまとめて成功・失敗させる単位）の完了不能は、取得失敗を示すフラグと代替値に分けて返す。
+2. ページが共有loaderを呼び、そのloaderが `readPublicDataOrFallback` と `readPublicSnapshot` の中でPrismaを使い、店舗・公開メニュー・品目マスタを取得する。認識したDB接続障害と公開読取のトランザクション（複数のDB操作をまとめて成功・失敗させる単位）の完了不能は、取得失敗を示すフラグと代替値に分けて返す。
 3. [公開条件](rules.md#publication)で不完全なメニューを除く。状態を組み立てる際は有効な4状態以外を `UNKNOWN` に正規化し、公開APIも不正値を含むメニューを404にする。詳細では店舗IDとメニューIDの対応も照合する。対象なしの404とDB障害の案内を区別する。
 4. 店舗内の他の公開可能メニューから補足情報を作り、登録状態と表示用の値を分ける。画像URLも表示可能なものに絞る。
 5. 日付などをブラウザに渡せる形へ整え、一覧や詳細のClient Componentへ渡す。

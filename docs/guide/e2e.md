@@ -10,6 +10,8 @@
 | `test:e2e:local` | Windowsの既存PG実行ファイルから所有する使い捨てDBを作成 | Clerk境界だけを模擬する新規A/B |
 | `test:e2e:ci` | CIで準備済みのサービスDB・公開fixture・Client・ブラウザーを再利用 | Clerk境界だけを模擬する新規A/B |
 
+このローカル未採用試作では、基本11件に鮮度7件を加えた18件を定義します。通常の全project実行はこの18件が対象で、native BFCache未使用時は1件を未実証として残します。[追加projectと判定](#freshness-prototype)を参照し、PR #128の基本11件・過去のCI結果と区別してください。
+
 ## 実行
 
 アプリ依存と既存ブラウザーランナーが準備済みであることを確認します。ランナー未準備時にテストが自動インストールすることはありません。必要な取得が許可された環境でのみ、既存の `node scripts/browser-runner.mjs install` を実行してください。
@@ -35,7 +37,7 @@ npm.cmd run test:e2e -- --project=public --headed
 
 ## 実Clerkを使わないローカル実行
 
-Windows上でPostgreSQLの実行ファイル、同じlockfileに対応する生成済みPrisma Client/engine、既存Playwright 1.61.0とChromiumが揃っている場合は、11件を新規の使い捨てDBで実行できます。Dockerや実Clerkアカウントは使いません。依存・Prisma・ブラウザー・PostgreSQLの自動取得は行いません。
+Windows上でPostgreSQLの実行ファイル、同じlockfileに対応する生成済みPrisma Client/engine、既存Playwright 1.61.0とChromiumが揃っている場合は、基本11件と当試作の鮮度7件（計18定義）を新規の使い捨てDBで実行できます。Dockerや実Clerkアカウントは使いません。依存・Prisma・ブラウザー・PostgreSQLの自動取得は行いません。
 
 ```powershell
 $env:E2E_PG_BIN = 'C:\tools\pgsql\bin' # 既存のinitdb/pg_ctl/createdb
@@ -65,11 +67,11 @@ npm run test:e2e:ci -- --allow-font-download
 
 `run-ci.mjs` は共有 `run-fixture.mjs` を使い、既存アプリ依存・実行platform用の生成済みClientとengine・隔離ブラウザーを新しいアプリコピーで再利用します。Windows用engineの固定指定、PGプロセスの起動・停止、migrate、`setup-ci-env.ts` の再実行は行いません。既存サービスの停止・削除やDBリセットも行いません。実Clerkへの接続やClerkアカウントの作成は不要です。
 
-この実行の前後で既存User/Shop/MenuItem/AuditLog行のfingerprintを照合し、新しいrun IDのA/Bとそのテストデータだけを作成・削除します。User削除で匿名化される監査ログも、今回作ったUser IDに限って先に削除し、既存AuditLogのfingerprint一致と新規監査行の残留なしを要求します。他の同時書込みを検知した場合も成功にせず、共有fixtureの利用を止めて確認してください。公開4件は既存CIの架空公開店舗を使い、管理7件は新規A/Bを使います。spec前に `/e2e-fixture-check` でrun ID・baseURL・実DB identityを照合してから、所有者操作へ進みます。
+この実行の前後で既存User/Shop/MenuItem/AuditLog行のfingerprintを照合し、新しいrun IDのA/Bとそのテストデータだけを作成・削除します。User削除で匿名化される監査ログも、今回作ったUser IDに限って先に削除し、既存AuditLogのfingerprint一致と新規監査行の残留なしを要求します。他の同時書込みを検知した場合も成功にせず、共有fixtureの利用を止めて確認してください。公開4件は既存CIの架空公開店舗を使い、管理7件と当試作の鮮度7件は新規A/Bを使います。spec前に `/e2e-fixture-check` でrun ID・baseURL・実DB identityを照合してから、所有者操作へ進みます。
 
 `test-results/ci-<run ID>/`へ `lifecycle.json` と各コマンドのログ・結果を保存します。成功判定にはspec結果だけでなく、新規fixtureの後始末、既存行fingerprintの一致、所有Next/process groupと一時コピーの終了が必要です。サービスDBは保持します。後始末が不確定なら失敗として一時領域を残し、他のCIデータを手動削除しません。
 
-CI定義には、通常の製品buildと従来の公開回帰を残したまま、全11件を認証境界差替えbuildの別stepとして追加しています。各経路の結果は、対象baseとrun IDに結び付いた記録で確認してください。head `5dbba923` のUbuntu／GitHub Actions実行は、通常製品build・単体299件・新E2E9件を含めて成功しています。対象headとrunを確認し、Windowsの実測とは分けて扱います。 食品訂正・UNKNOWNの追加2件はPR #128の `1a8fa046` 後の追補です。この2件を含む11件のローカル結果と公開後のhead別CIの扱いは[追補検証](../verification/e2e-food-states-20261105.md)を参照してください。run ID・後始末・unitの制限を含む結果は[検証・採用状況](verification.md#practical-e2e-status)を参照してください。
+CI定義には、通常の製品buildと従来の公開回帰を残したまま、基本11件を認証境界差替えbuildの別stepとして追加しています。当試作では同じstepが全18定義を実行します。各経路の結果は、対象baseとrun IDに結び付いた記録で確認してください。head `5dbba923` のUbuntu／GitHub Actions実行は、通常製品build・単体299件・新E2E9件を含めて成功しています。対象headとrunを確認し、Windowsの実測とは分けて扱います。 食品訂正・UNKNOWNの追加2件はPR #128の `1a8fa046` 後の追補です。この2件を含む11件のローカル結果と公開後のhead別CIの扱いは[追補検証](../verification/e2e-food-states-20261105.md)を参照してください。run ID・後始末・unitの制限を含む結果は[検証・採用状況](verification.md#practical-e2e-status)を参照してください。
 
 ## 検証対象
 
@@ -107,3 +109,18 @@ CI定義には、通常の製品buildと従来の公開回帰を残したまま�
 画像/Blob upload、新規Clerkアカウント・店舗の初回登録、招待の作成・取消、実サービスでのキャッシュ伝播はこの初期suiteに含めません。管理specの開始時点でA/Bは店舗作成済みであり、UIからの店舗初回登録には別のfixtureと後始末が必要です。画像試験は既存 `admin` runner側に実Blob書込と別cleanupがあるため、無断で重複実行しません。
 
 環境やブラウザーが準備できず実行できない場合はUNVERIFIEDです。`--list`、構文、単体テスト、lintの成功だけでブラウザーE2EをPASSにしません。Clerk境界を模擬する範囲、1件の500応答注入、実Clerk未検証を明記し、実行した環境・head・runごとに結果を記録します。E2E単独の成功を、実行していない別の検査の成功へ拡張しません。外部操作を禁止された作業では実Clerk版admin projectを実行しないでください。local/ci版も未準備の依存・フォントを取得してよい理由にはなりません。
+
+<a id="freshness-prototype"></a>
+## 未採用ローカル候補のfreshness project
+
+この試作branchでは基本11件に `e2e/freshness.spec.mjs` の7件を加えた18件を定義しています。既存PR #128の11件とは別の候補です。現在のlocal/ci共通runnerは全projectを実行するため、この候補では18件が対象です。以下は準備済みの架空アプリへの絞り込みで、アプリ・認証・DBを自動準備するコマンドではありません。
+
+```powershell
+npm.cmd run test:e2e -- --project=freshness
+```
+
+管理fixtureを使うため、既存の対象ガード・所有データcleanupが必要です。承認された使い捨てDB＋Clerk境界模擬での実行を優先し、実Clerk版へ無断で切り替えません。手動3画面・入力保持・取得中/失敗/回復・参照/遮蔽・実STOP・補足依存・合成復帰・実SPA履歴を確認します。native BFCacheだけは復元を実際に試し、persisted=trueを観測できない場合SKIPとして未実証を残します。合成pageshow成功で置き換えません。自動再実行は0のままです。
+
+Draft公開時は#128のbranch `test/practical-e2e-main-20261105` をbaseとするため、このbase宛pull_requestも既存CI／依存監査の対象へ限定追加しています。手動workflow起動は行わず、PRの自動実行と測定対象SHAを照合します。head `test/public-freshness-prototype-20261105` のVercel Git配備はexact falseですが、mainへの採用や手動配備を抑止する設定ではありません。
+
+匿名の架空公開画面だけを明示撮影し、取得中・失敗・遮蔽等を保存します。trace・認証画面・cookie・tokenは保存しません。UIの試作と製品採用を区別し、[対象・結果・native未確認の理由](../verification/public-freshness-prototype-20261105.md)を参照します。

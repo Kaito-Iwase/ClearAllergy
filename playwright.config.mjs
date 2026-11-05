@@ -27,6 +27,10 @@ export default defineConfig({
     projects: [
         { name: 'public', testMatch: 'public.spec.mjs', use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' } },
         { name: 'admin', testMatch: 'admin.spec.mjs' },
+        { name: 'freshness', testMatch: 'freshness.spec.mjs', use: { launchOptions: {
+            ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}),
+            ignoreDefaultArgs: ['--disable-back-forward-cache'],
+        } } },
     ],
     // Start the already prepared app separately. No automatic DB reset, Clerk
     // account creation, Prisma download, migration or package install here.

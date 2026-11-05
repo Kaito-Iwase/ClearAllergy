@@ -1,0 +1,43 @@
+# 鮮度試作のDraft公開準備・敵対的セルフレビュー（2026-11-05）
+
+## 比較基点と範囲
+
+確認時のmainは `51adcb23945b80bb34b110d2d0f263d29629a821`、PR #128はDraft・未merge、head `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` です。鮮度試作はそのheadに依存します。新PRのbaseは#128のbranch `test/practical-e2e-main-20261105`、headは `test/public-freshness-prototype-20261105` とし、#128の32ファイルを新PRの独立差分へ重複させません。#128を採用する判断は本PR作成へ含めません。mainへretargetする前には#128の採用状態・差分・再検証が必要です。
+
+本記録は実装担当によるセルフレビューです。[保存済みの独立レビュー](public-freshness-prototype-20261105.md#実行結果と証拠)や、別途進む独立レビューと区別します。元repoの別作業、#128用worktree、元食品E2E候補を変更しません。
+
+## #128を単独で疑う
+
+| 反証したい誤り | 実コード・証拠の照合と限界 |
+| --- | --- |
+| 古い版の拒否をSTOP拒否と取り違える | A/B各店で別タブの価格保存後、元editorのPUT409・入力保持・DB read不変を要求し、同じeditorのbodyなしSTOP200と食品内容保持・公開API404を別assertする。STOPにも版照合があるという模擬仕様を追加しない |
+| 認可拒否を画面上だけで済ませる | 他店のGET/PUT/DELETE/STOPを404とし、所有者readとの不変比較を残す。匿名管理API401も別条件。Clerk境界模擬なので実Clerkの署名・session検証の証拠にはしない |
+| 食品変更が公開されたままになる、UNKNOWNをFREEとして見せる | 実保存後の非公開化・食品版上昇・公開確認版解除、確認panel、別操作の再公開を検査。代表3状態は管理GET・公開API・同じ品目行で照合。UNKNOWNは最新版の公開要求400と新規公開画面からの除去を要求し、UNKNOWNの公開成功を要求しない |
+| mock成功を実DB障害や生SQL照合の成功と呼ぶ | 保存失敗1件は500注入。管理GETは永続化の観測で、生SQLによる各E2Eデータの独立照合ではない。実DB制約回帰は別のscriptで保持する |
+| cleanupが既存データを消す／監査を残す | run所有の新規User/Shop/Menuと監査だけをcleanupし、既存4model fingerprint・監査残留なし・process終了・一時領域終了を要求する。共有fixtureへの同時書込みは成功にしない。任意の実DBへ流用しない |
+
+#128のLinux既証拠は11/11、unit299/299の対象head・runに限定します。今回の試作CIの結果ではありません。実Clerk、Blob、新規店舗登録、招待、実サービス伝播、人の食品判断は未確認です。
+
+## 鮮度試作を単独で疑う
+
+| 反証したい誤り | 実装・検査と残る範囲 |
+| --- | --- |
+| HTTP200や呼出完了だけで「更新済み」にする | 対象key・UUID・HTTP意味・schemaを照合し、必要な本文leafのDOM commitまで完了にしない。初期取得・正常404・503・HTML・render失敗を区別する。DOM commitはpaintや利用者認知の証明ではない |
+| 古い応答で別画面や停止済み食品を復活させる | 世代・対象・中止・unmountを検査。abortを無視する旧promiseの後着をunitで与え、正常な対象なし適用後にも復活できない負例を持つ。実ブラウザの全配送順序を再現したものではない |
+| 本体のupdatedAtだけで店舗内補足の変更を見落とす | 同一RepeatableRead内の完全snapshotを共通loaderで取得。他menuのSTOPでtarget更新日時が不変でも補足が変わるE2Eを持つ。原FREEをSTORE_HANDLEDへ書き換えない |
+| 取得失敗した旧FREEを現在の安心へ言い換える | Aは肯定的要約を止め、各行を以前の登録と明示。原状態と既知注意は残すが、旧FREEの読み飛ばし・誤読は未実証。Bは旧本文と既知注意・本文内の確認先も隠す。非表示を「含有なし」と誤読する可能性も未検証 |
+| 復帰さえすれば即時・全端末へ訂正が届くとする | manual/focus/visible/persisted pageshow/SPA履歴が契機。表示したまま・JS無効・process休止・実オフライン・復帰前の旧paint・native BFCacheは保証しない。native実復元はpersisted=falseのため1件SKIP。合成イベント成功で置換しない |
+| 更新による入力消失を見逃す | 通常再取得の未適用検索文字列は実E2E確認。遮蔽前のfocus移動も確認。未適用個人設定案の全状態は未検証。正常な対象なしでは本文フォームが終了し、その入力案の継続方法は未確定 |
+
+Aは利用者比較の暫定既定候補です。旧FREEの誤読が続き、Bでは注意の消失を安心へ読み替えず確認行動へ進める証拠が出れば、確認先・入力案の扱いも含めて推奨を変えます。両案とも安全性の優位を実証していません。期限秒数・最大許容遅延・自動timeout・定期pollを根拠なく追加していません。
+
+## 統合時の競合・試験の抜け
+
+- #128のpublic/admin spec11件の本文とfixture・所有データguardは変更せず、freshness project7定義を追加します。既存の新規ナビゲーションによる非公開除去と、開いている画面の再取得を別の条件として残します。held-page観察はassertへ昇格させません。
+- 公開3pageのクエリ抽出に合わせ、実4caller testと10箇所のmutation参照先を更新します。root-client禁止・distinct tx・要求間snapshot分離・正確なread集合・期待原因検出・復元条件を保持します。
+- #128上のローカル結合runは17 PASS・native1 SKIP、unit316（既知EPERM指定1件除外）、実DB37groups、lint・型検査・通常Next設定buildが成功。対応source hashを保持し、今回のLinux CIは公開後の別結果として確認します。
+- 生SQLでの全E2E観測、実Clerk、JS無効、実通信断、利用者理解、全ブラウザ・OS、native BFCache、継続閲覧への訂正到達、本番の要求集中・DB待機・取消後SQLの負荷は、この結合成功から証明しません。
+- baseに#128固有のCI基盤が必要なため、既存CIと依存監査のpull_request base filterへそのbranch一つだけを追加します。main/develop、監査のhigh閾値・paths、通常製品build、既存DB/browser検査・UTC3job・read-only権限を維持します。手動Actions起動や既知拒否の再試行は行いません。
+- 最初に公開するcommitから正確なhead branchの `git.deploymentEnabled=false` を含めます。既存guardは保持し、main/developの既定動作・Project設定を変更しません。公式仕様と設定の照合は実際の非配備観測とは別であり、push後に両Projectのbranch/SHA配備一覧とProduction IDを確認します。merge・手動deployの抑止ではありません。
+
+設定・文書の追加を除く測定済み実装の変更は、この公開準備時点ではありません。新たな不具合を確認した場合は原因・最小修正・再検証を追記し、受入条件を弱めません。Draft作成・CI成功は、製品方針の確定・main merge・本番配備の承認ではありません。
