@@ -1,5 +1,7 @@
 # 公開画面の再取得・旧情報表示のローカル試作（2026-11-05）
 
+以下の既存節は各固定head・作業時点の記録です。後続CI、専用stagingとmain取込前の状態は[2026-11-06の追補](#main-adoption-preparation-20261106)を参照してください。過去の採用範囲・承認・未実施の記述を現在へ読み替えません。
+
 [操作候補](../guide/product.md#freshness-prototype) · [内部処理](../guide/architecture.md#freshness-prototype) · [E2E](../guide/e2e.md#freshness-prototype) · [検証状況](../guide/verification.md#freshness-prototype-status)
 
 ## 状態と対象
@@ -103,3 +105,16 @@ local runは監査67行除去・既存4model fingerprint保持・所有Next proc
 - 新しい公開snapshot API・本文client view化・候補文言の製品採用は別判断です。後続のユーザー指示でDraft PR公開とCI確認のみ承認されました。merge／本番操作／配備は行いません。
 
 既存構成図は初期表示と主要処理の概要で、公開APIを省略対象として明記しています。初期SSR→同じsnapshot→共通公開判定の経路を照合し、図の既存説明を維持します。再取得候補は[内部処理](../guide/architecture.md#freshness-prototype)で別に説明します。schema・migration・依存版・認証規則・共通公開条件は変更しておらず、rules／AGENTSの本文変更は不要です。
+
+<a id="main-adoption-preparation-20261106"></a>
+## 2026-11-06追補：修正後CIとmain取込前の確認状態
+
+混在FREEと旧一覧の表示を修正したPR #129 head `88ca4630d42f82063c7d6d7bd5c2f24cd76432ba` の[CI 42134197073](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197073)は成功しました。実checkoutは#128へのPR merge候補 `8fc3998ba27de087b290b3d9afaed3e5e7e20a5c`、unit324/324・skip0、全20定義のE2Eは19 PASS・native BFCache1 SKIPです。run `ci-bacfcc2f-a8c4-49f0-afbe-4a6046426d74` の監査67行除去、既存fixture保持、所有processとTEMPの後始末を確認しています。上記の旧17件やWindowsの指定1件除外付きunit323件とは別の結果です。
+
+[artifact 13464194430](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197073/artifacts/13464194430)は7,385,865 bytes、SHA256 `05aafbf7937956a19b08d8f350894aaed431fbd21ae1dd530ecb2e872c462ced`。[依存監査 42134197138](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197138)もhigh閾値で成功し、moderate8件は残っています。保存証拠はworktreeの親の `public-freshness-review-followup-20261105/result.json` です。
+
+その後の専用Previewでは、初期の `credentials:omit` で手動再取得が失敗し、相対URLへのfetchを `credentials:same-origin` にする修正後、公開3画面の再取得と未適用検索文字列の保持を観測しました。最終deployment `dpl_2ccZ9M7vQTd1vyrnKfwbsnT6y6DR` は、先に3画面を確認した219 runtime filesへ既存 `instrumentation.ts` を戻した220 filesの版で、一覧／メニューの再取得をsmoke確認したものです。初回失敗の正確なHTTP statusは未取得で、実Clerk管理操作・Blob書込・訂正の連続到達を検査した結果ではありません。詳細はworktreeの親の `public-freshness-staging-20261106/staging-final-handoff.md` と各browser観測記録に保存しています。
+
+staging由来の移植は `features/public/shops/freshness/revalidation.ts` と `tests/public-freshness.test.ts` のsame-origin修正2ファイルに限ります。公開snapshotは匿名のprojectionを維持し、Cookie／Authorizationの手動転送や認証保護の迂回を追加しません。staging専用guard・banner・Blob保護等の12ファイルは取り込みません。これとは別に、統合前の精査でroot layoutへの復帰listener配置、店舗集計・件数・0件の旧情報局所注記、暫定表示方式の説明を修正対象としています。公開layoutを離れたSPA復帰の追加負例と最終件数は、実行結果が確定してから対象SHAへ結び付けます。
+
+この変更をmainへ取り込む場合も、参照表示Aは利用者比較の暫定設定です。A/B方式・文言・理解度・食品安全性の最終判断、連続した最新性や全端末への訂正到達の保証とは区別します。公開layout内の実SPA履歴と合成復帰イベントの成功を、公開layoutを離れたSPA復帰、native BFCache、JS未実行、実オフライン、復帰前の旧画面paintの検証へ拡張しません。後続sourceと文書同期後の最終SHA・CI、retarget後の検証、merge SHA・main CI・Production反映は未確定で、上記88ca4630の成功を流用しません。

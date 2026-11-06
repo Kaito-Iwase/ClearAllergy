@@ -17,6 +17,7 @@ const originalLoad = loader._load;
 const requireForTest = createRequire(import.meta.url);
 let Cards: typeof import('../features/public/shops/components/SelectedAllergenResultCardsClient').default;
 let List: typeof import('../features/public/shops/components/PublicShopListClient').default;
+let ShopMenus: typeof import('../features/public/shops/components/ShopMenuListClient').default;
 try {
     loader._load = function (id, ...args) {
         if (id.endsWith('/UserAllergenPreferenceClient')) return {
@@ -31,6 +32,7 @@ try {
     };
     Cards = requireForTest('../features/public/shops/components/SelectedAllergenResultCardsClient.tsx').default;
     List = requireForTest('../features/public/shops/components/PublicShopListClient.tsx').default;
+    ShopMenus = requireForTest('../features/public/shops/components/ShopMenuListClient.tsx').default;
 } finally { loader._load = originalLoad; }
 
 const allergens = [
@@ -116,4 +118,43 @@ test('通常の店舗一覧は既存の条件一致・除外結果を維持す�
     assert.match(html, /条件に一致するClearAllergy登録済み店舗/);
     assert.match(html, /架空店舗-free/); assert.doesNotMatch(html, /架空店舗-contains/);
     assert.doesNotMatch(html, /現在のアレルゲン登録を再確認できていません/);
+});
+
+function shopMenus(previous: boolean, menus: boolean, excluded = false, query = '') {
+    preferences = { highlightSlugs: ['milk'], excludedSlugs: excluded ? ['egg'] : [], includeMayContain: true, selectedSlugs: ['milk'] };
+    searchQuery = query;
+    return render(previous, React.createElement(ShopMenus, {
+        shopId: 'fictional-shop', storeHandledAllergenSlugs: ['egg'],
+        allergenMaster: allergens.map((allergen, sortOrder) => ({ ...allergen, sortOrder })),
+        menus: menus ? [{ id: 'fictional-menu', name: '架空メニュー', description: null,
+            priceYen: 100, category: null, precaution: '架空の既知注意', updatedAt: '2026-11-05T00:00:00.000Z',
+            allergenLinks: [{ status: 'CONTAINS', allergen: { slug: 'egg' } }, { status: 'FREE', allergen: { slug: 'milk' } }] }] : [],
+    }));
+}
+
+test('旧店舗詳細の店舗全体集計にも未再確認を付け、該当なしを以前の登録に限定する', () => {
+    const html = shopMenus(true, true);
+    const section = html.match(/<section aria-label="店舗全体の登録情報"[\s\S]*?<\/section>/)?.[0];
+    assert.ok(section);
+    assert.match(section, /以前取得した登録・現在は未再確認/);
+    assert.match(section, /以前取得した登録での、あなたの確認対象/);
+    assert.match(section, /該当なし/);
+    assert.match(section, /卵/);
+    assert.doesNotMatch(section, /このうち、あなたの確認対象/);
+    assert.match(html, /架空の既知注意/);
+});
+
+test('旧店舗詳細の件数・検索0件・除外0件も以前の登録による判定と示す', () => {
+    assert.match(shopMenus(true, true), /以前取得した登録情報による表示/);
+    assert.match(shopMenus(true, false, false, 'q=fictional'), /以前取得した登録情報では、検索条件に一致する公開メニューがありません/);
+    assert.match(shopMenus(true, false), /以前取得した登録情報では、公開メニューがありません/);
+    assert.match(shopMenus(true, true, true), /以前取得した登録情報と除外設定による表示は0件です/);
+});
+
+test('通常の店舗詳細の集計・0件案内を変更しない', () => {
+    const html = shopMenus(false, true);
+    assert.match(html, /このうち、あなたの確認対象/);
+    assert.doesNotMatch(html, /現在は未再確認|以前取得した登録情報による表示/);
+    assert.match(shopMenus(false, false), /現在公開中のメニューはありません/);
+    assert.match(shopMenus(false, true, true), /除外設定により表示できるメニューがありません/);
 });

@@ -20,9 +20,9 @@ Vercel・Neonは想定する配備構成です。図はリポジトリの実装�
 `diagrams/clearallergy-architecture.drawio` が編集用の原本、同名の `.svg` がREADMEなどに表示する画像です。SVGは、拡大しても輪郭が崩れない画像形式です。draw.ioで原本を開き、編集後はSVGも更新します。SVGは外部画像・外部フォント・スクリプトに依存せず、draw.ioの編集データも埋め込んでいます。図を変更する際は、公開ページ・管理API・共通判定・DB・画像の実装と照合し、本文と両方のファイルを同じ作業で整合させてください。
 
 <a id="freshness-prototype"></a>
-## 未採用のローカル候補：完全snapshotの再取得
+## 完全snapshotの再取得
 
-この試作branchは公開3ページのquery・公開判定・DTO変換を `server/public-*-data.ts` へ分離し、初期SSRと新しい `GET /api/public-snapshot` で共用します。UI本文は検証済みの完全snapshotを一括適用し、店舗名・件数・全状態・他メニュー由来の補足を混在させません。server pageは維持し、初期取得後に変わる本文だけをclient viewへ分離しています。構成図は初期表示と主要処理の概要として照合し、省略している公開APIの候補経路を以下に分けます。
+この変更をmainへ取り込む場合、公開3ページのquery・公開判定・DTO変換を `server/public-*-data.ts` へ分離し、初期SSRと新しい `GET /api/public-snapshot` で共用します。UI本文は検証済みの完全snapshotを一括適用し、店舗名・件数・全状態・他メニュー由来の補足を混在させません。server pageは維持し、初期取得後に変わる本文だけをclient viewへ分離しています。構成図は初期表示と主要処理の概要として照合し、省略している公開snapshot APIの経路を以下に分けます。
 
 ```mermaid
 flowchart LR
@@ -34,9 +34,9 @@ flowchart LR
   DTO --> View[一括React view・内容のDOM適用proof]
 ```
 
-相関IDとresource key、取消・要求世代を照合し、旧後着を破棄します。正常な対象なしと取得不能を分け、型不一致・HTML・表示失敗を確認成功にしません。list/menuの本文とshopのmenu・要約の両方のcommitを待ちます。取得失敗は登録状態を変えず、旧情報表示は参照／遮蔽の比較候補です。数値TTL・polling・配送保証はありません。既存の公開メニューAPIは維持しています。
+root layoutの `PublicFreshnessNavigation` が履歴等の契機を受け、公開画面の再取得を要求します。取得先は相対URLの公開snapshot APIに固定し、same-originの既存保護sessionを使います。公開projectionは匿名のままで、Cookie／Authorizationを手動転送しません。相関IDとresource key、取消・要求世代を照合し、旧後着を破棄します。正常な対象なしと取得不能を分け、型不一致・HTML・表示失敗を確認成功にしません。list/menuの本文とshopのmenu・要約の両方のcommitを待ちます。取得失敗は登録状態を変えず、旧情報表示は参照／遮蔽の比較候補です。数値TTL・polling・配送保証はありません。既存の公開メニューAPIは維持しています。
 
-これはmain未採用の候補で、[操作と結果](../verification/public-freshness-prototype-20261105.md)の範囲を超える稼働・安全保証ではありません。
+mainへの統合状態は[検証・採用状況](verification.md#freshness-prototype-status)で確認します。コードの取込は表示方式A/Bの最終選定や、[操作と結果](../verification/public-freshness-prototype-20261105.md)の範囲を超える稼働・安全保証を意味しません。公開layoutを離れたSPA復帰は未実証です。
 
 ## ファイルの役割を先に理解する
 
@@ -78,7 +78,7 @@ Prismaの入れ子の取得指定（nested select）でもSQLが分かれるた�
 
 食品情報を載せる店舗一覧・店舗詳細・メニュー詳細は、ルート入口と実装の `force-dynamic` によりアクセスごとにDBを読みます。以前の `force-static` / `revalidate = 60` は、停止後も新しい要求へ古い情報を返すことがローカル本番buildで再現したため、これらの3ルートでは使いません。DB読取は増えます。Cache Componentsや別のDBキャッシュは導入していません。
 
-変更APIは `lib/public-cache.ts` の関数で関連ページの再検証も要求します。これだけで既に開いた画面・戻る操作・オフライン画面へ訂正を配送することはできません。トップ・規約等の静的ページは別で、実Vercel配備の応答や負荷は別途確認が必要です。
+変更APIは `lib/public-cache.ts` の関数で関連ページの再検証も要求します。これだけで既に開いた画面・戻る操作・オフライン画面へ訂正を配送することはできません。[公開3画面の手動・復帰時再取得](#freshness-prototype)と、全閲覧者への到達保証は別です。トップ・規約等の静的ページは別で、実Vercel配備の応答や負荷は別途確認が必要です。
 
 <a id="preferences"></a>
 ## 個人設定を適用する処理

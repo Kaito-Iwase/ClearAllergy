@@ -28,7 +28,9 @@ export async function fetchPublicSnapshot(target: PublicTarget, requestId: strin
     if (target.kind !== 'list') query.set('shopId', target.shopId);
     if (target.kind === 'menu') query.set('menuId', target.menuId);
     const response = await fetch('/api/public-snapshot?' + query, {
-        signal, cache: 'no-store', credentials: 'omit', headers: { Accept: 'application/json' },
+        // Keep the browser's existing same-origin deployment-protection session.
+        // Public loaders remain anonymous and never personalize the snapshot.
+        signal, cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' },
     });
     return readSnapshotResponse(target, requestId, response);
 }

@@ -113,7 +113,7 @@ function Surface({ target, initialSnapshot }: Props) {
     return <>
         <aside aria-label="公開情報の再取得" data-public-freshness={state.phase} data-previous-information={state.stale}
             className="mx-auto my-4 max-w-5xl space-y-3 rounded-xl border-2 border-amber-500 bg-amber-50 p-4 text-gray-900">
-            <p className="text-xs font-bold">表示方法の試作・未採用</p>
+            <p className="text-xs font-bold">旧情報の表示方法は暫定です</p>
             <h2 ref={statusHeading} tabIndex={-1} className="font-bold outline-offset-4">公開情報の取得状態</h2>
             <p role="status" aria-live="polite" className="font-bold">{message}</p>
             {state.stale && <p>表示する登録内容は以前取得した情報です。FREE（原材料に含まない）の登録も、現在の状態として再確認できていません。</p>}

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePublicApplyProof } from "../freshness/presentation";
+import { usePublicApplyProof, usePreviousPublicInformation } from "../freshness/presentation";
 
 import { STORE_ALLERGEN_NOTE } from "@/lib/public-prototype";
 import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
@@ -64,6 +64,7 @@ export default function ShopMenuListClient({
     storeHandledAllergenSlugs?: string[];
 }) {
     usePublicApplyProof("shop-menus");
+    const previous = usePreviousPublicInformation();
     const router = useRouter();
     const searchParams = useSearchParams();
     const q = (searchParams.get("q") ?? "").trim();
@@ -148,6 +149,7 @@ export default function ShopMenuListClient({
             <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
                 <h2 className="text-base font-extrabold">公開メニュー</h2>
                 <p className="text-xs text-gray-500">
+                    {previous && "以前取得した登録情報による表示："}
                     表示 {visibleMenuItems.length}件 / 検索対象 {searchedMenus.length}件
                 </p>
             </div>
@@ -157,8 +159,9 @@ export default function ShopMenuListClient({
             {storeHandledAllergenSlugs.length > 0 && (
                 <section aria-label="店舗全体の登録情報" className="mb-5 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
                     <h3 className="text-sm font-bold text-amber-950">店舗の公開メニュー全体の登録情報</h3>
+                    {previous && <p className="mt-2 text-sm font-bold text-amber-950">以前取得した登録・現在は未再確認</p>}
                     <p className="mt-2 text-sm leading-6 text-amber-950">「含む」登録のある品目：{allergenMaster.filter(item => storeHandledAllergenSlugs.includes(item.slug)).map(item => item.nameJa).join("・")}</p>
-                    {hasPreference && <p className="mt-1 text-sm leading-6 text-amber-950">このうち、あなたの確認対象：{allergenMaster.filter(item => storeHandledAllergenSlugs.includes(item.slug) && selectedSlugs.includes(item.slug)).map(item => item.nameJa).join("・") || "該当なし"}</p>}
+                    {hasPreference && <p className="mt-1 text-sm leading-6 text-amber-950">{previous ? "以前取得した登録での、あなたの確認対象" : "このうち、あなたの確認対象"}：{allergenMaster.filter(item => storeHandledAllergenSlugs.includes(item.slug) && selectedSlugs.includes(item.slug)).map(item => item.nameJa).join("・") || "該当なし"}</p>}
                     <p className="mt-2 text-xs leading-5 text-amber-900">個々のメニューの原材料登録とは別の情報です。{STORE_ALLERGEN_NOTE}</p>
                 </section>
             )}
@@ -166,7 +169,9 @@ export default function ShopMenuListClient({
             {searchedMenus.length === 0 ? (
                 <div role="status" className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6">
                     <p className="text-sm text-gray-700">
-                        {q !== ""
+                        {previous ? (q !== ""
+                            ? "以前取得した登録情報では、検索条件に一致する公開メニューがありません。"
+                            : "以前取得した登録情報では、公開メニューがありません。") : q !== ""
                             ? "検索条件に一致する公開メニューがありません。"
                             : "現在公開中のメニューはありません。"}
                     </p>
@@ -180,7 +185,7 @@ export default function ShopMenuListClient({
             ) : visibleMenuItems.length === 0 ? (
                 <div role="status" className="rounded-xl border border-dashed border-red-200 bg-red-50 p-6">
                     <p className="text-sm font-bold text-red-800">
-                        除外設定により表示できるメニューがありません。
+                        {previous ? "以前取得した登録情報と除外設定による表示は0件です。" : "除外設定により表示できるメニューがありません。"}
                     </p>
                     <p className="mt-2 text-xs leading-5 text-red-700">
                         必要に応じて、あなた向けのアレルゲン設定で「除外」を外してください。

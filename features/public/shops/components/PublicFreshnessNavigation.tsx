@@ -4,8 +4,9 @@ import React from 'react';
 
 const Navigation = React.createContext<{ epoch: number; consume: (key: string) => boolean } | null>(null);
 
-// This persistent layout listener catches SPA popstate before the destination
-// page mounts. pageshow/visibility/focus are handled by the mounted surface.
+// The common root layout keeps this listener mounted across route groups, so
+// popstate is recorded even while the user is outside the public layout.
+// pageshow/visibility/focus are handled by the mounted public surface.
 export default function PublicFreshnessNavigation({ children }: { children: React.ReactNode }) {
     const pending = React.useRef<string | null>(null);
     const [epoch, setEpoch] = React.useState(0);

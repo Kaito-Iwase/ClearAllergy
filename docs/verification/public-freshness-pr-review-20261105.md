@@ -1,5 +1,7 @@
 # 鮮度試作のDraft公開準備・敵対的セルフレビュー（2026-11-05）
 
+以下の既存節は公開準備と各固定headの記録です。後続のmain取込前の文書整合・検証範囲は[2026-11-06の追補](#main-adoption-review-20261106)へ分けています。
+
 ## 比較基点と範囲
 
 確認時のmainは `51adcb23945b80bb34b110d2d0f263d29629a821`、PR #128はDraft・未merge、head `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` です。鮮度試作はそのheadに依存します。新PRのbaseは#128のbranch `test/practical-e2e-main-20261105`、headは `test/public-freshness-prototype-20261105` とし、#128の32ファイルを新PRの独立差分へ重複させません。#128を採用する判断は本PR作成へ含めません。mainへretargetする前には#128の採用状態・差分・再検証が必要です。
@@ -53,3 +55,16 @@ Aは利用者比較の暫定既定候補です。旧FREEの誤読が続き、B�
 初回の自己確認と旧17件の成功では、単独FREEと詳細一覧の注記を確認していましたが、混在欄のFREE行と店舗一覧失敗時の除外結果を確認できていませんでした。独立レビューからの2指摘を実コードと修正前に失敗する部品試験で確認し、3表示部品を修正しました。上部件数と関連店舗を含む0件案内まで対象にします。修正中の0件表現の範囲誤りも独立レビューで検出し、関連店舗だけ残る負例を追加して公開前に解消しました。
 
 既存のアレルゲン状態・補足・除外計算・端末設定の意味を変更せず、旧情報の文脈を判定結果と同じ位置へ示す修正です。SSR部品7件、実アプリの追加E2E2件を加え、[修正前後・実行結果・後始末](public-freshness-prototype-20261105.md#review-followup-20261106)を別に記録しました。旧headのCI成功を新しい条件の検証済みという意味に拡張しません。Aの暫定性、継続表示・JSなし・実offline・native BFCache・利用者理解の未確認も維持します。
+
+<a id="main-adoption-review-20261106"></a>
+## 2026-11-06追補：main取込前の文書整合と検証範囲
+
+PR #128 head `bcc4c0cd` とPR #129 head `88ca4630` の独立した文書レビューで、現行ガイドの「未採用branch」「main未反映」「取得中・失敗時表示や復帰時挙動は未変更」という説明を、そのままmain取込後の説明にできないことを確認しました。本追補では現行本文を「この変更をmainへ取り込む場合」の動作へ整合させ、旧検証本文・件数・未実施事項は当時の記録として保持しています。これは文書の照合であり、レビュー担当によるDB／ブラウザー再実行ではありません。
+
+PR #128の固定headのLinux11件と、PR #129の固定headのLinux19 PASS・native1 SKIP、後続stagingの観測は[食品訂正の追補](e2e-food-states-20261105.md#linux-ci-bcc4c0cd)と[鮮度の追補](public-freshness-prototype-20261105.md#main-adoption-preparation-20261106)へ分けました。staging由来のsame-origin transportは製品sourceと対応testの2ファイルに限定し、staging専用12ファイルは含めません。後続のroot layout listenerと店舗集計表示の修正・追加回帰は別に検証します。stagingの別構成での成功をmain取込対象そのもののCI成功へ読み替えません。
+
+Aは比較用の暫定設定です。共通公開条件、raw status、既知の注意、実Clerk／Blob書込未検証、食品安全性・連続した最新性の未保証を維持します。公開layoutを離れたSPA復帰は追加負例の検査対象で、実行前の成功を主張せず、従来の公開layout内のSPA履歴成功や合成pageshowから保証しません。
+
+後続の局所修正では関連30件が30 PASS・fail0・skip0でした。旧表示コードに新しい部品試験だけを適用した別worktreeは10件中8 PASS・2 FAILで、店舗内集計と0件の旧情報注記不足を検出しています。型検査と変更TSX等への直接ESLint CLIもexit0です。保存先はworktreeの親の `pr129-refresh-followup-20261106/`（`focused-first.log`、`presentation-before-fix.log`、`typecheck.log`、`lint.log`）です。この関連検査を最終E2E・build・CIの成功へ拡張しません。
+
+この追補時点でPR #128・#129は未mergeです。最終source／文書のSHA・そのCIと件数、mainへのretarget後の検証、merge SHA・main CI・Production deploymentと公開読取の確認結果は未確定です。確定後に対象SHAとrunを本節へ追記し、それまではmain反映済み・Production確認済みとは報告しません。

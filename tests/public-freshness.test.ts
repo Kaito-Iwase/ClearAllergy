@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { createPublicRevalidator, readSnapshotResponse } from '../features/public/shops/freshness/revalidation';
+import { createPublicRevalidator, fetchPublicSnapshot, readSnapshotResponse } from '../features/public/shops/freshness/revalidation';
 import { targetKey, type PublicSnapshot, type PublicTarget } from '../features/public/shops/freshness/contracts';
 
 const target: PublicTarget = { kind: 'menu', shopId: 'test-shop', menuId: 'test-menu' };
@@ -23,6 +23,31 @@ function harness() {
     return { engine, jobs, initial };
 }
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));
+
+test('同一originの保護認証を使って取得し、認証HTMLを正常snapshotとして扱わない', async (t) => {
+    const id = randomUUID(); const signal = new AbortController().signal; const expected = snapshot('保護Previewの食品', id);
+    t.mock.method(globalThis, 'fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+        assert.equal(init?.signal, signal); assert.equal(init?.cache, 'no-store');
+        if (init?.credentials !== 'same-origin') return new Response('<html>Authentication Required</html>', { status: 401 });
+        return new Response(JSON.stringify(expected), { status: 200 });
+    });
+    assert.deepEqual(await fetchPublicSnapshot(target, id, signal), expected);
+});
+
+test('IDに外部URLを含めても取得先を固定し、CookieやAuthorizationを手動転送しない', async (t) => {
+    const hostile: PublicTarget = { kind: 'menu', shopId: 'https://outside.invalid/shops', menuId: '//outside.invalid/menu?x=1' };
+    const id = randomUUID(); const expected: PublicSnapshot = { ...snapshot('unused', id), targetKey: targetKey(hostile), result: { kind: 'not-found' } };
+    t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        assert.equal(typeof input, 'string'); assert.match(String(input), /^\/api\/public-snapshot\?/);
+        const url = new URL(String(input), 'https://fixture.invalid');
+        assert.equal(url.origin, 'https://fixture.invalid'); assert.equal(url.pathname, '/api/public-snapshot');
+        assert.equal(url.searchParams.get('shopId'), hostile.shopId); assert.equal(url.searchParams.get('menuId'), hostile.menuId);
+        assert.equal(init?.credentials, 'same-origin'); const headers = new Headers(init?.headers);
+        assert.equal(headers.get('accept'), 'application/json'); assert.equal(headers.has('cookie'), false); assert.equal(headers.has('authorization'), false);
+        return new Response(JSON.stringify(expected), { status: 404 });
+    });
+    assert.deepEqual(await fetchPublicSnapshot(hostile, id, new AbortController().signal), expected);
+});
 
 test('取得完了だけでは成功にせず、対応するDOM適用まで旧snapshotを保持する', async () => {
     const { engine, jobs, initial } = harness();

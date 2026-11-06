@@ -225,6 +225,53 @@ test('鮮度: 実SPA履歴で戻った画面から停止した食品を再表示
     await shot(page, testInfo, 'spa-withdrawn');
 });
 
+test('鮮度: 公開layout外から複数履歴を戻り、訂正された食品を再取得する', async ({ actors, createMenu, baseURL }) => {
+    const menu = await createMenu(); await publish(menu);
+    // The existing signed-in actor follows the real login redirect without
+    // rendering the unsupported Clerk login form in the local boundary double.
+    const page = actors.a.page;
+    await page.goto(publicURL(menu)); await ready(page);
+    await page.evaluate(token => {
+        window.__freshnessOutsideLayout = { token, popstates: 0 };
+        window.addEventListener('popstate', () => { window.__freshnessOutsideLayout.popstates++; });
+    }, menu.id);
+    await page.locator('header a[href="/"]').click();
+    await expect(page).toHaveURL(new URL('/', baseURL).href);
+    await page.locator('a[href="/admin/login"]').first().click();
+    await expect(page).toHaveURL(new URL('/admin/shop', baseURL).href);
+    await expect(page.getByLabel('お店の説明', { exact: true })).toBeVisible();
+    await expect(controls(page)).toHaveCount(0);
+
+    // Keep the target published so either a cached or a new RSC result mounts
+    // its Surface. A fresh server 404 would correctly have no Surface to wake.
+    const correctedName = `${menu.name} 訂正後`;
+    await menu.page.goto(menu.editURL);
+    await menu.page.getByLabel('メニュー名', { exact: true }).fill(correctedName);
+    const saved = menu.page.waitForResponse(r => new URL(r.url()).pathname === menu.api && r.request().method() === 'PUT');
+    await menu.page.getByRole('button', { name: '保存する', exact: true }).click();
+    expect((await saved).status()).toBe(200); await publish(menu);
+    await page.bringToFront();
+    const snapshot = page.waitForResponse(r => {
+        const url = new URL(r.url());
+        return url.pathname === '/api/public-snapshot' && url.searchParams.get('menuId') === menu.id;
+    });
+    // Returning one entry at a time could remount the public listener before
+    // reaching the menu and conceal the missing cross-layout popstate handler.
+    await page.evaluate(() => history.go(-2));
+    await expect(page).toHaveURL(new URL(publicURL(menu), baseURL).href);
+    const response = await snapshot; expect(response.status()).toBe(200);
+    const result = await response.json();
+    expect(result.targetKey).toBe(publicURL(menu));
+    expect(result.result.kind).toBe('menu'); expect(result.result.data.menuName).toBe(correctedName);
+    await ready(page);
+    await expect(page.getByRole('heading', { name: correctedName, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: menu.name, exact: true })).toHaveCount(0);
+    const observation = await page.evaluate(token => ({ sameDocument: window.__freshnessOutsideLayout?.token === token,
+        popstates: window.__freshnessOutsideLayout?.popstates ?? 0 }), menu.id);
+    expect(observation.sameDocument).toBe(true); expect(observation.popstates).toBe(1);
+    console.info('[cross-layout-spa-history-observation]', JSON.stringify(observation));
+});
+
 test('鮮度: native BFCache復元を試み、persisted=trueの場合だけ復帰動作を実証する', async ({ createMenu, page }, testInfo) => {
     const menu = await createMenu(); await publish(menu);
     await page.addInitScript(() => window.addEventListener('pageshow', event => {

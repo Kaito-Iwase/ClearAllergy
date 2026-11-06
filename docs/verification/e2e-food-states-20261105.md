@@ -1,5 +1,7 @@
 # 食品訂正・状態表示のE2E追補（2026-11-05）
 
+以下の既存節はWindowsローカル検証時点の記録です。公開後のLinux結果とmain取込前の状態は[末尾の追補](#linux-ci-bcc4c0cd)へ分け、当時の未実施事項を現在の全体未検証と読み替えません。
+
 [実行手順](../guide/e2e.md) · [現行公開条件](../guide/rules.md#publication) · [検証状況](../guide/verification.md#food-state-e2e-status) · [未採用の鮮度比較案](../research/product/public-view-freshness-options-20261105.md)
 
 ## 対象と変更範囲
@@ -60,3 +62,12 @@ UNKNOWNを含むメニューは[現行仕様](../guide/rules.md#publication)で�
 このローカル実測を、追加2件を含むLinux CIの成功へ読み替えません。公開後のCI・監査の結果は上記PRの対象headに結び付けます。実Clerkの署名検証/ログイン、実Preview、Blob、実配備のcache伝播、利用者の理解は未確認です。上記ローカル検証の取得時点ではpush・PR更新・merge・配備・本番操作は行っていません。拒否されたActions・Prisma取得・Preview操作は再試行していません。追補の公開とmain merge・本番操作・意図的な配備は別判断です。
 
 更新したのは本記録、E2E手順、変更対応表、検証状況、鮮度比較案と研究索引です。操作・公開条件・schema・アーキテクチャ・作業ルールを変えないため、product/rules/architecture/development/AGENTSは本文変更不要と判断しました。
+
+<a id="linux-ci-bcc4c0cd"></a>
+## 2026-11-06追補：公開後の固定headのLinux CI
+
+PR #128 head `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315`、base `51adcb23945b80bb34b110d2d0f263d29629a821` の[CI 42054864143](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864143)は全4job成功、実checkoutはPR merge候補 `a4257172c7c34e0ab0e95a4cbb030fee2bcdb48a` です。無除外unit299/299、通常npm build、lint・型検査・実DB・既存browserと、E2E11/11（28.3秒、run `ci-d95df2fa-17d7-4c99-8ad1-e9c48f7ef45b`）が成功しました。run監査27行除去、既存4model fingerprint保持、所有process／TEMP終了、helper終了時のservice DB保持とjob終了時のcontainer停止を確認した記録です。
+
+[artifact 13429131564](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864143/artifacts/13429131564)は4,776,761 bytes、SHA256 `35ff9ddfeb8d1a896d8a40ab8efed494a4de83af63c6c2bda507d31a58d66916`。[依存監査 42054864250](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864250)は既存high閾値で成功し、開発依存のmoderate8件は残っています。保存証拠はworktreeの親の `e2e-food-publication-20261105/result.json` です。
+
+この追補時点でPR #128・#129は未mergeです。最終HEAD・CI・merge SHA・main CI・Production反映は未確定として、[現行の確認状態](../guide/verification.md#practical-e2e-status)と対象PRへ後続の実績を結び付けます。実Clerk／Blob書込、食品安全、継続閲覧への訂正到達をこのCIで実証したとは扱いません。

@@ -42,31 +42,29 @@ PR #111追従開始時の確認済みProductionは、PR #113の自動配備 `Eoe
 F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIのSHA、公開4入口の結果を記録し、上記の規約導入時点の結果と分けます。main更新は自動Production配備を起動するため、ユーザーの個別承認範囲を確認し、異常時は追加変更を止めます。rollbackは別承認です。ブランチ固有の配備抑止をmainの配備抑止と解釈しません。
 
 <a id="practical-e2e-status"></a>
-## 2026-11-05 main基準の通常Playwright E2E候補
+## 通常Playwright E2Eの取込対象と確認状態
 
-最新remote main `51adcb23945b80bb34b110d2d0f263d29629a821` を確認して作成した独立branch `test/practical-e2e-main-20261105` のmain向け通常E2E候補です。公開とCIの最終状態は対象PRのSHAに結び付けて確認し、main採用・Production反映と区別します。旧PR #120の76ファイル差分、専用runner、workflowの実処理は取り込みません。mainにはtimeoutの対象service guardが存在しないため、その固定message修正も移しません。
+PR #128はmain `51adcb23945b80bb34b110d2d0f263d29629a821` を基準としたE2E基盤と食品訂正の追補です。この文書更新時点ではPR #128・#129とも未mergeで、最終HEADのCI、merge SHA、main CI、Production反映は未確定です。以下はこの変更をmainへ取り込む場合の動作と、固定headごとの既存証拠を分けた案内です。旧PR #120の76ファイル差分・専用runner・workflow実処理は取り込みません。
 
-既存のUTC migration独立job・main/developのCI起動条件・checkout版・通常製品buildと公開回帰を保持し、新E2Eは準備済みのサービスDB・ブラウザーを使う別stepにします。新branchだけVercel Git配備をfalseにし、既存の配備設定とmainのProduction追跡方針を保持します。2026-11-05 12:57 UTCのVercel API観測では、このbranchの配備は対象2 Projectとも0件で、既存Productionは保持されていました。別経路や将来の配備まで保証する結果ではありません。mainへのmergeは別途Production再配備を誘発し得るため、公開branchの配備抑止をmergeの許可と読み替えません。
+既存のUTC migration独立job・main/developのCI起動条件・通常製品build・公開回帰を保持し、新E2Eは準備済みサービスDBとブラウザーを使う別stepです。PR branchのVercel Git配備抑止はmainや手動配備を止めません。mainへのmergeはProduction再配備を誘発し得るため、コード統合と実際の配備結果を別に確認します。
 
-[main基準の検証記録](../verification/practical-e2e-main-20261105.md)に対象と限界をまとめています。旧Clientをコピーせず、既存CLI/engineからmain用Clientをローカル生成してschema一致を確認しました。Windowsのprepared CI共通経路は9/9 PASS（26.8秒）、既存User/Shop/MenuItem/AuditLogを保持し、run所有の監査17行も後始末しました。単体回帰はhardlink名除外指定付き298件PASS、lint・型検査も成功しました。
-
-Windowsの通常製品buildはフォント接続とTurbopack子Node起動で失敗した記録を保持します。一方、head `5dbba923cf0c4bec4889ffef07ba9c701e99b31d` の[Linux CI](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42030085365)は、実checkout `f079371fe36e034e238bae1b1a7a6aaf14117286` でUTC3timezone・単体299/299（除外なし）・lint・型検査・実DB・通常製品build・既存browser・新E2E9/9が成功しました。[依存監査](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42030085234)も成功しています。Node22.23.4とnpm11.18.0整合stepを使用した結果で、Windowsの失敗原因が解消したとは扱いません。実Clerk/Blob、実配備環境でのcache伝播は未検証です。旧466基準の結果は流用していません。文書同期後の各commitも、そのSHAのPR CIで別に確認します。
+初期9件とWindows準備時点の結果・制限は[main基準の検証記録](../verification/practical-e2e-main-20261105.md)に残します。食品訂正の追加2件を含む固定head `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` の[CI 42054864143](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864143)は、実checkout `a4257172c7c34e0ab0e95a4cbb030fee2bcdb48a` で全4job、unit299/299、通常npm build・lint・型検査・実DB・既存browser、E2E11/11が成功しました。[依存監査 42054864250](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864250)も既存high閾値で成功しています。これは後続headやmain CIの結果ではありません。
 
 <a id="food-state-e2e-status"></a>
-## 2026-11-05 食品訂正・状態表示のE2E追補候補
+## 食品訂正・状態表示のE2E
 
-PR #128のhead `1a8fa04699b0472b43ba930138055c5c3bde0b95` から独立branch `test/e2e-food-states-20261105` で2件を追加し、既存[PR #128](https://github.com/Kaito-Iwase/ClearAllergy/pull/128)へ反映する追補です。[追補検証](../verification/e2e-food-states-20261105.md)は、食品訂正→非公開保存→保存済み確認→別公開と、CONTAINS/MAY_CONTAIN/FREEの公開API・品目行の表示、UNKNOWNの公開拒否を対象にします。公開条件・製品コードは変更していません。最終差分は旧9件を含め11/11成功（run `ci-d4f749ea-f01a-4e6b-ac13-a8efc209e694`、37.0秒）です。DB回帰37グループ、通常設定のNext build、lint・型検査も成功しました。unitは指定1件除外・所有TEMP/TMP指定で298件成功し、既定sandbox一時パスでは既存3件の失敗を変更前でも再現しています。除外なしの通常 `npm test` 成功とは区別します。この数値はWindowsローカル結果です。追補公開後のLinux CI・監査はPR #128の最新head・runで別に確認し、過去の9件成功と区別します。実Clerk・実サービスは未検証です。
+基本11件は、食品訂正→非公開保存→保存済み確認→別公開、CONTAINS／MAY_CONTAIN／FREEの公開API・同じ品目行の表示、UNKNOWNの公開拒否を含みます。公開条件は変更していません。[食品訂正の検証記録](../verification/e2e-food-states-20261105.md#linux-ci-bcc4c0cd)で、Windowsローカル298件の指定除外付きunit、11件のE2Eと、公開後Linuxの無除外unit299件を分けています。実Clerk・Blob書込・食品安全の検証ではありません。
 
-開いた画面の鮮度は[未採用比較案](../research/product/public-view-freshness-options-20261105.md)として独立批評を反映しました。取得中・失敗時の表示や期限等の製品判断を残し、最大遅延や全閲覧者への自動到達を保証しません。製品の復帰時挙動は変更していません。
+開いた画面の再取得・取得中／失敗時表示はPR #129の変更に含みます。[比較原稿](../research/product/public-view-freshness-options-20261105.md)の過去の未実行表を実行済みへ変更せず、表示方式A/Bの最終選定や最大遅延・全閲覧者への到達保証とも分けます。
 
 <a id="freshness-prototype-status"></a>
-## 2026-11-05 公開鮮度UIの独立ローカル候補
+## 公開鮮度UIの取込対象と確認状態
 
-PR #128 head `bcc4c0cd` から作った `test/public-freshness-prototype-20261105` の未採用Draft候補です。公開3画面の共有loader／完全JSON snapshot／手動・復帰取得／状態表示／旧情報の参照・遮蔽を実装しています。[追補記録](../verification/public-freshness-prototype-20261105.md)の最初の実Next・使い捨てDB・既存Chromium実行は17 PASS・native BFCache1 SKIP、unit316件（既知EPERM指定1件除外・所有TEMP/TMP指定）と10負例が成功しました。最終差分のrun `ci-9f927481-4e8c-4143-9ef0-5d95ca19d2cf` も17 PASS・native1 SKIP。通常Next設定build、全体lint・型検査、最終unit316件、既存部品browser17グループも成功しました。icon-fontの現物とnative BFCache復元は未確認です。
+PR #129はPR #128 head `bcc4c0cd` を基点に、公開3画面の共有loader・完全JSON snapshot・手動／復帰取得・状態表示・旧情報の参照／遮蔽を追加します。この変更をmainへ取り込む場合の動作は[操作説明](product.md#freshness-prototype)と[内部処理](architecture.md#freshness-prototype)を参照してください。参照表示Aは比較用の暫定設定で、コード取込だけで最終表示方式・文言・利用者理解・安全性を確定しません。
 
-native復元はno-store等により使われず、合成イベント・実SPA成功と区別します。画面の文言・表示方針・期限・採用は未決です。[Draft PR #129](https://github.com/Kaito-Iwase/ClearAllergy/pull/129)の公開head `7feb5c1` はLinux CI全4job成功、unit317/317・skip0、E2E17 PASS・native1 SKIPでした。実checkout・run・artifactと非配備観測は[公開後の記録](../verification/public-freshness-prototype-20261105.md#linux-ci-7feb5c1)へ分けます。実Clerk・本番・native復元は未確認で、PR #128の成功を流用しません。元PR branchへのpushや更新は行いません。
+混在FREEの行別注記と旧一覧の判定表現を修正した固定head `88ca4630d42f82063c7d6d7bd5c2f24cd76432ba` の[CI 42134197073](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197073)は、実checkout `8fc3998ba27de087b290b3d9afaed3e5e7e20a5c` でunit324/324、E2E19 PASS・native BFCache1 SKIPでした。[依存監査 42134197138](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197138)もhigh閾値で成功しましたが、moderate8件が残っています。初期17件、Windowsの指定1件除外付きunit323件とは[追補記録](../verification/public-freshness-prototype-20261105.md#main-adoption-preparation-20261106)で区別します。
 
-その後、head `0fb032d` の独立レビューで混在FREEの行別注記と旧店舗一覧の判定表現の抜けを確認しました。[2026-11-06の修正追補](../verification/public-freshness-prototype-20261105.md#review-followup-20261106)は、SSR部品7件・実アプリE2E2件を追加し、ローカル19 PASS・native1 SKIP、全体unit323（既知EPERM指定1件除外）、lint・型検査まで確認しています。上記の旧17件の結果にはこの2条件が含まれません。後続のCI結果はPRの対象headと照合します。
+後続のsame-origin transport、root layoutの復帰listener、店舗集計の旧情報注記と文書同期は、この固定headのCIへ含めません。専用stagingでの匿名公開画面・手動再取得の観測は、実Clerk管理操作・Blob書込・継続した訂正到達の検証とは別です。公開layoutを離れたSPA復帰は追加検査の対象で、実行前の成功は主張しません。native BFCache、JS未実行、実オフライン、利用者理解も未実証です。最終件数・HEADのCIとmerge後の実績は[統合前のレビュー追補](../verification/public-freshness-pr-review-20261105.md#main-adoption-review-20261106)へ対象SHAに結び付けて追記します。
 
 ## 日付付きの検証記録
 
