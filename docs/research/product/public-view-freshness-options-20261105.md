@@ -2,7 +2,9 @@
 
 2026-11-05。調査対象は HEAD `1a8fa04699b0472b43ba930138055c5c3bde0b95`、文書作業branchは `test/e2e-food-states-20261105`。製品挙動を変更しない比較・技術検証案です。TTL、表示方針、通知文言、オフライン時の扱い、最大許容遅延は決定していません。本稿の追加は機能採用・実装・本番反映を意味しません。
 
-現時点の提案は、**復帰時再検証を優先して比較・技術検証し、表示方針等の製品判断後に実装案を確定する**ことです。明示的な再読み込みを比較基準に置き、経過表示や定期取得との組合せを評価します。以下の試験候補は未実行です。
+後続の[独立ローカル試作](../../verification/public-freshness-prototype-20261105.md)では、この比較を基に三画面の再取得・取得状態・参照／遮蔽を実装しています。製品採用ではありません。以下の比較原稿と未実行表はHEAD1a8fa046での検討時点を保持し、後続の実行結果と区別します。
+
+比較時点の提案は、**復帰時再検証を優先して比較・技術検証し、表示方針等の製品判断後に実装案を確定する**ことです。明示的な再読み込みを比較基準に置き、経過表示や定期取得との組合せを評価します。以下の試験候補は比較原稿の作成時点で未実行です。後続候補の結果は上記追補記録を参照します。
 
 現行仕様の正本は[共通ルール](../../guide/rules.md#publication)、取得処理は[内部処理](../../guide/architecture.md#public)、入口と検証層は[変更対応表](../../guide/change-map.md#cross-cutting)です。研究資料の時点・状態は[研究索引](../README.md)に従って区別します。
 
@@ -10,16 +12,16 @@
 
 | 確認した事実 | 根拠（対象HEADの行番号） |
 | --- | --- |
-| 食品情報を載せる公開3ページは `force-dynamic`。公開ページの初期取得はServer ComponentからDBを読む | [PublicShopListPage.tsx:8](../../../features/public/shops/server/PublicShopListPage.tsx#L8)、[PublicShopDetailPage.tsx:34](../../../features/public/shops/server/PublicShopDetailPage.tsx#L34)、[PublicMenuDetailPage.tsx:24](../../../features/public/shops/server/PublicMenuDetailPage.tsx#L24) |
-| 食品・状態・マスタ・補足を `RepeatableRead` transactionで読む。取得完了不能の一部を既存の取得不能案内へ渡す | [public-read-snapshot.ts:7](../../../features/public/shops/server/public-read-snapshot.ts#L7)、[lib/public-db.ts:15](../../../lib/public-db.ts#L15) |
-| 公開APIは稼働・公開フラグと、食品版・公開条件を検査する。対象なし・条件不成立は404、取得中の例外は500 | [publicMenuRoute.ts:48](../../../features/public/shops/server/publicMenuRoute.ts#L48)、同ファイル:110、170 |
-| 公開詳細は取得不能を対象なしと分ける。正常に取得した対象なし・公開条件不成立にはnot-foundを使う | [PublicMenuDetailPage.tsx:102](../../../features/public/shops/server/PublicMenuDetailPage.tsx#L102)、同ファイル:115、123。ストリーミング後はHTTP 200の場合もあるため、状態コードだけで食品の表示継続を判断しない。[共通ルール:74](../../guide/rules.md#publication) |
-| STOPは古い編集フォームや新しい確認の完了に依存せず、所有店舗の対象を `isPublished:false` に保存後、関連pathの再検証を要求する。後処理失敗は `publicRefreshPending` として区別する | [adminMenuRoute.ts:663](../../../features/admin/menus/server/adminMenuRoute.ts#L663)。管理画面側の結果不明の扱いは [MenuEditClient.tsx:515](../../../features/admin/menus/components/MenuEditClient.tsx#L515)、[MenuListPageClient.tsx:158](../../../features/admin/menus/components/MenuListPageClient.tsx#L158) |
-| 無効化は `revalidatePath`。tag invalidationや他の閲覧者への配送処理はない | [lib/public-cache.ts:1](../../../lib/public-cache.ts#L1)。既に開いた画面・戻る・オフラインへの自動配送なしは[内部処理:62](../../guide/architecture.md#public)にも明記 |
-| 公開側のfocus購読は個人設定のlocalStorage再読込であり、食品情報の再取得ではない。食品取得用のpageshow・visibilitychange購読もない | [lib/public-allergen-preferences.ts:51](../../../lib/public-allergen-preferences.ts#L51)、同ファイル:83。公開側・共通libの呼出元検索と照合 |
-| 公開画面の「更新」はメニューの `updatedAt`。食品確認日時や取得成功日時ではない。店舗内補足は別メニューの公開登録から変化する | [PublicMenuDetailPage.tsx:181](../../../features/public/shops/server/PublicMenuDetailPage.tsx#L181)、[PublicMenuDetailBodyClient.tsx:176](../../../features/public/shops/components/PublicMenuDetailBodyClient.tsx#L176)、[storeAllergenSupplement.ts:4](../../../features/public/shops/server/storeAllergenSupplement.ts#L4)、[共通ルール:70](../../guide/rules.md#publication) |
-| 公開画面の利用者設定には保存済み値とは別の編集案・競合状態がある。検索入力もclient stateを持つ | [UserAllergenPreferenceClient.tsx:34](../../../features/public/shops/components/UserAllergenPreferenceClient.tsx#L34)、[PublicShopListClient.tsx:106](../../../features/public/shops/components/PublicShopListClient.tsx#L106)。管理フォームの未保存保護は [useUnsavedMenuChanges.ts:7](../../../features/admin/menus/components/useUnsavedMenuChanges.ts#L7) |
-| 既存の伝播確認は新規要求で停止等を反映する試験定義であり、開いた画面への自動反映をassertしない | [check-publication-propagation.ts:78](../../../scripts/check-publication-propagation.ts#L78)、同ファイル:105 |
+| 食品情報を載せる公開3ページは `force-dynamic`。公開ページの初期取得はServer ComponentからDBを読む | [PublicShopListPage.tsx:8](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/server/PublicShopListPage.tsx#L8)、[PublicShopDetailPage.tsx:34](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/server/PublicShopDetailPage.tsx#L34)、[PublicMenuDetailPage.tsx:24](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/server/PublicMenuDetailPage.tsx#L24) |
+| 食品・状態・マスタ・補足を `RepeatableRead` transactionで読む。取得完了不能の一部を既存の取得不能案内へ渡す | [public-read-snapshot.ts:7](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/server/public-read-snapshot.ts#L7)、[lib/public-db.ts:15](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/lib/public-db.ts#L15) |
+| 公開APIは稼働・公開フラグと、食品版・公開条件を検査する。対象なし・条件不成立は404、取得中の例外は500 | [publicMenuRoute.ts:48](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/server/publicMenuRoute.ts#L48)、同ファイル:110、170 |
+| 公開詳細は取得不能を対象なしと分ける。正常に取得した対象なし・公開条件不成立にはnot-foundを使う | [PublicMenuDetailPage.tsx:102](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/server/PublicMenuDetailPage.tsx#L102)、同ファイル:115、123。ストリーミング後はHTTP 200の場合もあるため、状態コードだけで食品の表示継続を判断しない。[共通ルール:74](../../guide/rules.md#publication) |
+| STOPは古い編集フォームや新しい確認の完了に依存せず、所有店舗の対象を `isPublished:false` に保存後、関連pathの再検証を要求する。後処理失敗は `publicRefreshPending` として区別する | [adminMenuRoute.ts:663](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/admin/menus/server/adminMenuRoute.ts#L663)。管理画面側の結果不明の扱いは [MenuEditClient.tsx:515](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/admin/menus/components/MenuEditClient.tsx#L515)、[MenuListPageClient.tsx:158](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/admin/menus/components/MenuListPageClient.tsx#L158) |
+| 無効化は `revalidatePath`。tag invalidationや他の閲覧者への配送処理はない | [lib/public-cache.ts:1](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/lib/public-cache.ts#L1)。既に開いた画面・戻る・オフラインへの自動配送なしは[内部処理:62](../../guide/architecture.md#public)にも明記 |
+| 公開側のfocus購読は個人設定のlocalStorage再読込であり、食品情報の再取得ではない。食品取得用のpageshow・visibilitychange購読もない | [lib/public-allergen-preferences.ts:51](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/lib/public-allergen-preferences.ts#L51)、同ファイル:83。公開側・共通libの呼出元検索と照合 |
+| 公開画面の「更新」はメニューの `updatedAt`。食品確認日時や取得成功日時ではない。店舗内補足は別メニューの公開登録から変化する | [PublicMenuDetailPage.tsx:181](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/server/PublicMenuDetailPage.tsx#L181)、[PublicMenuDetailBodyClient.tsx:176](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/components/PublicMenuDetailBodyClient.tsx#L176)、[storeAllergenSupplement.ts:4](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/server/storeAllergenSupplement.ts#L4)、[共通ルール:70](../../guide/rules.md#publication) |
+| 公開画面の利用者設定には保存済み値とは別の編集案・競合状態がある。検索入力もclient stateを持つ | [UserAllergenPreferenceClient.tsx:34](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/components/UserAllergenPreferenceClient.tsx#L34)、[PublicShopListClient.tsx:106](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/public/shops/components/PublicShopListClient.tsx#L106)。管理フォームの未保存保護は [useUnsavedMenuChanges.ts:7](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/features/admin/menus/components/useUnsavedMenuChanges.ts#L7) |
+| 既存の伝播確認は新規要求で停止等を反映する試験定義であり、開いた画面への自動反映をassertしない | [check-publication-propagation.ts:78](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/scripts/check-publication-propagation.ts#L78)、同ファイル:105 |
 
 以上は静的な実装照合です。本稿の鮮度機能候補の実装・復帰試験・実サービス接続・配備設定の調査は行っていません。別の[食品訂正E2E追補](../../verification/e2e-food-states-20261105.md)は実DBを使った新規取得と保持中DOMの一時点の観察を含みますが、現在の本番での反映時間、接続pool、負荷、全利用者への到達を確認した証拠にはしません。
 
@@ -108,7 +110,7 @@ Next.jsの `router.refresh()` は新しい要求でServer Componentを再取得�
 
 ブラウザはbackgroundのtimerを抑制するため、poll周期を訂正到達の上限にしません。復帰時取得にもネットワーク・DB・DOM適用の遅延があります。[MDNのbackground timer制御説明](https://github.com/mdn/content/blob/main/files/en-us/web/api/page_visibility_api/index.md)
 
-## 今後の検証候補（全項目未実行）
+## 比較時点の検証候補（当時は全項目未実行）
 
 表示方針・対象範囲を決定した後、その仕様に対応する最低限の試験を選びます。既存の新規要求の試験を維持し、復帰・表示適用の試験を追加する案です。実行環境・架空データ・接続先・副作用の許可は実施時に別確認します。
 
@@ -125,11 +127,11 @@ Next.jsの `router.refresh()` は新しい要求でServer Componentを再取得�
 | キーボード・読み上げ・拡大表示で更新/失敗/対象消失 | フォーカスの所在、通知の重複、再試行可能性、登録状態と取得状態の区別 |
 | 想定閲覧数・復帰集中・失敗時再試行 | HTTP要求、SQL、pool待機、接続保持、遅延分布、通信量。製品判断で定めた基準との比較 |
 
-この文書は静的調査と独立批評を反映した未採用案です。本稿に記した機能の実装・表の試験・実サービスの操作は行っておらず、表の項目をPASS扱いにしません。
+この文書は静的調査と独立批評を反映した未採用案です。この比較原稿の作成時点では候補機能・表の試験・実サービス操作は未実施でした。後続のローカル試作結果は追補記録へ分け、この表の全項目をPASS扱いにしません。
 
 ## 一次資料と適用限界
 
-2026-11-05にContext7でNext.jsとMDNの公式資料を確認しました。Next.jsの対象依存は [package.json:34](../../../package.json#L34) の16.4.1です。取得できたNext.js資料はcanaryの公式文書であり、対象版での動作試験の代替にはしません。MDNの資料もブラウザ別・OS別の全動作を保証するものではありません。
+2026-11-05にContext7でNext.jsとMDNの公式資料を確認しました。Next.jsの対象依存は [package.json:34](https://github.com/Kaito-Iwase/ClearAllergy/blob/1a8fa04699b0472b43ba930138055c5c3bde0b95/package.json#L34) の16.4.1です。取得できたNext.js資料はcanaryの公式文書であり、対象版での動作試験の代替にはしません。MDNの資料もブラウザ別・OS別の全動作を保証するものではありません。
 
 - [Next.js useRouter / router.refresh](https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/04-functions/use-router.mdx)：新しい要求、RSCのマージ、影響を受けないclient state・scroll、戻り値voidの説明。
 - [Next.js revalidatePath](https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/04-functions/revalidatePath.mdx)：Route Handlerからの無効化は次回訪問時の再検証。現在のpath無効化だけで開いた他画面へ配送できるという根拠にはしない。

@@ -25,6 +25,18 @@
 `admin` は `scripts/check-test-browser.mjs` を使い、専用テスト環境の実Clerk・DB・Blobを必要とします。CIの公開画面回帰の成功を、実認証や外部サービス連携の確認済みとは扱いません。今回の観察・修正・確認範囲は [UI/UX精査記録](ui-ux-review.md) を参照してください。
 
 <a id="pages"></a>
+## 公開鮮度の再取得経路
+
+PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。この変更をmainへ取り込む場合の入口を以下に示します。公開3ページの初期取得は `server/public-shop-list-data.ts` / `public-shop-detail-data.ts` / `public-menu-detail-data.ts` の共有loaderへ移し、同じ公開条件・RepeatableRead・補足を使います。既存caller4件と10負例のsource参照はloaderへ追従し、検出条件を維持しています。
+
+| 入口 | 実装・検証 |
+| --- | --- |
+| `GET /api/public-snapshot` | `app/api/public-snapshot/route.ts` →共有loader。kind/ID/要求IDを限定し公開whitelistを返す。`tests/public-freshness-api.test.ts`、`freshness/contracts.ts` |
+| 三画面の再取得と表示 | `PublicFreshnessSurface.tsx` / root `app/layout.tsx` の `PublicFreshnessNavigation.tsx` / `freshness/revalidation.ts` / `freshness/presentation.tsx`。`SelectedAllergenResultCardsClient.tsx` / `PublicShopListClient.tsx` / `PublicShopMap.tsx`。`tests/public-freshness.test.ts`、`tests/public-freshness-presentation.test.ts`、`e2e/freshness.spec.mjs` |
+| 内容と適用proof | `PublicShopDetailView.tsx` / `PublicMenuDetailView.tsx` と既存list/menu本文。shopはmenu・検索要約の両方を待つ。FREE要約抑制と注意保持は `MenuAllergenSummary.tsx` / `SelectedAllergenResultCardsClient.tsx`。店舗内の集計・件数・0件の局所注記は `ShopMenuListClient.tsx` |
+
+[実装・実行結果](../verification/public-freshness-prototype-20261105.md)、[操作と暫定表示方式](product.md#freshness-prototype)、[統合状態](verification.md#freshness-prototype-status)を参照します。コードの取込を表示方式A/Bの最終決定や実サービスの到達保証へ読み替えません。
+
 ## 全ページの入口
 
 `(public)` や `(dashboard)` はURLに含まれません。角括弧は動的な部分、`[[...name]]` は基点も含む可変パスです。個々の店舗IDを一覧に載せません。
@@ -94,7 +106,7 @@
 | 管理一覧の公開前確認待ち | [管理操作](product.md#menus)、[検証入口](development.md#browser) | `features/admin/menus/menu-list.ts`、`features/admin/menus/server/menu-list-data.ts` と通常管理・一覧GET・デモの共通DTO。記録なし・別版・最新未解決を区別し、通常STOPは確認失効へ変換しない | `tests/admin-menu-list.test.ts`、`tests/admin-menu-api.test.ts`、`scripts/check-allergen-cards-browser.mjs`、接続先ガード付き `scripts/check-admin-menu-list-database.ts`。[今回の証拠](../verification/admin-menu-review-queue-20261015.md)と[演習準備](../research/product/ingredient-change-trial-20261015.md)。演習スクリプトの合成保存を実DB回帰や参加者の観察へ数えない |
 | 保存応答・送信中の入力保護 | [保存処理](architecture.md#mutation)、[管理操作](product.md#menus) | `features/admin/menus/schemas/menu-response.ts`、`features/admin/menus/components/MenuEditClient.tsx`、`features/admin/menus/components/NewMenuForm.tsx` | `scripts/check-allergen-cards-browser.mjs`。不正なID・確認履歴・版・画像URL、遅延送信中の画像操作。[敵対的レビュー](../verification/menu-food-review-adversarial-20261009.md) |
 | 公開読取の同時更新・取得不能 | [公開処理](architecture.md#public)、[公開条件](rules.md#publication) | `features/public/shops/server/public-read-snapshot.ts`、公開3ページ・公開メニューAPI・`features/public/shops/server/storeAllergenSupplement.ts`、`lib/public-db.ts` | `scripts/check-public-read-snapshot.ts` の実SQL競合、`tests/public-read-callers.test.ts` の実routeからのtx利用、`scripts/check-public-caller-mutations.mjs` の10負例、`tests/public-read-snapshot.test.ts` の取得不能境界、`tests/public-menu-api.test.ts`、`scripts/check-publication-propagation.ts` |
-| 食品情報の取得鮮度・停止反映 | [公開条件](rules.md#publication)、[取得処理](architecture.md) | `app/(public)/shops/` の3ページと `features/public/shops/server/PublicShopListPage.tsx` / `PublicShopDetailPage.tsx` / `PublicMenuDetailPage.tsx` の `force-dynamic`、公開メニューAPI | `scripts/check-publication-propagation.ts`（loopbackの本番build＋架空CI DB限定、検査店舗を作成・削除）。HTTP応答と、隔離Playwright指定時は停止後の実画面を検証。既存表示・戻る・オフラインへの自動反映は未確認 |
+| 食品情報の取得鮮度・停止反映 | [公開条件](rules.md#publication)、[取得処理](architecture.md) | `app/(public)/shops/` の3ページと `features/public/shops/server/PublicShopListPage.tsx` / `PublicShopDetailPage.tsx` / `PublicMenuDetailPage.tsx` の `force-dynamic`、公開メニューAPI | `scripts/check-publication-propagation.ts`（loopbackの本番build＋架空CI DB限定、検査店舗を作成・削除）。HTTP応答と、隔離Playwright指定時は停止後の実画面を検証。開いた画面の再取得は上記 `e2e/freshness.spec.mjs` で別に検査。公開layoutを離れたSPA復帰は隔離CIの1経路で訂正反映を確認。native BFCache・実オフライン・継続閲覧への到達は未実証 |
 | 認証・所有権・更新制限 | [権限](rules.md#ownership) | `proxy.ts`、`lib/auth/getCurrentAppUser.ts`、`lib/auth/admin-auth.ts`、`lib/auth/admin-api-utils.ts`、`lib/auth/portfolio-mode.ts`、`lib/auth/admin-platform-auth.ts`、`lib/auth/admin-registration.ts` | `tests/admin-menu-api.test.ts`、`tests/admin-shop-api.test.ts`、`tests/admin-upload-api.test.ts`、`tests/admin-invitation-api.test.ts`。実Clerk・proxy・別所有者の画面操作は実操作回帰と手動 |
 | 認証通知と監査の信頼性 | [認証処理](architecture.md#invitations) | `lib/auth/auth-audit.ts`、`features/admin/auth/server/adminLoginRoute.ts`、`features/admin/auth/server/adminSsoRoute.ts`、`lib/audit-log.ts` | `tests/auth-audit-api.test.ts`（成功申告のセッション検証・未認証拒否・再通知抑制・不正入力も含む回数制限・自由入力の非記録）。実Clerkの認証動作は別確認。複数プロセス間の重複抑止は未対応 |
 | 招待の入力・競合 | [招待処理](architecture.md#invitations) | `features/admin/invitations/schemas/admin-invitations.ts`、`lib/auth/invitations.ts` の `acceptPendingInviteForCurrentUser`、`lib/email.ts`、AdminInvite/User/Shop、`prisma/migrations/20260420000000_add_admin_invites/migration.sql` | `tests/admin-invitation-api.test.ts`（競合の割込み順序・外部失敗・再試行・補償処理）、`scripts/database-regression.ts`（pendingの部分一意制約・受諾行ロック・条件付き更新・置換失敗のロールバック）。実Clerk／メール／画面操作は手動 |

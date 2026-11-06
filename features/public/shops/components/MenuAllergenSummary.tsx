@@ -1,8 +1,12 @@
+"use client";
+
 import type { buildSelectedAllergenSummary } from "@/lib/allergens";
+import { usePreviousPublicInformation } from "../freshness/presentation";
 
 type Summary = ReturnType<typeof buildSelectedAllergenSummary>;
 
 export default function MenuAllergenSummary({ summary }: { summary: Summary }) {
+    const previous = usePreviousPublicInformation();
     const rows = [
         { label: "含む", names: summary.containsNames, className: "border-red-200 bg-red-50 text-red-800" },
         { label: "含む可能性あり・要確認", names: summary.mayContainNames, className: "border-amber-200 bg-amber-50 text-amber-900" },
@@ -11,6 +15,7 @@ export default function MenuAllergenSummary({ summary }: { summary: Summary }) {
 
     return (
         <div className="mt-3 space-y-3">
+            {previous && <p className="text-xs font-semibold text-amber-900">以前取得した登録内容・現在は未再確認</p>}
             <div role="group" aria-label="店舗が登録したアレルゲン">
                 {rows.length > 0 ? (
                     <dl className="space-y-2">
@@ -26,7 +31,7 @@ export default function MenuAllergenSummary({ summary }: { summary: Summary }) {
                     </dl>
                 ) : (
                     <p className="break-words rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
-                        {summary.registrationSummaryText}
+                        {previous ? "未再確認のため、条件に合うかの要約は表示していません。" : summary.registrationSummaryText}
                     </p>
                 )}
             </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { usePreviousPublicInformation, usePublicApplyProof } from "../freshness/presentation";
+
 import Link from "next/link";
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -101,6 +103,8 @@ export default function PublicShopListClient({
     allergens: PublicAllergen[];
     isDatabaseAvailable: boolean;
 }) {
+    usePublicApplyProof("list");
+    const previous = usePreviousPublicInformation();
     const router = useRouter();
     const searchParams = useSearchParams();
     const [area, setArea] = React.useState(searchParams.get("area") ?? "");
@@ -339,7 +343,9 @@ export default function PublicShopListClient({
                 ) : null}
                 {hasExclusionPreference ? (
                     <p className="mt-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm leading-6 text-red-900">
-                        除外設定に一致するメニューしかない店舗は非表示になります
+                        {previous
+                            ? "以前取得した登録情報に除外設定を適用しています。除外設定に一致するメニューしかなかった店舗は非表示です"
+                            : "除外設定に一致するメニューしかない店舗は非表示になります"}
                         {includeMayContain
                             ? "（店舗登録の可能性あり・別メニューでの使用も対象）"
                             : "（含む登録のみ対象。店舗登録の注意情報は表示します）"}
@@ -355,6 +361,7 @@ export default function PublicShopListClient({
                 <PublicShopMap
                     shops={visibleShops}
                     locationStatus={locationStatus}
+                    previousInformation={previous}
                 />
             </section>
 
@@ -366,8 +373,9 @@ export default function PublicShopListClient({
 
             <section className="mt-8">
                 <h2 className="text-xl font-black text-neutral-900">
-                    条件に一致するClearAllergy登録済み店舗
+                    {previous ? "以前取得した登録情報による店舗一覧" : "条件に一致するClearAllergy登録済み店舗"}
                 </h2>
+                {previous && <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">表示・非表示の判定は以前取得した登録情報によるものです。現在のアレルゲン登録を再確認できていません。</p>}
                 <p role="status" className="mt-1 text-sm text-neutral-600">
                     {filtered.exact.length}件
                 </p>
@@ -379,7 +387,7 @@ export default function PublicShopListClient({
                         />
                     ) : (
                         <p className="rounded-xl border border-dashed p-5 text-sm text-neutral-600">
-                            完全一致する登録済み店舗はありません。
+                            {previous ? "以前取得した登録情報では、すべての検索条件に一致する店舗は0件です。現在の条件を再確認した結果ではありません。" : "完全一致する登録済み店舗はありません。"}
                         </p>
                     )}
                 </div>
@@ -388,7 +396,7 @@ export default function PublicShopListClient({
             {filtered.related.length > 0 ? (
                 <section className="mt-10">
                     <h2 className="text-xl font-black text-neutral-900">
-                        条件の一部に一致する店舗
+                        {previous ? "以前取得した登録情報による関連店舗" : "条件の一部に一致する店舗"}
                     </h2>
                     <p className="mt-1 text-sm text-neutral-600">
                         {filtered.related.length}件

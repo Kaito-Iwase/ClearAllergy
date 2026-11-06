@@ -10,6 +10,8 @@
 | `test:e2e:local` | Windowsの既存PG実行ファイルから所有する使い捨てDBを作成 | Clerk境界だけを模擬する新規A/B |
 | `test:e2e:ci` | CIで準備済みのサービスDB・公開fixture・Client・ブラウザーを再利用 | Clerk境界だけを模擬する新規A/B |
 
+この変更では、基本public/admin 11件とfreshness project10件の全21定義を実行します。固定head cd18f209のCIは20 PASS・native BFCache1 SKIPです。後続HEADの結果は別に照合し、native BFCache未使用時はその条件を未実証として残します。[追加projectと判定](#freshness-prototype)を参照し、PR #128の基本11件・過去のCI結果と区別してください。
+
 ## 実行
 
 アプリ依存と既存ブラウザーランナーが準備済みであることを確認します。ランナー未準備時にテストが自動インストールすることはありません。必要な取得が許可された環境でのみ、既存の `node scripts/browser-runner.mjs install` を実行してください。
@@ -35,7 +37,7 @@ npm.cmd run test:e2e -- --project=public --headed
 
 ## 実Clerkを使わないローカル実行
 
-Windows上でPostgreSQLの実行ファイル、同じlockfileに対応する生成済みPrisma Client/engine、既存Playwright 1.61.0とChromiumが揃っている場合は、11件を新規の使い捨てDBで実行できます。Dockerや実Clerkアカウントは使いません。依存・Prisma・ブラウザー・PostgreSQLの自動取得は行いません。
+Windows上でPostgreSQLの実行ファイル、同じlockfileに対応する生成済みPrisma Client/engine、既存Playwright 1.61.0とChromiumが揃っている場合は、基本public/adminとfreshness projectを新規の使い捨てDBで実行できます。Dockerや実Clerkアカウントは使いません。依存・Prisma・ブラウザー・PostgreSQLの自動取得は行いません。
 
 ```powershell
 $env:E2E_PG_BIN = 'C:\tools\pgsql\bin' # 既存のinitdb/pg_ctl/createdb
@@ -65,11 +67,11 @@ npm run test:e2e:ci -- --allow-font-download
 
 `run-ci.mjs` は共有 `run-fixture.mjs` を使い、既存アプリ依存・実行platform用の生成済みClientとengine・隔離ブラウザーを新しいアプリコピーで再利用します。Windows用engineの固定指定、PGプロセスの起動・停止、migrate、`setup-ci-env.ts` の再実行は行いません。既存サービスの停止・削除やDBリセットも行いません。実Clerkへの接続やClerkアカウントの作成は不要です。
 
-この実行の前後で既存User/Shop/MenuItem/AuditLog行のfingerprintを照合し、新しいrun IDのA/Bとそのテストデータだけを作成・削除します。User削除で匿名化される監査ログも、今回作ったUser IDに限って先に削除し、既存AuditLogのfingerprint一致と新規監査行の残留なしを要求します。他の同時書込みを検知した場合も成功にせず、共有fixtureの利用を止めて確認してください。公開4件は既存CIの架空公開店舗を使い、管理7件は新規A/Bを使います。spec前に `/e2e-fixture-check` でrun ID・baseURL・実DB identityを照合してから、所有者操作へ進みます。
+この実行の前後で既存User/Shop/MenuItem/AuditLog行のfingerprintを照合し、新しいrun IDのA/Bとそのテストデータだけを作成・削除します。User削除で匿名化される監査ログも、今回作ったUser IDに限って先に削除し、既存AuditLogのfingerprint一致と新規監査行の残留なしを要求します。他の同時書込みを検知した場合も成功にせず、共有fixtureの利用を止めて確認してください。公開4件は既存CIの架空公開店舗を使い、管理7件とfreshness projectは新規A/Bを使います。spec前に `/e2e-fixture-check` でrun ID・baseURL・実DB identityを照合してから、所有者操作へ進みます。
 
 `test-results/ci-<run ID>/`へ `lifecycle.json` と各コマンドのログ・結果を保存します。成功判定にはspec結果だけでなく、新規fixtureの後始末、既存行fingerprintの一致、所有Next/process groupと一時コピーの終了が必要です。サービスDBは保持します。後始末が不確定なら失敗として一時領域を残し、他のCIデータを手動削除しません。
 
-CI定義には、通常の製品buildと従来の公開回帰を残したまま、全11件を認証境界差替えbuildの別stepとして追加しています。各経路の結果は、対象baseとrun IDに結び付いた記録で確認してください。head `5dbba923` のUbuntu／GitHub Actions実行は、通常製品build・単体299件・新E2E9件を含めて成功しています。対象headとrunを確認し、Windowsの実測とは分けて扱います。 食品訂正・UNKNOWNの追加2件はPR #128の `1a8fa046` 後の追補です。この2件を含む11件のローカル結果と公開後のhead別CIの扱いは[追補検証](../verification/e2e-food-states-20261105.md)を参照してください。run ID・後始末・unitの制限を含む結果は[検証・採用状況](verification.md#practical-e2e-status)を参照してください。
+CI定義には、通常の製品buildと従来の公開回帰を残したまま、基本11件を認証境界差替えbuildの別stepとして追加しています。この変更では同じstepが全projectを実行します。各経路の結果は、対象baseとrun IDに結び付いた記録で確認してください。head `5dbba923` のUbuntu／GitHub Actions実行は、通常製品build・単体299件・新E2E9件を含めて成功しています。対象headとrunを確認し、Windowsの実測とは分けて扱います。 食品訂正・UNKNOWNの追加2件はPR #128の `1a8fa046` 後の追補です。この2件を含む11件のローカル結果と公開後のhead別CIの扱いは[追補検証](../verification/e2e-food-states-20261105.md)を参照してください。run ID・後始末・unitの制限を含む結果は[検証・採用状況](verification.md#practical-e2e-status)を参照してください。
 
 ## 検証対象
 
@@ -84,7 +86,7 @@ CI定義には、通常の製品buildと従来の公開回帰を残したまま�
 
 新規公開は、架空メニューの全品目を入力して非公開保存し、サーバーから取得した保存済み版に別の公開操作を行います。実食品の安全確認を代用するものではありません。公開条件やAPIの期待値を緩めていません。競合2件とSTOP2件は独立した期待値です。
 
-停止後は公開APIの404を要求し、HTMLではnot-found見出しを待ってから、公開前に表示した固有のメニュー名・架空原材料が本文に残らないことを検査します。[公開読取の仕様](rules.md#publication)と[Nextのnot-found規約](https://github.com/vercel/next.js/blob/v16.2.9/docs/01-app/03-api-reference/03-file-conventions/not-found.mdx)では、ストリーミング後のnot-foundはHTTP200になる場合があります。HTML輸送statusだけで公開情報の残留を判定しません。 停止・訂正後のページ確認は新規ナビゲーションです。開いたままの画面への自動到達を保証せず、食品訂正テストのheld-page添付も観察だけです。[鮮度の比較案](../research/product/public-view-freshness-options-20261105.md)は未採用で、製品の取得中・失敗時表示は変更していません。
+停止後は公開APIの404を要求し、HTMLではnot-found見出しを待ってから、公開前に表示した固有のメニュー名・架空原材料が本文に残らないことを検査します。[公開読取の仕様](rules.md#publication)と[Nextのnot-found規約](https://github.com/vercel/next.js/blob/v16.2.9/docs/01-app/03-api-reference/03-file-conventions/not-found.mdx)では、ストリーミング後のnot-foundはHTTP200になる場合があります。HTML輸送statusだけで公開情報の残留を判定しません。 基本の食品訂正テストによる停止・訂正後のページ確認は新規ナビゲーションです。そのheld-page添付は観察だけで、開いた画面の再取得・取得中／失敗時表示は[別のfreshness project](#freshness-prototype)で検査します。[鮮度の比較案](../research/product/public-view-freshness-options-20261105.md)にある表示方式A/Bの最終選定や、全閲覧者への自動到達を保証する結果ではありません。
 
 ## 認証とデータの前提
 
@@ -107,3 +109,18 @@ CI定義には、通常の製品buildと従来の公開回帰を残したまま�
 画像/Blob upload、新規Clerkアカウント・店舗の初回登録、招待の作成・取消、実サービスでのキャッシュ伝播はこの初期suiteに含めません。管理specの開始時点でA/Bは店舗作成済みであり、UIからの店舗初回登録には別のfixtureと後始末が必要です。画像試験は既存 `admin` runner側に実Blob書込と別cleanupがあるため、無断で重複実行しません。
 
 環境やブラウザーが準備できず実行できない場合はUNVERIFIEDです。`--list`、構文、単体テスト、lintの成功だけでブラウザーE2EをPASSにしません。Clerk境界を模擬する範囲、1件の500応答注入、実Clerk未検証を明記し、実行した環境・head・runごとに結果を記録します。E2E単独の成功を、実行していない別の検査の成功へ拡張しません。外部操作を禁止された作業では実Clerk版admin projectを実行しないでください。local/ci版も未準備の依存・フォントを取得してよい理由にはなりません。
+
+<a id="freshness-prototype"></a>
+## freshness project
+
+この変更をmainへ取り込む場合、基本public/admin 11件と `e2e/freshness.spec.mjs` の10件を、local/ci共通runnerが全projectとして実行します。公開layoutを離れたSPA履歴復帰の負例も含みます。[固定headの検証記録](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)は21定義中20 PASS・native BFCache1 SKIPで、後続HEADへ流用しません。以下は準備済みの架空アプリへの絞り込みで、アプリ・認証・DBを自動準備するコマンドではありません。
+
+```powershell
+npm.cmd run test:e2e -- --project=freshness
+```
+
+管理fixtureを使うため、既存の対象ガード・所有データcleanupが必要です。承認された使い捨てDB＋Clerk境界模擬での実行を優先し、実Clerk版へ無断で切り替えません。手動3画面・入力保持・取得中/失敗/回復・参照/遮蔽・実STOP・補足依存・合成復帰・実SPA履歴に加え、混在FREEの行別旧情報表示と、実訂正後の旧除外結果／再取得による除去を確認します。公開layoutを離れたSPA復帰は隔離1経路のCIで同一document・popstate1回と訂正API／DOM反映を確認しました。全復帰経路の保証ではありません。native BFCacheは復元を実際に試し、persisted=trueを観測できない場合SKIPとして未実証を残します。合成pageshow成功で置き換えません。自動再実行は0のままです。
+
+当初のDraft公開では#128のbranch `test/practical-e2e-main-20261105` 宛pull_requestもCI／依存監査の対象へ限定追加しました。PR #128のmergeとPR #129のmainへのretargetに伴い、この一時base filterを削除し、main/developを対象とする定義へ戻します。手動workflow起動は行わず、PRの自動実行と測定対象SHAを照合します。head `test/public-freshness-prototype-20261105` のVercel Git配備はexact falseですが、mainへの採用や手動配備を抑止する設定ではありません。
+
+匿名の架空公開画面だけを明示撮影し、取得中・失敗・遮蔽等を保存します。trace・認証画面・cookie・tokenは保存しません。mainへのコード取込と表示方式A/Bの最終選定・安全性の実証を区別し、[対象・結果・native未確認の理由](../verification/public-freshness-prototype-20261105.md)を参照します。

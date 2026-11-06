@@ -13,19 +13,21 @@ const tempRoot = realpathSync(tmpdir());
 const fixture = mkdtempSync(join(tempRoot, "clearallergy-caller-mutations-"));
 const testFile = "tests/public-read-callers.test.ts";
 const targets = [
-    ["shop list", "PublicShopListPage.tsx", "tx.shop.findMany", "prisma.shop.findMany"],
-    ["shop list", "PublicShopListPage.tsx", "tx.allergen.findMany", "prisma.allergen.findMany"],
-    ["shop detail", "PublicShopDetailPage.tsx", "tx.shop.findFirst", "prisma.shop.findFirst"],
-    ["shop detail", "PublicShopDetailPage.tsx", "tx.allergen.findMany", "prisma.allergen.findMany"],
-    ["menu detail", "PublicMenuDetailPage.tsx", "tx.menuItem.findFirst", "prisma.menuItem.findFirst"],
-    ["menu detail", "PublicMenuDetailPage.tsx", "tx.allergen.findMany", "prisma.allergen.findMany"],
-    ["menu detail", "PublicMenuDetailPage.tsx", "allergenMaster, tx)", "allergenMaster, prisma)"],
+    ["shop list", "public-shop-list-data.ts", "tx.shop.findMany", "prisma.shop.findMany"],
+    ["shop list", "public-shop-list-data.ts", "tx.allergen.findMany", "prisma.allergen.findMany"],
+    ["shop detail", "public-shop-detail-data.ts", "tx.shop.findFirst", "prisma.shop.findFirst"],
+    ["shop detail", "public-shop-detail-data.ts", "tx.allergen.findMany", "prisma.allergen.findMany"],
+    ["menu detail", "public-menu-detail-data.ts", "tx.menuItem.findFirst", "prisma.menuItem.findFirst"],
+    ["menu detail", "public-menu-detail-data.ts", "tx.allergen.findMany", "prisma.allergen.findMany"],
+    ["menu detail", "public-menu-detail-data.ts", "allergenMaster, tx)", "allergenMaster, prisma)"],
     ["menu API", "publicMenuRoute.ts", "tx.menuItem.findFirst", "prisma.menuItem.findFirst"],
     ["menu API", "publicMenuRoute.ts", "tx.allergen.findMany", "prisma.allergen.findMany"],
     ["menu API", "publicMenuRoute.ts", "allergenMaster, tx)", "allergenMaster, prisma)"],
 ];
 const sourceFiles = [testFile, "scripts/check-public-caller-mutations.mjs", "package-lock.json",
     "features/public/shops/server/public-read-snapshot.ts", "features/public/shops/server/storeAllergenSupplement.ts",
+    "features/public/shops/server/PublicShopListPage.tsx", "features/public/shops/server/PublicShopDetailPage.tsx",
+    "features/public/shops/server/PublicMenuDetailPage.tsx", "features/public/shops/freshness/contracts.ts",
     ...new Set(targets.map(([, filename]) => `features/public/shops/server/${filename}`))];
 const report = {
     generatedAt: new Date().toISOString(), node: process.version,

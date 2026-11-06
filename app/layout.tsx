@@ -2,6 +2,7 @@ import { PROTOTYPE_NOTICE } from "@/lib/public-prototype";
 import type { Metadata } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import PublicFreshnessNavigation from "@/features/public/shops/components/PublicFreshnessNavigation";
 import "./globals.css";
 
 const uiFont = Noto_Sans_JP({
@@ -43,7 +44,7 @@ export default function RootLayout({
                 <aside aria-label="プロトタイプについて" className="mx-auto max-w-7xl px-4 pt-4">
                     <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">{PROTOTYPE_NOTICE}</p>
                 </aside>
-                {children}
+                <PublicFreshnessNavigation>{children}</PublicFreshnessNavigation>
                 <Analytics />
             </body>
         </html>
