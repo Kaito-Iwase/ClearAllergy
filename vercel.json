@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
+      "chore/staging-dry-run-main-20261106": false,
       "test/public-freshness-prototype-20261105": false,
       "test/practical-e2e-main-20261105": false,
       "ci/issue118-workflow-registration": false,
