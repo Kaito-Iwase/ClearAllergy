@@ -264,3 +264,43 @@ for (const role of ['a', 'b']) {
         } finally { await winner.close(); }
     });
 }
+
+for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+    test(`編集画面: hydration前の入力を防ぎ訂正を保存する ${viewport.width}`, async ({ createMenu }) => {
+        const menu = await createMenu();
+        await menu.page.setViewportSize(viewport);
+        let release;
+        const gate = new Promise(resolve => { release = resolve; });
+        let blockedScripts = 0;
+        const holdScripts = async route => {
+            if (route.request().resourceType() === 'script') {
+                blockedScripts++;
+                await gate;
+            }
+            await route.continue();
+        };
+        await menu.page.route('**/_next/static/**', holdScripts);
+        const ingredients = menu.page.getByLabel(/原材料名/);
+        try {
+            await menu.page.goto(menu.editURL, { waitUntil: 'commit' });
+            await expect(ingredients).toBeVisible();
+            await expect.poll(() => blockedScripts).toBeGreaterThan(0);
+            await expect(ingredients).toBeDisabled();
+            await expect(menu.page.getByRole('button', { name: '保存する', exact: true })).toBeDisabled();
+        } finally {
+            release();
+            await menu.page.unrouteAll({ behavior: 'wait' });
+        }
+        await expect(ingredients).toBeEnabled();
+        const wanted = `訂正後の架空原材料 ${viewport.width}`;
+        await ingredients.fill(wanted);
+        await expect(ingredients).toHaveValue(wanted);
+        const saved = menu.page.waitForResponse(r => new URL(r.url()).pathname === menu.api && r.request().method() === 'PUT');
+        await menu.page.getByRole('button', { name: '保存する', exact: true }).click();
+        const response = await saved;
+        expect(response.status()).toBe(200);
+        expect(response.request().postDataJSON().ingredients).toBe(wanted);
+        await expect(menu.page.getByRole('region', { name: '保存しました', exact: true })).toBeVisible();
+        expect((await readMenu(menu)).ingredients).toBe(wanted);
+    });
+}
