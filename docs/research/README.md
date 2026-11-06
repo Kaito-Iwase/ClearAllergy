@@ -8,6 +8,10 @@
 
 2026-10-21の[二段階公開の判断ログ](product/two-step-publication-decision-20261021.md)は、長文フォーム廃止の承認・理由・実装範囲と、未解決の明示解除の暫定承認を記録します。現行作業ブランチの[検証結果](../verification/two-step-publication-20261021.md)と対に読み、本番反映済みとは扱いません。
 
+## 2026-11-05 公開画面の鮮度対策の比較（未採用）
+
+[公開画面の鮮度対策](product/public-view-freshness-options-20261105.md)は、現行cache・公開停止・復帰挙動に照らした比較案です。独立批評を反映し、取得中・失敗時の表示、期限の意味、継続閲覧の扱いを製品判断として残します。製品への実装・到達遅延の保証ではありません。[食品訂正E2E追補](../verification/e2e-food-states-20261105.md)の新規ページ確認と区別します。
+
 ## 2026-10-16の追加精査：実装候補と未完のテスト接続
 
 [3作業の結論](engineering/material-change-followup-20261016.md)から、[確認文の独立反証・隔離ブラウザ記録](../verification/material-change-confirmation-20261016.md)と[公開再取得・一料理E2Eの計画全文](product/public-refresh-and-change-e2e-plan-20261016.md)へ進めます。確認文の不一致は2条件を再現し、UNKNOWN条件は反証しました。アプリコードは未修正です。再取得UIと実認証E2Eの追加は提案・未実行で、既存の保存/確認/公開機能を未実装と扱いません。

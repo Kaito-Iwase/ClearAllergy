@@ -10,6 +10,8 @@
 
 mainへの採用、別ブランチで検証済みの候補、未検証・HOLD、Productionの確認結果は[検証・採用状況](docs/guide/verification.md#adoption-status)を参照してください。製品の公開条件は[共通ルール](docs/guide/rules.md#publication)、二段階公開の理由は[判断記録](docs/research/product/two-step-publication-decision-20261021.md)に分けています。
 
+通常のPlaywright E2Eのコマンド・認証と架空データの前提は[実行手順](docs/guide/e2e.md)、main基準の候補と未検証事項は[検証状況](docs/guide/verification.md#practical-e2e-status)にまとめています。
+
 ## 制作背景
 
 自分自身に食物アレルギーの経験があり、外食時にアレルゲン情報を探す手間や、店員さんに確認する心理的な負担を感じていました。

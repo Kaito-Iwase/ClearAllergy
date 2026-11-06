@@ -16,6 +16,8 @@
 
 ブラウザ回帰は `scripts/browser-runner.mjs` が入口です。`public` は公開画面だけ、`demo` は公開画面と保存しない管理デモを検査し、両方とも `scripts/check-first-use-browser.mjs` を使います。`ui` は `scripts/check-public-ui-browser.mjs` でCI（変更ごとの自動検査）用の架空データに対する5種類の画面幅の表示・設定・状態の誤読防止を検査します。
 
+通常のPlaywright E2Eは `playwright.config.mjs` と `e2e/*.spec.mjs`、起動済みアプリへの入口は同runnerの `e2e` です。[実行手順](e2e.md)に従い、Windowsの使い捨てDBは `e2e/run-local.mjs` → `e2e/local-postgres.mjs`、準備済みCI service DBは `e2e/run-ci.mjs` から共通の `e2e/run-fixture.mjs` を使います。共通処理は既存ブラウザーと生成済みPrismaを再利用し、認証境界だけを試験用に置換します。CIの既存 `public` 回帰は標準11件にない検査も含むため維持します。食品訂正→非公開→確認→別公開と3状態の公開表示、UNKNOWNの公開拒否は `e2e/admin.spec.mjs` で検査します。[追補結果](../verification/e2e-food-states-20261105.md)はPR #128の初期9件・CI結果と区別します。実Clerk・Blobの検証とは区別します。
+
 [Issue118の手動workflow登録stub](../../.github/workflows/issue118-live-e2e.yml)は、default branch上の定義を必要とする[GitHubのworkflow_dispatch](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)向けの登録専用です。この定義は権限なし・job常時falseで、checkout・Environment・資格情報・認証・fixture処理を持ちません。実処理は別途承認・レビューしたref上の同パスの定義であり、このstub追加を実E2E成功や実処理のmain採用と扱いません。準備branch `ci/issue118-workflow-registration` だけは `vercel.json` で配備を抑止します。main抑止は追加せず、mainはVercel両ProjectのProduction追跡先なので、workflowだけのmergeでも本番自動再配備を誘発し得ます。merge・配備・本番への影響は適用前の別判断が必要です。
 
 `allergens` は実メニューカードと新規・編集フォームの入力ガイド、`composition` は実画像編集部品、`qr` は実QR部品と印刷PDFを、アプリ・認証・DBなしの隔離した検証用環境（fixture）で検査します。
