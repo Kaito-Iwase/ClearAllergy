@@ -32,7 +32,7 @@
 | 候補の入口 | 実装・検証 |
 | --- | --- |
 | `GET /api/public-snapshot` | `app/api/public-snapshot/route.ts` →共有loader。kind/ID/要求IDを限定し公開whitelistを返す。`tests/public-freshness-api.test.ts`、`freshness/contracts.ts` |
-| 三画面の再取得と表示 | `PublicFreshnessSurface.tsx` / `PublicFreshnessNavigation.tsx` / `freshness/revalidation.ts` / `freshness/presentation.tsx`。`tests/public-freshness.test.ts`、`e2e/freshness.spec.mjs` |
+| 三画面の再取得と表示 | `PublicFreshnessSurface.tsx` / `PublicFreshnessNavigation.tsx` / `freshness/revalidation.ts` / `freshness/presentation.tsx`。`SelectedAllergenResultCardsClient.tsx` / `PublicShopListClient.tsx` / `PublicShopMap.tsx`。`tests/public-freshness.test.ts`、`tests/public-freshness-presentation.test.ts`、`e2e/freshness.spec.mjs` |
 | 内容と適用proof | `PublicShopDetailView.tsx` / `PublicMenuDetailView.tsx` と既存list/menu本文。shopはmenu・検索要約の両方を待つ。FREE要約抑制と注意保持は `MenuAllergenSummary.tsx` / `SelectedAllergenResultCardsClient.tsx` |
 
 [実装・実行結果](../verification/public-freshness-prototype-20261105.md)と[操作候補](product.md#freshness-prototype)を参照します。現行採用範囲や実サービスの到達保証へ読み替えません。

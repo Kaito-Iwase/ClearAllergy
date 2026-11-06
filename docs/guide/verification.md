@@ -66,6 +66,8 @@ PR #128 head `bcc4c0cd` から作った `test/public-freshness-prototype-2026110
 
 native復元はno-store等により使われず、合成イベント・実SPA成功と区別します。画面の文言・表示方針・期限・採用は未決です。[Draft PR #129](https://github.com/Kaito-Iwase/ClearAllergy/pull/129)の公開head `7feb5c1` はLinux CI全4job成功、unit317/317・skip0、E2E17 PASS・native1 SKIPでした。実checkout・run・artifactと非配備観測は[公開後の記録](../verification/public-freshness-prototype-20261105.md#linux-ci-7feb5c1)へ分けます。実Clerk・本番・native復元は未確認で、PR #128の成功を流用しません。元PR branchへのpushや更新は行いません。
 
+その後、head `0fb032d` の独立レビューで混在FREEの行別注記と旧店舗一覧の判定表現の抜けを確認しました。[2026-11-06の修正追補](../verification/public-freshness-prototype-20261105.md#review-followup-20261106)は、SSR部品7件・実アプリE2E2件を追加し、ローカル19 PASS・native1 SKIP、全体unit323（既知EPERM指定1件除外）、lint・型検査まで確認しています。上記の旧17件の結果にはこの2条件が含まれません。後続のCI結果はPRの対象headと照合します。
+
 ## 日付付きの検証記録
 
 以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。

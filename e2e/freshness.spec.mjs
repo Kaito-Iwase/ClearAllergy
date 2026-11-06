@@ -29,6 +29,13 @@ async function shot(page, testInfo, name) {
     await page.screenshot({ path: testInfo.outputPath(name + '.png'), fullPage: true });
 }
 
+async function selectPreferences(page, settings) {
+    const panel = page.getByRole('button', { name: /あなた向けのアレルゲン設定/ }).filter({ visible: true });
+    if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
+    for (const [name, value] of settings) await page.getByRole('combobox', { name: `${name}の表示設定`, exact: true }).filter({ visible: true }).selectOption(value);
+    await page.getByRole('button', { name: '変更を適用', exact: true }).filter({ visible: true }).click();
+}
+
 test('鮮度: 三画面を手動で完全再取得し検索入力を保持する', async ({ createMenu, page }) => {
     const menu = await createMenu(); await publish(menu);
     for (const [url, kind] of [['/shops', 'list'], [`/shops/${menu.shopId}`, 'shop'], [publicURL(menu), 'menu']]) {
@@ -96,6 +103,65 @@ test('鮮度: 取得中/失敗の旧FREE要約を抑え、注意保持と遮蔽�
         await expect(controls(page).getByText('再取得を中止しました。', { exact: true })).toBeVisible();
     } finally { releaseFocus(); await page.unroute('**/api/public-snapshot?**', focusHandler); }
     await refresh(page);
+});
+
+test('鮮度: 混在する含有・混入・FREEも取得中/失敗時は同じFREE行を以前の登録と示す', async ({ createMenu, page }, testInfo) => {
+    const menu = await createMenu(); await statuses(menu); await page.goto(publicURL(menu)); await ready(page);
+    await selectPreferences(page, [['卵', 'highlight'], ['小麦', 'highlight'], ['乳', 'highlight']]);
+    const mixed = page.getByRole('region', { name: '選択中アレルゲンの登録状態', exact: true });
+    const milk = mixed.getByRole('listitem').filter({ hasText: '乳' });
+    await expect(milk).toHaveCount(1); await expect(milk).toContainText('原材料に含まない');
+    await expect(milk).not.toContainText('現在は未再確認');
+    let release; const held = new Promise(resolve => { release = resolve; });
+    const handler = async route => { await held; await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); };
+    await page.route('**/api/public-snapshot?**', handler);
+    try {
+        await controls(page).getByRole('button', { name: '公開情報を再取得', exact: true }).click();
+        await expect(controls(page)).toHaveAttribute('data-public-freshness', 'loading');
+        await expect(milk).toContainText('以前の登録は「原材料に含まない」');
+        await expect(milk).toContainText('以前取得した登録・現在は未再確認');
+        await expect(page.getByRole('heading', { name: '含む', exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: '含む可能性あり・要確認', exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: '原材料に含まない', exact: true })).toHaveCount(0);
+        release(); await expect(controls(page)).toHaveAttribute('data-public-freshness', 'error');
+        await expect(milk).toContainText('以前取得した登録・現在は未再確認');
+        await page.setViewportSize({ width: 390, height: 844 }); await shot(page, testInfo, 'mixed-failure-mobile');
+    } finally { release(); await page.unroute('**/api/public-snapshot?**', handler); }
+    await refresh(page);
+    await expect(milk).toContainText('原材料に含まない'); await expect(milk).not.toContainText('現在は未再確認');
+    const saved = await readMenu(menu);
+    for (const [slug, status] of [['egg', 'CONTAINS'], ['wheat', 'MAY_CONTAIN'], ['milk', 'FREE']]) expect(saved.allergens.find(row => row.slug === slug)?.status).toBe(status);
+});
+
+test('鮮度: 旧除外結果を再確認済みの条件一致と呼ばず、実訂正後の再取得で一覧から除く', async ({ createMenu, page }, testInfo) => {
+    const menu = await createMenu(); await publish(menu); await page.goto('/shops'); await ready(page);
+    await selectPreferences(page, [['卵', 'exclude']]);
+    const card = page.locator(`#shop-${menu.shopId}`);
+    await expect(card).toBeVisible();
+    await expect(page.getByRole('heading', { name: '条件に一致するClearAllergy登録済み店舗', exact: true })).toBeVisible();
+    let release; const held = new Promise(resolve => { release = resolve; });
+    const handler = async route => { await held; await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); };
+    await page.route('**/api/public-snapshot?**', handler);
+    try {
+        await controls(page).getByRole('button', { name: '公開情報を再取得', exact: true }).click();
+        await expect(controls(page)).toHaveAttribute('data-public-freshness', 'loading');
+        await statuses(menu); // Actual save and separate publish: old FREE becomes CONTAINS.
+        const changed = await readMenu(menu); expect(changed.isPublished).toBe(true);
+        expect(changed.allergens.find(row => row.slug === 'egg')?.status).toBe('CONTAINS');
+        await expect(card).toBeVisible(); // A keeps the previous snapshot; this is not a current match.
+        await expect(page.getByRole('heading', { name: '条件に一致するClearAllergy登録済み店舗', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: '以前取得した登録情報による店舗一覧', exact: true })).toBeVisible();
+        await expect(page.getByText('表示・非表示の判定は以前取得した登録情報によるものです。現在のアレルゲン登録を再確認できていません。', { exact: true })).toBeVisible();
+        release(); await expect(controls(page)).toHaveAttribute('data-public-freshness', 'error');
+        await expect(card).toBeVisible();
+        await expect(page.getByRole('heading', { name: '以前取得した登録情報による店舗一覧', exact: true })).toBeVisible();
+        await page.setViewportSize({ width: 390, height: 844 }); await shot(page, testInfo, 'list-failure-mobile');
+    } finally { release(); await page.unroute('**/api/public-snapshot?**', handler); }
+    await refresh(page);
+    await expect(card).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '条件に一致するClearAllergy登録済み店舗', exact: true })).toBeVisible();
+    await expect(page.getByText('表示・非表示の判定は以前取得した登録情報によるものです。現在のアレルゲン登録を再確認できていません。', { exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('clearallergy:user-allergens')).excludedSlugs)).toContain('egg');
 });
 
 test('鮮度: 実STOP後は三画面の新規結果から旧食品と店舗を除去する', async ({ createMenu, context }) => {

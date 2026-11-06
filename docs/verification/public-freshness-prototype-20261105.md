@@ -53,7 +53,7 @@ PR #128のhead `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` を基点とした、�
 | UI証拠 | 通常・取得中・失敗mobile・遮蔽mobile・SPA後の画像。匿名の架空公開画面だけを保存し、認証値・ログイン・traceは保存しない |
 | 独立レビュー | 履歴を共有しない読取専用reviewで初期コードの確定P1/P2なし。最終ソースhash・実行ログ・画像・文書の照合も完了し、確定P1/P2・重大不一致なし |
 
-ローカル補助ログはworkspaceの `public-freshness-prototype-20261105/` と `test-results/ci-<run>/` に保存します。初回からの修正・実行を混同せず、ローカル測定時の未commit差分とsource manifestに結び付けます。Draft公開準備ではこの測定対象の製品コード・specを維持し、公開用のCI対象・branch配備guard・状態文書を追加します。測定後の文書・設定差分まで既測定と扱いません。
+ローカル補助ログはworkspaceの `public-freshness-prototype-20261105/` と `test-results/ci-<run>/` に保存します。初回からの修正・実行を混同せず、ローカル測定時の未commit差分とsource manifestに結び付けます。初回Draft公開準備（7feb5c1）ではこの測定対象の製品コード・specを維持し、公開用のCI対象・branch配備guard・状態文書を追加します。測定後の文書・設定差分まで既測定と扱いません。
 
 [Next.jsのrefresh資料](https://github.com/vercel/next.js/blob/v16.2.9/docs/01-app/03-api-reference/04-functions/use-router.mdx)は16.2.9、実依存は16.4.1です。`router.refresh()`呼出を成功証拠にしない設計の参考にし、対象版の実ブラウザ結果とは区別します。
 
@@ -76,7 +76,22 @@ Linuxの実Next・使い捨てDB・既存CIブラウザとClerk境界模擬のru
 
 2026-11-05 23:34:32 UTCのVercel読み取りでは、`clear-allergy`と`clear-allergy-e2e`の本branch配備は両方0件でした。Productionは従前と同じmain `51adcb23945b80bb34b110d2d0f263d29629a821`、Readyで、IDはそれぞれ `dpl_BwzZHdde7UuMnctfrU4CtAnPW2oS` と `dpl_GcKXLERckVxBp1VHvySdf9oxnM6B` です。観測範囲の事実で、mainや手動配備まで抑止する保証ではありません。
 
-この記録の追補は文書だけで、測定済みの製品コード・テスト・CI設定は変更しません。後続headのChecksはPRの対象SHAと照合し、上記runを別headで実行したことにはしません。
+7feb5c1から0fb032dへの追補は文書だけで、測定済みの製品コード・テスト・CI設定は変更していません。後続headのChecksはPRの対象SHAと照合し、上記runを別headで実行したことにはしません。
+
+<a id="review-followup-20261106"></a>
+## 2026-11-06 独立レビュー指摘への表示修正
+
+PR #129 head `0fb032d` では、選択中のCONTAINS／MAY_CONTAINとFREEが混在する欄のFREE行に、詳細一覧のような行別の未再確認表示がありませんでした。また店舗一覧の見出し・0件・上部件数は、再取得失敗中の旧除外結果にも現在の条件一致と読める表現を残していました。画面上部の一括警告と単独FREE要約の抑制だけでは、この2経路を覆えていませんでした。旧17成功の試験はこれらの失敗表示を検証しておらず、本修正の成功証拠へ流用しません。
+
+混在欄は、同じFREE品目行を「以前の登録は原材料に含まない」「以前取得した登録・現在は未再確認」と示します。店舗一覧は、見出し・関連店舗・0件・上部件数・除外案内を以前取得した登録情報による表示と明示します。除外計算・保存済み設定・raw status・既知の含有／混入注意は変更しません。最初の修正案の「検索結果0件」は関連店舗がある場合に範囲が広すぎたため、独立レビューを受け「すべての検索条件に一致する店舗は0件」へ限定しました。
+
+`tests/public-freshness-presentation.test.ts` は実表示部品・分類・除外処理・旧情報contextを使うSSR部品試験です。設定store/editorとNext navigationだけを架空値へ置換し、実ブラウザ／DB試験とは分けます。0fb032dの表示を対象にした最初の6件は3失敗・3成功、修正後6成功。関連店舗のみの負例・上部件数も含む7件へ拡張した中間検査は3失敗・4成功、最終修正後7成功です。型fixtureの必須selectedSlugs不足による初回の型検査停止も保存し、製品の不具合とは区別します。
+
+Windowsの全体unitは323成功（従来の既知EPERM指定1件除外）、lint・型検査成功。実Next／保存API／所有権／使い捨てDB／既存Chromium、Clerk境界だけ模擬のlocal run `local-2ca42956-ce47-447c-a62f-0700e51da1da` は19 PASS・native BFCache1 SKIP（約1.4分）です。全20定義のうち既存11件を保持し、混在FREEの同じ行の注記と、実際のFREE→CONTAINS訂正・再公開後に残る旧除外結果／再取得後の除去を新たな2件で確認しました。通信失敗は503注入であり、実offlineの再現ではありません。
+
+local runは監査67行除去・既存4model fingerprint保持・所有Next process tree停止・所有DB停止・一時領域削除まで成功しました。初回run `local-8f16d9be-1d87-42bd-b4d9-2e69d7a6af4f` は追加test fixtureの型検査で起動前停止し、DB／Next／ブラウザは未起動・所有一時領域削除済みです。新しい製品コードを通した通常設定build／Linux CIは、後続のPR #129のhead別Checksと本文へ対応付け、ここにある旧headの成功へ読み替えません。
+
+独立した読取専用delta reviewで、0件範囲と上部件数の指摘解消、混在FREEの注記・既知注意・原状態・正常時・除外処理の保持を確認し、新たな確定P1/P2なしでした。レビュー担当によるDB／ブラウザの再実行はなく、実行検証の結果とは分けます。保存した架空モバイル画面は混在FREEと旧一覧の注記を目視確認しましたが、利用者の誤読率や食品安全性の検証ではありません。
 
 ## 採用判断・未確認
 

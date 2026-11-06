@@ -47,3 +47,9 @@ Aは利用者比較の暫定既定候補です。旧FREEの誤読が続き、B�
 [Draft PR #129](https://github.com/Kaito-Iwase/ClearAllergy/pull/129)を#128宛に作成しました。head `7feb5c136e52dd29afa54a7c9387c35ab910b7d4` とbase `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` のmerge候補 `b7bfa54abb2f73aecd2181af8c853ad2e6cdcc85` で、自動CI全4job・high閾値の依存監査が成功しています。Linux unit317/317・skip0と、既存11件を含むE2E17 PASS・native1 SKIPを確認しました。[具体的なrun・artifact・cleanup・非配備観測](public-freshness-prototype-20261105.md#linux-ci-7feb5c1)を参照してください。
 
 公開準備後のfocused22件も再実行して22/22・skip0、文書リンク365件・40ファイルscope・diff/check・exact branch falseと既存guard不変を確認しました。設定の最初の文字列照合はCRLF checkoutとLF blobの差で失敗し、改行を正規化して内容一致を検査すると成功しました。製品の不具合ではなく、製品コードの修正は伴いません。別途の独立レビュー完了をこの自己レビューから主張しません。
+
+## 2026-11-06 独立レビューで確認された試験の抜け
+
+初回の自己確認と旧17件の成功では、単独FREEと詳細一覧の注記を確認していましたが、混在欄のFREE行と店舗一覧失敗時の除外結果を確認できていませんでした。独立レビューからの2指摘を実コードと修正前に失敗する部品試験で確認し、3表示部品を修正しました。上部件数と関連店舗を含む0件案内まで対象にします。修正中の0件表現の範囲誤りも独立レビューで検出し、関連店舗だけ残る負例を追加して公開前に解消しました。
+
+既存のアレルゲン状態・補足・除外計算・端末設定の意味を変更せず、旧情報の文脈を判定結果と同じ位置へ示す修正です。SSR部品7件、実アプリの追加E2E2件を加え、[修正前後・実行結果・後始末](public-freshness-prototype-20261105.md#review-followup-20261106)を別に記録しました。旧headのCI成功を新しい条件の検証済みという意味に拡張しません。Aの暫定性、継続表示・JSなし・実offline・native BFCache・利用者理解の未確認も維持します。

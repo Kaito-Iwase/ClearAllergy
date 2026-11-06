@@ -200,16 +200,17 @@ export default function SelectedAllergenResultCardsClient({
                 </AllergenInfoCard>
             ) : null}
             {(hasRiskResults || hasUnknownResults) && freeAllergens.length > 0 ? (
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-                    <p className="font-bold">選択中アレルゲンの登録状態</p>
+                <section aria-label="選択中アレルゲンの登録状態" className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+                    <p className="font-bold">{previous ? "以前取得した選択中アレルゲンの登録状態" : "選択中アレルゲンの登録状態"}</p>
                     <p className="mt-1 text-sm leading-6">原材料に含まないという登録は食品安全の保証ではありません。上の注意・補足情報も確認してください。</p>
                     <ul className="mt-3 space-y-2">
                         {freeAllergens.map((allergen) => <li key={allergen.slug}>
-                            <span className="font-semibold">{allergen.nameJa}</span>：原材料に含まない
+                            <span className="font-semibold">{allergen.nameJa}</span>：{previous ? "以前の登録は「原材料に含まない」" : "原材料に含まない"}
+                            {previous && <span className="block text-xs font-semibold text-amber-900">以前取得した登録・現在は未再確認</span>}
                             {storeHandledAllergenSlugs.includes(allergen.slug) && <span className="block text-sm leading-6 text-amber-900"><strong>別メニューに含む</strong>：同じ店舗の別の公開メニューに、この品目を含む登録があります。</span>}
                         </li>)}
                     </ul>
-                </div>
+                </section>
             ) : null}
         </div>
     );
