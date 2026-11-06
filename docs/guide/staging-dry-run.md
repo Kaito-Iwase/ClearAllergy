@@ -6,7 +6,7 @@
 
 ## 今回の境界と確認時点
 
-2026-11-06、継続作業開始時の live main は `7ac9a96cfbddfe801b48aa195cc59c520aa19658` で、PR #128（`a6dd7ad6f0c468ffceab8748645e7a6497cd4abc`）と #129（main と同じ SHA）は merge 済みでした。`test/staging` は `6293d5a02758f72a7cf00201fec239afc6b699eb` のままです。今回の dry-run 差分は統合後 main を基準にしており、既存 CI・アプリ・依存・Vercel 設定を変更しません。PR の merge は、この自動追従の有効化や実環境検証の完了を意味しません。
+2026-11-06、継続作業開始時の live main は `7ac9a96cfbddfe801b48aa195cc59c520aa19658` で、PR #128（`a6dd7ad6f0c468ffceab8748645e7a6497cd4abc`）と #129（main と同じ SHA）は merge 済みでした。`test/staging` は `6293d5a02758f72a7cf00201fec239afc6b699eb` のままです。今回の dry-run 差分は統合後 main を基準にし、既存 CI・アプリ・依存・外部 Vercel project 設定は変更しません。リポジトリの `vercel.json` には、この PR の作業 branch `chore/staging-dry-run-main-20261106` だけを自動配備から除外する `false` を追加します。PR の merge は、この自動追従の有効化や実環境検証の完了を意味しません。
 
 親担当が公式 `get_project` で確認した専用 project は `clear-allergy-e2e`（`prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK`）、本番 project は `clear-allergy`（`prj_7gertmNpQ1EfYEoQ9rgFP466ahJq`）、両方の account は `team_2Y9pPeo8w16CVx1U7ToVuKFq` です。専用 project の Node は22.x、本番は24.x、SSO protection はそれぞれ all / all_except_custom_domains という観察でした。これらは設定変更の指示ではありません。
 
@@ -51,7 +51,7 @@ workflow 定義を承認変更した場合は、保護された policy の blob 
 
 現行 `.github/workflows/ci.yml` の push 対象は main/develop で、test/staging では CI が自動実行されません。この変更でその対象は増やしていません。PR の CI 成功を転用せず、採用する CI 対象 branch・テスト範囲と運用方針を承認後に揃える必要があります。
 
-`main` の `vercel.json` は列挙した branch の Git 自動配備だけを false にしています。全 branch を抑止する設定ではありません。main の Git 配備は CI 完了待ちと同義ではなく、test/staging への push も本体 project の Preview を作り得ます。今回 push は行いません。Git 自動配備の抑止/分離方針と影響を両 project で確認し、別途承認してから変更します。
+`main` の `vercel.json` は列挙した branch の Git 自動配備だけを false にしています。全 branch を抑止する設定ではありません。main の Git 配備は CI 完了待ちと同義ではなく、test/staging への push も本体 project の Preview を作り得ます。この PR の送信前には作業 branch の完全一致キーを false にし、既存ルールを維持し、true に一致する別ルールがないことを確認します。これはこの branch の Git 自動配備を抑止するだけで、手動配備の禁止や staging 運用全体の分離を保証しません。main/test/staging や外部 project 設定は変更せず、staging 自動追従の有効化には両 project の経路を別途確認・承認します。
 
 将来の workflow は次の順序を満たす必要があります。これは手順の設計であり、コピーして有効化できる配備 YAML ではありません。
 

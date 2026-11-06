@@ -40,6 +40,8 @@ CI 成功 commit・workflow・環境・専用 project/team・固定 alias の一
 
 ## 残る境界
 
+ローカル検証後の Draft PR 準備では、`vercel.json` に `chore/staging-dry-run-main-20261106: false` の完全一致ルール1行を追加しました。未指定 branch の既定値は true であり、設定なしの初回 push が不要な配備を誘発し得るためです。既存ルール・main/develop/test/staging は不変で、外部 Vercel project 設定や credential を変更するものではありません。push 前に JSON 差分と minimatch による一致を確認し、ローカルの抑止条件と実サービス上の抑止観測は区別します。
+
 この結果はローカル実装・テスト・build の検証です。GitHub 上でこの差分の CI を実行した結果、CI と同一 npm/Linux 環境、実認証、ブラウザー、実 DB、staging 配備/固定 URL 切替の成功は **UNVERIFIED**。UI・schema を変更しておらず、外部書込は禁止されているため、それらの回帰は今回実行しません。
 
 現行 CI は `test/staging` push を対象にせず、Vercel の自動配備抑止も全 branch に適用されていません。有効化前に必要な承認・環境分離・collector・直列化・書込直前/直後の照合は[運用手順](../guide/staging-dry-run.md#自動化を有効化する前の別作業)を参照してください。
