@@ -118,3 +118,14 @@ local runは監査67行除去・既存4model fingerprint保持・所有Next proc
 staging由来の移植は `features/public/shops/freshness/revalidation.ts` と `tests/public-freshness.test.ts` のsame-origin修正2ファイルに限ります。公開snapshotは匿名のprojectionを維持し、Cookie／Authorizationの手動転送や認証保護の迂回を追加しません。staging専用guard・banner・Blob保護等の12ファイルは取り込みません。これとは別に、統合前の精査でroot layoutへの復帰listener配置、店舗集計・件数・0件の旧情報局所注記、暫定表示方式の説明を修正対象としています。公開layoutを離れたSPA復帰の追加負例と最終件数は、実行結果が確定してから対象SHAへ結び付けます。
 
 この変更をmainへ取り込む場合も、参照表示Aは利用者比較の暫定設定です。A/B方式・文言・理解度・食品安全性の最終判断、連続した最新性や全端末への訂正到達の保証とは区別します。公開layout内の実SPA履歴と合成復帰イベントの成功を、公開layoutを離れたSPA復帰、native BFCache、JS未実行、実オフライン、復帰前の旧画面paintの検証へ拡張しません。後続sourceと文書同期後の最終SHA・CI、retarget後の検証、merge SHA・main CI・Production反映は未確定で、上記88ca4630の成功を流用しません。
+
+<a id="linux-ci-cd18f209"></a>
+## 後続追補：head cd18f209のLinux CIと公開layout外SPA復帰
+
+固定head `cd18f20947886514ff280b0bea01ef3a3eee25d2` の[CI 42216014800](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42216014800)は全4job成功しました。実checkoutはPR merge候補 `3350ef8a0e1190538a1e7bbad01d27e361ead527`、unit329/329・skip0、E2Eは基本11件とfreshness10件の全21定義中20 PASS・native BFCache1 SKIPです。same-origin transport、root layoutの復帰listener、店舗集計・件数・0件の旧情報局所注記を含む対象headの結果で、旧headの19 PASSから流用したものではありません。
+
+追加した公開layoutを離れて戻るSPA履歴の隔離1経路は、同一documentがtrue、popstateが1回で、訂正後の公開APIとDOMの反映に成功しました。従来の公開layout内のSPA履歴や合成イベントとは別の条件を通過しましたが、全ブラウザー／OS・全復帰経路、native BFCacheの実復元、実オフライン、JS未実行、継続閲覧への即時訂正到達は実証していません。A/B表示方式の最終判断、利用者理解、食品安全、実Clerk管理操作・Blob書込の未検証も維持します。
+
+run `ci-0add273d-beec-4b44-be69-a6b9e81976e5` の所有A/B削除、既存fixture保持、所有TEMPの後始末を確認しました。[artifact 13501681169](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42216014800/artifacts/13501681169)は7,426,245 bytes、SHA256 `a7b121334c26a73663ad677ab801e0237bc427553e3cd38268d2df702f477196` を照合済みです。[依存監査 42216014715](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42216014715)も成功し、既存開発依存のmoderate8件は残っています。
+
+その後PR #128は通常merge `a6dd7ad6f0c468ffceab8748645e7a6497cd4abc` でmainへ統合され、mainのtreeはbcc4c0cdと一致しました。PR #129はmainへretarget済みで、一時的な#128 branch宛CI base filterを削除する追従差分を準備しています。このmain追従・文書同期後の最終HEAD／CI、PR #129のmerge、main CI・Productionは未確定です。cd18f209の上記結果をそれらの結果として扱いません。

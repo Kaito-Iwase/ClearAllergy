@@ -12,7 +12,7 @@
 
 [公開画面の鮮度対策](product/public-view-freshness-options-20261105.md)は、現行cache・公開停止・復帰挙動に照らした比較案です。独立批評を反映し、取得中・失敗時の表示、期限の意味、継続閲覧の扱いを製品判断として残します。製品への実装・到達遅延の保証ではありません。[食品訂正E2E追補](../verification/e2e-food-states-20261105.md)の新規ページ確認と区別します。
 
-[後続実装](../verification/public-freshness-prototype-20261105.md)は、三画面の再取得・状態表示・参照／遮蔽を実装したPR #129の変更です。この変更をmainへ取り込む場合も、比較原稿の未実行表をPASSへ変更せず、表示方式A/Bの最終選定・利用者理解・安全性の実証とは分けます。統合状態は[検証・採用状況](../guide/verification.md#freshness-prototype-status)を参照してください。native BFCacheと公開layoutを離れたSPA復帰は未実証です。
+[後続実装](../verification/public-freshness-prototype-20261105.md)は、三画面の再取得・状態表示・参照／遮蔽を実装したPR #129の変更です。この変更をmainへ取り込む場合も、比較原稿の未実行表をPASSへ変更せず、表示方式A/Bの最終選定・利用者理解・安全性の実証とは分けます。統合状態は[検証・採用状況](../guide/verification.md#freshness-prototype-status)を参照してください。公開layoutを離れたSPA復帰は[固定headの隔離CI](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)の1経路で訂正反映を確認しました。比較原稿の未実行表は保持し、native BFCacheの実復元は未実証として残します。
 
 ## 2026-10-16の追加精査：実装候補と未完のテスト接続
 

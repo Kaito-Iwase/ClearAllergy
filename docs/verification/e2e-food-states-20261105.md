@@ -71,3 +71,10 @@ PR #128 head `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315`、base `51adcb23945b80bb
 [artifact 13429131564](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864143/artifacts/13429131564)は4,776,761 bytes、SHA256 `35ff9ddfeb8d1a896d8a40ab8efed494a4de83af63c6c2bda507d31a58d66916`。[依存監査 42054864250](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864250)は既存high閾値で成功し、開発依存のmoderate8件は残っています。保存証拠はworktreeの親の `e2e-food-publication-20261105/result.json` です。
 
 この追補時点でPR #128・#129は未mergeです。最終HEAD・CI・merge SHA・main CI・Production反映は未確定として、[現行の確認状態](../guide/verification.md#practical-e2e-status)と対象PRへ後続の実績を結び付けます。実Clerk／Blob書込、食品安全、継続閲覧への訂正到達をこのCIで実証したとは扱いません。
+
+<a id="main-merge-a6dd7ad6"></a>
+## 後続追補：PR #128のmain統合
+
+PR #128は通常merge `a6dd7ad6f0c468ffceab8748645e7a6497cd4abc` でmainへ統合されました。統合後mainのtreeは、上記CIで確認したhead `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` と一致しています。以前の未merge記述は各記録時点の状態として保持します。tree一致をmerge SHA自身のmain CIやProduction確認の成功へ読み替えません。
+
+依存するPR #129はmainへretarget済みです。[公開鮮度の固定head CI](public-freshness-prototype-20261105.md#linux-ci-cd18f209)と、main追従後の最終HEAD・CI・merge・Production実績を区別し、後者は未確定として残します。

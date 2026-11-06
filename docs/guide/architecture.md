@@ -36,7 +36,7 @@ flowchart LR
 
 root layoutの `PublicFreshnessNavigation` が履歴等の契機を受け、公開画面の再取得を要求します。取得先は相対URLの公開snapshot APIに固定し、same-originの既存保護sessionを使います。公開projectionは匿名のままで、Cookie／Authorizationを手動転送しません。相関IDとresource key、取消・要求世代を照合し、旧後着を破棄します。正常な対象なしと取得不能を分け、型不一致・HTML・表示失敗を確認成功にしません。list/menuの本文とshopのmenu・要約の両方のcommitを待ちます。取得失敗は登録状態を変えず、旧情報表示は参照／遮蔽の比較候補です。数値TTL・polling・配送保証はありません。既存の公開メニューAPIは維持しています。
 
-mainへの統合状態は[検証・採用状況](verification.md#freshness-prototype-status)で確認します。コードの取込は表示方式A/Bの最終選定や、[操作と結果](../verification/public-freshness-prototype-20261105.md)の範囲を超える稼働・安全保証を意味しません。公開layoutを離れたSPA復帰は未実証です。
+mainへの統合状態は[検証・採用状況](verification.md#freshness-prototype-status)で確認します。コードの取込は表示方式A/Bの最終選定や、[操作と結果](../verification/public-freshness-prototype-20261105.md)の範囲を超える稼働・安全保証を意味しません。公開layoutを離れたSPA復帰は[固定headの隔離CI](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)の1経路で、同一document・popstate1回と訂正反映を確認しました。native BFCacheの実復元や全復帰経路の保証ではありません。
 
 ## ファイルの役割を先に理解する
 

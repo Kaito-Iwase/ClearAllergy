@@ -44,7 +44,7 @@ F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIの
 <a id="practical-e2e-status"></a>
 ## 通常Playwright E2Eの取込対象と確認状態
 
-PR #128はmain `51adcb23945b80bb34b110d2d0f263d29629a821` を基準としたE2E基盤と食品訂正の追補です。この文書更新時点ではPR #128・#129とも未mergeで、最終HEADのCI、merge SHA、main CI、Production反映は未確定です。以下はこの変更をmainへ取り込む場合の動作と、固定headごとの既存証拠を分けた案内です。旧PR #120の76ファイル差分・専用runner・workflow実処理は取り込みません。
+PR #128はmain `51adcb23945b80bb34b110d2d0f263d29629a821` を基準としたE2E基盤と食品訂正の追補です。PR #128は通常merge `a6dd7ad6f0c468ffceab8748645e7a6497cd4abc` でmainへ統合され、mainのtreeは検証済みhead `bcc4c0cd` と一致しています。PR #129はmainへretarget済みですが、main追従後の最終HEAD・CI・merge・Production反映は未確定です。以下はこの変更をmainへ取り込む場合の動作と、固定headごとの既存証拠を分けた案内です。旧PR #120の76ファイル差分・専用runner・workflow実処理は取り込みません。
 
 既存のUTC migration独立job・main/developのCI起動条件・通常製品build・公開回帰を保持し、新E2Eは準備済みサービスDBとブラウザーを使う別stepです。PR branchのVercel Git配備抑止はmainや手動配備を止めません。mainへのmergeはProduction再配備を誘発し得るため、コード統合と実際の配備結果を別に確認します。
 
@@ -64,7 +64,7 @@ PR #129はPR #128 head `bcc4c0cd` を基点に、公開3画面の共有loader・
 
 混在FREEの行別注記と旧一覧の判定表現を修正した固定head `88ca4630d42f82063c7d6d7bd5c2f24cd76432ba` の[CI 42134197073](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197073)は、実checkout `8fc3998ba27de087b290b3d9afaed3e5e7e20a5c` でunit324/324、E2E19 PASS・native BFCache1 SKIPでした。[依存監査 42134197138](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197138)もhigh閾値で成功しましたが、moderate8件が残っています。初期17件、Windowsの指定1件除外付きunit323件とは[追補記録](../verification/public-freshness-prototype-20261105.md#main-adoption-preparation-20261106)で区別します。
 
-後続のsame-origin transport、root layoutの復帰listener、店舗集計の旧情報注記と文書同期は、この固定headのCIへ含めません。専用stagingでの匿名公開画面・手動再取得の観測は、実Clerk管理操作・Blob書込・継続した訂正到達の検証とは別です。公開layoutを離れたSPA復帰は追加検査の対象で、実行前の成功は主張しません。native BFCache、JS未実行、実オフライン、利用者理解も未実証です。最終件数・HEADのCIとmerge後の実績は[統合前のレビュー追補](../verification/public-freshness-pr-review-20261105.md#main-adoption-review-20261106)へ対象SHAに結び付けて追記します。
+same-origin transport、root layoutの復帰listener、店舗集計の旧情報注記を含む固定head `cd18f20947886514ff280b0bea01ef3a3eee25d2` の[CI 42216014800](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42216014800)は全4job成功、実checkout `3350ef8a0e1190538a1e7bbad01d27e361ead527`、unit329/329・skip0、E2E21定義のうち20 PASS・native BFCache1 SKIPです。公開layoutを離れたSPA復帰の隔離1経路で、同一document・popstate1回と訂正後API／DOMの反映を確認しました。[依存監査 42216014715](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42216014715)も成功し、既存開発依存のmoderate8件は残っています。[固定headの証拠と限界](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)を参照してください。専用stagingの匿名公開画面・手動再取得と同様、実Clerk管理操作・Blob書込・継続した訂正到達の検証ではありません。native BFCache、JS未実行、実オフライン、利用者理解は未実証です。mainへのretargetと一時CI base filter削除後の最終HEAD・CI・merge・Production実績は[後続の確認状態](../verification/public-freshness-pr-review-20261105.md#main-retarget-status-20261106)へ別に結び付けます。
 
 ## 日付付きの検証記録
 

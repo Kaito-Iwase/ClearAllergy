@@ -68,3 +68,12 @@ Aは比較用の暫定設定です。共通公開条件、raw status、既知の
 後続の局所修正では関連30件が30 PASS・fail0・skip0でした。旧表示コードに新しい部品試験だけを適用した別worktreeは10件中8 PASS・2 FAILで、店舗内集計と0件の旧情報注記不足を検出しています。型検査と変更TSX等への直接ESLint CLIもexit0です。保存先はworktreeの親の `pr129-refresh-followup-20261106/`（`focused-first.log`、`presentation-before-fix.log`、`typecheck.log`、`lint.log`）です。この関連検査を最終E2E・build・CIの成功へ拡張しません。
 
 この追補時点でPR #128・#129は未mergeです。最終source／文書のSHA・そのCIと件数、mainへのretarget後の検証、merge SHA・main CI・Production deploymentと公開読取の確認結果は未確定です。確定後に対象SHAとrunを本節へ追記し、それまではmain反映済み・Production確認済みとは報告しません。
+
+<a id="main-retarget-status-20261106"></a>
+## 後続追補：固定headのCI確定とmainへのretarget
+
+head `cd18f20947886514ff280b0bea01ef3a3eee25d2` の[CI 42216014800](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42216014800)は全4job、unit329/329・skip0、E2E21定義中20 PASS・native BFCache1 SKIPで成功しました。実checkout `3350ef8a0e1190538a1e7bbad01d27e361ead527`、artifact・cleanupと[公開layout外SPA復帰の隔離1経路の証拠](public-freshness-prototype-20261105.md#linux-ci-cd18f209)を固定headへ結び付けています。以前の未実行・未実証記述は当時の記録として保持し、今回通過した1経路とnative BFCache等の未検証を分けます。
+
+PR #128の通常merge SHAは `a6dd7ad6f0c468ffceab8748645e7a6497cd4abc`、統合後mainのtreeはbcc4c0cdと一致しています。PR #129のbaseはmainへretarget済みです。既存2workflowへ限定追加した#128 branchの一時base filterは今回のmain追従差分で削除し、main/developの対象条件を維持します。
+
+この追従・文書同期後の最終HEADとそのCI、PR #129のmerge SHA・main CI・Production反映は引き続き未確定です。cd18f209のCI成功やPR #128のtree一致から、それらの完了を主張しません。参照表示Aの暫定性、食品安全・連続した最新性の未保証、実Clerk管理操作・Blob書込未検証、staging専用12ファイルを取り込まない範囲を維持します。
