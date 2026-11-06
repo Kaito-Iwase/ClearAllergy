@@ -70,6 +70,8 @@ same-origin transport、root layoutの復帰listener、店舗集計の旧情報�
 
 以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。
 
+- [2026-11-06 専用 staging dry-run のローカル検証](../verification/staging-dry-run-20261106.md)：#128/#129 統合後 main を基準にした検証時点のローカル差分の判定・拒否テストと、指定 Node 版での通常 build を記録。自動追従・実配備・外部設定は未有効/未変更です。
+
 PR #102のUTC日時契約は、[当初の検証](../verification/utc-timestamp-contract-20261024.md)、[main統合候補](../verification/utc-timestamp-pr102-20261103.md)、[最新mainへの追補検証](../verification/utc-timestamp-pr102-latest-main-20261103.md)を参照してください。今回の追補はmain `9e22cc237d00cb4f33d6740855db55f60128a0c0` に対する未commitのローカル候補で、main・Productionへの採用、GitHub CI成功、配備の記録ではありません。
 
 PR #96の公開店舗読取の重複取得削減を最新mainへ限定採用する差分とF3 fixtureの追従は、[2026-10-28の検証記録](../verification/public-shop-read-performance-20261028.md)を参照してください。過去候補のSELECT本数比較を今回の測定や本番速度の保証に読み替えません。採用先PRのmerge SHA・最終CI・Production結果は元PR #96から辿る証跡に結び付け、未採用の統合候補全体とは区別します。

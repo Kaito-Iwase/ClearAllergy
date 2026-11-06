@@ -355,6 +355,11 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 
 このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
 
+<a id="staging-dry-run"></a>
+### 専用 staging の事前判定（無配備）
+
+「CI 成功した commit → 専用 staging → 固定 URL」の準備として、ローカル JSON を照合する dry-run だけを用意しています。[実行方法・拒否条件・有効化前の残作業](staging-dry-run.md)を参照してください。`eligible=true` でも配備許可は false です。現行 CI の test/staging 対応、Git 自動配備の抑止、collector、配備・alias 更新は未実装/未有効であり、push で専用 staging だけに反映される保証はありません。
+
 <a id="dependabot-deploy-guard"></a>
 ### Dependabotの自動デプロイ抑止
 

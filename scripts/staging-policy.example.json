@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "repository": { "id": null, "fullName": "Kaito-Iwase/ClearAllergy" },
+  "branch": "test/staging",
+  "workflowId": null,
+  "workflowPath": ".github/workflows/ci.yml",
+  "workflowFileSha": "",
+  "githubEnvironment": "staging",
+  "teamId": "team_2Y9pPeo8w16CVx1U7ToVuKFq",
+  "stagingProjectId": "prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK",
+  "productionProjectId": "prj_7gertmNpQ1EfYEoQ9rgFP466ahJq",
+  "stagingUrl": "https://clear-allergy-e2e-git-test-staging-kaitoexe00-9350s-projects.vercel.app",
+  "productionUrls": []
+}
