@@ -358,7 +358,7 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 <a id="staging-dry-run"></a>
 ### 専用 staging の CI 後配備（初期状態は無効）
 
-`test/staging` pushを通常CIへ追加し、成功した元runの厳密なSHAを専用Previewへ配備する `staging-deploy.yml` を用意しています。repository variable `STAGING_ACTIONS_ENABLED=true` が必要で、初期状態は無効です。[配備手順・資格情報・環境scope・排他と失敗時の限界](staging-actions.md)を参照してください。`vercel.json` はtest/stagingと準備branchのGit自動配備をfalseにします。専用projectのGit切離し・source保護・Preview変数分離・認証情報の準備と、固定URLの実配備確認は別途必要です。旧[ローカルdry-run](staging-dry-run.md)も残しますが、配備workflowは旧evaluatorを権限判定に使いません。ローカル検証は `node --import tsx --test tests/staging-actions.test.ts` で、外部配備は行いません。
+`test/staging` pushを通常CIへ追加し、成功した元runの厳密なSHAを専用Previewへ配備する `staging-deploy.yml` を用意しています。repository variable `STAGING_ACTIONS_ENABLED=true` が必要で、初期状態は無効です。[配備手順・資格情報・環境scope・排他と失敗時の限界](staging-actions.md)を参照してください。`vercel.json` はtest/stagingと準備branchのGit自動配備をfalseにします。専用projectのGit接続とbranch限定Preview変数を保持するremote build候補です。source保護・productionBranch・資格情報・既存alias・writer履歴の確認と固定URLの実配備検証は別途必要です。旧[ローカルdry-run](staging-dry-run.md)も残しますが、配備workflowは旧evaluatorを権限判定に使いません。ローカル検証は `node --import tsx --test tests/staging-actions.test.mjs tests/staging-adapter.test.mjs` で、外部配備は行いません。
 
 <a id="dependabot-deploy-guard"></a>
 ### Dependabotの自動デプロイ抑止
