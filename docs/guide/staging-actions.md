@@ -1,64 +1,117 @@
-# 専用 staging の CI 後配備（初期状態は無効）
+# 専用 staging の remote Preview 配備候補（初期状態は無効）
 
-[開発手順](development.md#staging-dry-run) · [変更対応表](change-map.md) · [検証記録](../verification/staging-actions-20261106.md)
+[開発手順](development.md#staging-dry-run) · [変更対応表](change-map.md)
 
-`.github/workflows/ci.yml` はmain/develop/test/staging向けPRと各branchのpushに、通常の使い捨てDB・架空認証の検査を実行します。PRのbranch filterはheadではなくマージ先baseを判定します。test/stagingへ必須PRチェックを設定する前に、このCI定義がそのbranchへ導入済みであることを確認します。別の `staging-deploy.yml` は成功した **test/stagingのpush runだけ** を受け、専用 project の Preview を作り、固定 URL へ割り当てます。PRの成功をpush SHAの配備許可へ転用しません。`STAGING_ACTIONS_ENABLED` が文字列 `true` でなければ配備 job は動きません。設定・認証情報の登録や実配備は、このコード変更だけでは完了しません。
+このローカル候補は main c8ef34554263166405d9e80f4a21f2e2ca6d7e8d の
+既存 workflow/helper を置き換えます。外部設定、資格情報、配備は変更していません。
+旧方式の Git 切離し、branch override の撤去、vercel pull、runner上のアプリ build、
+明示的 alias set は使用しません。Git接続と12件の test/staging 限定 Preview変数を保持し、
+Vercelでremote buildを行います。新しい依存パッケージはありません。
 
-## 処理と責務
+## 実行契約
 
-1. default branch の workflow SHA を `control` に checkout し、その判定コードを使う。元 run をIDで再取得し、同一repository ID、push、`test/staging`、completed/success、正規CIのworkflow ID/path、完全SHA、attemptを照合する。branch headと最新run（失敗・実行中も含む）が一致し、source branchがprotectedであることも確認する。
-2. candidate の CI 定義と `vercel.json` のblob SHAをcontrolと比較する。candidateがテストを削除したCIや配備設定を使う場合は停止する。承認済み設定の変更はdefault branchとsourceを揃えてから新しいpush CIで検査する。
-3. Vercel RESTで固定team/project、Git連携なし、固定aliasのproject・redirectなし・現在destinationのREADY/Previewを確認する。API失敗や項目不足は停止する。
-4. CIの `head_sha` をdetached checkoutし、`git rev-parse HEAD` と照合する。Vercel CLI **65.12.1**を候補外の一時フォルダーへ導入し、`pull --environment=preview --git-branch=test/staging` → `build --environment=preview --standalone` を実行する。通常CIのfixture buildを再利用しない。
-5. standalone出力と固定org/projectだけのproject.jsonをGitのない一時フォルダーへコピーし、`deploy --prebuilt --environment=preview` を実行する。候補のvercel.json、Git情報、branch alias用metadataを配備入力に持ち込まない。SHA/run/attemptは独自metadataに記録する。
-6. 新deploymentのteam/project・READY・Preview・metadata・個別URLをRESTで検査する。固定aliasがすでに新deploymentへ動いていたら異常として停止する。最新sourceを再取得してからCLI `alias set` で固定URLを切り替え、RESTでも同じdeployment IDへの割当を照合する。
+`STAGING_ACTIONS_ENABLED` が文字列 `true` の時だけ動きます。
+GitHub Environment は `staging`、権限は contents/actions read、control checkout は
+workflow_run の default branch SHAです。candidate/CI artifactをrunnerで実行しません。
+既存の `queue: max` / `cancel-in-progress: false` で参加Actions writerだけを直列化します。
+Git連携・手動Vercel・他workflowのwriterはこのlockに参加しません。
 
-固定先は既存dry-run policyと同じteam `team_2Y9pPeo8w16CVx1U7ToVuKFq`、専用project `prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK` です。本番 `prj_7gertmNpQ1EfYEoQ9rgFP466ahJq` を拒否します。固定URLは https://clear-allergy-e2e-git-test-staging-kaitoexe00-9350s-projects.vercel.app です。これらは今回再取得した外部設定の証明ではありません。
+1. 元CIは同一repository ID/name、正規workflow、push、completed/success、同じrun ID/attempt、
+   現branch head、最新push runであることを再取得します。protected booleanに加え、レビューや
+   bypassの実際の保護設定は導入時に別途確認します。CI/vercel.jsonのblobはcontrolと一致必須。
+2. 専用project/team/Git link、raw `link.productionBranch=main`、SSO `deploymentType=all`を確認。
+   GitHub default branchからproductionBranchを推測しません。欠損・不一致は停止します。
+3. env一覧は `decrypt=false` で取得し、Previewを含む全entryを抽出します。正確な12キー、
+   encrypted 8件/sensitive 4件、Previewだけ、gitBranch=test/staging、custom scopeなしを要求します。
+   raw visibilityはencrypted→config 8件、sensitive→secret 4件、decrypted=falseを厳密に要求します。復号状態はPreview以外も含め受信した全entryでboolean false必須です。旧形式の項目欠損・未知値・分類矛盾は拒否します。この対応は既取得の非秘密metadata観察に基づきます。Production entryは書き換えません。値・IDの更新APIはありません。
+4. 固定hostのaliasがredirectなしで専用projectのREADY/Previewを指すことを確認します。
+   最初は `STAGING_APPROVED_ALIAS_ID` の承認済みdeployment、以後はmetadataとGitHub APIで
+   成功済みの同workflow writerに対応するdeploymentを許可します。bootstrap IDの毎回更新は不要。
+   これは他writerが変更できない証明ではなく、metadataも自己認証的な証明ではありません。
+5. 全deployment履歴をページ取得し、専用projectの非terminal buildがあれば停止。
+   不明な状態・重複・欠けたcursor・100ページ超過は停止。時刻cursorの完全性、削除、API整合性の
+   限界は残り、同時writer不在を原子的に保証しません。source/project/env/aliasを再確認します。
+6. POST `/v13/deployments?teamId=...` は固定専用project、GitHub repo ID `1144262510`、
+   ref `test/staging`、成功CIの40桁SHA、CIとwriterのrun/attempt metadataだけを送ります。
+   targetは省略（Preview既定）。files/env/deploymentId/withLatestCommitは送りません。
+7. IDが判明したbuildは45分までterminalを観測し続けます。SIGTERM/SIGINTでも可能な範囲で待ちます。
+   GitHub job timeoutは60分。ただし強制終了・runner障害はremote buildを停止しません。
+8. full deploymentのowner/project、targetが明示null、custom環境なし、gitSourceとproviderの
+   githubCommitSha、CI/writer metadata、READYを照合します。その後の別alias readでhost/project/ID、
+   nested ID、redirect明示null、microfrontendsなし、aliasAssigned=true、aliasErrorなしを要求します。
+   redirect省略は公式schemaで許容されますが、この候補では保守的に拒否します。
 
-REST v13の `target: null` はPreviewを表すため、この明示値のみ許可します。target欠損・production・custom environmentは拒否します。[旧dry-run](staging-dry-run.md)の正規化evidenceの `environment: preview` とは入力契約が異なり、旧evaluatorを実配備の権限判定に使いません。
+## 成功の意味と残る競合
 
-## 有効化前の設定と判断（今回未実施）
+identity/READYだけでは固定URL成功ではありません。別alias照合の成功も、その時点のAPI routing
+mappingだけです。HTTP、SSO、Clerk、DB、Blob、画面の正常性や将来のrouting維持は未確認です。
+VercelはREADY付近で**postcheck前に固定branch URLを変更できます**。build中のbranch進行で
+旧SHAが一時公開される可能性は残ります。事後拒否は既に起きた変更を取り消しません。
+`--skip-domain`はProduction用で、このPreviewの解決策ではありません。
 
-| 対象 | 必要な確認・設定 |
-| --- | --- |
-| `test/staging` | 必須CI・PRレビュー・push権限・bypass/管理者/force-push制限を設定し、**信頼できるレビュー済みコードだけ**を入れる。APIのprotected booleanだけではレビュー内容やbypass除外まで証明しない。任意コードを試すbranchにはこのjobを有効化しない |
-| GitHub Environment `staging` | default branchのレビュー済みworkflowに限定する。`workflow_run` のrefは元の `test/staging` ではなくdefault branchになるため、Environmentをsource branchだけに制限するとjobが起動できない。sourceの保護は別途必要 |
-| Environment secret `STAGING_VERCEL_TOKEN` | 専用projectに必要なPreview設定読取・配備・alias操作を持つ既存資格情報を使用できるか確認。利用可能なVercelプランでproject制限ができるか確認し、本番権限を持つ広いtokenを便宜上流用しない。未用意なら別承認で認証を準備する。GitHub tokenはcontents/actions readのみ |
-| 専用Vercel project | Git連携を切り離す。main・PRからこのprojectへの自動配備を残さない。CLI用projectはGit連携なしで運用する。既存配備・aliasは削除せず、SSO保護も維持する |
-| 本番projectのGit経路 | sourceの `vercel.json` に `test/staging: false` があることを確認してからpushする。今回の準備branchもfalse。main/developは従来の挙動を維持するため、この変更をmainへmergeすると従来通り本番再配備が起こり得る |
-| Preview変数 | 専用DB・Clerk test instance・Blob・公開URLとcallback/originの分離を確認。Production/Developmentの値を補完しない。test/staging専用overrideだけではGit情報なしuploadのruntime変数に引き継がれない可能性があるため、**専用projectのPreview既定値を正本とし、branch overrideを使わない**。system git変数をアプリの契約にしない |
-| Node/build | 専用projectも `.node-version` と同じ22系へ揃える。通常CIのnpmは11.18.0。CLI buildはPreview変数を使用し、DB migration/reset/fixture作成は追加しない |
-| 固定alias | 現destinationが専用projectのREADY/Previewであること、他workflow・Deploy Hook・手動担当者が並行更新しないことを確認する。現在のaliasにGit連携由来の残ジョブがあれば完了・停止状態を確認する |
-| 有効化 | 以上の確認と実配備試験の承認後にrepository variable `STAGING_ACTIONS_ENABLED=true` を設定。workflowはdefault branchへ登録する必要がある。merge・設定変更・実配備はそれぞれ別操作 |
+`test/staging:false`と全設定rule falseでも、未指定mainは通常通り自動配備可能です。
+Gitを保持すると、main変更は専用e2eと実Productionの両projectでProduction buildを起動し得ます。
+e2eのProduction変数8件の値・接続先は未調査です。全project隔離を主張しません。
+共有vercel.jsonへglobal Git falseは追加しません。必要なら別の承認済みproject別抑止が必要です。
 
-`pull` はPreviewのアプリ秘密値をrunnerへ保存し、candidateのinstall/buildがそれを読めます。配備tokenとGitHub tokenはbuild stepの環境へ渡しませんが、同じrunnerでコードを実行するため、悪意あるコードに対するsandboxではありません。branchの信頼性が有効化の前提です。キャッシュ・CI artifactを実行せず、出力/秘密値のartifactアップロードも行いません。終了時にpulled設定と出力を削除します。runtime秘密値は専用projectのPreview設定が正本です。
+## 不確実なPOST・後続run・復旧
 
-PR branch filterでworkflow全体を除外すると必須チェックがPendingのまま残り、mergeを妨げ得ます。`test/staging`向けPRが通常CIを起動し、既存job名のチェックを報告することを、保護設定の導入時に実PRで確認してください。PR CIは通常のPR merge refを検査し、merge後のpush CIはそのcommitを再検査します。保護ルールの設定自体はYAML変更では行いません。merge queueを利用する場合の`merge_group`対応は別途必要で、今回その機能や設定を追加していません。
+1 runの1 attemptにつきPOSTは最大1回。attempt 2以降は拒否します。POST失敗/応答喪失では
+読み取りだけでreconcileし、候補が一覧に見えなくても再POSTしません。ID不明もincidentです。
+既知IDのread失敗はdeadlineまで再readします。alias/delete/rollback/promotionは行いません。
 
-新しいtokenを発行しなくても、既存tokenをGitHub Environmentへ新たに登録するなら、GitHub runnerへのアクセス追加になります。コードの固定project IDはtoken自体の権限を狭めません。project/環境単位の資格情報制限が現在のaccount/planで可能かは未確認であり、teamに対するtokenを「Preview専用token」と呼び替えません。接続ツールの認証を取り出してrunnerへ移す処理もありません。
+別run Bも、過去writer Aのfailure/cancelled/未完了があればVercel一覧が空でも停止します。
+GitHub workflow履歴を全ページ読み、total_countの変動、重複、欠落、上限超過も拒否。
+後続のqueued/waiting等は通常の待機として許可し、後続の実行中writerは拒否します。
+POST前の正常なsource supersededは `noDeploymentCreated:true` として成功終了し、後続を妨げません。
+これを固定URL成功と扱いません。他のpreflightエラーは保守的にincidentとして止めます。
 
-現在の12件のbranch限定Preview変数をPreview既定値へ移すと、同じ専用project内の別branchや手動Previewも対象になります。Git切離しとwriter管理でその配備経路を限定する必要があります。移す場合も対象は既存の12件だけで、値とSecret/sensitive分類を保持し、既存Production変数8件や本番projectには変更を加えない計画です。値の読出し・SecretからConfigへの変換・自動rotationは不要な操作として追加しません。`pull` とローカルbuildでSecret値がどう扱われるか、必要な値をエクスポートせずbuildできるかは実環境で未確認です。必要な秘密値が取得できない場合は停止し、Secret分類の緩和で解決しません。[公式のSecret仕様](https://vercel.com/docs/environment-variables/sensitive-environment-variables)も確認してください。
+復旧時はactivationをfalseにし、参加jobと外部writer、未知POST、既知/未完了remote build、
+固定aliasを人が照合します。全件がterminalで結果・副作用が判明するまでresetしません。
+必要な復旧操作は別途承認。照合済みの最後の旧writer run IDだけを
+`STAGING_RECONCILED_THROUGH_RUN_ID` に設定し、bootstrap alias/現在sourceを再承認した後、
+新しい正規CIイベントで再開します。これは過去のincidentを無視する権限を持つ安全上重要な設定です。
+現在/未来のrun ID、単に空だった一覧、blind rerunをreset根拠にしません。
+履歴を削除/期限切れにしないこと、workflow名/pathを変えないこと、履歴保持期間内で運用することも前提。
+この小さいadapterは消えた履歴やVercelの不可視の書込みを証明できません。
 
-## 排他・失敗・復旧
+## 値・資格情報の境界
 
-固定aliasに対してconcurrency groupを一つだけ使い、`queue: max` / `cancel-in-progress: false` で実行中writerと既存pendingを維持します。既定の `queue: single` は、実行中A・最新成功Bがpendingの間に古いCが到着するとBを取り消します。Cをsource検査で拒否してもBは復活しないため、単なる古いrunの拒否だけでは最新の反映機会を保持できません。maxでは上限内のB/Cを両方待機させ、実行時のsource照合で最新だけを許可します。CI自体はbranch単位で古いrunをキャンセルする従来の動作を維持します。
+この開発では資格情報やlive envを読み取っていません。fixtureは架空値のみです。
+将来のenv API応答には`decrypt=false`でもvalue fieldが含まれるため、metadata-only APIとは呼べません。
+adapterはそのfieldを直ちに捨て、保存/ログ/POST/アプリbuildへ渡しません。暗号化値を含む応答を
+runnerが受け取る点と、sensitive変数の実際の応答挙動は導入前確認事項です。plaintext秘密値が
+返るなら停止し、この方式を有効化しません。4つのアプリ秘密値をGitHub secretsへ移しません。
+STAGING_VERCEL_TOKEN自体の権限は固定project IDによって狭まりません。既存tokenの新しい保存や
+継続アクセス追加、新規token、SSO変更は別の明示承認が必要です。
 
-GitHub公式仕様ではpendingは**最大100件**で、満杯では新たに到着したrunが取り消されます。`queue: max` と `cancel-in-progress: true` は併用できません。待機開始時刻に基づくFIFOであり、event/dispatch順そのものは保証されません。配備前とalias更新直前のhead/run/attempt照合は引き続き必要です。100件を超えた最新run、手動cancel、timeout、サービス障害まで自動回復させる仕組みはなく、常に最後は最新が反映されるという保証はしません。
+## 導入前の一括確認・承認チェックリスト
 
-上限到達・取消・異常終了後は、まず待機数と実行中writer・外部書込の状態を確認します。安全にキューが空いた後、現在のbranch headと最新の正規push CIのrun/attempt/completed-success、固定aliasを再取得し、**その最新CIに紐付く取消/失敗した配備workflowだけ**を再実行する運用です。最新runが失敗/実行中なら過去の成功へ遡らず、現在headの最新CIを再検証します。古い配備workflowを再実行してもsource照合で拒否されます。元の配備workflowを再実行できない、または設定/SHAが変わっている場合は、現在headの正規push CIを再実行する等で新しい成功イベントを得る判断が必要です。新pushへ進んでいれば旧headを復活させません。今回この復旧操作・有効化・実配備は行っていません。
+- [ ] ローカル候補のレビュー、完全checkoutでlint/typecheck/test/build、GitHub YAML検証。
+- [ ] repo変更のpush/PR/merge範囲と、それによる両projectの通常main Production配備の影響を承認。
+- [ ] test/stagingをレビュー済みCI/configと一致させ、PR/CI/force-push/bypass保護を確認・承認。
+- [ ] 専用projectのproductionBranch、Git接続、SSO all、既存alias、12変数のscope/type/値の維持を確認。
+- [ ] env APIの値非復号、remote ref+SHAの実checkout/branch変数選択、raw API shapeを確認。
+- [ ] writer履歴を保持し、bootstrap alias ID、初期reconciliation watermark、外部writer管理を確認。
+- [ ] Preview作成と自動固定URL変更、early/stale SHA露出、他writer/main Production残存を承認。
+- [ ] 最小権限の資格情報利用/保存・Environment設定・security設定の変更を必要な時点で明示承認。
+- [ ] 不明結果の停止/reconcile/reset責任者と範囲を承認。自動delete/alias/rollbackは追加しない。
+- [ ] 許可された初回実試験でCI SHA/deployment/aliasとSSO/Clerk/DB/Blob/画面を別々に記録してから有効化。
 
-検査・build・deploy失敗では後続alias stepを実行しません。build中にsourceが進んだ場合も固定URLを更新しません。Preview作成後に古くなった場合、未割当のPreviewが残ることがあります。APIの取得失敗を成功に補完しません。
+2026-11-07の既知blocker: live test/stagingは古い6293d5a、unprotected、Git rule true。
+main mergeでは解消していません。この候補だけで有効化可能とは報告しません。
 
-GitHub ref変更とVercel alias更新を単一transactionにできないため、最終照合の直後に新pushが来る短い競合窓は残ります。後続の成功runが新SHAへ進める一方、新pushが失敗した場合は最後に成功した版が残ります。「更新瞬間のheadとの原子的な一致」はこの小さい構成では保証しません。古いwriterが新しいwriterの配備を上書きする通常経路は直列化で防ぎます。
+## ローカル検証と公式資料
 
-手動キャンセル・timeout・ネットワーク断では外部APIの書込結果が不明な場合があります。alias書込後の検査失敗は「旧版のまま」と保証できません。自動rollback/再試行を行わず、先に同じteam/project/aliasのREST状態を照合します。疑わしい場合はvariableをfalseにして新規jobを止め、実行中job・Vercelのin-flight処理・aliasの確定状態を確認してから、承認された新runまたは手動復旧へ進みます。variable変更だけでは実行中jobは止まりません。
+`node --test tests/staging-actions.test.mjs tests/staging-adapter.test.mjs`（Node 24）でfake transport/clockを使用。
+既存npm testへ2つの明示的な.mjsパスを追加し、依存/lock変更なし。Node22の通常CIはtsx loaderを使用。
+完全checkoutのNode22.23.4では全体540テスト、lint/typecheck/buildが成功しました。[今回の検証](../verification/staging-branch-preview-20261107.md)を参照してください。Actions実行、実DB/E2E、live API/固定URLは別gateです。
 
-## 検証と成功の意味
-
-`node --import tsx --test tests/staging-actions.test.ts` はAPI代用品だけでsource・拒否・alias照合を検査します。ネットワークや配備を行いません。通常CIが成功しても、外部projectの資格情報や設定は検証できません。
-
-キューの回帰テストは、YAMLのmax/非cancel設定を確認し、公式仕様を仮定した小さいモデルでA実行中・B最新待機・C旧run到着の損失と修正後の保持、100件上限・空いた後の再試行を検査します。実source判定もAPI代用品で呼びますが、GitHub上でA/B/Cを競合実行した証拠ではありません。通常PR CIでは配備workflowを起動せず、待機順・満杯時の取消・再実行のevent配送を実証していません。有効化前の許可された実行時検証として残します。
-
-workflowの成功は「配備metadataと固定aliasのdestination照合」の成功です。HTTP応答・SSO後の画面・実Clerk管理操作・保存/公開・Blobアップロードは別途確認し、CI run、SHA、deployment ID、固定URL、確認日時を結び付けて記録します。初回はGit pushによる先行配備が両projectで発生しないことも観測します。
-
-公式資料は [workflow_runのrefと秘密値](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)、[concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)、[Vercel Git抑止](https://vercel.com/docs/project-configuration/git-configuration)、[pull](https://vercel.com/docs/cli/pull)、[deploy](https://vercel.com/docs/cli/deploy)、[alias](https://vercel.com/docs/cli/alias)、[REST deployment](https://vercel.com/docs/rest-api/deployments/get-a-deployment-by-id-or-url)、[REST alias](https://vercel.com/docs/rest-api/aliases/get-an-alias)です。2026-11-06の調査ではContext7が環境にないため、公式資料とCLI 65.12.1のローカルhelpを照合しました。現行CLIの環境指定は `--environment`、移動可能な出力には `build --standalone` を使います。
+Context7はこの環境では利用不可でした。公式schemaは
+[Vercel SDK pinned commit](https://github.com/vercel/sdk/tree/b2f99500bd164d528aad07dd4830b0ea4d1abd6f/src/models)
+のgetprojectfrompreset.ts、filterprojectenvsop.ts、getdeploymentsop.ts、pagination.ts、
+getdeploymentresponsebody.ts、getdeploymentserviceshttpget.ts、getaliasop.tsに照合しました。
+[create API](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment)、
+[Git抑止](https://vercel.com/docs/project-configuration/git-configuration)、
+[GitHub concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+も参照。schema適合はlive挙動の実証ではありません。

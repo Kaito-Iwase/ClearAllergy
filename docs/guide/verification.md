@@ -217,3 +217,6 @@ Dockerは通常起動で復旧し、今回専用PostgreSQL17へ既存16 migratio
 QRのURL解決、メニュー保存予定と確定結果の区別、店舗フォームの順序とスクロールは[実装・検証記録](../verification/store-review-20261019.md)を参照してください。既存画面の読み取り監査と架空fixtureの回帰検査を、実店舗の利用実証から区別します。
 
 2026-10-22の[店舗管理・公開カードの整理と検証](../verification/store-management-20261022.md)は、直接操作・一覧の公開停止・店舗共通補足、本番レスポンスの注意書きの由来、元の白余白の再現限界を記録します。実装と本番適用を区別します。
+
+
+2026-11-07 remote Preview候補: Git接続/branch限定変数を保持したadapterへ置換。[完全checkoutでの検証](../verification/staging-branch-preview-20261107.md)はNode22で540テスト・lint/typecheck/build成功。実配備・固定URL・外部設定は別gate。[現候補の境界と承認条件](staging-actions.md)を参照し、旧CLI/prebuilt方式の結果は転用しません。
