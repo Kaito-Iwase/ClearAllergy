@@ -222,6 +222,34 @@ test("STOPのreadonly拒否と、停止確定後のcache未確認を区別する
     assert.equal(writes, 1);
 });
 
+test("STOP後の旧版保存は409で、停止状態と食品版を上書きしない", async t => {
+    setup(t);
+    const stored = { id: "own-menu", shopId: "own-shop", name: "元の架空料理", isPublished: true,
+        version: 30, foodVersion: 29, publicationConfirmedFoodVersion: 29, allergenLinks: [] };
+    let stopWrites = 0;
+    replace(t, prisma.menuItem, "update", async ({ where, data }: Args) => {
+        assert.deepEqual(where, { id: stored.id, shopId: stored.shopId });
+        assert.deepEqual(data, { isPublished: false });
+        stopWrites++; stored.isPublished = false; stored.version++;
+        return { id: stored.id, isPublished: stored.isPublished, version: stored.version };
+    });
+    replace(t, prisma.menuItem, "findFirst", async ({ where }: Args) => {
+        assert.deepEqual(where, { id: stored.id, shopId: stored.shopId });
+        return { ...stored };
+    });
+    const stopped = await menuRoute.STOP(request("POST", "/api/admin/menus/own-menu/stop"));
+    assert.equal(stopped.status, 200);
+    assert.deepEqual(await stopped.json(), { ok: true, menu: { id: stored.id, isPublished: false, version: 31 } });
+    const stale = await menuRoute.PUT(request("PUT", "/api/admin/menus/own-menu", JSON.stringify({
+        expectedVersion: 30, name: "旧フォームの架空変更", isPublished: true,
+    })));
+    assert.equal(stale.status, 409);
+    assert.equal(stopWrites, 1);
+    assert.equal(stored.name, "元の架空料理"); assert.equal(stored.isPublished, false);
+    assert.equal(stored.version, 31); assert.equal(stored.foodVersion, 29);
+    assert.equal(stored.publicationConfirmedFoodVersion, 29);
+});
+
 test("空objectの下書きは所有店舗に作成し、欠損状態をすべてUNKNOWNで保存する", async (t) => {
     setup(t);
     let savedLinks: { status: string }[] = [];
@@ -306,6 +334,50 @@ test("保存済み最新版の別公開操作だけが新しい公開記録を�
     assert.equal(response.status, 200);
     assert.equal((await response.json()).menu.isPublished, true);
     assert.deepEqual(confirmed, { menuItemId: "own-menu", foodVersion: 1, actorUserId: "app-owner" });
+});
+
+for (const change of ["allergen", "reported"] as const) test(`食品変更と別公開が同時に要求されても非公開保存する: ${change}`, async t => {
+    setup(t);
+    const links = ALLERGEN_MASTER.map(a => ({ allergen: { slug: a.slug }, status: "FREE" }));
+    replace(t, prisma.menuItem, "findFirst", async () => ({
+        id: "own-menu", name: "架空料理", description: null, category: null, ingredients: "架空原材料",
+        precaution: null, priceYen: null, imageUrl: null, isPublished: false, version: 4,
+        foodVersion: 3, publicationConfirmedFoodVersion: null, allergenLinks: links,
+    }));
+    let writes = 0;
+    let replacementLinks = 0;
+    let savedLinks: Array<{ allergenId: string; status: string }> = [];
+    replace(t, prisma, "$transaction", async (work: (tx: object) => Promise<unknown>) => work({
+        $executeRaw: async () => 0,
+        menuItem: {
+            update: async ({ where, data }: Args) => {
+                writes++;
+                assert.deepEqual(where, { id: "own-menu", shopId: "own-shop", version: 4 });
+                assert.equal(data?.isPublished, false);
+                assert.deepEqual(data?.foodVersion, change === "reported" ? { increment: 1 } : undefined);
+                return {};
+            },
+            findFirstOrThrow: async () => ({ id: "own-menu", shopId: "own-shop", isPublished: false,
+                version: 5, foodVersion: 4, publicationConfirmedFoodVersion: null, reviewedFoodVersion: null }),
+        },
+        menuItemAllergen: { deleteMany: async () => { replacementLinks++; },
+            createMany: async ({ data }: { data: typeof savedLinks }) => { replacementLinks++; savedLinks = data; } },
+        menuPublicationConfirmation: { create: async () => assert.fail("Food change must not create a publication confirmation") },
+        menuFoodReview: { create: async () => assert.fail("Food change must not fabricate a review") },
+    }));
+    const body = change === "allergen" ? { allergenStatusBySlug: { milk: "CONTAINS" } } : { foodChangeReported: true };
+    const response = await menuRoute.PUT(request("PUT", "/api/admin/menus/own-menu", JSON.stringify({
+        expectedVersion: 4, publicationAction: "publish", ...body,
+    })));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).menu.isPublished, false);
+    assert.equal(writes, 1);
+    assert.equal(replacementLinks, change === "allergen" ? 2 : 0);
+    if (change === "allergen") {
+        assert.equal(savedLinks.length, ALLERGEN_MASTER.length);
+        assert.equal(savedLinks.find(link => link.allergenId === "milk")?.status, "CONTAINS");
+        assert.ok(savedLinks.filter(link => link.allergenId !== "milk").every(link => link.status === "FREE"));
+    }
 });
 
 for (const blocked of ["unresolved", "missing-master", "unknown", "missing-link"] as const) test(`別公開操作の${blocked}拒否は理由付き400で根拠を作らない`, async (t) => {

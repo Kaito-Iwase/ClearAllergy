@@ -94,6 +94,25 @@ async function requestMenu() {
     return GET(new Request("http://localhost/api/menus/menu-1"));
 }
 
+test("public menu requires the exact positive food version confirmation", async (t) => {
+    let confirmed = 2;
+    let supplementReads = 0;
+    stubPrisma(t, {
+        findMenu: async () => makeMenu({ foodVersion: 3, publicationConfirmedFoodVersion: confirmed }),
+        findStoreMenus: async () => { supplementReads++; return []; },
+    });
+    for (const value of [2, 4]) {
+        confirmed = value;
+        const response = await requestMenu();
+        assert.equal(response.status, 404);
+        assert.deepEqual(await response.json(), { error: "menu not found" });
+        assert.equal(supplementReads, 0);
+    }
+    confirmed = 3;
+    assert.equal((await requestMenu()).status, 200);
+    assert.equal(supplementReads, 1);
+});
+
 test("公開APIは記録なし・旧版の確認では公開せず、私的な根拠記録を返さない", async (t) => {
     let publicationConfirmedFoodVersion: number | null = null;
     stubPrisma(t, { findMenu: async () => makeMenu({ publicationConfirmedFoodVersion, foodReviews: [{ evidenceRefs: "private evidence" }] }) });

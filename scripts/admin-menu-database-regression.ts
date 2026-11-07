@@ -228,6 +228,31 @@ export async function runAdminMenuDatabaseRegression(
         assert.deepEqual(stopAfter.foodReviews, stopBefore.foodReviews);
         console.log("PASS: dedicated STOP works without form/review input and preserves saved food content and evidence");
 
+        // The old editor keeps the pre-STOP version. A stale full save must not
+        // republish or replace any food data or publication/review history.
+        const stopSnapshot = () => db.menuItem.findUniqueOrThrow({ where: { id: createdBody.id }, include: {
+            allergenLinks: { orderBy: { allergenId: "asc" } }, foodReviews: { orderBy: { reviewSequence: "asc" } },
+            publicationConfirmations: { orderBy: { id: "asc" } }, foodIssueResolutions: { orderBy: { id: "asc" } },
+        } });
+        const afterStop = await stopSnapshot();
+        assert.ok(afterStop.publicationConfirmations.length > 0);
+        const successfulAuditsBefore = await db.auditLog.count({ where: { actorShopId: shopId, targetId: createdBody.id, success: true } });
+        const staleAfterStop = await route.PUT(put(createdBody.id, { expectedVersion: stopBefore.version,
+            name: "旧フォームによる架空の上書き", isPublished: true, allergenStatusBySlug: { [master[0].slug]: "CONTAINS" } }));
+        assert.equal(staleAfterStop.status, 409, "Pre-STOP form must not be accepted after STOP");
+        assert.deepEqual(await stopSnapshot(), afterStop, "Stale save must not change the stopped menu or its history");
+        assert.equal(await db.auditLog.count({ where: { actorShopId: shopId, targetId: createdBody.id, success: true } }), successfulAuditsBefore);
+        assert.equal((await stopPublicRoute.GET(new Request(`http://localhost/api/menus/${createdBody.id}`))).status, 404);
+        // Positive control: the same owner and current version can save a price
+        // without republishing or changing the saved food version.
+        const currentAfterStop = await route.PUT(put(createdBody.id, { expectedVersion: afterStop.version, priceYen: 1100 }));
+        assert.equal(currentAfterStop.status, 200, "Current-version owner save must still work");
+        const afterCurrentSave = await stopSnapshot();
+        assert.equal(afterCurrentSave.priceYen, 1100); assert.equal(afterCurrentSave.isPublished, false);
+        assert.equal(afterCurrentSave.foodVersion, afterStop.foodVersion);
+        assert.deepEqual(afterCurrentSave.publicationConfirmations, afterStop.publicationConfirmations);
+        console.log("PASS: real STOP followed by stale PUT returns 409; private menu, food version, links and history stay unchanged");
+
         const issueMenu = await createMenu("【架空】実APIの明示解除と公開");
         const oldIssue = await db.menuFoodReview.create({ data: { menuItemId: issueMenu.id, foodVersion: issueMenu.foodVersion,
             contentSnapshot: {}, evidenceRefs: "保持する架空の旧資料", scope: "架空全品目", checkedAt: new Date(),

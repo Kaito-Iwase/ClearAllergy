@@ -6,6 +6,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkT4ObserverOffline } from "./check-issue118-t4-offline.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(join(root, "package.json"));
@@ -36,16 +37,16 @@ const base = { id, version: 30, foodVersion: 29, reviewedFoodVersion: null, publ
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || "playwright");
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
 const cases = [], errors = [], external = [];
-async function open({ width = 390, menu = {}, path = "/edit", intercept } = {}) {
+async function open({ width = 390, menu = {}, path = "/edit", intercept, acceptDialogs = false } = {}) {
     const context = await browser.newContext({ viewport: { width, height: 844 } });
     const f = { state: structuredClone({ ...base, ...menu }), writes: [], reads: 0, dialogs: [] };
     await context.route("**/*", async route => {
         const req = route.request(), url = new URL(req.url());
         if (url.origin !== origin) { external.push(url.origin); return route.abort(); }
         if (url.pathname.startsWith("/api/")) {
-            const method = req.method(), body = method === "GET" ? null : req.postDataJSON();
-            if (method === "GET") f.reads++; else f.writes.push({ method, body });
-            const overridden = intercept ? await intercept({ method, body, f }) : null;
+            const method = req.method(), body = method === "GET" || url.pathname === "/api/admin/upload-menu-image" ? null : req.postDataJSON();
+            if (method === "GET") f.reads++; else f.writes.push({ method, body, path: url.pathname });
+            const overridden = intercept ? await intercept({ method, body, f, path: url.pathname }) : null;
             if (overridden?.abort) return route.abort();
             if (overridden) return route.fulfill({ status: overridden.status || 200, contentType: overridden.contentType || "application/json", body: overridden.rawBody ?? JSON.stringify(overridden.body) });
             if (method === "GET") return route.fulfill({ json: { menu: f.state } });
@@ -72,7 +73,7 @@ async function open({ width = 390, menu = {}, path = "/edit", intercept } = {}) 
     const page = await context.newPage();
     page.setDefaultTimeout(8000);
     page.on("pageerror", e => errors.push(e.message));
-    page.on("dialog", d => { f.dialogs.push(d.type()); return d.dismiss(); });
+    page.on("dialog", d => { f.dialogs.push(d.type()); return acceptDialogs ? d.accept() : d.dismiss(); });
     await page.goto(origin + path); await page.getByRole("heading", { name: "保存・公開の架空検証" }).waitFor();
     return { ...f, page, context, get state() { return f.state; }, get reads() { return f.reads; } };
 }
@@ -80,6 +81,145 @@ const panel = f => f.page.getByRole("region", { name: "保存しました", exac
 const save = f => f.page.getByRole("button", { name: "保存する", exact: true }).click();
 async function check(name, run) { try { await run(); cases.push({ name, passed: true }); console.log("PASS " + name); } catch (e) { cases.push({ name, passed: false, error: e.message }); console.error("FAIL " + name + ": " + e.message); } }
 try {
+    await check("T4 observer separates held/fresh/back/failed-refetch and rejects unchanged/unavailable fresh reads (synthetic loopback HTTP only)", async () => {
+        const reports = await checkT4ObserverOffline(browser);
+        writeFileSync(join(output, "issue118-t4-offline-result.json"), JSON.stringify({ scope: "Synthetic loopback HTTP plus real Chromium; no app/auth/DB/Blob/real STOP", reports }, null, 2));
+    });
+    await check("empty, invalid JSON, 500 or lost image upload response prevents menu creation and save", async () => {
+        const failures = [
+            { status: 500, body: { error: "fictional upload failure" } },
+            { rawBody: "not-json" },
+            { body: {} },
+            { body: { url: "" } },
+            { abort: true },
+        ];
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        for (const path of ["/new", "/edit"]) for (const failure of failures) {
+            const f = await open({ path, intercept: ({ path: requestPath }) => requestPath === "/api/admin/upload-menu-image" ? failure : null });
+            try {
+                const prefix = path === "/new" ? "new" : "edit";
+                const name = f.page.locator(`#${prefix}-menu-field-1`);
+                await name.fill("Fictional upload draft");
+                await f.page.locator(`#${prefix}-menu-field-7`).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                if (path === "/new") await f.page.locator("form").evaluate(form => form.requestSubmit());
+                else await save(f);
+                await f.page.getByRole("alert").waitFor();
+                assert.deepEqual(f.writes.map(write => write.path), ["/api/admin/upload-menu-image"]);
+                assert.equal(await name.inputValue(), "Fictional upload draft");
+                assert.equal(await f.page.locator(`#${prefix}-menu-field-7`).evaluate(input => input.files.length), 1);
+                assert.equal(await panel(f).count(), 0);
+                assert.equal(f.state.version, base.version);
+                assert.equal(f.state.isPublished, false);
+            } finally { await f.context.close(); }
+        }
+    });
+    await check("valid image upload reaches the separate menu write", async () => {
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        const uploaded = "https://fixture.public.blob.vercel-storage.com/menu-images/fixture/photo.png";
+        for (const path of ["/new", "/edit"]) {
+            const f = await open({ path, intercept: ({ path: requestPath }) => requestPath === "/api/admin/upload-menu-image" ? { body: { url: uploaded } } : null });
+            try {
+                const prefix = path === "/new" ? "new" : "edit";
+                await f.page.locator(`#${prefix}-menu-field-1`).fill("Fictional upload control");
+                await f.page.locator(`#${prefix}-menu-field-7`).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                if (path === "/new") await f.page.locator("form").evaluate(form => form.requestSubmit());
+                else await save(f);
+                await panel(f).waitFor();
+                assert.equal(f.writes.length, 2);
+                assert.equal(f.writes[0].path, "/api/admin/upload-menu-image");
+                assert.equal(f.writes[1].path, path === "/new" ? "/api/admin/menus" : `/api/admin/menus/${id}`);
+                assert.equal(f.writes[1].body.imageUrl, uploaded);
+            } finally { await f.context.close(); }
+        }
+    });
+    await check("cancelling STOP preserves unsaved input without a request", async () => {
+        const f = await open({ menu: { isPublished: true, publicationConfirmedFoodVersion: 29 } });
+        try {
+            const description = f.page.getByLabel("説明", { exact: true });
+            await description.fill("取り消し後も保持する入力");
+            await f.page.getByRole("button", { name: "公開を停止する", exact: true }).click();
+            assert.deepEqual(f.dialogs, ["confirm"]); assert.equal(f.writes.length, 0);
+            assert.equal(f.state.isPublished, true); assert.equal(await description.inputValue(), "取り消し後も保持する入力");
+        } finally { await f.context.close(); }
+    });
+    await check("STOP saved with pending public refresh does not claim public propagation", async () => {
+        const f = await open({ menu: { isPublished: true, publicationConfirmedFoodVersion: 29 }, acceptDialogs: true,
+            intercept: ({ method, path, f }) => {
+                if (method === "POST" && path === `/api/admin/menus/${id}/stop`) {
+                    f.state.isPublished = false; f.state.version++;
+                    return { body: { ok: true, menu: { id, isPublished: false, version: f.state.version }, publicRefreshPending: true } };
+                }
+                return null;
+            } });
+        try {
+            await f.page.getByRole("button", { name: "公開を停止する", exact: true }).click();
+            await f.page.getByText("公開停止を保存しましたが、公開表示の更新処理が未完了です。", { exact: true }).waitFor();
+            assert.equal(f.state.isPublished, false); assert.equal(f.writes.length, 1);
+            assert.equal(f.writes[0].path, `/api/admin/menus/${id}/stop`);
+        } finally { await f.context.close(); }
+    });
+    await check("STOP keeps dirty input and its old revision; a stale save cannot overwrite the stopped menu", async () => {
+        const f = await open({ menu: { isPublished: true, publicationConfirmedFoodVersion: 29 }, acceptDialogs: true,
+            intercept: ({ method, path, f }) => {
+                if (method === "POST" && path === `/api/admin/menus/${id}/stop`) {
+                    f.state.isPublished = false; f.state.version++;
+                    return { body: { ok: true, menu: { id, isPublished: false, version: f.state.version } } };
+                }
+                if (method === "PUT") return { status: 409, body: { error: "別の変更が保存されています。入力を保持したまま、最新内容を確認してください。" } };
+                return null;
+            } });
+        try {
+            const description = f.page.getByLabel("説明", { exact: true });
+            await description.fill("未保存の架空説明");
+            await f.page.getByRole("button", { name: "公開を停止する", exact: true }).click();
+            await f.page.getByText("公開停止を保存しました。編集を続ける前に最新内容を確認してください。", { exact: true }).waitFor();
+            assert.deepEqual(f.dialogs, ["confirm"]);
+            assert.equal(f.writes.length, 1); assert.equal(f.writes[0].path, `/api/admin/menus/${id}/stop`);
+            assert.equal(f.writes[0].body, null); assert.equal(f.state.isPublished, false);
+            assert.equal(await description.inputValue(), "未保存の架空説明");
+            await save(f);
+            await f.page.getByRole("alert").getByText(/別の変更が保存されています/).waitFor();
+            assert.equal(f.writes.length, 2); assert.equal(f.writes[1].method, "PUT");
+            assert.equal(f.writes[1].body.expectedVersion, 30);
+            assert.equal(f.state.version, 31); assert.equal(f.state.description, base.description);
+            assert.equal(await description.inputValue(), "未保存の架空説明");
+        } finally { await f.context.close(); }
+    });
+    await check("STOP response loss after a simulated commit remains unknown and never repeats the write", async () => {
+        const f = await open({ menu: { isPublished: true, publicationConfirmedFoodVersion: 29 }, acceptDialogs: true,
+            intercept: ({ method, path, f }) => {
+                if (method === "POST" && path === `/api/admin/menus/${id}/stop`) {
+                    f.state.isPublished = false; f.state.version++;
+                    return { abort: true };
+                }
+                return null;
+            } });
+        try {
+            const description = f.page.getByLabel("説明", { exact: true });
+            await description.fill("保持する未保存入力");
+            await f.page.getByRole("button", { name: "公開を停止する", exact: true }).click();
+            await f.page.getByRole("alert").getByText("公開停止の結果を確認できません。最新の公開状態を確認してください。", { exact: true }).waitFor();
+            assert.equal(f.state.isPublished, false); assert.equal(f.state.version, 31);
+            assert.equal(f.writes.length, 1); assert.equal(f.writes[0].path, `/api/admin/menus/${id}/stop`);
+            assert.equal(await description.inputValue(), "保持する未保存入力");
+            assert.equal(await f.page.getByText(/公開停止を保存しました/).count(), 0);
+        } finally { await f.context.close(); }
+    });
+    await check("STOP error or invalid success response never displays confirmed success", async () => {
+        for (const response of [{ status: 500, body: { error: "架空の停止エラー" } }, { body: { ok: false } }]) {
+            const f = await open({ menu: { isPublished: true, publicationConfirmedFoodVersion: 29 }, acceptDialogs: true,
+                intercept: ({ method, path }) => method === "POST" && path === `/api/admin/menus/${id}/stop` ? response : null });
+            try {
+                const description = f.page.getByLabel("説明", { exact: true });
+                await description.fill("エラー後も保持する入力");
+                await f.page.getByRole("button", { name: "公開を停止する", exact: true }).click();
+                await f.page.getByRole("alert").waitFor();
+                assert.equal(f.writes.length, 1); assert.equal(f.writes[0].path, `/api/admin/menus/${id}/stop`);
+                assert.equal(await f.page.getByText(/公開停止を保存しました/).count(), 0);
+                assert.equal(await description.inputValue(), "エラー後も保持する入力");
+            } finally { await f.context.close(); }
+        }
+    });
     await check("blank names and negative prices never submit; zero and empty prices remain distinct", async () => {
         for (const price of ["0", ""]) {
             const f = await open();
@@ -227,6 +367,96 @@ try {
                 await f.page.screenshot({ path: join(output, `saved-publication-${width}.png`), fullPage: true });
                 await heading.focus(); await f.page.keyboard.press("Tab"); assert.equal(await panel(f).getByRole("button", { name: "公開の確認を閉じる", exact: true }).evaluate(e => e === document.activeElement), true);
                 await f.page.keyboard.press("Escape"); await panel(f).waitFor({ state: "detached" }); assert.equal(f.writes.length, 1);
+            } finally { await f.context.close(); }
+        }
+    });
+    await check("STOP blocked before the fictional backend still reports unknown, preserves input and never retries automatically", async () => {
+        const f = await open({ menu: { isPublished: true, publicationConfirmedFoodVersion: 29 }, acceptDialogs: true,
+            intercept: ({ method, path }) => method === "POST" && path === `/api/admin/menus/${id}/stop` ? { abort: true } : null });
+        try {
+            const description = f.page.getByLabel("説明", { exact: true });
+            await description.fill("送信前遮断でも保持する入力");
+            await f.page.getByRole("button", { name: "公開を停止する", exact: true }).click();
+            await f.page.getByRole("alert").getByText("公開停止の結果を確認できません。最新の公開状態を確認してください。", { exact: true }).waitFor();
+            assert.equal(f.state.isPublished, true);
+            assert.equal(f.state.version, base.version);
+            assert.equal(f.state.foodVersion, base.foodVersion);
+            assert.equal(f.state.publicationConfirmedFoodVersion, 29);
+            assert.deepEqual(f.writes.map(write => [write.method, write.path]), [["POST", `/api/admin/menus/${id}/stop`]]);
+            assert.equal(f.reads, 0);
+            assert.equal(await description.inputValue(), "送信前遮断でも保持する入力");
+            assert.equal(await f.page.getByText(/公開停止を保存しました/).count(), 0);
+        } finally { await f.context.close(); }
+    });
+    await check("successful image upload followed by rejected or unknown menu save retains the File and never claims save success", async () => {
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        const uploaded = "https://fixture.public.blob.vercel-storage.com/menu-images/fixture/unreferenced.png";
+        for (const path of ["/new", "/edit"]) for (const failure of [400, 409, 500, "before-model-write", "after-model-write"]) {
+            let committed = 0;
+            const f = await open({ path, intercept: ({ method, body, path: requestPath, f }) => {
+                if (requestPath === "/api/admin/upload-menu-image") return { body: { url: uploaded } };
+                if (!["POST", "PUT"].includes(method)) return null;
+                if (failure === "after-model-write") {
+                    // This is an intercepted HTTP model, not a real API commit or response-receipt proof.
+                    committed++;
+                    f.state = { ...f.state, ...body, version: base.version + 1, isPublished: false };
+                }
+                return typeof failure === "number" ? { status: failure, body: { error: "架空の保存拒否・障害" } } : { abort: true };
+            } });
+            try {
+                const prefix = path === "/new" ? "new" : "edit";
+                const name = f.page.locator(`#${prefix}-menu-field-1`);
+                const file = f.page.locator(`#${prefix}-menu-field-7`);
+                await name.fill("画像送信後も保持する架空入力");
+                await file.setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                if (path === "/new") await f.page.locator("form").evaluate(form => form.requestSubmit());
+                else await save(f);
+                await f.page.getByRole("alert").waitFor();
+                assert.deepEqual(f.writes.map(write => write.path), ["/api/admin/upload-menu-image", path === "/new" ? "/api/admin/menus" : `/api/admin/menus/${id}`]);
+                assert.equal(f.writes[1].body.imageUrl, uploaded);
+                assert.equal(f.writes[1].body.isPublished, false);
+                assert.ok(f.writes.every(write => !write.body?.publicationAction));
+                assert.equal(await name.inputValue(), "画像送信後も保持する架空入力");
+                assert.equal(await file.evaluate(input => input.files.length), 1);
+                assert.equal(await panel(f).count(), 0);
+                assert.equal(f.reads, 0);
+                assert.equal(f.state.isPublished, false);
+                assert.equal(committed, failure === "after-model-write" ? 1 : 0);
+                assert.equal(f.state.version, base.version + committed);
+                assert.equal(f.state.imageUrl, committed ? uploaded : null);
+                assert.equal(await f.page.getByText(/保存済み内容を公開しました|メニューを登録しました/).count(), 0);
+            } finally { await f.context.close(); }
+        }
+    });
+    await check("explicit retry after known menu validation rejection reuses its acknowledged upload and creation operation", async () => {
+        const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
+        const uploaded = "https://fixture.public.blob.vercel-storage.com/menu-images/fixture/reusable.png";
+        for (const path of ["/new", "/edit"]) {
+            let attempts = 0;
+            const f = await open({ path, intercept: ({ method, path: requestPath }) => {
+                if (requestPath === "/api/admin/upload-menu-image") return { body: { url: uploaded } };
+                if (["POST", "PUT"].includes(method) && ++attempts === 1) return { status: 400, body: { error: "架空の訂正可能な入力拒否" } };
+                return null;
+            } });
+            try {
+                const prefix = path === "/new" ? "new" : "edit";
+                const submit = () => path === "/new" ? f.page.locator("form").evaluate(form => form.requestSubmit()) : save(f);
+                await f.page.locator(`#${prefix}-menu-field-1`).fill("訂正前の架空入力");
+                await f.page.locator(`#${prefix}-menu-field-7`).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: png });
+                await submit(); await f.page.getByRole("alert").waitFor();
+                assert.equal(f.writes.length, 2);
+                await f.page.locator(`#${prefix}-menu-field-1`).fill("訂正後の架空入力");
+                await submit(); await panel(f).waitFor();
+                assert.equal(attempts, 2);
+                assert.equal(f.writes.filter(write => write.path === "/api/admin/upload-menu-image").length, 1);
+                assert.equal(f.writes.length, 3);
+                assert.equal(f.writes[1].body.imageUrl, uploaded);
+                assert.equal(f.writes[2].body.imageUrl, uploaded);
+                assert.equal(f.writes[2].body.name, "訂正後の架空入力");
+                if (path === "/new") {
+                    assert.match(f.writes[1].body.operationId, /^[0-9a-f-]{36}$/i);
+                    assert.equal(f.writes[2].body.operationId, f.writes[1].body.operationId);
+                } else assert.equal(f.writes[2].body.expectedVersion, base.version);
             } finally { await f.context.close(); }
         }
     });

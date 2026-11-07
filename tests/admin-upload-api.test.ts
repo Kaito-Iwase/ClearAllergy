@@ -36,6 +36,24 @@ const routes = [
     { kind: "menu", path: "/api/admin/upload-menu-image", post: menuRoute.POST, prefix: "menu-images/shop-a/" },
     { kind: "shop", path: "/api/admin/upload-shop-image", post: shopRoute.POST, prefix: "shops/shop-a/cover-" },
 ] as const;
+
+test("malformed multipart upload cannot write a Blob or report success", async (t) => {
+    const { audits } = setup(t);
+    const logs: unknown[] = [];
+    t.mock.method(console, "error", (...args: unknown[]) => { logs.push(args); });
+    for (const route of routes) {
+        const response = await route.post(new Request(`http://localhost${route.path}`, {
+            method: "POST",
+            headers: { Origin: "http://localhost", "Content-Type": "multipart/form-data; boundary=fixture" },
+            body: "--fixture\r\nContent-Disposition: form-data; name=\"file\"\r\n\r\nfixture-secret",
+        }));
+        assert.equal(response.status, 500);
+        assert.equal((await response.json()).url, undefined);
+        assert.equal(audits.at(-1)?.data?.success, false);
+        assert.deepEqual(blobCalls, []);
+    }
+    assert.ok(!JSON.stringify(logs).includes("fixture-secret"));
+});
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
 type Query = { where?: Record<string, unknown>; data?: Record<string, unknown> };
 
