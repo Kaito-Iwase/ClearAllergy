@@ -165,6 +165,33 @@ test("workflow keeps deployment off by default, serializes writers, and gates al
     assert.ok(Object.values(rules).every((value) => value === false));
 });
 
+test("CI covers PRs targeting staging before merge and staging pushes after merge", () => {
+    const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+    function branches(event: "pull_request" | "push") {
+        const block = ci.match(new RegExp(`^  ${event}:\\n((?: {4}[^\\n]*\\n)+)`, "m"))?.[1];
+        assert.ok(block, `Missing ${event} trigger`);
+        const list = block.match(/^    branches: \[([^\]]+)\]$/m)?.[1];
+        assert.ok(list, `Missing ${event} branch allowlist`);
+        // Required checks must not be silently skipped on a docs-only PR.
+        assert.doesNotMatch(block, /^    (?:paths(?:-ignore)?|branches-ignore):/m);
+        return list.split(",").map((value) => value.trim());
+    }
+    const pullRequest = branches("pull_request");
+    const push = branches("push");
+    assert.deepEqual(pullRequest, ["main", "develop", "test/staging"]);
+    assert.deepEqual(push, ["main", "develop", "test/staging"]);
+    // GitHub's PR branch filter uses base.ref; a matching head alone is not enough.
+    for (const [base, head, expected] of [
+        ["test/staging", "fix/reviewed-change", true],
+        ["main", "test/staging", true],
+        ["develop", "fix/reviewed-change", true],
+        ["unrelated", "test/staging", false],
+    ] as const) {
+        assert.equal(pullRequest.includes(base), expected, `${head} -> ${base}`);
+    }
+    assert.ok(push.includes(staging.branch));
+});
+
 type QueuePolicy = "single" | "max";
 function deploymentQueuePolicy(): QueuePolicy {
     const workflow = readFileSync(".github/workflows/staging-deploy.yml", "utf8");
