@@ -1,8 +1,8 @@
-# 専用 staging 自動追従の事前判定（未有効）
+# 専用 staging の旧ローカル事前判定（#130時点の記録）
 
 [開発手順](development.md#staging-dry-run) · [変更対応表](change-map.md)
 
-目的は「CI が成功した厳密な commit → 専用 staging → 固定 URL」で確認することです。現在あるのは、ローカル JSON に対する **無配備 dry-run** だけです。GitHub/Vercel から証拠を収集する実装、配備処理、alias 更新、実行 workflow は追加していません。`eligible=true` でも `deploymentAllowed=false` です。JSON は利用者が作成できるため、この結果は実サービスの認証や配備許可の証明ではありません。
+このページの以下の本文は#130時点の無配備dry-runと当時の残作業を記録します。後続の実行workflow・有効化条件は[専用 staging の CI 後配備](staging-actions.md)を参照してください。ローカルJSONに対するdry-runは現在も配備を行わず、`eligible=true` でも `deploymentAllowed=false` です。JSONは利用者が作成できるため、この結果は実サービスの認証や配備許可の証明ではありません。
 
 ## 今回の境界と確認時点
 

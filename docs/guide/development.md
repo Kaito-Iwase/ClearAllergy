@@ -333,7 +333,7 @@ CDは配備・公開の自動化のことです。
 
 `seed` は起動コマンドではありません。既存デモの更新、同名メニューと品目リンクの再作成、古いマスタの削除、条件付きClerk同期を含みます。`auth:migrate:clerk` はClerk・DB更新、`allergens:backfill:pistachio`、`repair:published-menus` はDB補正を伴います。これらの既存運用コマンドが廃止コマンドと同じく自動拒否されるわけではありません。`allergens:check` も実DBを読むので接続先を確認します。名前だけで安全と判断せず、変更対応表から本体を読んでください。
 
-CI定義は `.github/workflows/ci.yml`。main/develop向けPR、両ブランチへのpush、手動実行で動きます。同じ参照の古い実行をキャンセルし、`Test, lint, typecheck, and build` のジョブで次を順に行います。
+CI定義は `.github/workflows/ci.yml`。main/develop向けPR、main/develop/test/stagingへのpush、手動実行で動きます。同じ参照の古い実行をキャンセルし、`Test, lint, typecheck, and build` のジョブで次を順に行います。
 
 依存配置 → Prisma生成・validate → 単体テスト → lint → 型確認 → CI専用DB準備 → 実DB回帰 → build → ブラウザランナー準備 → 起動 → 公開ブラウザ回帰 → 成果物保存。
 
@@ -356,9 +356,9 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
 
 <a id="staging-dry-run"></a>
-### 専用 staging の事前判定（無配備）
+### 専用 staging の CI 後配備（初期状態は無効）
 
-「CI 成功した commit → 専用 staging → 固定 URL」の準備として、ローカル JSON を照合する dry-run だけを用意しています。[実行方法・拒否条件・有効化前の残作業](staging-dry-run.md)を参照してください。`eligible=true` でも配備許可は false です。この PR の作業 branch だけは `vercel.json` で Git 自動配備を false にします。現行 CI の test/staging 対応、staging 用の Git 配備経路の分離、collector、配備・alias 更新は未実装/未有効であり、push で専用 staging だけに反映される保証はありません。
+`test/staging` pushを通常CIへ追加し、成功した元runの厳密なSHAを専用Previewへ配備する `staging-deploy.yml` を用意しています。repository variable `STAGING_ACTIONS_ENABLED=true` が必要で、初期状態は無効です。[配備手順・資格情報・環境scope・排他と失敗時の限界](staging-actions.md)を参照してください。`vercel.json` はtest/stagingと準備branchのGit自動配備をfalseにします。専用projectのGit切離し・source保護・Preview変数分離・認証情報の準備と、固定URLの実配備確認は別途必要です。旧[ローカルdry-run](staging-dry-run.md)も残しますが、配備workflowは旧evaluatorを権限判定に使いません。ローカル検証は `node --import tsx --test tests/staging-actions.test.ts` で、外部配備は行いません。
 
 <a id="dependabot-deploy-guard"></a>
 ### Dependabotの自動デプロイ抑止
