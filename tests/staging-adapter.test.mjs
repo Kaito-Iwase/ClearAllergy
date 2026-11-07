@@ -207,3 +207,42 @@ for(const value of [true,'false',0,null,undefined])test(`all received env entrie
  const f=adapterFixture(),old=f.options.vercel;f.options.vercel=async(path,body)=>{const r=await old(path,body);if(path.includes('/env?'))r.envs.find(e=>e.target.includes('production')).decrypted=value;return r;};
  await assert.rejects(execute(f.options),/ENV_DECRYPTION/);assert.equal(f.calls.filter(c=>c.body).length,0);
 });
+
+
+test('deployment reads explicitly request Git source',async()=>{const f=adapterFixture();await execute(f.options);assert.ok(f.calls.filter(c=>c.path.startsWith('/v13/deployments/dpl_')).every(c=>c.path.includes('withGitRepoInfo=true')));});
+test('READY waits for existing alias to settle without a second create',async()=>{
+ const f=adapterFixture(),old=f.options.vercel;let reads=0;
+ f.options.vercel=async(path,body)=>{const r=await old(path,body);if(path.includes('/dpl_new')){reads++;r.aliasAssigned=reads>=3;}if(path.startsWith('/v4/')&&reads>0&&reads<3)r.deploymentId='dpl_old';return r;};
+ assert.equal((await execute(f.options)).fixedUrlFollowConfirmed,true);assert.equal(reads,3);assert.equal(f.calls.filter(c=>c.body).length,1);
+});
+test('READY old alias times out, no mutation retry',async()=>{
+ const f=adapterFixture(),old=f.options.vercel;
+ f.options.vercel=async(path,body)=>{const r=await old(path,body);if(path.startsWith('/v4/'))r.deploymentId='dpl_old';return r;};
+ await assert.rejects(execute(f.options),/ALIAS_SETTLEMENT_TIMEOUT/);assert.equal(f.calls.filter(c=>c.body).length,1);
+});
+for(const kind of ['competitor','source','writer','aliasError','malformed'])test(`alias polling rejects ${kind}`,async()=>{
+ const f=adapterFixture(),old=f.options.vercel;let reads=0;
+ f.options.vercel=async(path,body)=>{const r=await old(path,body);if(path.includes('/dpl_new')){reads++;r.aliasAssigned=false;if(reads===2){if(kind==='source')r.gitSource.sha='f'.repeat(40);if(kind==='writer')r.meta.clearallergyWriterRunId='999';if(kind==='aliasError')r.aliasError={message:'PRIVATE'};if(kind==='malformed')r.aliasAssigned='true';}}
+ if(path.startsWith('/v4/')&&reads>=2&&kind==='competitor')r.deploymentId='dpl_competitor';return r;};
+ await assert.rejects(execute(f.options));assert.equal(f.calls.filter(c=>c.body).length,1);
+});
+test('safe diagnostics emit allowlisted code and known ID, never arbitrary errors',async()=>{
+ const {safeFailure}=await import('../scripts/staging-actions.mjs');const f=adapterFixture();f.d.aliasAssigned=false;
+ try{await execute(f.options);assert.fail();}catch(e){assert.deepEqual(safeFailure(e),{code:'ALIAS_SETTLEMENT_TIMEOUT',stage:'alias',deploymentId:'dpl_new'});}
+ assert.deepEqual(safeFailure(new Error('PRIVATE_TOKEN https://secret')), {code:'UNCLASSIFIED_FAILURE',stage:'startup'});
+});
+test('incident observer uses three fixed GETs and projects no raw metadata',async()=>{
+ const {inspectionClient,inspectIncident,incidentId}=await import('../scripts/staging-inspect.mjs');const calls=[];
+ const get=inspectionClient({token:'SYNTHETIC',transport:async(url,opts)=>{calls.push({url,opts});return {ok:true,redirected:false,json:async()=>({id:incidentId,meta:{secret:'PRIVATE'},aliasAssigned:'PRIVATE'})};}});
+ const r=await inspectIncident(get);assert.equal(calls.length,3);assert.ok(calls.every(c=>c.opts.method==='GET'&&!c.opts.body&&c.opts.redirect==='error'));assert.ok(!JSON.stringify(r).includes('PRIVATE'));assert.equal(r.ordinary.aliasAssignedType,'other');await assert.rejects(get('/v13/deployments'));
+});
+test('incident observer refuses redirects without dumping upstream error',async()=>{
+ const {inspectionClient,inspectIncident}=await import('../scripts/staging-inspect.mjs');const get=inspectionClient({token:'SYNTHETIC',transport:async()=>{throw Error('PRIVATE');}});await assert.rejects(inspectIncident(get),/^Error: INSPECTION_FAILED$/);
+});
+test('incident workflow limits push to main and the two diagnostic paths',async()=>{
+ const {readFileSync}=await import('node:fs');const y=readFileSync(new URL('../.github/workflows/staging-inspect.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+ assert.match(y,/push:\n    branches: \[main\]\n    paths:\n      - .github\/workflows\/staging-inspect.yml\n      - scripts\/staging-inspect.mjs\npermissions:/);
+ assert.match(y,/if: github.ref == 'refs\/heads\/main' && vars.STAGING_ACTIONS_ENABLED == 'false'/);
+ assert.match(y,/environment: staging/);assert.match(y,/ref: \$\{\{ github.sha \}\}/);assert.match(y,/persist-credentials: false/);
+ assert.doesNotMatch(y,/staging-actions.mjs|workflow_run|pull_request|actions: write|contents: write/);
+});
