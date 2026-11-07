@@ -131,3 +131,6 @@ PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。こ�
 「CIが落ちる」なら環境行からジョブの失敗段階と同じコマンドを確認し、実認証を検証していない範囲を分けます。いずれも説明の変更先はこの表の「説明先」で特定し、実際に修正する範囲と確認だけの範囲を[保守ルール](maintenance.md)に従って分けてください。
 
 一覧の公開停止・店舗編集の直接ボタン・公開カードの共通補足は[店舗操作の検証記録](../verification/store-management-20261022.md)と上記の各画面を照合します。開発上の過去の技術比較・未確認の根拠は[設計判断と根拠](design-decisions.md)を参照し、現行仕様とは時点を区別します。
+
+
+初回staging停止のGET-only診断候補: `scripts/staging-inspect.mjs` / `.github/workflows/staging-inspect.yml`。対象と未公開条件は [CI後配備](staging-actions.md) を参照。

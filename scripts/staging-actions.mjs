@@ -1,7 +1,7 @@
 // Remote Preview adapter. Importing this module never reads credentials or sends requests.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { policy, expectedEnvironment, plan, validateFixedUrlFollow } from './staging-guards.mjs';
+import { policy, expectedEnvironment, plan, validateResponse, validateFixedUrlFollow } from './staging-guards.mjs';
 export { policy } from './staging-guards.mjs';
 const requireThat = (ok, code) => { if (!ok) throw new Error(code); };
 const terminal = new Set(['READY', 'ERROR', 'CANCELED']);
@@ -40,7 +40,7 @@ const query = path => `${path}${path.includes('?') ? '&' : '?'}teamId=${policy.t
 export function vercelReader(api) {
   const getDeployment = async id => {
     requireThat(idOK(id), 'INVALID_DEPLOYMENT_ID');
-    return api(query(`/v13/deployments/${id}`));
+    return api(query(`/v13/deployments/${id}?withGitRepoInfo=true`));
   };
   return {
     getDeployment,
@@ -125,7 +125,8 @@ export async function checkWriterHistory(github, writerRunId, reconciledThroughR
 }
 async function executeInternal({ enabled, event, trustedSha, github, vercel, approvedAliasId,
   writerRunId, writerAttempt, reconciledThroughRunId = '0', clock = { now: Date.now, sleep: ms => new Promise(r => setTimeout(r, ms)) },
-  interrupted = () => false, deadlineMs = 45 * 60 * 1000 }) {
+  interrupted = () => false, deadlineMs = 45 * 60 * 1000, context = {} }) {
+  context.stage = 'preflight';
   requireThat(enabled === 'true', 'DISABLED');
   requireThat(/^\d+$/.test(writerRunId) && writerAttempt === '1', 'WRITER_RECONCILIATION_REQUIRED');
   requireThat(idOK(approvedAliasId), 'APPROVED_ALIAS_REQUIRED');
@@ -147,6 +148,7 @@ async function executeInternal({ enabled, event, trustedSha, github, vercel, app
     requireThat(alias.alias === policy.host && alias.projectId === policy.project
       && idOK(alias.deploymentId) && alias.redirect === null && !alias.microfrontends
       && (alias.deployment?.id === undefined || alias.deployment.id === alias.deploymentId), 'EXISTING_ALIAS_NOT_APPROVED');
+    context.priorAliasId = alias.deploymentId;
     const current = await reader.getDeployment(alias.deploymentId); previewIdentity(current);
     requireThat(current.id === alias.deploymentId, 'EXISTING_ALIAS_DEPLOYMENT_ID_MISMATCH');
     requireThat(current.readyState === 'READY', 'EXISTING_ALIAS_NOT_READY');
@@ -193,7 +195,7 @@ async function executeInternal({ enabled, event, trustedSha, github, vercel, app
   requireThat(!interrupted(), 'INTERRUPTED_BEFORE_CREATE');
   final.request.body.meta.clearallergyWriterRunId = writerRunId;
   final.request.body.meta.clearallergyWriterAttempt = writerAttempt;
-  let created; createStarted = true;
+  let created; createStarted = true; context.stage = 'create';
   try { created = await vercel(final.request.path, final.request.body); }
   catch {
     // Read-only reconciliation, never a second POST. A missing match is not proof of absence.
@@ -201,6 +203,7 @@ async function executeInternal({ enabled, event, trustedSha, github, vercel, app
     throw new Error('CREATE_OUTCOME_UNCERTAIN_DISABLE_AND_RECONCILE');
   }
   requireThat(idOK(created?.id), 'CREATE_ID_UNKNOWN_DISABLE_AND_RECONCILE');
+  context.deploymentId = created.id; context.stage = 'build';
   const id = created.id, deadline = clock.now() + deadlineMs;
   // A contradictory create response cannot be repaired by a later apparently valid GET.
   let bad = (created.projectId !== undefined && created.projectId !== policy.project)
@@ -230,8 +233,21 @@ async function executeInternal({ enabled, event, trustedSha, github, vercel, app
         && d.meta?.clearallergyWriterAttempt === writerAttempt, 'WRITER_META_MISMATCH');
       const fresh = await sourcePlan();
       requireThat(JSON.stringify(fresh.source) === JSON.stringify(final.source), 'SOURCE_CHANGED_AFTER_BUILD');
+      validateResponse(d, final.source, id);
+      await checkWriterHistory(github, writerRunId, reconciledThroughRunId);
+      context.stage = 'alias';
       const alias = await reader.getAlias();
-      return validateFixedUrlFollow({ deployment: d, source: final.source, expectedId: id, alias });
+      // Only the previously validated preflight mapping may remain temporarily.
+      // Unknown writers, malformed states and explicit alias errors never get retried.
+      requireThat(d.aliasError == null && typeof d.aliasAssigned === 'boolean', 'ALIAS_ASSIGNMENT_INVALID');
+      requireThat(alias?.alias === policy.host && alias.projectId === policy.project
+        && alias.redirect === null && !alias.microfrontends
+        && (alias.deployment?.id === undefined || alias.deployment.id === alias.deploymentId)
+        && [id, context.priorAliasId].includes(alias.deploymentId), 'ALIAS_CONFLICT');
+      if (d.aliasAssigned === true && alias.deploymentId === id)
+        return validateFixedUrlFollow({ deployment: d, source: final.source, expectedId: id, alias });
+      requireThat(clock.now() < deadline, 'ALIAS_SETTLEMENT_TIMEOUT');
+      await clock.sleep(5000); continue;
     }
     if (clock.now() >= deadline) throw new Error('REMOTE_BUILD_STILL_RUNNING_DISABLE_AND_RECONCILE');
     await clock.sleep(5000);
@@ -239,13 +255,25 @@ async function executeInternal({ enabled, event, trustedSha, github, vercel, app
 }
 
 export async function execute(options) {
-  try { return await executeInternal(options); }
+  const context = {};
+  try { return await executeInternal({ ...options, context }); }
   catch (error) {
     if (error.message === 'SAFE_NO_CREATE_SUPERSEDED') return {
       noDeploymentCreated: true, reason: 'source superseded before create',
       fixedUrlFollowConfirmed: false, functionalChecksVerified: false };
+    if (error && typeof error === 'object') failureContexts.set(error, context);
     throw error;
   }
+}
+
+
+const failureContexts = new WeakMap();
+const diagnosticCodes = new Set(['ALIAS_ASSIGNMENT_INVALID', 'ALIAS_ASSIGNMENT_NOT_CONFIRMED', 'ALIAS_CONFLICT', 'ALIAS_SETTLEMENT_TIMEOUT', 'API_READ_FAILED', 'APPROVED_ALIAS_REQUIRED', 'CI_GATE_FAILED', 'CI_NOT_ELIGIBLE', 'CONFLICTING_PROJECT_BRANCH', 'CONFLICTING_PROJECT_OWNER', 'CREATE_ID_UNKNOWN_DISABLE_AND_RECONCILE', 'CREATE_OUTCOME_UNCERTAIN', 'CREATE_OUTCOME_UNCERTAIN_DISABLE_AND_RECONCILE', 'CURRENT_WRITER_MISSING', 'DEPLOYMENT_CURSOR_INVALID', 'DEPLOYMENT_HISTORY_INCOMPLETE', 'DEPLOYMENT_NOT_READY', 'DEPLOYMENT_PAGE_DUPLICATE', 'DEPLOYMENT_PAGE_UNKNOWN', 'DISABLED', 'DUPLICATE_ENV', 'ENV_DECRYPTION_UNREVIEWED', 'ENV_PAGINATION_UNVERIFIED', 'ENV_SCOPE_UNKNOWN', 'ENV_VISIBILITY_OR_DECRYPTION_UNREVIEWED', 'EXISTING_ALIAS_CI_NOT_SUCCESSFUL', 'EXISTING_ALIAS_DEPLOYMENT_ID_MISMATCH', 'EXISTING_ALIAS_NOT_APPROVED', 'EXISTING_ALIAS_NOT_READY', 'EXISTING_ALIAS_SOURCE_MISMATCH', 'EXISTING_ALIAS_SOURCE_UNKNOWN', 'EXISTING_ALIAS_WRITER_NOT_SUCCESSFUL', 'FIXED_ALIAS_RESOLUTION_MISMATCH', 'GIT_DEPLOYMENT_NOT_DISABLED', 'HTTP_FAILURE', 'INCOMPLETE_ENV_INVENTORY', 'INSPECTION_REQUIRED', 'INTERRUPTED_BEFORE_CREATE', 'INVALID_API_PATH', 'INVALID_DEPLOYMENT_ID', 'INVALID_RECONCILIATION_BASELINE', 'INVALID_SERVICE', 'INVALID_TRANSITION', 'MISSING_API_TOKEN', 'NEWER_WRITER_EXISTS', 'NOT_PREVIEW', 'NO_AUTOMATIC_MUTATION_OR_RETRY', 'OUTSTANDING_REMOTE_BUILD', 'PRIOR_CREATE_REQUIRES_RECONCILIATION', 'PRIOR_WRITER_UNRESOLVED', 'REMOTE_BUILD_STILL_RUNNING_DISABLE_AND_RECONCILE', 'REMOTE_OUTCOME_UNKNOWN_DISABLE_AND_RECONCILE', 'RUN_CHANGED', 'RUN_ID_MISMATCH', 'SAFE_NO_CREATE_SUPERSEDED', 'SIGINT', 'SIGTERM', 'SOURCE_BRANCH_NOT_PROTECTED', 'SOURCE_CHANGED', 'SOURCE_CHANGED_AFTER_BUILD', 'SSO_PROTECTION_REQUIRED', 'SUPERSEDED_HEAD', 'SUPERSEDED_RUN', 'TERMINAL_INSPECTION_REQUIRED', 'UNAPPROVED_PREVIEW', 'UNKNOWN_DEPLOYMENT_STATE', 'UNREVIEWED_CONFIGURATION', 'UNTRUSTED_REPOSITORY', 'UNTRUSTED_TRIGGER', 'UNVERIFIED_OR_WRONG_PRODUCTION_BRANCH', 'WORKFLOW_MISMATCH', 'WRITER_HISTORY_INCOMPLETE', 'WRITER_HISTORY_INVALID', 'WRITER_HISTORY_UNSTABLE', 'WRITER_META_MISMATCH', 'WRITER_RECONCILIATION_REQUIRED', 'WRITE_NOT_ALLOWED', 'WRONG_DEPLOYMENT_ID', 'WRONG_DEPLOYMENT_OWNER', 'WRONG_DEPLOYMENT_URL', 'WRONG_ENV_KEY_OR_TYPE', 'WRONG_ENV_SCOPE_OR_VALUE', 'WRONG_GIT_LINK', 'WRONG_GIT_SOURCE', 'WRONG_PROJECT', 'WRONG_REPOSITORY_ID', 'WRONG_SOURCE_META'] );
+export function safeFailure(error) {
+  const context = error && typeof error === 'object' ? failureContexts.get(error) : undefined;
+  return { code: diagnosticCodes.has(error?.message) ? error.message : 'UNCLASSIFIED_FAILURE',
+    stage: ['preflight','create','build','alias'].includes(context?.stage) ? context.stage : 'startup',
+    ...(idOK(context?.deploymentId) ? {deploymentId:context.deploymentId} : {}) };
 }
 
 async function main() {
@@ -263,5 +291,5 @@ async function main() {
   console.log(JSON.stringify(result)); // Whitelisted result only, never API payloads.
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(() => { console.error('STAGING_STOPPED: inspect remote state before any retry; disable activation after uncertain outcomes.'); process.exitCode = 1; });
+  main().catch(error => { console.error(JSON.stringify({ status: 'STAGING_STOPPED', ...safeFailure(error) })); process.exitCode = 1; });
 }
