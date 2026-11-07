@@ -2,7 +2,7 @@
 
 [開発手順](development.md#staging-dry-run) · [変更対応表](change-map.md) · [検証記録](../verification/staging-actions-20261106.md)
 
-`.github/workflows/ci.yml` は `test/staging` push に通常の使い捨てDB・架空認証の検査を実行します。別の `staging-deploy.yml` は成功した push run の終了を受け、専用 project の Preview を作り、固定 URL へ割り当てます。`STAGING_ACTIONS_ENABLED` が文字列 `true` でなければ配備 job は動きません。設定・認証情報の登録や実配備は、このコード変更だけでは完了しません。
+`.github/workflows/ci.yml` はmain/develop/test/staging向けPRと各branchのpushに、通常の使い捨てDB・架空認証の検査を実行します。PRのbranch filterはheadではなくマージ先baseを判定します。test/stagingへ必須PRチェックを設定する前に、このCI定義がそのbranchへ導入済みであることを確認します。別の `staging-deploy.yml` は成功した **test/stagingのpush runだけ** を受け、専用 project の Preview を作り、固定 URL へ割り当てます。PRの成功をpush SHAの配備許可へ転用しません。`STAGING_ACTIONS_ENABLED` が文字列 `true` でなければ配備 job は動きません。設定・認証情報の登録や実配備は、このコード変更だけでは完了しません。
 
 ## 処理と責務
 
@@ -32,6 +32,8 @@ REST v13の `target: null` はPreviewを表すため、この明示値のみ許�
 | 有効化 | 以上の確認と実配備試験の承認後にrepository variable `STAGING_ACTIONS_ENABLED=true` を設定。workflowはdefault branchへ登録する必要がある。merge・設定変更・実配備はそれぞれ別操作 |
 
 `pull` はPreviewのアプリ秘密値をrunnerへ保存し、candidateのinstall/buildがそれを読めます。配備tokenとGitHub tokenはbuild stepの環境へ渡しませんが、同じrunnerでコードを実行するため、悪意あるコードに対するsandboxではありません。branchの信頼性が有効化の前提です。キャッシュ・CI artifactを実行せず、出力/秘密値のartifactアップロードも行いません。終了時にpulled設定と出力を削除します。runtime秘密値は専用projectのPreview設定が正本です。
+
+PR branch filterでworkflow全体を除外すると必須チェックがPendingのまま残り、mergeを妨げ得ます。`test/staging`向けPRが通常CIを起動し、既存job名のチェックを報告することを、保護設定の導入時に実PRで確認してください。PR CIは通常のPR merge refを検査し、merge後のpush CIはそのcommitを再検査します。保護ルールの設定自体はYAML変更では行いません。merge queueを利用する場合の`merge_group`対応は別途必要で、今回その機能や設定を追加していません。
 
 新しいtokenを発行しなくても、既存tokenをGitHub Environmentへ新たに登録するなら、GitHub runnerへのアクセス追加になります。コードの固定project IDはtoken自体の権限を狭めません。project/環境単位の資格情報制限が現在のaccount/planで可能かは未確認であり、teamに対するtokenを「Preview専用token」と呼び替えません。接続ツールの認証を取り出してrunnerへ移す処理もありません。
 

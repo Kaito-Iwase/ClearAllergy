@@ -333,7 +333,7 @@ CDは配備・公開の自動化のことです。
 
 `seed` は起動コマンドではありません。既存デモの更新、同名メニューと品目リンクの再作成、古いマスタの削除、条件付きClerk同期を含みます。`auth:migrate:clerk` はClerk・DB更新、`allergens:backfill:pistachio`、`repair:published-menus` はDB補正を伴います。これらの既存運用コマンドが廃止コマンドと同じく自動拒否されるわけではありません。`allergens:check` も実DBを読むので接続先を確認します。名前だけで安全と判断せず、変更対応表から本体を読んでください。
 
-CI定義は `.github/workflows/ci.yml`。main/develop向けPR、main/develop/test/stagingへのpush、手動実行で動きます。同じ参照の古い実行をキャンセルし、`Test, lint, typecheck, and build` のジョブで次を順に行います。
+CI定義は `.github/workflows/ci.yml`。main/develop/test/staging向けPR、main/develop/test/stagingへのpush、手動実行で動きます。PRのbranch filterはマージ先（base）を判定します。同じ参照の古い実行をキャンセルし、`Test, lint, typecheck, and build` のジョブで次を順に行います。
 
 依存配置 → Prisma生成・validate → 単体テスト → lint → 型確認 → CI専用DB準備 → 実DB回帰 → build → ブラウザランナー準備 → 起動 → 公開ブラウザ回帰 → 成果物保存。
 

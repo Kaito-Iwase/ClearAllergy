@@ -97,3 +97,13 @@
 - actionlint1.7.11は新しいqueueキーを認識せず、未加工の実行はその1件でFAILでした。[同じ既知の互換性報告](https://github.com/rhysd/actionlint/issues/746)があります。ローカルではその**正確なqueue未知キー診断だけ**を除外した再実行が成功しました。他の診断を一括無効化した結果ではありません。queueの位置・max・非cancelは別のYAML構造検査/テストと公式資料で照合しています。完全な未加工actionlint PASSとは扱いません。
 - GitHub上で配備workflowのA/B/Cを起動していません。モデルテストは実キューの待機・取消・満杯・再実行event配送の実証ではありません。通常PR CIでこのworkflowを実行せず、queue:maxの実行時動作は未検証です。今回の修正で常に最新へ自動復旧することを保証しません。
 - 100件上限・cancel・timeout・外部書込結果不明時の復旧条件は[運用手順](../guide/staging-actions.md#排他失敗復旧)へ更新。実行中writerと外部状態を確認し、キューが安全に空いた後に現在head/最新成功push CI/run/attempt/aliasを再取得し、その最新CIに結び付く配備workflowだけを再実行する運用です。旧runを無条件に復活させません。今回復旧操作・有効化・実配備は行いません。
+
+## 2026-11-07：test/staging向けPRの必須CIを報告できる起動条件
+
+追加レビューで、pushだけをtest/stagingへ広げたままpull_requestがmain/developに限定されている差分を確認しました。[GitHubのPRイベント仕様](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#running-your-pull_request-workflow-based-on-the-head-or-base-branch-of-a-pull-request)ではbranchesはbaseを判定し、[必須チェックの仕様](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)ではbranch filterでworkflowが除外されるとPendingのままmergeを止め得ます。保護設定の有無を変更・推測せず、この定義の欠落として修正します。
+
+ci.ymlのpull_request.branchesへtest/stagingを追加する1行変更です。既存main/develop、push対象、job名・内容、read-only token、使い捨てDBと架空認証を維持します。PR headの名前で代用せず、path filterやpull_request_targetは追加しません。配備workflowとsource判定は従来通りpushだけを許可し、PR成功を配備へ使いません。
+
+回帰テストは実ci.ymlのPR/push allowlistを読み、main/develop/test/stagingを保持すること、base=test/stagingの通常headは対象、baseが無関係ならhead=test/stagingでも対象にならないこと、必須CIを除外するpath filterがないことを検査します。既存のPR eventを配備sourceとして拒否するテストも維持します。ローカルhelperは35件、CI syntaxは未加工actionlintで確認します（配備workflowのqueue未対応診断は前節と同じ別件）。
+
+この検証で実際に実行するDraft PR #132はbase=mainです。test/staging向けの別PR作成やbase変更・保護ルール変更・merge・test/stagingへのpushは行わず、test/staging向け実PRで必須チェックがmergeを許可する動作は有効化前の未検証事項として残します。公式仕様と設定回帰の確認を、この実行時確認へ読み替えません。新headの通常GitHub CI結果はPR本文に結び付けます。直前head e5b8479のCI 42338096586は4job成功/unit414件でしたが、新headの結果に転用しません。
