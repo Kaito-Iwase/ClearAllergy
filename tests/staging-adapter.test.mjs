@@ -37,7 +37,7 @@ function adapterFixture() {
  const history={total_count:1,workflow_runs:[{id:100,status:'in_progress'}]};
  const options={enabled:'true',event:f.event,trustedSha,writerRunId:'100',writerAttempt:'1',approvedAliasId:'dpl_old',
   clock:{now:()=>ticks,sleep:async ms=>{ticks+=ms}},deadlineMs:10000,
-  github:async path=>path.includes('staging-deploy.yml/runs')?structuredClone(history):f.github(path),
+  github:async path=>path.includes('staging-deploy.yml/runs')?structuredClone({ ...history, workflow_runs:history.workflow_runs.map(r=>({run_attempt:1,...r})) }):f.github(path),
   vercel:async(path,body)=>{
    calls.push({path,body});
    if(body){posted=true;return {id:'dpl_new'};}
@@ -245,4 +245,56 @@ test('incident workflow limits push to main and the two diagnostic paths',async(
  assert.match(y,/if: github.ref == 'refs\/heads\/main' && vars.STAGING_ACTIONS_ENABLED == 'false'/);
  assert.match(y,/environment: staging/);assert.match(y,/ref: \$\{\{ github.sha \}\}/);assert.match(y,/persist-credentials: false/);
  assert.doesNotMatch(y,/staging-actions.mjs|workflow_run|pull_request|actions: write|contents: write/);
+});
+
+test('integrated writer aliases only its freshly created Preview and verifies GET',async()=>{
+ const f=adapterFixture(),old=f.options.vercel;let assigned=false,posts=0;f.options.explicitAliasEnabled=true;
+ f.options.vercel=async(path,body)=>{if(path.startsWith('/v2/')){posts++;assigned=true;assert.deepEqual(body,{alias:p.host,redirect:null});return {alias:p.host,oldDeploymentId:'dpl_old'};}const r=await old(path,body);if(path.startsWith('/v4/'))r.deploymentId=assigned?'dpl_new':'dpl_old';return r;};
+ assert.equal((await execute(f.options)).fixedUrlFollowConfirmed,true);assert.equal(posts,1);assert.equal(f.calls.filter(x=>x.body).length,1);
+});
+test('integrated uncertain alias stops rerun and later different-source writer via history',async()=>{
+ const f=adapterFixture(),old=f.options.vercel;let aliases=0;f.options.explicitAliasEnabled=true;
+ f.options.vercel=async(path,body)=>{if(path.startsWith('/v2/')){aliases++;throw Error('PRIVATE');}const r=await old(path,body);if(path.startsWith('/v4/'))r.deploymentId='dpl_old';return r;};
+ await assert.rejects(execute(f.options),/ALIAS_OUTCOME_UNCERTAIN/);
+ f.options.writerAttempt='2';await assert.rejects(execute(f.options),/RECONCILIATION_REQUIRED/);
+ f.options.writerAttempt='1';f.options.writerRunId='101';f.history.total_count=2;f.history.workflow_runs=[{id:100,status:'completed',conclusion:'failure'},{id:101,status:'in_progress'}];
+ f.f.run.head_sha='e'.repeat(40);await assert.rejects(execute(f.options),/PRIOR_WRITER_UNRESOLVED/);assert.equal(aliases,1);
+});
+test('API alias capability cannot target an arbitrary or not-yet-verified deployment',async()=>{
+ const client=apiClient({service:'vercel',token:'SYNTHETIC',transport:async()=>{throw Error('must not call');}});
+ await assert.rejects(client(`/v2/deployments/dpl_other/aliases?teamId=${p.team}`,{alias:p.host,redirect:null}),/WRITE_NOT_ALLOWED/);
+});
+test('API one-alias capability requires create then verified READY and is consumed before transport',async()=>{
+ const f=adapterFixture();let posts=0;
+ const client=apiClient({service:'vercel',token:'SYNTHETIC',transport:async(url,options)=>{if(url.includes('/aliases?')){posts++;throw Error('timeout');}return {ok:true,redirected:false,json:async()=>options.method==='POST'?{id:'dpl_new'}:f.d};}});
+ await execute({...f.options,vercel:async(path,body)=>{if(body){await f.options.vercel(path,body);return client(path,body);}return f.options.vercel(path);}});
+ await client(`/v13/deployments/dpl_new?withGitRepoInfo=true&teamId=${p.team}`);
+ const path=`/v2/deployments/dpl_new/aliases?teamId=${p.team}`,body={alias:p.host,redirect:null};
+ await assert.rejects(client(path,body),/ALIAS_OUTCOME_UNCERTAIN/);await assert.rejects(client(path,body),/WRITE_NOT_ALLOWED/);assert.equal(posts,1);
+});
+for(const kind of ['source','response','conflict','active'])test(`integrated alias ${kind} fails closed without retry`,async()=>{
+ const f=adapterFixture(),old=f.options.vercel;let aliases=0,created=false;f.options.explicitAliasEnabled=true;
+ f.options.vercel=async(path,body)=>{if(path.startsWith('/v2/')){aliases++;if(kind==='source')f.f.snapshots[`/repos/${p.repository}/git/ref/heads/${p.branch}`].object.sha='e'.repeat(40);return {alias:p.host,oldDeploymentId:kind==='response'?'dpl_external':'dpl_old'};}
+ const r=await old(path,body);if(body)created=true;if(path.startsWith('/v4/'))r.deploymentId=created&&kind==='conflict'?'dpl_external':'dpl_old';if(path.startsWith('/v6/')&&created&&kind==='active')r.deployments=[{uid:'dpl_external',projectId:p.project,readyState:'BUILDING'}];return r;};
+ await assert.rejects(execute(f.options));assert.equal(aliases,['conflict','active'].includes(kind)?0:1);
+});
+for(const conclusion of ['success','skipped'])test(`rerun cannot erase failed writer barrier through ${conclusion}`,async()=>{
+ const f=adapterFixture();f.history.total_count=2;f.history.workflow_runs.push({id:99,status:'completed',conclusion,run_attempt:2});await assert.rejects(execute(f.options),/PRIOR_WRITER_UNRESOLVED/);assert.equal(f.calls.filter(x=>x.body).length,0);
+});
+test('expired deadline before explicit alias mutation blocks POST',async()=>{
+ const f=adapterFixture(),old=f.options.vercel;let aliases=0,n=0;f.options.explicitAliasEnabled=true;f.options.clock.now=()=>n++===0?0:20000;
+ f.options.vercel=async(path,body)=>{if(path.startsWith('/v2/')){aliases++;throw Error('must not call');}const r=await old(path,body);if(path.startsWith('/v4/'))r.deploymentId='dpl_old';return r;};
+ await assert.rejects(execute(f.options),/ALIAS_SETTLEMENT_TIMEOUT/);assert.equal(aliases,0);
+});
+for(const changed of ['source','alias','previous'])test(`post-scan ${changed} recheck blocks alias write`,async()=>{
+ const f=adapterFixture(),old=f.options.vercel;let created=false,scanned=false,aliases=0;f.options.explicitAliasEnabled=true;
+ f.options.vercel=async(path,body)=>{if(path.startsWith('/v2/')){aliases++;throw Error('must not call');}const r=await old(path,body);if(body)created=true;if(path.startsWith('/v6/')&&created){scanned=true;if(changed==='source')f.f.snapshots[`/repos/${p.repository}/git/ref/heads/${p.branch}`].object.sha='e'.repeat(40);}
+ if(path.startsWith('/v4/'))r.deploymentId=scanned&&changed==='alias'?'dpl_external':'dpl_old';if(path.includes('/dpl_old?')&&scanned&&changed==='previous')r.target='production';return r;};
+ await assert.rejects(execute(f.options));assert.equal(aliases,0);
+});
+for(const previous of ['omitted',null])for(const matches of [true,false])test(`nullable oldDeploymentId ${previous} needs independent mapping ${matches}`,async()=>{
+ const f=adapterFixture(),old=f.options.vercel;let posted=false,aliases=0;f.options.explicitAliasEnabled=true;
+ f.options.vercel=async(path,body)=>{if(path.startsWith('/v2/')){aliases++;posted=true;return {alias:p.host,created:'2026-11-07T00:00:00.000Z',uid:'mock_alias',...(previous==='omitted'?{}:{oldDeploymentId:previous})};}
+ const r=await old(path,body);if(path.startsWith('/v4/'))r.deploymentId=posted&&matches?'dpl_new':'dpl_old';return r;};
+ if(matches)assert.equal((await execute(f.options)).fixedUrlFollowConfirmed,true);else await assert.rejects(execute(f.options),/ALIAS_SETTLEMENT_TIMEOUT/);assert.equal(aliases,1);
 });
