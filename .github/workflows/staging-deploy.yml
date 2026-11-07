@@ -32,7 +32,7 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6, verified official ref 2026-11-07
         with:
           node-version: '22'
-      # No candidate checkout, npm install, vercel pull, local app build or alias write.
+      # No candidate checkout, npm install, vercel pull, local app build. Only the fixed staging alias may be assigned.
       - name: Create remote Preview and observe terminal build and fixed URL mapping
         env:
           STAGING_ACTIONS_ENABLED: ${{ vars.STAGING_ACTIONS_ENABLED }}

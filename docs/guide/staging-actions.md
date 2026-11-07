@@ -2,10 +2,10 @@
 
 [開発手順](development.md#staging-dry-run) · [変更対応表](change-map.md)
 
-このローカル候補は main c8ef34554263166405d9e80f4a21f2e2ca6d7e8d の
-既存 workflow/helper を置き換えます。外部設定、資格情報、配備は変更していません。
-旧方式の Git 切離し、branch override の撤去、vercel pull、runner上のアプリ build、
-明示的 alias set は使用しません。Git接続と12件の test/staging 限定 Preview変数を保持し、
+このローカル候補は main bde61a08bf57f15c26238829cb415aaa683961db の
+既存 workflow/helper に固定host明示割当を加えます。この変更では外部設定、資格情報、配備は変更していません。
+旧方式の Git 切離し、branch override の撤去、vercel pull、runner上のアプリ build は使用しません。
+このrunが新規作成した検証済みPreviewに限り、既存固定hostへのalias POSTを最大1回使用します。Git接続と12件の test/staging 限定 Preview変数を保持し、
 Vercelでremote buildを行います。新しい依存パッケージはありません。
 
 ## 実行契約
@@ -40,6 +40,9 @@ Git連携・手動Vercel・他workflowのwriterはこのlockに参加しませ�
    githubCommitSha、CI/writer metadata、READYを照合します。その後の別alias readでhost/project/ID、
    nested ID、redirect明示null、microfrontendsなし、aliasAssigned=true、aliasErrorなしを要求します。
    redirect省略は公式schemaで許容されますが、この候補では保守的に拒否します。
+9. 固定hostが元の承認済みPreviewのままなら、履歴・全deploymentを再検査し、source/新旧Preview/aliasを再取得。
+   deadline内に限り、このrunがcreateしたIDへ固定hostだけを明示割当します。POST後も全guardとGET照合を要求。
+   aliasAssigned=trueやautomaticAliases一覧だけで固定host更新を推定しません。
 
 ## 成功の意味と残る競合
 
@@ -56,11 +59,11 @@ e2eのProduction変数8件の値・接続先は未調査です。全project隔�
 
 ## 不確実なPOST・後続run・復旧
 
-1 runの1 attemptにつきPOSTは最大1回。attempt 2以降は拒否します。POST失敗/応答喪失では
+1 runの1 attemptにつきcreate POSTと固定alias POSTは各最大1回。attempt 2以降は拒否します。POST失敗/応答喪失では
 読み取りだけでreconcileし、候補が一覧に見えなくても再POSTしません。ID不明もincidentです。
-既知IDのread失敗はdeadlineまで再readします。alias/delete/rollback/promotionは行いません。
+既知IDのread失敗はdeadlineまで再readします。alias POSTのblind retry、delete/rollback/promotionは行いません。
 
-別run Bも、過去writer Aのfailure/cancelled/未完了があればVercel一覧が空でも停止します。
+別run Bも、過去writer Aのfailure/cancelled/未完了・attempt1以外があればVercel一覧が空でも停止します。
 GitHub workflow履歴を全ページ読み、total_countの変動、重複、欠落、上限超過も拒否。
 後続のqueued/waiting等は通常の待機として許可し、後続の実行中writerは拒否します。
 POST前の正常なsource supersededは `noDeploymentCreated:true` として成功終了し、後続を妨げません。
@@ -93,9 +96,9 @@ STAGING_VERCEL_TOKEN自体の権限は固定project IDによって狭まりま�
 - [ ] 専用projectのproductionBranch、Git接続、SSO all、既存alias、12変数のscope/type/値の維持を確認。
 - [ ] env APIの値非復号、remote ref+SHAの実checkout/branch変数選択、raw API shapeを確認。
 - [ ] writer履歴を保持し、bootstrap alias ID、初期reconciliation watermark、外部writer管理を確認。
-- [ ] Preview作成と自動固定URL変更、early/stale SHA露出、他writer/main Production残存を承認。
+- [ ] Preview作成と固定host明示割当、early/stale SHA露出、他writer/main Production残存を承認。
 - [ ] 最小権限の資格情報利用/保存・Environment設定・security設定の変更を必要な時点で明示承認。
-- [ ] 不明結果の停止/reconcile/reset責任者と範囲を承認。自動delete/alias/rollbackは追加しない。
+- [ ] 不明結果の停止/reconcile/reset責任者と範囲を承認。固定host以外のalias変更や自動delete/rollbackは追加しない。
 - [ ] 許可された初回実試験でCI SHA/deployment/aliasとSSO/Clerk/DB/Blob/画面を別々に記録してから有効化。
 
 2026-11-07の既知blocker: live test/stagingは古い6293d5a、unprotected、Git rule true。
@@ -115,3 +118,31 @@ getdeploymentresponsebody.ts、getdeploymentserviceshttpget.ts、getaliasop.ts�
 [Git抑止](https://vercel.com/docs/project-configuration/git-configuration)、
 [GitHub concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
 も参照。schema適合はlive挙動の実証ではありません。
+
+
+
+## 初回停止後の読み取り専用診断（未公開候補）
+
+固定した既存 deployment だけを `scripts/staging-inspect.mjs` で取得する。
+既定 GET、`withGitRepoInfo=true` GET、固定 alias GET を比較し、期待値との一致を boolean と固定 enum のみで表示する。
+資格情報・レスポンス全文・任意 metadata・URL・環境変数は出力しない。POST、alias 更新、再配備は実装しない。
+`.github/workflows/staging-inspect.yml` 候補は main ref、activation flag が文字列 false、既存 staging Environment に限定する。
+実行するには別途レビュー済み変更の公開が必要。main push は診断 workflow/entry の変更がある場合のみ実行し、manual dispatch も保持する。本候補の作成はその操作を行った意味ではない。
+
+writer は既知 guard code・段階・検証済み deployment ID のみを失敗時に表示する。未知 error は固定 UNCLASSIFIED_FAILURE。
+READY 後は identity、source、writer 履歴を再確認し、期限内に元 alias または対象 deployment へ向く場合だけ読み取りを続ける。
+競合、型不明、aliasError、source 不一致は停止する。成功条件は従来の全 identity/meta/alias 照合を保持する。
+待機は API GitSource 作成による branch alias 自動更新を保証しない。今回の根本原因も raw 診断前には確定しない。
+
+公開時の別 gate: 新 branch 初回 commit に exact Git 配備抑止が必要。main merge は通常 Production 再配備を起こし得る。
+vercel.json を変更する場合は staging source/control blob 一致を再検証する。診断実行は再配備・再有効化・固定URL変更の許可にはならない。
+
+
+## 固定host明示割当のlocal候補
+
+API生成PreviewのaliasAssigned=trueは固定host更新を保証しないため、[明示割当候補](../verification/staging-explicit-alias-candidate.md)をlocalで検証する。
+このrunが新規作成した検証済みPreviewだけへ固定hostを一度割り当て、GETで実mappingを再確認する。
+旧failed incidentの復旧entryは追加せず、再試行/rollback/activation/watermark更新もしない。
+履歴barrierは旧runのattempt1も要求し、再実行でfailureがsuccess/skippedに見えても停止する。
+外部writerとのCASは存在せず、POST後にsource変化が見つかると既にURLが変わった可能性がある。
+本候補は未公開・実API未実行であり、自動追従再開やHTTP/認証/Blob健康確認済みという意味ではない。
