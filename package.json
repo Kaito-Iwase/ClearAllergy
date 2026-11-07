@@ -22,8 +22,8 @@
     "test:e2e:guards": "node --test tests/e2e-environment.test.mjs"
   },
   "dependencies": {
-    "@clerk/backend": "^3.2.13",
-    "@clerk/nextjs": "^7.2.3",
+    "@clerk/backend": "^3.26.6",
+    "@clerk/nextjs": "^7.9.24",
     "@googlemaps/js-api-loader": "^2.1.1",
     "@next/env": "16.4.1",
     "@prisma/client": "^6.19.2",
