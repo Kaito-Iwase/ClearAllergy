@@ -27,7 +27,8 @@
       "chore/ca-dependabot-deploy-guard-20261026": false,
       "chore/dependabot-guard-main-20261028": false,
       "perf/public-read-main-20261028": false,
-      "ci/staging-incident-20261107": false
+      "ci/staging-incident-20261107": false,
+      "ci/staging-explicit-alias-20261107": false
     }
   }
 }
