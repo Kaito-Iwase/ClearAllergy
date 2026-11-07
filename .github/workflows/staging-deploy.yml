@@ -1,0 +1,165 @@
+name: Deploy dedicated staging
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [test/staging]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+# One writer for the fixed alias. Retain pending runs so a delayed stale trigger
+# cannot replace the latest successful trigger. GitHub caps this queue at 100;
+# overflow/cancellation requires checking the latest source and retrying later.
+# Do not cancel a writer with an external request in flight.
+concurrency:
+  group: clearallergy-dedicated-staging
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.STAGING_ACTIONS_ENABLED == 'true' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      VERCEL_ORG_ID: team_2Y9pPeo8w16CVx1U7ToVuKFq
+      VERCEL_PROJECT_ID: prj_0i0cPZtGyoPYXnnB1XaC17DmLXBK
+      VERCEL_TELEMETRY_DISABLED: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      TRUSTED_SHA: ${{ github.sha }}
+    steps:
+      - name: Set temporary deployment URL path
+        run: echo "DEPLOYMENT_URL_FILE=$RUNNER_TEMP/staging-deployment-url" >> "$GITHUB_ENV"
+
+      - name: Checkout reviewed control code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: control/.node-version
+          # No cache from the source CI or candidate branch.
+
+      - name: Validate source run and reviewed configuration
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node control/scripts/staging-actions.mjs source
+
+      - name: Verify dedicated project and current alias
+        env:
+          VERCEL_TOKEN: ${{ secrets.STAGING_VERCEL_TOKEN }}
+        run: node control/scripts/staging-actions.mjs preflight
+
+      - name: Checkout exact successful source SHA
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Verify checkout
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: test "$(git -C candidate rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Install fixed deployment CLI outside candidate
+        run: |
+          npm install --global npm@11.18.0
+          npm install --prefix "$RUNNER_TEMP/staging-cli" --no-audit --no-fund vercel@65.12.1
+
+      - name: Pull dedicated Preview settings for test/staging
+        working-directory: candidate
+        env:
+          VERCEL_TOKEN: ${{ secrets.STAGING_VERCEL_TOKEN }}
+        run: >-
+          "$RUNNER_TEMP/staging-cli/node_modules/.bin/vercel" pull
+          --yes --environment=preview --git-branch=test/staging
+          --token="$VERCEL_TOKEN"
+
+      # test/staging must be protected, reviewed code before enabling this job.
+      # Builds necessarily consume Preview app credentials, never a production
+      # token. GITHUB_TOKEN and the deployment token are not process env here.
+      - name: Build with dedicated Preview settings
+        working-directory: candidate
+        run: '"$RUNNER_TEMP/staging-cli/node_modules/.bin/vercel" build --environment=preview --standalone'
+
+      - name: Recheck source before creating Preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node control/scripts/staging-actions.mjs source
+
+      - name: Prepare upload without Git metadata or custom aliases
+        run: |
+          mkdir -p "$RUNNER_TEMP/staging-upload/.vercel"
+          cp -R candidate/.vercel/output "$RUNNER_TEMP/staging-upload/.vercel/output"
+          node -e 'const fs = require("node:fs"); fs.writeFileSync(process.env.RUNNER_TEMP + "/staging-upload/.vercel/project.json", JSON.stringify({orgId: process.env.VERCEL_ORG_ID, projectId: process.env.VERCEL_PROJECT_ID}));'
+
+      - name: Create Preview without updating the branch alias
+        env:
+          VERCEL_TOKEN: ${{ secrets.STAGING_VERCEL_TOKEN }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_RUN_ID: ${{ steps.source.outputs.runId }}
+          SOURCE_ATTEMPT: ${{ steps.source.outputs.attempt }}
+        run: |
+          "$RUNNER_TEMP/staging-cli/node_modules/.bin/vercel" deploy \
+            --cwd "$RUNNER_TEMP/staging-upload" --prebuilt --yes --environment=preview \
+            --meta "clearallergyCommitSha=$SOURCE_SHA" \
+            --meta "clearallergyRunId=$SOURCE_RUN_ID" \
+            --meta "clearallergyRunAttempt=$SOURCE_ATTEMPT" \
+            --token="$VERCEL_TOKEN" > "$DEPLOYMENT_URL_FILE"
+
+      - name: Verify Preview identity before assigning fixed URL
+        env:
+          VERCEL_TOKEN: ${{ secrets.STAGING_VERCEL_TOKEN }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_RUN_ID: ${{ steps.source.outputs.runId }}
+          SOURCE_ATTEMPT: ${{ steps.source.outputs.attempt }}
+        run: node control/scripts/staging-actions.mjs deployment
+
+      - name: Reject superseded run immediately before alias update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node control/scripts/staging-actions.mjs source
+
+      - name: Assign fixed staging URL
+        env:
+          VERCEL_TOKEN: ${{ secrets.STAGING_VERCEL_TOKEN }}
+        run: |
+          deployment_url=$(cat "$DEPLOYMENT_URL_FILE")
+          "$RUNNER_TEMP/staging-cli/node_modules/.bin/vercel" alias set "$deployment_url" \
+            clear-allergy-e2e-git-test-staging-kaitoexe00-9350s-projects.vercel.app \
+            --scope "$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"
+
+      - name: Verify fixed URL destination
+        env:
+          VERCEL_TOKEN: ${{ secrets.STAGING_VERCEL_TOKEN }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_RUN_ID: ${{ steps.source.outputs.runId }}
+          SOURCE_ATTEMPT: ${{ steps.source.outputs.attempt }}
+        run: node control/scripts/staging-actions.mjs alias
+
+      - name: Record deployment identity
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_RUN_ID: ${{ steps.source.outputs.runId }}
+          SOURCE_ATTEMPT: ${{ steps.source.outputs.attempt }}
+        run: |
+          echo "Preview alias verified for SHA $SOURCE_SHA (CI run $SOURCE_RUN_ID, attempt $SOURCE_ATTEMPT)." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Application HTTP/browser checks: UNVERIFIED. Open the protected fixed staging URL for functional verification.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove pulled secrets and upload output
+        if: always()
+        run: rm -rf candidate/.vercel "$RUNNER_TEMP/staging-upload" "$DEPLOYMENT_URL_FILE"
