@@ -115,3 +115,21 @@ getdeploymentresponsebody.ts、getdeploymentserviceshttpget.ts、getaliasop.ts�
 [Git抑止](https://vercel.com/docs/project-configuration/git-configuration)、
 [GitHub concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
 も参照。schema適合はlive挙動の実証ではありません。
+
+
+
+## 初回停止後の読み取り専用診断（未公開候補）
+
+固定した既存 deployment だけを `scripts/staging-inspect.mjs` で取得する。
+既定 GET、`withGitRepoInfo=true` GET、固定 alias GET を比較し、期待値との一致を boolean と固定 enum のみで表示する。
+資格情報・レスポンス全文・任意 metadata・URL・環境変数は出力しない。POST、alias 更新、再配備は実装しない。
+`.github/workflows/staging-inspect.yml` 候補は main ref、activation flag が文字列 false、既存 staging Environment に限定する。
+実行するには別途レビュー済み変更の公開が必要。main push は診断 workflow/entry の変更がある場合のみ実行し、manual dispatch も保持する。本候補の作成はその操作を行った意味ではない。
+
+writer は既知 guard code・段階・検証済み deployment ID のみを失敗時に表示する。未知 error は固定 UNCLASSIFIED_FAILURE。
+READY 後は identity、source、writer 履歴を再確認し、期限内に元 alias または対象 deployment へ向く場合だけ読み取りを続ける。
+競合、型不明、aliasError、source 不一致は停止する。成功条件は従来の全 identity/meta/alias 照合を保持する。
+待機は API GitSource 作成による branch alias 自動更新を保証しない。今回の根本原因も raw 診断前には確定しない。
+
+公開時の別 gate: 新 branch 初回 commit に exact Git 配備抑止が必要。main merge は通常 Production 再配備を起こし得る。
+vercel.json を変更する場合は staging source/control blob 一致を再検証する。診断実行は再配備・再有効化・固定URL変更の許可にはならない。
