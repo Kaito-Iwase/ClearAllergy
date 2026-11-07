@@ -155,6 +155,7 @@ test("workflow keeps deployment off by default, serializes writers, and gates al
     const workflow = readFileSync(".github/workflows/staging-deploy.yml", "utf8");
     assert.ok(workflow.includes("vars.STAGING_ACTIONS_ENABLED == 'true'"));
     assert.ok(workflow.includes("cancel-in-progress: false"));
+    assert.match(workflow, /^  queue: max$/m);
     assert.ok(!workflow.includes("--prod"));
     assert.ok(!workflow.includes("githubDeployment=1"));
     assert.ok(workflow.indexOf("Reject superseded run immediately") < workflow.indexOf("vercel\" alias set"));
@@ -162,4 +163,78 @@ test("workflow keeps deployment off by default, serializes writers, and gates al
     assert.equal(rules[staging.branch], false);
     assert.equal(rules["ci/staging-actions-20261106"], false);
     assert.ok(Object.values(rules).every((value) => value === false));
+});
+
+type QueuePolicy = "single" | "max";
+function deploymentQueuePolicy(): QueuePolicy {
+    const workflow = readFileSync(".github/workflows/staging-deploy.yml", "utf8");
+    const block = workflow.match(/^concurrency:\n([\s\S]*?)(?=^\S)/m)?.[1];
+    assert.ok(block, "Expected the workflow-level writer lock");
+    assert.match(block, /^  cancel-in-progress: false$/m);
+    const queue = block.match(/^  queue: (\w+)$/m)?.[1] ?? "single";
+    assert.ok(queue === "single" || queue === "max");
+    return queue;
+}
+
+// Model ONLY the documented queue policy behind an active writer A. This is not
+// a scheduler implementation or evidence of GitHub's live enqueue/run behavior.
+function waitBehindActive(policy: QueuePolicy, arrivals: number[]) {
+    const pending: number[] = [];
+    const canceled: number[] = [];
+    for (const id of arrivals) {
+        if (policy === "single") canceled.push(...pending.splice(0));
+        else if (pending.length === 100) { canceled.push(id); continue; }
+        pending.push(id);
+    }
+    return { pending, canceled };
+}
+
+function staleSourceFixture() {
+    const f = sourceFixture();
+    f.run.id = 455;
+    f.event.workflow_run.id = 455;
+    f.data["/actions/runs/455"] = f.run;
+    f.data[`/actions/workflows/789/runs?branch=${encodeURIComponent(staging.branch)}&event=push&per_page=1`] = {
+        workflow_runs: [{ id: 456 }],
+    };
+    return f;
+}
+
+async function eligibleAfterDrain(pending: number[]) {
+    const eligible: number[] = [];
+    for (const id of pending) {
+        if (id === 456) {
+            assert.equal((await checkSource(sourceFixture())).runId, "456");
+            eligible.push(id);
+        } else {
+            await assert.rejects(checkSource(staleSourceFixture()), /SUPERSEDED_RUN/);
+        }
+    }
+    return eligible;
+}
+
+test("queue model retains latest B behind active A when stale C arrives late or early", async () => {
+    const latestB = 456, staleC = 455;
+    const oldDefault = waitBehindActive("single", [latestB, staleC]);
+    assert.deepEqual(oldDefault.canceled, [latestB]);
+    assert.deepEqual(await eligibleAfterDrain(oldDefault.pending), []);
+    const policy = deploymentQueuePolicy();
+    assert.equal(policy, "max");
+    for (const order of [[latestB, staleC], [staleC, latestB]]) {
+        const retained = waitBehindActive(policy, order);
+        assert.deepEqual(retained.canceled, []);
+        assert.deepEqual(await eligibleAfterDrain(retained.pending), [latestB]);
+    }
+});
+
+test("queue model caps pending at 100 and needs a fresh retry after overflow drains", async () => {
+    const older = Array.from({ length: 100 }, (_, i) => i + 1);
+    const full = waitBehindActive(deploymentQueuePolicy(), [...older, 456]);
+    assert.deepEqual(full.pending, older);
+    assert.deepEqual(full.canceled, [456]); // even the latest trigger can be lost
+    const retry = waitBehindActive(deploymentQueuePolicy(), [456]);
+    assert.deepEqual(retry.canceled, []);
+    assert.deepEqual(await eligibleAfterDrain(retry.pending), [456]);
+    // Recovery must still use fresh source evidence, never resurrect an old run.
+    await assert.rejects(checkSource(staleSourceFixture()), /SUPERSEDED_RUN/);
 });
