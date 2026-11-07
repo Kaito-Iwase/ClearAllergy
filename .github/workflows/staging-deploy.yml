@@ -10,10 +10,13 @@ permissions:
   contents: read
   actions: read
 
-# One writer for the fixed alias. Do not cancel a writer with an external request
-# in flight. Pending order is not guaranteed; source checks reject stale runs.
+# One writer for the fixed alias. Retain pending runs so a delayed stale trigger
+# cannot replace the latest successful trigger. GitHub caps this queue at 100;
+# overflow/cancellation requires checking the latest source and retrying later.
+# Do not cancel a writer with an external request in flight.
 concurrency:
   group: clearallergy-dedicated-staging
+  queue: max
   cancel-in-progress: false
 
 jobs:

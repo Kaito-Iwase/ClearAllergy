@@ -85,3 +85,15 @@
 - pre-pushでhelper32/32・skip0、actionlint（shellcheck無効）、diff checkを再確認してPASS。実配備workflowの実行成功とは扱いません。
 
 この確認を前提に、承認された検証branchのcommit/pushとDraft PRだけを行います。staging自動追従の有効化・実deploy・main merge・Vercel/GitHub設定・権限変更は行いません。
+
+## 2026-11-07：待機runの置換を防ぐ修正
+
+初回head `dcdab56d548267c855bb22abd9366e2afa0bce5d` は[Draft PR #132](https://github.com/Kaito-Iwase/ClearAllergy/pull/132)の[CI 42336925738](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42336925738)で4ジョブ成功、unit412/412・skip0、Prisma生成/typecheck/build/隔離DB・ブラウザ検査が成功しました。実checkoutは `b0330d468d1dfddb800785af3aa5658e097abf15` です。これは以下の修正前の結果であり、修正後のCI結果はPR本文の最新head/runを参照します。
+
+独立レビューで、既定の単一pendingが最新Bを古いCに置き換え、Cをsource判定で拒否してもBの実行機会は失われる問題が指摘されました。workflow-level concurrencyへ `queue: max` を追加し、同じgroupと `cancel-in-progress: false` を維持します。独自controllerや状態ストアは追加しません。
+
+- [GitHub公式仕様](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)を2026-11-07に確認。maxはpending100件まで、満杯時は追加runを取消。maxとcancel-in-progress=trueは併用不可。FIFOはconcurrency待機開始順であり、dispatch/event順の保証ではありません。
+- ローカル回帰は34/34・skip0、lint、YAML構造検査、diff checkがPASS。公式キュー仕様を仮定したモデルで、A実行中/B最新待機/C旧runの到着順2通り、旧singleでのB損失、maxでのB保持、100件満杯で最新自体も取消される境界、キューが空いた後の再試行と旧sourceの拒否を検査しました。source判定は既存の実関数をAPI代用品で呼びます。
+- actionlint1.7.11は新しいqueueキーを認識せず、未加工の実行はその1件でFAILでした。[同じ既知の互換性報告](https://github.com/rhysd/actionlint/issues/746)があります。ローカルではその**正確なqueue未知キー診断だけ**を除外した再実行が成功しました。他の診断を一括無効化した結果ではありません。queueの位置・max・非cancelは別のYAML構造検査/テストと公式資料で照合しています。完全な未加工actionlint PASSとは扱いません。
+- GitHub上で配備workflowのA/B/Cを起動していません。モデルテストは実キューの待機・取消・満杯・再実行event配送の実証ではありません。通常PR CIでこのworkflowを実行せず、queue:maxの実行時動作は未検証です。今回の修正で常に最新へ自動復旧することを保証しません。
+- 100件上限・cancel・timeout・外部書込結果不明時の復旧条件は[運用手順](../guide/staging-actions.md#排他失敗復旧)へ更新。実行中writerと外部状態を確認し、キューが安全に空いた後に現在head/最新成功push CI/run/attempt/aliasを再取得し、その最新CIに結び付く配備workflowだけを再実行する運用です。旧runを無条件に復活させません。今回復旧操作・有効化・実配備は行いません。

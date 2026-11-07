@@ -39,7 +39,11 @@ REST v13の `target: null` はPreviewを表すため、この明示値のみ許�
 
 ## 排他・失敗・復旧
 
-固定aliasに対してconcurrency groupを一つだけ使い、`cancel-in-progress: false` で実行中writerを維持します。CI自体はbranch単位で古いrunをキャンセルします。GitHubはpendingの順序を保証しないため、配備前とalias更新直前にもhead/run/attemptを再照合します。旧runの再実行も、より新しいrunがあれば停止します。
+固定aliasに対してconcurrency groupを一つだけ使い、`queue: max` / `cancel-in-progress: false` で実行中writerと既存pendingを維持します。既定の `queue: single` は、実行中A・最新成功Bがpendingの間に古いCが到着するとBを取り消します。Cをsource検査で拒否してもBは復活しないため、単なる古いrunの拒否だけでは最新の反映機会を保持できません。maxでは上限内のB/Cを両方待機させ、実行時のsource照合で最新だけを許可します。CI自体はbranch単位で古いrunをキャンセルする従来の動作を維持します。
+
+GitHub公式仕様ではpendingは**最大100件**で、満杯では新たに到着したrunが取り消されます。`queue: max` と `cancel-in-progress: true` は併用できません。待機開始時刻に基づくFIFOであり、event/dispatch順そのものは保証されません。配備前とalias更新直前のhead/run/attempt照合は引き続き必要です。100件を超えた最新run、手動cancel、timeout、サービス障害まで自動回復させる仕組みはなく、常に最後は最新が反映されるという保証はしません。
+
+上限到達・取消・異常終了後は、まず待機数と実行中writer・外部書込の状態を確認します。安全にキューが空いた後、現在のbranch headと最新の正規push CIのrun/attempt/completed-success、固定aliasを再取得し、**その最新CIに紐付く取消/失敗した配備workflowだけ**を再実行する運用です。最新runが失敗/実行中なら過去の成功へ遡らず、現在headの最新CIを再検証します。古い配備workflowを再実行してもsource照合で拒否されます。元の配備workflowを再実行できない、または設定/SHAが変わっている場合は、現在headの正規push CIを再実行する等で新しい成功イベントを得る判断が必要です。新pushへ進んでいれば旧headを復活させません。今回この復旧操作・有効化・実配備は行っていません。
 
 検査・build・deploy失敗では後続alias stepを実行しません。build中にsourceが進んだ場合も固定URLを更新しません。Preview作成後に古くなった場合、未割当のPreviewが残ることがあります。APIの取得失敗を成功に補完しません。
 
@@ -50,6 +54,8 @@ GitHub ref変更とVercel alias更新を単一transactionにできないため�
 ## 検証と成功の意味
 
 `node --import tsx --test tests/staging-actions.test.ts` はAPI代用品だけでsource・拒否・alias照合を検査します。ネットワークや配備を行いません。通常CIが成功しても、外部projectの資格情報や設定は検証できません。
+
+キューの回帰テストは、YAMLのmax/非cancel設定を確認し、公式仕様を仮定した小さいモデルでA実行中・B最新待機・C旧run到着の損失と修正後の保持、100件上限・空いた後の再試行を検査します。実source判定もAPI代用品で呼びますが、GitHub上でA/B/Cを競合実行した証拠ではありません。通常PR CIでは配備workflowを起動せず、待機順・満杯時の取消・再実行のevent配送を実証していません。有効化前の許可された実行時検証として残します。
 
 workflowの成功は「配備metadataと固定aliasのdestination照合」の成功です。HTTP応答・SSO後の画面・実Clerk管理操作・保存/公開・Blobアップロードは別途確認し、CI run、SHA、deployment ID、固定URL、確認日時を結び付けて記録します。初回はGit pushによる先行配備が両projectで発生しないことも観測します。
 
