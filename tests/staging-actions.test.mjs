@@ -181,7 +181,7 @@ test('PR132 retained: canonical config rules stay false without enabling global 
  assert.ok(Object.values(rules).every(value=>value===false));assert.equal(rules.main,undefined);
 });
 test('PR132 retained: CI covers staging-base PRs and staging pushes without paths exclusions',async()=>{
- const {readFileSync}=await import('node:fs');const ci=readFileSync(new URL('../.github/workflows/ci.yml',import.meta.url),'utf8');
+ const {readFileSync}=await import('node:fs');const ci=readFileSync(new URL('../.github/workflows/ci.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
  function branches(event){const block=ci.match(new RegExp(`^  ${event}:\\n((?: {4}[^\\n]*\\n)+)`,'m'))?.[1];assert.ok(block);
   const list=block.match(/^    branches: \[([^\]]+)\]$/m)?.[1];assert.ok(list);
   assert.doesNotMatch(block,/^    (?:paths(?:-ignore)?|branches-ignore):/m);return list.split(',').map(v=>v.trim());}
@@ -191,7 +191,7 @@ test('PR132 retained: CI covers staging-base PRs and staging pushes without path
 // Pure documented scheduler model, not evidence of GitHub's live queue behavior.
 function queueBehindActive(policy,arrivals){const pending=[],cancelled=[];
  for(const id of arrivals){if(policy==='single')cancelled.push(...pending.splice(0));else if(pending.length===100){cancelled.push(id);continue;}pending.push(id);}return {pending,cancelled};}
-async function configuredQueue(){const {readFileSync}=await import('node:fs');const y=readFileSync(new URL('../.github/workflows/staging-deploy.yml',import.meta.url),'utf8');
+async function configuredQueue(){const {readFileSync}=await import('node:fs');const y=readFileSync(new URL('../.github/workflows/staging-deploy.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
  const block=y.match(/^concurrency:\n([\s\S]*?)(?=^\S)/m)?.[1];assert.ok(block);assert.match(block,/^  cancel-in-progress: false$/m);assert.match(block,/^  queue: max$/m);return 'max';}
 async function eligibleQueue(pending){const out=[];for(const id of pending){const f=fixture();if(id===10){out.push(Number((await plan(f)).source.runId));}
  else {f.snapshots[`/repos/${p.repository}/actions/workflows/20/runs?branch=${encodeURIComponent(p.branch)}&event=push&per_page=1`].workflow_runs=[{id:11}];await assert.rejects(plan(f),/SUPERSEDED_RUN/);}}return out;}

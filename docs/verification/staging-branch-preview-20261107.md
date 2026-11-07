@@ -4,6 +4,13 @@ Base: `c8ef34554263166405d9e80f4a21f2e2ca6d7e8d`。元候補patchのSHA256は
 `760bb92e0264690792fcded7d89200651b3ac5b9925d13dd6263896387fee073`。
 部分snapshotの結果を全体検証と混同せず、独立した完全cloneで適用・検証した。
 
+## Windows follow-up and first PR CI
+
+- Isolated Windows checkout: Node 22.23.4 / npm 10.9.9. Focused tests initially failed three YAML text assertions under CRLF; normalize CRLF to LF at the two fixture reads. No workflow or adapter behavior changed.
+- Focused tests after correction: 160/160 PASS. Full tests after `prisma generate`: 540/540 PASS, skipped 0. Lint: PASS. The first full Windows attempt lacked the generated Prisma client and failed 11 test-file imports; generation resolved all failures without a DB connection.
+- First PR #133 head `731ac0476d444b94b2ed67be1fdf0ef2aa899883`: required CI run 42354815568 and audit run 42354815571 completed successfully. This is evidence for that head; the follow-up test-only commit must receive its own CI result.
+- Windows typecheck/build were not repeated; the full Linux checks above and GitHub CI are recorded separately. No real credentials, DB connection, configuration changes, or deployment were used for Windows tests.
+
 ## 今回の結果
 
 - Node **22.23.4**: 公式Linux配布と公式SHA256を照合。npm **10.9.9**。
