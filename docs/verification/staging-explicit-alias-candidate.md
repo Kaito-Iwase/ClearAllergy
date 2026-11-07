@@ -1,0 +1,37 @@
+# 固定staging aliasの明示割当候補（localのみ）
+
+基点: bde61a08bf57f15c26238829cb415aaa683961db。実alias変更、再配備、activation/watermark更新は行わない。PR公開と実運用の有効化を区別する。
+
+## 証拠と原因の範囲
+
+成功したGET-only診断ではdefault/Git情報付きGETともgitSourceとprovider/source/writer情報が一致した。今回のGit情報欠落説は棄却。automaticAliasesにhostがあり、aliasAssigned=trueでも実alias一覧は含まず、固定hostは旧配備のまま。従ってaliasAssignedは固定host到達の証明ではない。
+autoAssignCustomDomainsTrue=falseはraw false/欠損/null/異型を区別しない。このPRは診断entry/workflowを変更せず、旧incident診断をmain mergeで再実行しない。falseが原因とは断定できない。
+公式SDKの公開CreateDeployment requestでautoAssignCustomDomainsのPreview適用保証を確認できず、CLIのskip-domainがfalseを使うことだけではtrueによる影響範囲を証明できない。推測で追加しない。
+
+## workflow内のlocal統合候補
+
+既存staging-actions.mjsの単一executeへ統合する。このrunがcreateしたdeployment IDだけが対象。既存source/env/identity/meta検査、過去writer履歴、全ページでactive build不在を確認して、既存固定hostとredirect:nullだけを1回POSTする。API clientもcreate成功IDとREADY Preview GETを記憶し、それ以外へのalias POSTを拒否。attemptは通信前からsticky。GETで既に対象へ向いていれば書込なし。POST結果だけで成功にせず再取得と全guardで判定する。
+
+既存writerAttempt==1、同concurrency、checkWriterHistoryをcreate前/alias前で再利用する。POSTunknown・cancel・timeoutは失敗を維持し、次のtarget/runも過去失敗によって停止する。旧writerを再実行してsuccess/skippedに見せた場合もrun_attempt!=1を拒否する。新store/credential/standalone復旧entryは追加しない。既存failed incidentを再利用する経路でもなく、watermarkを自動変更しない。
+
+公開API: https://vercel.com/docs/rest-api/aliases/assign-an-alias
+expected-old/CAS条件はない。oldDeploymentIdは事後証拠で競合防止ではない。GET→POST間の外部writer変更を上書きする可能性があり、source変化がPOST後に見つかった場合はURLが既に変わっている可能性もある。自動rollback/再POSTはしない。Actions concurrencyはmanual/Git writerを止めない。履歴保持・削除禁止・明示operator reconciliationという既存前提が残る。
+
+現在main/staging config不一致とfailed writer barrierはそのまま停止条件。回復のため照合を弱めず、レビュー済み同期と既存deployment/alias照合を先に行う。この候補の検証では実writer起動/再配備/alias変更/activation変更を行っていない。
+
+検証: Node22.23.4で190/190 source/adapter tests PASS（adapter90件）。新規18件は固定alias正例、未知POSTと別run/target阻止、API capability、競合/source変更/response矛盾/active build、旧run attempt2によるincident消去拒否。長い履歴/全ページscan後にsource・対象/旧Preview・aliasを再取得し、POST直前に期限を検査する。実API未実行。完全checkoutでnpm ci/Prisma generate成功、npm test 570/570、lint/typecheck/build PASS。架空CI設定と隔離cacheのみ使用。nullable修正後の独立レビュー190/190 PASS。nullの理由は公式説明で未定義であり、null/省略をともに旧ID証拠なしとして扱う契約に限定する。GitHub CI/実APIは未実行。
+
+
+## 将来の公開・再開順序（未実施）
+
+作業branch `ci/staging-explicit-alias-20261107` は初回remote commitからvercel.jsonのexactfalseを含める。mainの通常Production再配備は残る。vercel.json更新後はtest/stagingへレビュー済み同期してcontrol blob一致と成功CIを確認する。
+
+設定変更は同じ作業時間にまとめられるが、activationは最後にする。flagfalse維持→既存failed run42372125591とremote deployment/固定alias/全inflight/履歴を照合→未解決結果がないことを確認→レビュー済コードとconfig同期/成功CI→照合済み範囲だけreconciliation watermark設定→新しい通常writerのイベント条件を確認→activationをtrue。この候補はwatermarkやactivationを更新しない。過去runをrerunしてincidentを消したり、現在/未来のrunをwatermarkへ設定しない。
+
+既存incidentのdeploymentを再利用する復旧機能はない。新runは新しい検証済みsourceから作成する。watermarkを設定しても、旧source/同CI attemptの既deployment重複チェックやsource/config guardは回避しない。
+
+
+## alias responseの正式schema
+
+https://github.com/vercel/sdk/blob/b2f99500bd164d528aad07dd4830b0ea4d1abd6f/src/models/assignaliasop.ts
+responseはalias/created/uid、oldDeploymentId?:string|null。null/省略は旧ID一致の証明ではなく、非nullの別IDだけを矛盾として停止する。null/省略でも独立GETの全mapping/identity/source条件を必須にする。responseに存在しないdeploymentId/id/deletedを要求しない。CASなしの制約は変わらない。

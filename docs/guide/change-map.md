@@ -137,3 +137,5 @@ PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。こ�
 | 対象 | 仕様・運用 | 実装・設定 | 検証入口 |
 | --- | --- | --- | --- |
 | exact test Previewの帯と専用画像保存、staging検証入口 | [stagingの準備](development.md#staging)。レビュー済みmainとの初回同期・Git自動配備抑止。専用DBの19件とmainのmigration20との差分は未解消、再INIT禁止 | `app/layout.tsx`、`app/globals.css`、`components/layout/TestEnvironmentBanner.tsx`、`lib/test-preview-environment.ts`、`lib/storage/upload-images.ts`、`lib/storage/image-url-policy.ts`、`.github/workflows/ci.yml`、`vercel.json` | `tests/test-environment-banner.test.ts`（Production/main/他branchの非表示）、`tests/test-preview-blob.test.ts`（専用token・不正設定のfallback拒否）。実外部サービス・配備・画像uploadは別確認 |
+
+初回staging停止のGET-only診断候補: `scripts/staging-inspect.mjs` / `.github/workflows/staging-inspect.yml`。対象と未公開条件は [CI後配備](staging-actions.md) を参照。
