@@ -4,6 +4,8 @@
     "deploymentEnabled": {
       "test/staging": false,
       "ci/staging-actions-20261106": false,
+      "ci/staging-branch-preview-20261107": false,
+      "ci/staging-sync-20261107": false,
       "fix/e2e-food-edit-20261106": false,
       "chore/staging-dry-run-main-20261106": false,
       "test/public-freshness-prototype-20261105": false,

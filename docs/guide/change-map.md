@@ -124,7 +124,7 @@ PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。こ�
 <a id="examples"></a>
 ## 代表的な変更依頼での使い方
 
-専用 staging の自動追従は、[開発手順](development.md#staging-dry-run) → [CI後配備・有効化条件](staging-actions.md) → `.github/workflows/staging-deploy.yml` / `scripts/staging-actions.mjs` / `tests/staging-actions.test.ts` を確認します。通常CIのtest/staging向けPRとpush、正規run/SHA/attempt・Preview・alias照合、排他、Git先行配備抑止が対象です。初期状態は無効で、外部設定・資格情報・実配備は未確認です。旧[無配備dry-run](staging-dry-run.md)の `scripts/staging-policy.ts` / `scripts/staging-dry-run.ts` / `tests/staging-policy.test.ts` はローカルシミュレーションとして残し、実配備workflowの権限判定と区別します。
+専用 staging の自動追従は、[開発手順](development.md#staging-dry-run) → [CI後配備・有効化条件](staging-actions.md) → `.github/workflows/staging-deploy.yml` / `scripts/staging-actions.mjs` / `scripts/staging-source.mjs` / `scripts/staging-guards.mjs` / `tests/staging-actions.test.mjs` / `tests/staging-adapter.test.mjs` を確認します。通常CIのtest/staging向けPRとpush、正規run/SHA/attempt・Preview・alias照合、排他、Git先行配備抑止が対象です。初期状態は無効で、外部設定・資格情報・実配備は未確認です。旧[無配備dry-run](staging-dry-run.md)の `scripts/staging-policy.ts` / `scripts/staging-dry-run.ts` / `tests/staging-policy.test.ts` はローカルシミュレーションとして残し、実配備workflowの権限判定と区別します。
 
 「設定で後から品目を追加したい」なら個人設定行から操作・処理を読み、正規化関数と購読元、一覧の検索、結果カードまで検索します。「公開できない理由を変えたい」なら公開条件行からUI・API・DBトリガーとテストを追います。「店舗へ担当者を追加したい」なら招待行と所有権ルールを読み、単なるフォーム追加でなくDBの一意制約に関わる依頼だと判断します。
 
