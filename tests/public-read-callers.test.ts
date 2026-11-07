@@ -1,13 +1,32 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { isValidElement, type ReactNode } from "react";
+import Module, { createRequire } from "node:module";
+import { publicSnapshotSchema } from "../features/public/shops/freshness/contracts";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
-import ShopListPage from "../app/(public)/shops/page";
-import ShopDetailPage from "../app/(public)/shops/[shopId]/page";
-import MenuDetailPage from "../app/(public)/shops/[shopId]/menus/[menuId]/page";
-import { GET } from "../app/api/menus/[menuId]/route";
+
+// Next resolves the server-only marker at build time. Plain Node uses its
+// throwing default export, so only that marker is replaced during synchronous
+// route loading. Snapshot/publication/supplement helpers remain the real ones.
+const moduleLoader = Module as unknown as { _load: (id: string, ...args: unknown[]) => unknown };
+const originalLoad = moduleLoader._load;
+const requireForTest = createRequire(import.meta.url);
+let ShopListPage: typeof import("../app/(public)/shops/page").default;
+let ShopDetailPage: typeof import("../app/(public)/shops/[shopId]/page").default;
+let MenuDetailPage: typeof import("../app/(public)/shops/[shopId]/menus/[menuId]/page").default;
+let GET: typeof import("../app/api/menus/[menuId]/route").GET;
+try {
+    moduleLoader._load = function (id, ...args) {
+        if (id === "server-only") return {};
+        return originalLoad.call(this, id, ...args);
+    };
+    ShopListPage = requireForTest("../app/(public)/shops/page.tsx").default;
+    ShopDetailPage = requireForTest("../app/(public)/shops/[shopId]/page.tsx").default;
+    MenuDetailPage = requireForTest("../app/(public)/shops/[shopId]/menus/[menuId]/page.tsx").default;
+    GET = requireForTest("../app/api/menus/[menuId]/route.ts").GET;
+} finally { moduleLoader._load = originalLoad; }
 
 const allergens = ALLERGEN_MASTER.map((allergen, index) => ({
     id: `allergen-${index}`, ...allergen,
@@ -49,8 +68,8 @@ function makeShop() {
     };
 }
 
-// Invoke actual route exports and inspect their returned client props. We do not
-// render client components or replace the snapshot/publication/supplement helpers.
+// Invoke actual route exports and inspect the full snapshot passed to the client.
+// We do not render client components or replace snapshot/publication/supplement helpers.
 function findProps(node: ReactNode, key: string): Record<string, unknown> {
     if (Array.isArray(node)) {
         for (const child of node) {
@@ -131,20 +150,26 @@ const callers: Array<{ name: string; reads: ReadName[]; invoke: () => Promise<vo
     {
         name: "shop list", reads: ["shop.findMany", "allergen.findMany"],
         invoke: async () => {
-            const props = findProps(await ShopListPage(), "initialShops");
-            const shops = props.initialShops as Array<{ id: string; menus: Array<{ name: string }> }>;
-            assert.equal(props.isDatabaseAvailable, true);
+            const props = findProps(await ShopListPage(), "initialSnapshot");
+            const snapshot = publicSnapshotSchema.parse(props.initialSnapshot);
+            assert.equal(snapshot.targetKey, "/shops");
+            assert.ok(snapshot.result.kind === "list");
+            const { initialShops: shops, allergens: publicAllergens, isDatabaseAvailable } = snapshot.result.data;
+            assert.equal(isDatabaseAvailable, true);
             assert.equal(shops.length, 1);
             assert.equal(shops[0].id, shopId);
             assert.equal(shops[0].menus[0].name, menuName);
-            assert.equal((props.allergens as unknown[]).length, allergens.length);
+            assert.equal(publicAllergens.length, allergens.length);
         },
     },
     {
         name: "shop detail", reads: ["shop.findFirst", "allergen.findMany"],
         invoke: async () => {
-            const props = findProps(await ShopDetailPage({ params: Promise.resolve({ shopId }) }), "menus");
-            const menus = props.menus as Array<{ id: string; name: string }>;
+            const props = findProps(await ShopDetailPage({ params: Promise.resolve({ shopId }) }), "initialSnapshot");
+            const snapshot = publicSnapshotSchema.parse(props.initialSnapshot);
+            assert.equal(snapshot.targetKey, `/shops/${shopId}`);
+            assert.ok(snapshot.result.kind === "shop");
+            const { menusForClient: menus } = snapshot.result.data;
             assert.equal(menus.length, 1);
             assert.equal(menus[0].id, menuId);
             assert.equal(menus[0].name, menuName);
@@ -153,10 +178,14 @@ const callers: Array<{ name: string; reads: ReadName[]; invoke: () => Promise<vo
     {
         name: "menu detail", reads: ["menuItem.findFirst", "allergen.findMany", "menuItem.findMany"],
         invoke: async () => {
-            const props = findProps(await MenuDetailPage({ params: Promise.resolve({ shopId, menuId }) }), "menuName");
-            assert.equal(props.menuName, menuName);
-            assert.deepEqual(props.storeHandledAllergenSlugs, [handledSlug]);
-            const row = (props.rows as Array<{ slug: string; status: string; effectiveRisk: string }>).find(row => row.slug === handledSlug);
+            const props = findProps(await MenuDetailPage({ params: Promise.resolve({ shopId, menuId }) }), "initialSnapshot");
+            const snapshot = publicSnapshotSchema.parse(props.initialSnapshot);
+            assert.equal(snapshot.targetKey, `/shops/${shopId}/menus/${menuId}`);
+            assert.ok(snapshot.result.kind === "menu");
+            const data = snapshot.result.data;
+            assert.equal(data.menuName, menuName);
+            assert.deepEqual(data.storeHandledAllergenSlugs, [handledSlug]);
+            const row = data.rows.find(row => row.slug === handledSlug);
             assert.equal(row?.status, "FREE");
             assert.equal(row?.effectiveRisk, "STORE_HANDLED");
         },

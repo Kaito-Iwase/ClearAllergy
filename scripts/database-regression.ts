@@ -51,7 +51,7 @@ export async function runDatabaseRegression(db: PrismaClient) {
 
         await db.menuItemAllergen.update({ where: { menuItemId_allergenId: { menuItemId: full.id, allergenId: master[0].id } }, data: { status: "UNKNOWN" } });
         assert.equal(await published(full.id), false);
-        pass("UNKNOWN update automatically unpublishes in PostgreSQL");
+        pass("UNKNOWN update keeps an already unpublished menu private in PostgreSQL");
 
         await db.$transaction(async (tx) => {
             await tx.menuItemAllergen.update({ where: { menuItemId_allergenId: { menuItemId: full.id, allergenId: master[0].id } }, data: { status: "FREE" } });

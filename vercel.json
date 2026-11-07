@@ -2,6 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": {
+      "test/staging": false,
+      "ci/staging-actions-20261106": false,
+      "ci/staging-branch-preview-20261107": false,
+      "ci/staging-sync-20261107": false,
+      "fix/e2e-food-edit-20261106": false,
+      "chore/staging-dry-run-main-20261106": false,
+      "test/public-freshness-prototype-20261105": false,
+      "test/practical-e2e-main-20261105": false,
+      "ci/issue118-workflow-registration": false,
       "fix/issue-triage-20261024": false,
       "fix/utc-db-timestamps-20261024": false,
       "chore/harness-evidence-20261024": false,
@@ -14,11 +23,10 @@
       "docs/shop-account-main-20261028": false,
       "fix/html-error-main-20261028": false,
       "dependabot/**": false,
+      "chore/dependabot-config-20261103": false,
       "chore/ca-dependabot-deploy-guard-20261026": false,
       "chore/dependabot-guard-main-20261028": false,
-      "perf/public-read-main-20261028": false,
-      "prepare/staging-main-v1-final-20261028": false,
-      "test/staging": true
+      "perf/public-read-main-20261028": false
     }
   }
 }

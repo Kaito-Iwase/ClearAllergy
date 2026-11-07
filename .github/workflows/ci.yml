@@ -15,6 +15,55 @@ permissions:
   contents: read
 
 jobs:
+  utc-timestamps:
+    name: UTC migration (${{ matrix.timezone }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        timezone: [UTC, Asia/Tokyo, America/Los_Angeles]
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: clearallergy_ci
+          POSTGRES_PASSWORD: local_ci_only
+          POSTGRES_DB: clearallergy_ci
+          TZ: ${{ matrix.timezone }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearallergy_ci -d clearallergy_ci"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
+      DIRECT_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
+      CLEARALLERGY_CI_FIXTURES: "true"
+      CLEARALLERGY_CI_TIMEZONE: ${{ matrix.timezone }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Align npm with Docker
+        run: npm install --global npm@11.18.0
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      # The upgrade regression requires an untouched database. The build job's
+      # publication upgrade/fixtures must never run on this job's service.
+      - name: Check UTC migration on an empty disposable database
+        run: node --import tsx scripts/check-utc-timestamp-migration.ts
+
   build:
     name: Test, lint, typecheck, and build
     runs-on: ubuntu-latest
@@ -40,7 +89,7 @@ jobs:
       DATABASE_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
       DIRECT_URL: postgresql://clearallergy_ci:local_ci_only@127.0.0.1:5432/clearallergy_ci
       CLEARALLERGY_CI_FIXTURES: "true"
-      # ビルド用の非実在キー。CIの画面確認は公開ページに限定する。
+      # 通常build・公開回帰用の非実在キー。管理E2Eは別コピーの認証境界だけを模擬する。
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlYXJhbGxlcmd5LWNpLmNsZXJrLmFjY291bnRzLmRldiQ
       CLERK_SECRET_KEY: sk_test_ci_placeholder_not_a_real_key
       PORTFOLIO_MODE: "true"
@@ -50,7 +99,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -106,6 +155,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Share isolated browser cache
+        run: echo "CLEARALLERGY_BROWSER_RUNNER_DIR=$RUNNER_TEMP/clearallergy-browser-1.61.0" >> "$GITHUB_ENV"
+
       - name: Install isolated browser runner
         run: node scripts/browser-runner.mjs install --with-deps
 
@@ -130,11 +182,17 @@ jobs:
         if: failure()
         run: node --import tsx scripts/collect-ci-diagnostics.ts "$RUNNER_TEMP/clearallergy-app.log" "$RUNNER_TEMP/clearallergy-browser-results/app-log-summary.json"
 
+      - name: Check owner flows with real routes and PostgreSQL in Chromium
+        # Clerk boundary only; uses the prepared service DB and installed browser.
+        run: npm run test:e2e:ci -- --allow-font-download
+
       - name: Save browser evidence
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: prototype-browser-${{ github.sha }}
-          path: ${{ runner.temp }}/clearallergy-browser-results
+          path: |
+            ${{ runner.temp }}/clearallergy-browser-results
+            test-results/ci-*
           if-no-files-found: ignore
           retention-days: 7

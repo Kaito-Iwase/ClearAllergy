@@ -1,0 +1,44 @@
+name: Deploy dedicated staging
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [test/staging]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: clearallergy-dedicated-staging
+  queue: max
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      vars.STAGING_ACTIONS_ENABLED == 'true' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: staging
+    steps:
+      - name: Checkout reviewed default-branch control code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, verified official ref 2026-11-07
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6, verified official ref 2026-11-07
+        with:
+          node-version: '22'
+      # No candidate checkout, npm install, vercel pull, local app build or alias write.
+      - name: Create remote Preview and observe terminal build and fixed URL mapping
+        env:
+          STAGING_ACTIONS_ENABLED: ${{ vars.STAGING_ACTIONS_ENABLED }}
+          STAGING_APPROVED_ALIAS_ID: ${{ vars.STAGING_APPROVED_ALIAS_ID }}
+          STAGING_RECONCILED_THROUGH_RUN_ID: ${{ vars.STAGING_RECONCILED_THROUGH_RUN_ID }}
+          TRUSTED_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.STAGING_VERCEL_TOKEN }}
+        run: node control/scripts/staging-actions.mjs

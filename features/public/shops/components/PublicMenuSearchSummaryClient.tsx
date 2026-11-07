@@ -1,5 +1,7 @@
 "use client";
 
+import { usePublicApplyProof } from "../freshness/presentation";
+
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -14,6 +16,7 @@ export default function PublicMenuSearchSummaryClient({
 }: {
     menus: MenuSearchItem[];
 }) {
+    usePublicApplyProof("shop-summary");
     const searchParams = useSearchParams();
     const q = (searchParams.get("q") ?? "").trim();
 

@@ -6,7 +6,7 @@
     "dev": "next dev",
     "prebuild": "prisma generate",
     "build": "next build",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "node --import tsx --test tests/*.test.ts tests/e2e-environment.test.mjs tests/staging-actions.test.mjs tests/staging-adapter.test.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit --incremental false",
@@ -15,7 +15,11 @@
     "allergens:check": "tsx scripts/check-allergen-master.ts",
     "auth:create:test-user": "tsx scripts/create-test-user.ts",
     "auth:migrate:clerk": "tsx scripts/migrate-users-to-clerk.ts",
-    "repair:published-menus": "tsx prisma/repair-published-menus.ts"
+    "repair:published-menus": "tsx prisma/repair-published-menus.ts",
+    "test:e2e": "node scripts/browser-runner.mjs e2e",
+    "test:e2e:local": "node e2e/run-local.mjs",
+    "test:e2e:ci": "node e2e/run-ci.mjs",
+    "test:e2e:guards": "node --test tests/e2e-environment.test.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.2.13",

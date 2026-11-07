@@ -6,6 +6,7 @@ import { getSelectedAllergenSlugs } from "@/lib/public-allergen-preferences";
 // このコンポーネントは、選択中アレルゲンとメニューの登録上の判定結果だけを表示します。
 
 import React from "react";
+import { usePreviousPublicInformation } from "../freshness/presentation";
 import AllergenPreferenceMatchNotice from "./AllergenPreferenceMatchNotice";
 import {
     classifySelectedAllergenStatuses,
@@ -87,6 +88,7 @@ export default function SelectedAllergenResultCardsClient({
     statusBySlug: Record<string, AllergenStatus>;
     storeHandledAllergenSlugs?: string[];
 }) {
+    const previous = usePreviousPublicInformation();
     const { preferences: { highlightSlugs, excludedSlugs, includeMayContain }, loaded } = useUserAllergenPreferences();
 
 
@@ -180,7 +182,8 @@ export default function SelectedAllergenResultCardsClient({
                     <AllergenChips allergens={unknownAllergens} label="未入力・未確認" className="border-gray-300 bg-white text-gray-900" />
                 </AllergenInfoCard>
             ) : null}
-            {!hasRiskResults &&
+            {previous && freeAllergens.length > 0 && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">未再確認のため、条件に合うかの要約は表示していません。詳細の登録状態も以前取得した情報です。</p>}
+            {!previous && !hasRiskResults &&
             !hasUnknownResults &&
             freeAllergens.length > 0 ? (
                 <AllergenInfoCard
@@ -197,16 +200,17 @@ export default function SelectedAllergenResultCardsClient({
                 </AllergenInfoCard>
             ) : null}
             {(hasRiskResults || hasUnknownResults) && freeAllergens.length > 0 ? (
-                <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-                    <p className="font-bold">選択中アレルゲンの登録状態</p>
+                <section aria-label="選択中アレルゲンの登録状態" className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+                    <p className="font-bold">{previous ? "以前取得した選択中アレルゲンの登録状態" : "選択中アレルゲンの登録状態"}</p>
                     <p className="mt-1 text-sm leading-6">原材料に含まないという登録は食品安全の保証ではありません。上の注意・補足情報も確認してください。</p>
                     <ul className="mt-3 space-y-2">
                         {freeAllergens.map((allergen) => <li key={allergen.slug}>
-                            <span className="font-semibold">{allergen.nameJa}</span>：原材料に含まない
+                            <span className="font-semibold">{allergen.nameJa}</span>：{previous ? "以前の登録は「原材料に含まない」" : "原材料に含まない"}
+                            {previous && <span className="block text-xs font-semibold text-amber-900">以前取得した登録・現在は未再確認</span>}
                             {storeHandledAllergenSlugs.includes(allergen.slug) && <span className="block text-sm leading-6 text-amber-900"><strong>別メニューに含む</strong>：同じ店舗の別の公開メニューに、この品目を含む登録があります。</span>}
                         </li>)}
                     </ul>
-                </div>
+                </section>
             ) : null}
         </div>
     );

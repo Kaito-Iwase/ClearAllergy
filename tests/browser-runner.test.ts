@@ -22,7 +22,7 @@ test("browser runner help is read-only and unknown modes fail before any setup",
     const options = { encoding: "utf8" as const, env: { ...process.env, CLEARALLERGY_BROWSER_RUNNER_DIR: runner }, windowsHide: true };
     const help = spawnSync(process.execPath, ["scripts/browser-runner.mjs", "--help"], options);
     assert.equal(help.status, 0);
-    assert.match(help.stdout, /dedicated DB, development Clerk and Blob/);
+    assert.match(help.stdout, /standard Playwright Test specs/);
     const invalid = spawnSync(process.execPath, ["scripts/browser-runner.mjs", "install", "--unexpected"], options);
     assert.equal(invalid.status, 1);
     assert.match(invalid.stderr, /Usage:/);

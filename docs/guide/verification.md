@@ -41,9 +41,41 @@ PR #111追従開始時の確認済みProductionは、PR #113の自動配備 `Eoe
 
 F3採用後は、PR #111にbefore/afterのProduction ID・SHA、merge/main CIのSHA、公開4入口の結果を記録し、上記の規約導入時点の結果と分けます。main更新は自動Production配備を起動するため、ユーザーの個別承認範囲を確認し、異常時は追加変更を止めます。rollbackは別承認です。ブランチ固有の配備抑止をmainの配備抑止と解釈しません。
 
+<a id="practical-e2e-status"></a>
+## 通常Playwright E2Eの取込対象と確認状態
+
+PR #128はmain `51adcb23945b80bb34b110d2d0f263d29629a821` を基準としたE2E基盤と食品訂正の追補です。PR #128は通常merge `a6dd7ad6f0c468ffceab8748645e7a6497cd4abc` でmainへ統合され、mainのtreeは検証済みhead `bcc4c0cd` と一致しています。PR #129はmainへretarget済みですが、main追従後の最終HEAD・CI・merge・Production反映は未確定です。以下はこの変更をmainへ取り込む場合の動作と、固定headごとの既存証拠を分けた案内です。旧PR #120の76ファイル差分・専用runner・workflow実処理は取り込みません。
+
+既存のUTC migration独立job・main/developのCI起動条件・通常製品build・公開回帰を保持し、新E2Eは準備済みサービスDBとブラウザーを使う別stepです。PR branchのVercel Git配備抑止はmainや手動配備を止めません。mainへのmergeはProduction再配備を誘発し得るため、コード統合と実際の配備結果を別に確認します。
+
+初期9件とWindows準備時点の結果・制限は[main基準の検証記録](../verification/practical-e2e-main-20261105.md)に残します。食品訂正の追加2件を含む固定head `bcc4c0cdd888ecef55e65279d4e4dbd370b0d315` の[CI 42054864143](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864143)は、実checkout `a4257172c7c34e0ab0e95a4cbb030fee2bcdb48a` で全4job、unit299/299、通常npm build・lint・型検査・実DB・既存browser、E2E11/11が成功しました。[依存監査 42054864250](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42054864250)も既存high閾値で成功しています。これは後続headやmain CIの結果ではありません。
+
+<a id="food-state-e2e-status"></a>
+## 食品訂正・状態表示のE2E
+
+基本11件は、食品訂正→非公開保存→保存済み確認→別公開、CONTAINS／MAY_CONTAIN／FREEの公開API・同じ品目行の表示、UNKNOWNの公開拒否を含みます。公開条件は変更していません。[食品訂正の検証記録](../verification/e2e-food-states-20261105.md#linux-ci-bcc4c0cd)で、Windowsローカル298件の指定除外付きunit、11件のE2Eと、公開後Linuxの無除外unit299件を分けています。実Clerk・Blob書込・食品安全の検証ではありません。
+
+開いた画面の再取得・取得中／失敗時表示はPR #129の変更に含みます。[比較原稿](../research/product/public-view-freshness-options-20261105.md)の過去の未実行表を実行済みへ変更せず、表示方式A/Bの最終選定や最大遅延・全閲覧者への到達保証とも分けます。
+
+<a id="freshness-prototype-status"></a>
+## 公開鮮度UIの取込対象と確認状態
+
+PR #129はPR #128 head `bcc4c0cd` を基点に、公開3画面の共有loader・完全JSON snapshot・手動／復帰取得・状態表示・旧情報の参照／遮蔽を追加します。この変更をmainへ取り込む場合の動作は[操作説明](product.md#freshness-prototype)と[内部処理](architecture.md#freshness-prototype)を参照してください。参照表示Aは比較用の暫定設定で、コード取込だけで最終表示方式・文言・利用者理解・安全性を確定しません。
+
+混在FREEの行別注記と旧一覧の判定表現を修正した固定head `88ca4630d42f82063c7d6d7bd5c2f24cd76432ba` の[CI 42134197073](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197073)は、実checkout `8fc3998ba27de087b290b3d9afaed3e5e7e20a5c` でunit324/324、E2E19 PASS・native BFCache1 SKIPでした。[依存監査 42134197138](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197138)もhigh閾値で成功しましたが、moderate8件が残っています。初期17件、Windowsの指定1件除外付きunit323件とは[追補記録](../verification/public-freshness-prototype-20261105.md#main-adoption-preparation-20261106)で区別します。
+
+same-origin transport、root layoutの復帰listener、店舗集計の旧情報注記を含む固定head `cd18f20947886514ff280b0bea01ef3a3eee25d2` の[CI 42216014800](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42216014800)は全4job成功、実checkout `3350ef8a0e1190538a1e7bbad01d27e361ead527`、unit329/329・skip0、E2E21定義のうち20 PASS・native BFCache1 SKIPです。公開layoutを離れたSPA復帰の隔離1経路で、同一document・popstate1回と訂正後API／DOMの反映を確認しました。[依存監査 42216014715](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42216014715)も成功し、既存開発依存のmoderate8件は残っています。[固定headの証拠と限界](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)を参照してください。専用stagingの匿名公開画面・手動再取得と同様、実Clerk管理操作・Blob書込・継続した訂正到達の検証ではありません。native BFCache、JS未実行、実オフライン、利用者理解は未実証です。mainへのretargetと一時CI base filter削除後の最終HEAD・CI・merge・Production実績は[後続の確認状態](../verification/public-freshness-pr-review-20261105.md#main-retarget-status-20261106)へ別に結び付けます。
+
 ## 日付付きの検証記録
 
+- [2026-11-07 staging初回同期のローカル検証](../verification/staging-sync-20261107.md)：main #133後の固定SHAを既存stagingへ非破壊mergeし、専用帯・Blob分離を保持。Git設定はmainと同一にし、DBのmigration20未適用と外部設定・実配備の未確認を分けます。
+
 以下は各作業時点の結果です。「今回」「未実施」「本番未適用」などの記述は記録した時点に対応し、現在の採用状態は上の案内と対象PRの最終SHA・実績で確認します。
+
+- [2026-11-06 専用 staging dry-run のローカル検証](../verification/staging-dry-run-20261106.md)：#128/#129 統合後 main を基準にした検証時点のローカル差分の判定・拒否テストと、指定 Node 版での通常 build を記録。自動追従・実配備・外部設定は未有効/未変更です。
+- [2026-11-06 CI後の専用staging配備候補](../verification/staging-actions-20261106.md)：#131後mainを基準にした未採用差分。初期状態は無効。API代用品の検査・CLI互換性と、外部設定・固定URLの実配備未確認を分けて記録します。
+
+PR #102のUTC日時契約は、[当初の検証](../verification/utc-timestamp-contract-20261024.md)、[main統合候補](../verification/utc-timestamp-pr102-20261103.md)、[最新mainへの追補検証](../verification/utc-timestamp-pr102-latest-main-20261103.md)を参照してください。今回の追補はmain `9e22cc237d00cb4f33d6740855db55f60128a0c0` に対する未commitのローカル候補で、main・Productionへの採用、GitHub CI成功、配備の記録ではありません。
 
 PR #96の公開店舗読取の重複取得削減を最新mainへ限定採用する差分とF3 fixtureの追従は、[2026-10-28の検証記録](../verification/public-shop-read-performance-20261028.md)を参照してください。過去候補のSELECT本数比較を今回の測定や本番速度の保証に読み替えません。採用先PRのmerge SHA・最終CI・Production結果は元PR #96から辿る証跡に結び付け、未採用の統合候補全体とは区別します。
 
@@ -187,3 +219,6 @@ Dockerは通常起動で復旧し、今回専用PostgreSQL17へ既存16 migratio
 QRのURL解決、メニュー保存予定と確定結果の区別、店舗フォームの順序とスクロールは[実装・検証記録](../verification/store-review-20261019.md)を参照してください。既存画面の読み取り監査と架空fixtureの回帰検査を、実店舗の利用実証から区別します。
 
 2026-10-22の[店舗管理・公開カードの整理と検証](../verification/store-management-20261022.md)は、直接操作・一覧の公開停止・店舗共通補足、本番レスポンスの注意書きの由来、元の白余白の再現限界を記録します。実装と本番適用を区別します。
+
+
+2026-11-07 remote Preview候補: Git接続/branch限定変数を保持したadapterへ置換。[完全checkoutでの検証](../verification/staging-branch-preview-20261107.md)はNode22で540テスト・lint/typecheck/build成功。実配備・固定URL・外部設定は別gate。[現候補の境界と承認条件](staging-actions.md)を参照し、旧CLI/prebuilt方式の結果は転用しません。
