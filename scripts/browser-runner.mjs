@@ -12,7 +12,7 @@ const runner = resolve(process.env.CLEARALLERGY_BROWSER_RUNNER_DIR || join(tmpdi
 const modulePath = join(runner, "node_modules", "playwright");
 const env = { ...process.env, PLAYWRIGHT_MODULE_PATH: modulePath, PLAYWRIGHT_BROWSERS_PATH: join(runner, "browsers") };
 const [command, ...options] = process.argv.slice(2);
-const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | public | ui | allergens | composition | qr | publication | demo | admin";
+const usage = "Usage: node scripts/browser-runner.mjs install [--with-deps] | e2e [Playwright test options] | public | ui | allergens | composition | qr | publication | demo | admin";
 class RunnerError extends Error {}
 
 function runNode(args, childEnv = env) {
@@ -32,6 +32,7 @@ try {
         console.log(usage);
         console.log("Start the isolated app separately. Public/ui/demo modes block browser external requests. UI mode requires the fictional loopback fixture. Admin mode uses the dedicated DB, development Clerk and Blob.");
         console.log("Allergens/composition/qr modes use temporary local component fixtures and built app CSS; no app, DB or Clerk startup is required.");
+        console.log("e2e runs standard Playwright Test specs. Use --list for discovery, --project=public for anonymous app/DB tests, or --project=admin for dedicated Compose A/B writes. See docs/guide/e2e.md.");
     } else if (command === "install" && options.every((option) => option === "--with-deps") && options.length <= 1) {
         // Use the Node installation's npm through Node, avoiding shell quoting
         // and npm.cmd process-launch differences on Windows.
@@ -42,6 +43,12 @@ try {
         assertInstalled();
         runNode([join(modulePath, "cli.js"), "install", ...options, "chromium"]);
         console.log(`Playwright ${version} and Chromium are ready. Start the isolated app, then run node scripts/browser-runner.mjs public.`);
+    } else if (command === "e2e") {
+        assertInstalled();
+        if (!existsSync(join(modulePath, "cli.js")) || !existsSync(join(modulePath, "test.js"))) {
+            throw new RunnerError("The isolated Playwright cache is incomplete. Run node scripts/browser-runner.mjs install before using e2e.");
+        }
+        runNode([join(modulePath, "cli.js"), "test", "--config", "playwright.config.mjs", ...options]);
     } else if (["public", "ui", "allergens", "composition", "qr", "publication", "demo", "admin"].includes(command) && options.length === 0) {
         assertInstalled();
         if (command === "admin") {

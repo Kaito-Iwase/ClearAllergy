@@ -1,154 +1,25 @@
+import { randomUUID } from "node:crypto";
 import { Suspense } from "react";
-import { readPublicSnapshot } from "./public-read-snapshot";
-import { createPublicAllergenLinkResolver } from "./public-allergen-links";
-import { readPublicDataOrFallback } from "@/lib/public-db";
-import PublicShopListClient from "@/features/public/shops/components/PublicShopListClient";
-import { createStatusBySlug, isMenuPublishable, isMenuPublicationCurrent } from "@/lib/allergens";
+import { notFound } from "next/navigation";
+import PublicFreshnessSurface from "@/features/public/shops/components/PublicFreshnessSurface";
+import { loadPublicShopList } from "./public-shop-list-data";
+import { targetKey, type PublicTarget, type PublicSnapshot } from "@/features/public/shops/freshness/contracts";
 
 export const dynamic = "force-dynamic";
 
 export default async function PublicShopListPage() {
-    // 公開メニューを持つ店舗と、検索画面で使うアレルゲン設定用マスタをアクセスごとに取得します。
-    const { data: publicShopListData, isDatabaseAvailable } =
-        await readPublicDataOrFallback(
-            async () => readPublicSnapshot(async tx => {
-                const [shops, allergenMaster] = await Promise.all([
-                    tx.shop.findMany({
-                        where: {
-                            isActive: true,
-                            menus: {
-                                some: {
-                                    isPublished: true,
-                                },
-                            },
-                        },
-                        orderBy: { updatedAt: "desc" },
-                        select: {
-                            id: true,
-                            name: true,
-                            description: true,
-                            address: true,
-                            prefecture: true,
-                            city: true,
-                            nearestStation: true,
-                            category: true,
-                            latitude: true,
-                            longitude: true,
-                            googlePlaceId: true,
-                            averageBudgetYen: true,
-                            coverImageUrl: true,
-                            coverImageFit: true,
-                            coverImageZoom: true,
-                            coverImagePositionX: true,
-                            coverImagePositionY: true,
-                            updatedAt: true,
-                            menus: {
-                                where: { isPublished: true },
-                                orderBy: { updatedAt: "desc" },
-                                select: {
-                                    name: true,
-                                    priceYen: true,
-                                    foodVersion: true,
-                                    reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
-                                    allergenLinks: {
-                                        select: {
-                                            status: true,
-                                            allergenId: true,
-                                        },
-                                    },
-                                },
-                            },
-                            _count: {
-                                select: {
-                                    menus: {
-                                        where: {
-                                            isPublished: true,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    }),
-                    tx.allergen.findMany({
-                        orderBy: { sortOrder: "asc" },
-                        select: { id: true, slug: true, nameJa: true },
-                    }),
-                ]);
-
-                const resolveLinks = createPublicAllergenLinkResolver(allergenMaster);
-                return {
-                    shops: shops.map(shop => ({
-                        ...shop,
-                        menus: shop.menus.map(menu => ({
-                            ...menu,
-                            allergenLinks: resolveLinks(menu.allergenLinks),
-                        })),
-                    })),
-                    allergenMaster: allergenMaster.map(({ slug, nameJa }) => ({ slug, nameJa })),
-                };
-            }),
-            {
-                shops: [],
-                allergenMaster: [],
-            },
-            { context: "public-shops:list" },
-        );
-
-    const { shops, allergenMaster } = publicShopListData;
-
-    // isPublished が古いデータに残っていても、未設定を含むメニューは公開側へ渡しません。
-    // 現行マスタに対するリンク欠損も createStatusBySlug が UNKNOWN として扱います。
-    const shopsWithPublishableMenus = shops.flatMap((shop) => {
-        const publishableMenus = shop.menus.filter((menu) =>
-            isMenuPublicationCurrent(menu) && isMenuPublishable({
-                name: menu.name,
-                allergens: allergenMaster,
-                statusBySlug: createStatusBySlug(
-                    allergenMaster,
-                    menu.allergenLinks,
-                ),
-            }),
-        );
-
-        if (publishableMenus.length === 0) return [];
-
-        return [
-            {
-                ...shop,
-                menus: publishableMenus.map(({ name, priceYen, allergenLinks }) => ({
-                    name,
-                    priceYen,
-                    allergenLinks,
-                })),
-                _count: { ...shop._count, menus: publishableMenus.length },
-            },
-        ];
-    });
-
-    const initialShops = shopsWithPublishableMenus.map((shop) => ({
-        ...shop,
-        updatedAt: shop.updatedAt.toISOString(),
-    }));
-    const allergensForClient = allergenMaster.map((allergen) => ({
-        slug: allergen.slug,
-        nameJa: allergen.nameJa,
-    }));
+    const startedAt = new Date().toISOString();
+    const requestId = randomUUID();
+    const target: PublicTarget = { kind: "list" };
+    const result = await loadPublicShopList();
+    if (result.kind === "not-found") notFound();
+    const initialSnapshot: PublicSnapshot = {
+        version: 1, targetKey: targetKey(target), requestId, startedAt, result,
+    };
 
     return (
-        <Suspense
-            fallback={
-                <main className="mx-auto max-w-5xl px-4 py-8">
-                    <div className="rounded-2xl border border-neutral-200 bg-white p-6 text-sm text-neutral-600 shadow-sm">
-                        店舗一覧を読み込み中です。
-                    </div>
-                </main>
-            }
-        >
-            <PublicShopListClient
-                initialShops={initialShops}
-                allergens={allergensForClient}
-                isDatabaseAvailable={isDatabaseAvailable}
-            />
+        <Suspense fallback={<main className="mx-auto max-w-5xl px-4 py-8"><p role="status">公開情報を読み込み中です。</p></main>}>
+            <PublicFreshnessSurface target={target} initialSnapshot={initialSnapshot} />
         </Suspense>
     );
 }

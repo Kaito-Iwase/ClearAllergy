@@ -63,6 +63,10 @@ const CREATE_ERROR_MESSAGE =
 const UPLOAD_ERROR_MESSAGE =
     "画像のアップロードに失敗しました。時間をおいてもう一度お試しください。";
 
+function subscribeHydration() {
+    return () => {};
+}
+
 export default function MenuEditClient(props: {
     menuId: string;
     initialVersion?: number;
@@ -92,6 +96,8 @@ export default function MenuEditClient(props: {
     initialConfirmationSnapshot?: SavedMenu;
 }) {
     const router = useRouter();
+    // SSRの入力欄は、Reactがイベントを接続するまで操作できない状態にする。
+    const hydrated = React.useSyncExternalStore(subscribeHydration, () => true, () => false);
 
     const {
         menuId,
@@ -531,12 +537,13 @@ export default function MenuEditClient(props: {
 
     return (
         <div className="min-w-0 space-y-6">
+        {!hydrated && <p role="status">編集の準備中です。</p>}
         {confirmationOpen && <SavedMenuPublicationPanel menu={confirmation} loading={confirmationLoading}
             error={confirmationError} busy={saving && !confirmationLoading} savedNow={confirmationSavedNow} blocked={conflict}
             onPublish={() => void saveMenuAction("publish")} onClose={() => finishConfirmation()}
             onEdit={unknown => finishConfirmation(unknown, true)}
             onRetry={() => { if (confirmationRevision.current) void openSavedConfirmation(confirmationRevision.current, confirmationSavedNow); }} />}
-        <fieldset ref={formFields} disabled={saving || uploading || creating || confirmationOpen} className="min-w-0 space-y-6"
+        <fieldset ref={formFields} disabled={!hydrated || saving || uploading || creating || confirmationOpen} className="min-w-0 space-y-6"
             onChangeCapture={() => setSaved(false)}>
             <legend className="sr-only">メニュー編集</legend>
             {notice && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}

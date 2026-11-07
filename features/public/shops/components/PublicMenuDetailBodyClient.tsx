@@ -1,5 +1,7 @@
 "use client";
 
+import { usePreviousPublicInformation, usePublicApplyProof } from "../freshness/presentation";
+
 import { STORE_ALLERGEN_NOTE } from "@/lib/public-prototype";
 import Link from "next/link";
 import Image from "next/image";
@@ -47,6 +49,8 @@ export default function PublicMenuDetailBodyClient(props: {
     rows: AllergenDisplayItem[];
     storeHandledAllergenSlugs: string[];
 }) {
+    usePublicApplyProof("menu");
+    const previous = usePreviousPublicInformation();
     const {
         shopId,
         shopName,
@@ -219,7 +223,7 @@ export default function PublicMenuDetailBodyClient(props: {
                             </h2>
                         </div>
 
-                        <p className="mb-2 text-sm font-bold text-gray-900">店舗が登録した内容</p>
+                        <p className="mb-2 text-sm font-bold text-gray-900">{previous ? "以前取得した店舗の登録内容・現在は未再確認" : "店舗が登録した内容"}</p>
                         <p className="mb-4 text-sm leading-6 text-gray-700">「原材料に含まない」という登録は食品安全の保証ではありません。「含む可能性あり・要確認」は、含む可能性があり、確認が必要な状態です。</p>
                         {rows.some((row) => row.effectiveRisk === "STORE_HANDLED") ? (
                             <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-950">{STORE_ALLERGEN_NOTE}</p>
@@ -240,6 +244,7 @@ export default function PublicMenuDetailBodyClient(props: {
                                     >
                                         {statusLabelJa(row.status)}
                                     </span>
+                                    {previous && <span className="w-full text-right text-xs font-semibold text-amber-900">以前取得した登録・現在は未再確認</span>}
                                     {row.effectiveRisk === "STORE_HANDLED" ? (
                                         <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm leading-6 text-amber-900">
                                             <p className="font-bold">別メニューに含む</p>

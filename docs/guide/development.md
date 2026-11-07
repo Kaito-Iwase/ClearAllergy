@@ -152,6 +152,8 @@ node scripts/check-shop-save-browser.mjs
 
 同じ作業ツリー（worktree）のビルド済みCSS（画面の見た目を指定するスタイル）が必要です。Webpackの `.next/static/css` と既定の `.next/static/chunks` を読めます。既存Windows依存をジャンクション（ディレクトリの参照リンク）で共有してTurbopackが作業ルートの外として拒否する環境では、同じスキーマの生成済みClientを確認したうえで `npm.cmd --ignore-scripts run build -- --webpack` を使い、共有Clientの再生成を省略したことを記録します。通常の独立環境・CIは従来の `npm run build` とPrisma生成を使います。[今回の結果と限界](../verification/shop-save-contract-20261015.md)を参照してください。
 
+通常のPlaywright E2Eは[専用手順](e2e.md)に従います。`npm.cmd run test:e2e -- --list` は列挙だけ、`test:e2e:local -- --allow-font-download` はWindowsの所有PG、`test:e2e:ci -- --allow-font-download` は準備済みCI DBとブラウザーを使う入口です。local/ciは認証境界だけを模擬し、実Next・API・DBを通します。既存の実Clerk/Blob用admin runnerとは区別してください。確認状況は[検証記録](verification.md#practical-e2e-status)を参照してください。
+
 ブラウザ回帰は `scripts/browser-runner.mjs` でPlaywright 1.61.0とChromiumを隔離して用意します。アプリの依存とlockfileは変更しません。既定の保存先はOSの一時ディレクトリ内の `clearallergy-browser-1.61.0` で、`CLEARALLERGY_BROWSER_RUNNER_DIR` で変更できます。初回の `install` はネットワークから検証ツールを取得するため、利用可能な環境で実行します。アプリの既存依存が必要です。
 
 ```powershell
@@ -331,7 +333,7 @@ CDは配備・公開の自動化のことです。
 
 `seed` は起動コマンドではありません。既存デモの更新、同名メニューと品目リンクの再作成、古いマスタの削除、条件付きClerk同期を含みます。`auth:migrate:clerk` はClerk・DB更新、`allergens:backfill:pistachio`、`repair:published-menus` はDB補正を伴います。これらの既存運用コマンドが廃止コマンドと同じく自動拒否されるわけではありません。`allergens:check` も実DBを読むので接続先を確認します。名前だけで安全と判断せず、変更対応表から本体を読んでください。
 
-CI定義は `.github/workflows/ci.yml`。main/develop向けPR、両ブランチへのpush、手動実行で動きます。同じ参照の古い実行をキャンセルし、`Test, lint, typecheck, and build` のジョブで次を順に行います。
+CI定義は `.github/workflows/ci.yml`。main/develop/test/staging向けPR、main/develop/test/stagingへのpush、手動実行で動きます。PRのbranch filterはマージ先（base）を判定します。同じ参照の古い実行をキャンセルし、`Test, lint, typecheck, and build` のジョブで次を順に行います。
 
 依存配置 → Prisma生成・validate → 単体テスト → lint → 型確認 → CI専用DB準備 → 実DB回帰 → build → ブラウザランナー準備 → 起動 → 公開ブラウザ回帰 → 成果物保存。
 
@@ -353,12 +355,28 @@ API障害はレスポンスの `X-Request-Id` と時刻・操作を記録し、�
 
 このCIにはVercelへのdeployや本番DB migrationはありません。VercelのGit連携、Production Branch、環境別のDB・Clerk・Blob設定は管理画面側の確認事項です。GitHubの必須チェックもYAMLだけでは強制されません。PRの成功SHAと公開するSHA、ブランチ保護の対象・バイパス、Vercelのmain/Node 22設定を確認します。現在のクラウド設定・稼働状態はこの文書だけで保証しません。
 
+<a id="staging-dry-run"></a>
+### 専用 staging の CI 後配備（初期状態は無効）
+
+`test/staging` pushを通常CIへ追加し、成功した元runの厳密なSHAを専用Previewへ配備する `staging-deploy.yml` を用意しています。repository variable `STAGING_ACTIONS_ENABLED=true` が必要で、初期状態は無効です。[配備手順・資格情報・環境scope・排他と失敗時の限界](staging-actions.md)を参照してください。`vercel.json` はtest/stagingと準備branchのGit自動配備をfalseにします。専用projectのGit接続とbranch限定Preview変数を保持するremote build候補です。source保護・productionBranch・資格情報・既存alias・writer履歴の確認と固定URLの実配備検証は別途必要です。旧[ローカルdry-run](staging-dry-run.md)も残しますが、配備workflowは旧evaluatorを権限判定に使いません。ローカル検証は `node --import tsx --test tests/staging-actions.test.mjs tests/staging-adapter.test.mjs` で、外部配備は行いません。
+
 <a id="dependabot-deploy-guard"></a>
-### Dependabot導入前の自動デプロイ抑止
+### Dependabotの自動デプロイ抑止
 
-`vercel.json` の `git.deploymentEnabled` は既存の抑止対象を保持し、`dependabot/**`、元の準備ブランチ `chore/ca-dependabot-deploy-guard-20261026`、main採用用ブランチ `chore/dependabot-guard-main-20261028` を `false` にします。[Vercel公式仕様](https://vercel.com/docs/project-configuration/git-configuration)はminimatch構文を使い、未指定ブランチは `true`、複数一致時は `true` が優先です。main/developや通常ブランチの自動デプロイ条件は変更しません。Git連携の自動デプロイを抑止するもので、手動deployを禁止する設定ではありません。
+`vercel.json` の `git.deploymentEnabled` は既存の抑止対象を保持し、`dependabot/**` と設定準備ブランチ `chore/dependabot-config-20261103` を `false` にします。[Vercel公式仕様](https://vercel.com/docs/project-configuration/git-configuration)はminimatch構文を使い、未指定ブランチは `true`、複数一致時は `true` が優先です。main/developや通常ブランチの自動デプロイ条件は変更しません。Git連携の自動デプロイを抑止するもので、手動deployを禁止する設定ではありません。
 
-[元PR #108](https://github.com/Kaito-Iwase/ClearAllergy/pull/108)の必要差分をmainへ限定採用します。採用先PRのmerge SHA・必須CI・実配備/skip・Productionの読取確認を元PRから辿れる形で残します。ローカルのパターン検査と実Vercel上の抑止観測は区別し、未観測の対象branchまで確認済みと扱いません。Dependabot security updatesの有効化とversion updates設定は、このguardのmain反映と対象branchの抑止確認後に別承認で行います。今回のguard採用にDependabotの有効化、GitHub保護設定変更、手動deployは含みません。
+[元PR #108](https://github.com/Kaito-Iwase/ClearAllergy/pull/108)のguardは[採用先PR #117](https://github.com/Kaito-Iwase/ClearAllergy/pull/117)でmainへ反映済みです。ローカルのパターン検査と実Vercel上の抑止観測は区別し、未観測の対象branchまで確認済みと扱いません。設定導入PRのpush前にも対象branchの抑止条件を確認します。`clear-allergy` と `clear-allergy-e2e` は同じリポジトリに接続しており、mainは両ProjectのProduction追跡先です。設定だけのmain変更でも自動配備が起こり得るため、main反映とGitHub管理設定の有効化は承認範囲を確認して行います。
+
+<a id="dependabot-updates"></a>
+### Dependabotの更新PR
+
+[`.github/dependabot.yml`](../../.github/dependabot.yml)はnpmのルート依存とGitHub Actionsを毎週月曜09:00（Asia/Tokyo）に確認します。通常のversion updatesで同時に開くPRはnpmが2件、Actionsが1件までです。設定はdefault branchへ反映してから有効になります。Draft PRの作成だけでは稼働開始になりません。
+
+npmのminor/patchはNext.js（`next` / `@next/env` / `eslint-config-next`）、Prisma（`prisma` / `@prisma/client`）、Clerk（`@clerk/backend` / `@clerk/nextjs`）、React（`react` / `react-dom`）の関係ごとにまとめます。majorは一律除外せず個別PRで判断します。Actionsやその他の依存は個別とし、devDependenciesも実行・ビルドへの影響を確認します。`@vercel/blob`、`bcrypt`、`hono`、`zod`なども一括で安全扱いしません。ローカルの `fast-glob` 互換層やNext/Prisma等のoverridesを更新のついでに外しません。
+
+security updatesにはGitHub側のDependabot alertsとsecurity updatesの有効化が別途必要です。YAMLだけでは管理設定を有効にしません。security updatesは通常更新の週次scheduleを待たず、アドバイザリを契機にdefault branchへ作成され、通常PR上限とは別の固定10件上限です。今回のgroupsはversion updatesだけに適用し、security updates全体を一つにまとめません。仕様は[GitHubの設定リファレンス](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#open-pull-requests-limit-)と[security PRの説明](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-pull-requests)を参照します。既存の週次 `dependency-audit.yml` は監査であり、更新PRの作成とは別です。
+
+各更新PRでは、変更前後の版・アドバイザリや変更内容・影響範囲、CIの対象SHAと結果、追加で必要な検証、未検証事項と採用保留理由を短く残します。Next/ESLint/ローカルglobはlint・build、Prismaは生成・schemaと隔離DB、Clerkは認証・所有権、Reactは画面回帰も確認対象です。通常CIはread-only token・架空Clerk・使い捨てPostgreSQLのまま使い、botへ実DBやClerk秘密鍵を渡しません。`pull_request_target`やwrite tokenへ切り替えず、自動approve・auto-mergeも設定しません。設定の導入と、生成された依存更新PRの採用・配備は別に判断します。
 
 ### 公開前と障害時の確認
 
@@ -369,6 +387,17 @@ API障害はレスポンスの `X-Request-Id` から `request_completed` / `oper
 招待の外部処理が失敗した場合は、取消済みで外部IDが残る行の再試行を先に検討します。結果不明や補償取消失敗では対象のClerk招待とDBを運営者が照合し、受諾済み状態や店舗所有者を古い要求で戻しません。監査の成功は記録したDB操作の成功であり、メール配送やClerkとの完全一致の証明ではありません。
 
 復旧では既知の正常SHAへのアプリの切戻しとDB復元を分けます。アプリを戻しても適用済みmigrationや変更データは戻りません。Neonのバックアップ保持・復元先・復元権限を確認し、復元訓練は許可された隔離DBで実施します。本番リセットや逆向きSQLを即席で実行しません。
+
+<a id="utc-timestamps"></a>
+### UTC 日時契約の移行と検証
+
+`20261024000000_utc_timestamp_contract` は既存列型を維持し、10 列の DB default と 8 関数の日時生成を明示 UTC にそろえます。Prisma の default 定義も同じ SQL に合わせます。アプリから日時を渡すだけでは、DB トリガーが上書きする記録時刻は直せないため、新しい migration が必要です。`checkedAt` の CHECK、食品版・公開確認・行ロック・履歴不変の制約は変えません。招待受諾の生 SQL も UTC にそろえ、期限や所有権のルールは維持します。[日時の契約](rules.md#timestamps)が正本です。
+
+`node --import tsx scripts/check-utc-timestamp-migration.ts` は既存 CI 接続ガードと空 DB 検査後に、旧 migration を適用し、UTC/JST の時刻差を再現してから新 migration を適用します。全アプリテーブルの既存行・日時・公開状態の不変、再適用、UTC/JST/米国時間の実記録時刻、同一瞬間の ISO、未来 5 分境界、停止時の監査・更新日時、実招待受諾関数の期限判定を検査します。DST の欠ける時刻・重複する時刻と過去値を検査し、列型・制約・インデックス・トリガー・所有者・権限・物理テーブル識別子も比較します。最後に実 `backfill-pistachio-allergen.ts` を架空 DB で動かし、新規リンクの UTC 日時・UNKNOWN・既存リンク不変を確認します。この運用 writer の日時式も明示 UTC です。外部認証・Blob は呼びません。生成した架空行は使い捨て DB に残るため、既存 DB に流用せず、実行後はその DB を停止・破棄します。公開・並行更新の既存回帰は `check-ci-database.ts`、`check-publication-database.ts`、`check-public-read-snapshot.ts`、`check-shop-database.ts`、`check-owned-menu-database.ts` で別に確認します。CI では通常 build と別の `utc-timestamps` job が空の PostgreSQL 17 を UTC/JST/LA の3構成で作成し、接続時の timezone を照合して実行します。通常の `npm test` には含まれません。[当初のローカル結果](../verification/utc-timestamp-contract-20261024.md)と[main統合後の検証](../verification/utc-timestamp-pr102-20261103.md)と[最新mainへの追補](../verification/utc-timestamp-pr102-latest-main-20261103.md)を参照してください。
+
+既存 migration は編集せず、既存行を更新・時差補正しません。本番適用前には対象 SHA、既存 migration 履歴、バックアップ/復元先、DDL ロックと許容停止時間、新旧アプリの同時稼働を確認してください。DB default の変更は ACCESS EXCLUSIVE ロックを取り、読む処理も待機させます。今回の migration は transaction 内の `SET LOCAL lock_timeout = '5s'` によりロック取得待ちを制限します。回帰では2番目の ALTER を妨げ、先行 ALTER を含めて全体が戻ることを検査します。意図した失敗を `migrate resolve --rolled-back` で記録するのは、この空の使い捨て DB のテスト内だけです。本番失敗の自動解決手順ではありません。旧アプリの UTC Date/JSON は互換ですが、招待 SQL は同じリリースで更新し、運用・直接 SQL の writer も UTC に統一します。過去値が正しいかはこの migration だけでは判断できません。過去の誤った未来値を残すため、移行前後の日時の大小だけで履歴順序を推定しません。
+
+切戻しで旧 migration を改変・削除したり、履歴を一括更新したりしません。アプリだけを戻しても DB 関数/default は残り、旧招待 SQL の時差問題は戻ります。必要な切戻しは対象環境の書込みを管理し、適用済み定義と互換性を確認した別の forward migration として準備します。今回のローカル検証は本番適用の承認や本番データの補正を含みません。
 
 ### 二段階公開の移行と検証
 
@@ -405,20 +434,20 @@ API/UIとmigrationを揃えて配備します。古いPUT/DELETEは版なしで4
 <a id="staging"></a>
 ### stagingの準備と環境分離
 
-変更は最新mainを基点に独立branchで準備し、`test/staging`のテスト環境で人間が確認してからmainへのPRで採用範囲を判断します。旧staging全体のmerge、未採用候補・UTCの20件目migration・追加harnessの一括取り込みはしません。mainへの採用とProduction配備は別の承認対象です。
+2026-11-07の初回同期は、既存 `test/staging` の履歴を保持して、レビュー済みmainの固定SHAをmergeします。staging専用のテスト帯・Blob分離・回帰テストを残し、main採用済みの修正とUTCの20件目migrationの**ソース**を取り込みます。DBへのmigration適用は別作業です。以後の運用は `test/staging` への変更 → 対象SHAのCI成功 → 専用Previewと固定URLの確認であり、mainからの自動mergeを追加しません。stagingからmainへの採用とProduction配備も別の承認対象です。[今回の同期と未確認事項](../verification/staging-sync-20261107.md)を参照してください。
 
-`vercel.json`は準備branch `prepare/staging-main-v1-final-20261028` の自動配備をfalseに保ち、exact `test/staging`だけをtrueにします。このcommitをtest/staging先端へ反映した後のpushがPreview自動更新の対象です。設定・実効SHA・CI・Preview Readyを照合するまで切替完了とは扱いません。準備branchにはtest/staging専用の環境変数が適用されないため配備しません。最終切替前に最新mainの対象SHAを固定し、採用済み差分を保持したまま検証します。旧branch先端の置換が必要なら旧SHAを保持し、その操作について新しい承認を得ます。過去のforce-with-lease許可を再利用しません。
+`.github/workflows/ci.yml` と `vercel.json` はレビュー済みmainと同一のblobにします。exact `test/staging`、`ci/staging-branch-preview-20261107`、同期PR用の `ci/staging-sync-20261107` はいずれもGit自動配備をfalseに保ち、同期branchの初回pushにもこの抑止を含めます。重複キーや別のtrueルールで抑止が上書きされないことを確認します。Git接続とbranch限定変数を維持するCI後配備の方式・有効化条件は[staging Actions](staging-actions.md)を参照してください。Git自動配備のtrueへの切替、force-push、旧先端の置換は行いません。mainや未指定branchのGit配備まで抑止した設定ではありません。
 
 テスト帯を表示するのは、`CLEARALLERGY_TEST_PREVIEW=true`、`VERCEL=1`、`VERCEL_ENV=preview`、`VERCEL_GIT_COMMIT_REF=test/staging`がすべて一致する場合だけです。Production、main、他branch、ローカル、設定不足では表示しません。帯は実店舗ではない架空データの案内であり、公開条件・権限・アレルゲンの意味は変えません。
 
-専用Previewの画像保存は `TEST_BLOB_READ_WRITE_TOKEN` と `EXPECTED_TEST_BLOB_STORE_ID` の対応を検査し、専用tokenをSDKへ明示します。対象branch・Preview条件や専用設定が不正なら共有Blobへfallbackせず停止します。通常のProduction環境では従来のSDK設定を維持します。token形式の検査は認証成功の確認ではありません。
-`ALLOWED_IMAGE_URL_PREFIXES` はPreview/exact `test/staging`で専用storeのHTTPS prefixだけを許可することが配備前の必須条件です。書込tokenの分離とは別で、URL policyは `TEST_BLOB_READ_WRITE_TOKEN` を参照せず、明示prefixがない場合は共通 `BLOB_READ_WRITE_TOKEN` 由来の共有storeを許可し得ます。変数名・scopeの存在だけで完了とせず、専用storeとの一致と共有storeを含まないことを秘密値なしで確認するまでは、自動配備を有効化しません。
+専用Previewの画像保存は `TEST_BLOB_READ_WRITE_TOKEN` と `EXPECTED_TEST_BLOB_STORE_ID` の対応を検査し、専用tokenをSDKへ明示します。検査の入口は、branchがexact `test/staging`、または `CLEARALLERGY_TEST_PREVIEW` が未設定・空・`false`以外の場合です。この入口に入った後、対象branch・Preview条件や専用設定が不正なら共有Blobへfallbackせず停止します。branchが欠損・別branchでflagも未設定・空・`false`なら、専用token変数が存在しても従来のSDK設定で動きます。実配備でのbranch metadataとflagの確認は必須です。通常のProduction環境では従来のSDK設定を維持します。token形式の検査は認証成功の確認ではありません。
+`ALLOWED_IMAGE_URL_PREFIXES` はPreview/exact `test/staging`で専用storeのHTTPS prefixだけを許可することが配備前の必須条件です。書込tokenの分離とは別で、URL policyは `TEST_BLOB_READ_WRITE_TOKEN` を参照せず、明示prefixがない場合は共通 `BLOB_READ_WRITE_TOKEN` 由来の共有storeを許可し得ます。変数名・scopeの存在だけで完了とせず、専用storeとの一致と共有storeを含まないことを秘密値なしで確認するまでは、CI後の配備を有効化しません。
 
-CIは既存job/check名・隔離PostgreSQL・権限を維持し、既存のpush/PR対象にexact `test/staging`だけを追加します。GitHub CIの成功だけでVercel配備・実Clerk・実Blob・外部DBを確認済みにしません。`prebuild`は従来どおりPrisma Client生成のみで、DB migrationやfixture作成を自動実行しません。
+CIは既存job/check名・隔離PostgreSQL・権限と、exact `test/staging` 向けのpush/PR対象を維持します。GitHub CIの成功だけでVercel配備・実Clerk・実Blob・外部DBを確認済みにしません。`prebuild`は従来どおりPrisma Client生成のみで、DB migrationやfixture作成を自動実行しません。
 
-専用 `clearallergy_main19` はmainと同じ19件のmigrationとchecksum、master29、User2・Shop2・Menu6（全draft）、アレルゲンリンク174、各history0の初期化後検証が完了しています。再INIT・通常seed・降順migration・reset・削除は行いません。旧 `neondb` の20件環境は保持します。自宅回線での読み取り接続と今回1回の初期化成功は、追加の接続・書き込み・再実行を許可するものではありません。過去のP1001原因は未確定です。VercelのPreview/exact test/stagingへのDB接続設定反映と実アプリの確認は別工程で、完了を確認するまで自動配備の抑止を維持します。
+専用 `clearallergy_main19` の初期化時には19件のmigrationとchecksum、master29、User2・Shop2・Menu6（全draft）、アレルゲンリンク174、各history0の一致を確認しました。これは過去の初期化記録です。2026-11-07の同期準備時点で専用DBは19件適用済み、今回取り込むmainには20件目 `20261024000000_utc_timestamp_contract` があり、**DBとの差分は未解消**です。今回のローカル同期ではDBに接続せず、migration適用・再INIT・通常seed・降順migration・reset・削除を行いません。旧 `neondb` も保持します。配備前に専用接続先、現状、差分と影響を改めて確認し、承認された範囲で移行と適用後検証を行う必要があります。過去の接続・初期化成功は追加の接続や書込の許可ではありません。過去のP1001原因は未確定です。
 
-自動更新を有効にする前に、VercelのGit連携・Production branch、対象SHA、exact branch guard、専用DB/Clerk/Blobの対応と変数scopeを秘密値なしで照合します。共通Preview値が残る場合、branch固有値が同名値を上書きすることと、専用branch以外へ適用されないことを確認します。配備抑止解除、環境設定の変更、push、merge、deployは対象・副作用・順序を確認した承認範囲で実行します。main採用とProduction配備は別承認です。
+CI後配備を有効にする前に、VercelのGit連携・Production branch、対象SHA、source保護、exact branch guard、専用DB/Clerk/Blobの対応と変数scopeを照合します。共通Preview値が残る場合、branch固有値が同名値を上書きすることと、専用branch以外へ適用されないことを確認します。設定変更、資格情報の利用・保存、DB移行、push、merge、deployは対象・副作用・順序を確認した承認範囲で実行します。実効SHA・CI・Preview Ready・固定URLと実アプリを照合するまで切替完了とは扱いません。
 
 ローカルの帯・Blob回帰は `node --import tsx --test tests/test-environment-banner.test.ts tests/test-preview-blob.test.ts`。実認証・所有権分離・保存・公開・STOP・画像uploadは、対象SHAのテスト環境で別途確認します。単体テストをこれらのPASSとして扱いません。
 
@@ -450,3 +479,7 @@ CIは既存job/check名・隔離PostgreSQL・権限を維持し、既存のpush/
 ### Runtime依存の限定override
 
 `@vercel/cli-config@0.2.0` 配下のZodはroot4.6.6へ合わせます。旧exact pinの公式advisory対策であり、Vercel SDK・認証設定の更新ではありません。上流consumer/Zodを更新するときはoverride削除可否と純粋schemaのparse/encode互換性を `tests/runtime-dependency-compat.test.ts` で再確認してください。[範囲・隔離・残gate](../verification/runtime-dependency-security-20261024.md)を参照してください。
+
+### 公開鮮度の再取得を検証する場合
+
+この変更をmainへ取り込む場合、基本public/admin 11件とfreshness project10件の全21定義が対象です。固定head cd18f209のCIは20 PASS・native BFCache1 SKIPで、後続HEADの結果は別に照合します。[E2E手順](e2e.md#freshness-prototype)と[結果・未確認](../verification/public-freshness-prototype-20261105.md)に従って、許可済みの架空DB・認証境界の範囲で実行します。native BFCacheが使われなかった場合を成功件数へ含めません。公開layoutを離れたSPA復帰は隔離CIの1経路で訂正反映を確認しましたが、全復帰経路の保証ではありません。既存のlint/typecheck/test/build、公開読取4入口と10負例の条件は維持します。
