@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { isValidElement, type ReactNode } from "react";
 import Module, { createRequire } from "node:module";
-import { publicSnapshotSchema } from "../features/public/shops/freshness/contracts";
+import { publicSnapshotSchema, shopViewSnapshotSchema, SHOP_VIEW_MEDIA_TYPE } from "../features/public/shops/freshness/contracts";
+import { readSnapshotResponse } from "../features/public/shops/freshness/revalidation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db";
 import { ALLERGEN_MASTER } from "../lib/constants/allergen-master";
@@ -17,6 +18,7 @@ let ShopListPage: typeof import("../app/(public)/shops/page").default;
 let ShopDetailPage: typeof import("../app/(public)/shops/[shopId]/page").default;
 let MenuDetailPage: typeof import("../app/(public)/shops/[shopId]/menus/[menuId]/page").default;
 let GET: typeof import("../app/api/menus/[menuId]/route").GET;
+let GETSnapshot: typeof import("../app/api/public-snapshot/route").GET;
 try {
     moduleLoader._load = function (id, ...args) {
         if (id === "server-only") return {};
@@ -26,6 +28,7 @@ try {
     ShopDetailPage = requireForTest("../app/(public)/shops/[shopId]/page.tsx").default;
     MenuDetailPage = requireForTest("../app/(public)/shops/[shopId]/menus/[menuId]/page.tsx").default;
     GET = requireForTest("../app/api/menus/[menuId]/route.ts").GET;
+    GETSnapshot = requireForTest("../app/api/public-snapshot/route.ts").GET;
 } finally { moduleLoader._load = originalLoad; }
 
 const allergens = ALLERGEN_MASTER.map((allergen, index) => ({
@@ -86,7 +89,7 @@ function findProps(node: ReactNode, key: string): Record<string, unknown> {
 type ReadName = "shop.findMany" | "shop.findFirst" | "allergen.findMany" |
     "menuItem.findFirst" | "menuItem.findMany";
 
-function stubDistinctTransaction(t: TestContext) {
+function stubDistinctTransaction(t: TestContext, shop: unknown = makeShop()) {
     const rootReads: string[] = [];
     const transactions: ReadName[][] = [];
     const forbidden = (name: ReadName) => async () => {
@@ -128,7 +131,7 @@ function stubDistinctTransaction(t: TestContext) {
         const tx = {
             shop: {
                 findMany: query("shop.findMany", [makeShop()]),
-                findFirst: query("shop.findFirst", makeShop()),
+                findFirst: query("shop.findFirst", shop),
             },
             allergen: { findMany: query("allergen.findMany", allergens) },
             menuItem: {
@@ -145,6 +148,72 @@ function stubDistinctTransaction(t: TestContext) {
     }) as typeof prisma.$transaction;
     return transactions;
 }
+
+test("shop thumbnails use validated publishable rows while default public JSON stays strict", async (t) => {
+    const origin = "https://fixture.public.blob.vercel-storage.com";
+    const url = `${origin}/menu-images/${shopId}/sample.jpg`;
+    const oldPrefixes = process.env.ALLOWED_IMAGE_URL_PREFIXES;
+    process.env.ALLOWED_IMAGE_URL_PREFIXES = origin;
+    t.after(() => {
+        if (oldPrefixes === undefined) delete process.env.ALLOWED_IMAGE_URL_PREFIXES;
+        else process.env.ALLOWED_IMAGE_URL_PREFIXES = oldPrefixes;
+    });
+
+    const valid = { ...makeMenu(), imageUrl: url, imageFrame: "wide", imageFit: "contain", imageZoom: 130, imagePositionX: 25, imagePositionY: 75 };
+    const unknown = { ...makeMenu(true), id: "unknown", imageUrl: url,
+        allergenLinks: makeMenu(true).allergenLinks.map((link, index) => index === 1 ? { ...link, status: "UNKNOWN" } : link) };
+    const missing = { ...makeMenu(true), id: "missing", imageUrl: url, allergenLinks: makeMenu(true).allergenLinks.slice(0, -1) };
+    const obsolete = { ...makeMenu(true), id: "obsolete", imageUrl: url, publicationConfirmedFoodVersion: 0 };
+    const invalid = { ...makeMenu(), id: "invalid-url", imageUrl: `${origin}/menu-images/another-shop/sample.jpg` };
+    const shop = { ...makeShop(), menus: [valid, unknown, missing, obsolete, invalid] };
+    const transactions = stubDistinctTransaction(t, shop);
+    const props = findProps(await ShopDetailPage({ params: Promise.resolve({ shopId }) }), "initialSnapshot");
+    assert.deepEqual(props.menuImages, {
+        [menuId]: { updatedAt: valid.updatedAt.toISOString(), safeImageUrl: url, imageFrame: "wide", imageFit: "contain",
+            imageZoom: 130, imagePositionX: 25, imagePositionY: 75 },
+    });
+    const snapshot = publicSnapshotSchema.parse(props.initialSnapshot);
+    assert.equal(snapshot.result.kind, "shop");
+    if (snapshot.result.kind !== "shop") assert.fail("Expected shop snapshot");
+    assert.deepEqual(snapshot.result.data.menusForClient.map(menu => menu.id), [menuId, "invalid-url"]);
+    assert.deepEqual(snapshot.result.data.storeHandledAllergenSlugs, [], "Unpublishable rows cannot supply store supplements");
+    const requestId = "8e20dad4-9de7-4e89-bd51-6917e79aef47";
+    const requestUrl = `http://localhost/api/public-snapshot?kind=shop&shopId=${shopId}&requestId=${requestId}`;
+    const response = await GETSnapshot(new Request(requestUrl, { headers: { Accept: "application/json" } }));
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(publicSnapshotSchema.parse(body).result, snapshot.result);
+    assert.doesNotMatch(JSON.stringify(body), /sample\.jpg|menuImages/);
+    assert.equal(transactions.length, 2);
+
+    const shopView = await GETSnapshot(new Request(requestUrl, { headers: { Accept: SHOP_VIEW_MEDIA_TYPE } }));
+    assert.equal(shopView.status, 200);
+    assert.equal(shopView.headers.get("content-type"), SHOP_VIEW_MEDIA_TYPE);
+    assert.equal(shopView.headers.get("cache-control"), "no-store");
+    assert.equal(shopView.headers.get("vary"), "Accept");
+    assert.deepEqual(transactions[2].sort(), ["allergen.findMany", "shop.findFirst"]);
+    assert.equal(transactions.length, 3, "One transaction per app refresh");
+    const { menuImages, ...viewSnapshot } = shopViewSnapshotSchema.parse(await shopView.clone().json());
+    assert.deepEqual(viewSnapshot.result, snapshot.result);
+    assert.deepEqual(menuImages, props.menuImages);
+    const target = { kind: "shop", shopId } as const;
+    assert.deepEqual((await readSnapshotResponse(target, requestId, shopView)).menuImages, props.menuImages);
+
+    const image = (props.menuImages as Record<string, { updatedAt: string; safeImageUrl: string }>)[menuId];
+    const badViews = [
+        { [menuId]: { ...image, updatedAt: "2026-11-09T00:00:00.000Z" } },
+        { [menuId]: { ...image, safeImageUrl: url.replace(shopId, "other-shop") } },
+        { unknown: image, missing: image, obsolete: image },
+    ];
+    for (const invalidImages of badViews) {
+        const bad = Response.json({ ...viewSnapshot, menuImages: invalidImages }, { headers: { "Content-Type": SHOP_VIEW_MEDIA_TYPE } });
+        const result = await readSnapshotResponse(target, requestId, bad);
+        assert.deepEqual(result.menuImages, {});
+        assert.deepEqual(result.result, snapshot.result);
+    }
+    const withoutImages = Response.json(viewSnapshot, { headers: { "Content-Type": SHOP_VIEW_MEDIA_TYPE } });
+    assert.deepEqual(await readSnapshotResponse(target, requestId, withoutImages), viewSnapshot);
+});
 
 const callers: Array<{ name: string; reads: ReadName[]; invoke: () => Promise<void> }> = [
     {

@@ -18,7 +18,7 @@ mkdirSync(output, { recursive: true });
 writeFileSync(join(fixture, "loader.cjs"), "const ts = require(" + JSON.stringify(require.resolve("typescript")) + "); module.exports = function(source) { return ts.transpileModule(source, {fileName:this.resourcePath, compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.ESNext}}).outputText; };", "utf8");
 // Routing/image adapters delimit this fixture; actual Next routing and uploads are not tested.
 writeFileSync(join(fixture, "link.tsx"), "import React from 'react'; export default function Link({prefetch,children,...props}){return <a {...props}>{children}</a>}", "utf8");
-writeFileSync(join(fixture, "image.tsx"), "import React from 'react'; export default function Image({fill,priority,...props}){return <img {...props}/>}", "utf8");
+writeFileSync(join(fixture, "image.tsx"), "import React from 'react'; export default function Image({fill,priority,style,...props}){return <img {...props} style={fill?{position:'absolute',inset:0,width:'100%',height:'100%',...style}:style}/>}", "utf8");
 writeFileSync(join(fixture, "navigation.ts"), "const router={push:href=>location.assign(href),replace:href=>location.replace(href),refresh:()=>{}}; export function useRouter(){return router} export function useSearchParams(){return new URLSearchParams(location.search)}", "utf8");
 const entry = [
     "import React from 'react'; import {createRoot} from 'react-dom/client';",
@@ -32,16 +32,20 @@ const entry = [
     "const note='乳：仕入れ品に、乳を扱う製造ラインについての注意表示があります。\\n小麦：小麦を使う料理と揚げ油を共用しています。';",
     "const target={id:'target',name:'ミックスプレート',description:null,category:'デザート',priceYen:880,precaution:note,updatedAt:'2026-10-09T00:00:00Z',allergenLinks:links({egg:'CONTAINS',wheat:'MAY_CONTAIN',milk:'MAY_CONTAIN',soybean:'CONTAINS'})};",
     "const source={...target,id:'source',name:'くるみを使う別メニュー',precaution:null,allergenLinks:links({walnut:'CONTAINS'})};",
+    "const all={...target,id:'all',name:'長い料理名'+ 'LongMenuName'.repeat(20),precaution:null,allergenLinks:master.map(a=>({allergen:{slug:a.slug},status:'CONTAINS'}))};",
+    "const free={...source,id:'free',name:'全選択FREE',allergenLinks:links({})}; const broken={...free,id:'broken',name:'読み込めない画像',allergenLinks:links({milk:'MAY_CONTAIN'})};",
+    "const picture={safeImageUrl:'/image.svg',imageFit:'contain',imageFrame:'wide',imageZoom:125,imagePositionX:23,imagePositionY:71,updatedAt:target.updatedAt}; const images={target:picture,source:{...picture,imageFrame:'square'},broken:{...picture,safeImageUrl:'/missing.jpg'},free:{...picture,updatedAt:'2026-10-08T00:00:00Z'}};",
     "const listBase={category:'架空検証',priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:new Date('2026-10-15T00:00:00Z'),foodVersion:2,reviewedFoodVersion:null,publicationConfirmedFoodVersion:null,allergenLinks:links({}),foodReviews:[]}; const listRows=[{id:'unknown',name:'架空・品目未設定',allergenLinks:links({milk:'UNKNOWN'})},{id:'current',name:'架空・現行確認で公開中',isPublished:true,reviewedFoodVersion:2,publicationConfirmedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]},{id:'old',name:'架空・材料更新で旧確認',foodReviews:[{foodVersion:1,unresolvedIssues:null}]},{id:'unresolved',name:'架空・最新記録が未解決',foodReviews:[{foodVersion:2,unresolvedIssues:'非公開の架空仕入れメモ'}]},{id:'missing',name:'架空・確認記録なし'},{id:'stopped',name:'架空・通常の公開停止',reviewedFoodVersion:2,publicationConfirmedFoodVersion:2,foodReviews:[{foodVersion:2,unresolvedIssues:null}]}].map(row=>toAdminMenuListRow({...listBase,...row},master));",
     "function prefs(highlightSlugs=[],excludedSlugs=[],includeMayContain=false){saveUserAllergenPreferences({highlightSlugs,excludedSlugs,includeMayContain,selectedSlugs:[]})}",
     "function App(){const [published,setPublished]=React.useState(true);const [unknown,setUnknown]=React.useState(false);const [long,setLong]=React.useState(false);const current={...target,precaution:long?'小麦：'+ '長い注意書き'.repeat(250):note,allergenLinks:unknown?links({egg:'CONTAINS',milk:'UNKNOWN'}):target.allergenLinks};const menus=published?[current,source]:[current];",
+    "if(location.pathname==='/matrix')return <><button onClick={()=>prefs(['walnut'],[],true)}>くるみの別メニュー補足</button><button onClick={()=>prefs(master.map(a=>a.slug))}>全品目を注目</button><ShopMenus shopId='fixture' menus={[all,free,broken,source]} allergenMaster={master} menuImages={images} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs([all,free,broken,source],master)]}/></>;",
     "if(location.pathname==='/shops/fixture/menus/target')return <Detail shopId='fixture' shopName='架空検証店' menuName={current.name} description={null} category={current.category} priceText='880円' updatedAtText='架空検証時刻' safeImageUrl={null} imageFrame='wide' imageFit='contain' imagePosition='center' imageZoom={100} imagePositionX={50} imagePositionY={50} ingredients='架空の原材料' precaution={note} allergensForClient={master} statusBySlugForClient={Object.fromEntries(current.allergenLinks.map(link=>[link.allergen.slug,link.status]))} rows={buildAllergenDisplayItems(buildAllergenRows(master,current.allergenLinks),getStoreContainsAllergenSlugs(menus,master))} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs(menus,master)]}/>;",
     "if(location.pathname.startsWith('/new'))return <NewMenu allergens={master} readOnlyPreview={location.pathname==='/new'}/>;",
     "if(location.pathname==='/list-delete')return <MenuList totalAllergenCount={master.length} initialMenus={[{id:'fixture',name:'架空削除メニュー',category:null,priceYen:null,imageUrl:null,isPublished:false,version:5,updatedAt:'2026-10-09T00:00:00Z',unknownAllergenNames:[],foodReviewState:'current'}]}/>;",
     "if(location.pathname==='/list-stop')return <MenuList totalAllergenCount={master.length} initialMenus={[{...listRows[0],id:'fixture',name:'架空停止メニュー',isPublished:true,version:5}]}/>;",
     "if(location.pathname.startsWith('/review-queue'))return <MenuList totalAllergenCount={master.length} initialMenus={location.pathname==='/review-queue-empty'?[]:listRows} readOnly={location.pathname==='/review-queue-demo'} readOnlyEditHrefBase={location.pathname==='/review-queue-demo'?'/admin/demo/menus':undefined}/>;",
     "if(location.pathname.startsWith('/edit'))return <EditMenu menuId='fixture' initialVersion={5} initialFoodVersion={1} initialReviewedFoodVersion={location.pathname==='/edit-save'?1:null} initialPublicationConfirmedFoodVersion={location.pathname==='/edit-save'?1:null} initialFoodReviews={location.pathname==='/edit-save'?history:[]} initialName='入力ガイド確認用' initialDescription={null} initialPriceYen={null} initialCategory={null} initialIngredients={null} initialPrecaution={null} initialImageUrl={null} initialImageFrame='wide' initialImageFit='contain' initialImagePosition='center' initialImageZoom={100} initialImagePositionX={50} initialImagePositionY={50} initialIsPublished={location.pathname==='/edit-save'} allergens={master} initialStatusBySlug={location.pathname==='/edit-save'?reviewedStatuses:statuses} readOnlyPreview={location.pathname==='/edit'}/>;",
-    "return <><h1>架空データによるカード確認</h1><nav style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}><button onClick={()=>prefs()}>設定を解除</button><button onClick={()=>prefs(['milk','walnut'])}>乳とくるみを注目</button><button onClick={()=>prefs([],['walnut'])}>くるみを除外</button><button onClick={()=>prefs([],['milk'])}>乳の可能性は残す</button><button onClick={()=>prefs([],['milk'],true)}>乳の可能性も除外</button><button onClick={()=>setPublished(v=>!v)}>補足元の公開を切替</button><button onClick={()=>setUnknown(v=>!v)}>未確認の入力を切替</button><button onClick={()=>setLong(v=>!v)}>長い注意書きを切替</button></nav><Prefs allergens={master}/><ShopMenus shopId='fixture' menus={menus} allergenMaster={master} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs(menus,master)]}/></>}",
+    "return <><h1>架空データによるカード確認</h1><nav style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}><button onClick={()=>prefs()}>設定を解除</button><button onClick={()=>prefs(['milk','walnut'])}>乳とくるみを注目</button><button onClick={()=>prefs([],['walnut'])}>くるみを除外</button><button onClick={()=>prefs([],['milk'])}>乳の可能性は残す</button><button onClick={()=>prefs([],['milk'],true)}>乳の可能性も除外</button><button onClick={()=>setPublished(v=>!v)}>補足元の公開を切替</button><button onClick={()=>setUnknown(v=>!v)}>未確認の入力を切替</button><button onClick={()=>setLong(v=>!v)}>長い注意書きを切替</button></nav><Prefs allergens={master}/><ShopMenus shopId='fixture' menus={menus} allergenMaster={master} menuImages={images} storeHandledAllergenSlugs={[...getStoreContainsAllergenSlugs(menus,master)]}/></>}",
     "createRoot(document.getElementById('root')).render(<App/>);",
 ].join("\n");
 writeFileSync(join(fixture, "entry.tsx"), entry, "utf8");
@@ -80,7 +84,7 @@ for (const name of readdirSync(media)) if (name.endsWith(".woff2")) {
 }
 const server = createServer((request, response) => {
     const path = new URL(request.url, "http://localhost").pathname;
-    const asset = assets.get(path) || (["/", "/shops/fixture/menus/target", "/new", "/new-save", "/edit", "/edit-save", "/list-delete", "/list-stop", "/review-queue", "/review-queue-demo", "/review-queue-empty"].includes(path) ? ["text/html", html] : null);
+    const asset = assets.get(path) || (["/", "/matrix", "/shops/fixture/menus/target", "/new", "/new-save", "/edit", "/edit-save", "/list-delete", "/list-stop", "/review-queue", "/review-queue-demo", "/review-queue-empty"].includes(path) ? ["text/html", html] : null);
     response.writeHead(asset ? 200 : 404, { "Content-Type": asset?.[0] || "text/plain" });
     response.end(asset?.[1] || "Not found");
 });
@@ -103,6 +107,7 @@ try {
     page.on("pageerror", error => errors.push(error.message));
     await page.goto(base);
     const card = page.locator('a[href="/shops/fixture/menus/target"]');
+    const source = page.locator('a[href="/shops/fixture/menus/source"]');
     await card.waitFor();
     const registered = card.getByRole("group", { name: "店舗が登録したアレルゲン", exact: true }).first();
     assert.match(await registered.innerText(), /含む\s+卵\s*（1品目）/);
@@ -115,12 +120,23 @@ try {
     assert.doesNotMatch(await registered.innerText(), /くるみ/);
     assert.match(await card.getByRole("group", { name: "店舗の注意書き", exact: true }).innerText(), /乳を扱う製造ライン.*\n小麦：/);
     pass("Names and counts remain scoped; manual uncertainty, automatic supplement and full note are separate");
-    for (const width of [320, 390, 768, 1440]) {
+    for (const width of [320, 390, 768, 1024, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, width + "px overflow");
+        const [first, second] = await Promise.all([card.boundingBox(), source.boundingBox()]);
+        assert.equal(first.y === second.y, width >= 1024, "Two columns start at 1024px");
+        if (width >= 1024) assert.ok(first.height > second.height, "Shorter cards must not stretch");
+        for (const [menu, ratio] of [[card, 4 / 3], [source, 1]]) {
+            const thumbnail = menu.locator("img");
+            await thumbnail.evaluate(image => image.decode());
+            const bounds = await thumbnail.locator("..").boundingBox();
+            assert.equal(bounds.width, width >= 1024 ? 96 : 80);
+            assert.equal(bounds.width / bounds.height, ratio);
+            assert.deepEqual(await thumbnail.evaluate(image => [image.alt, image.style.objectFit, image.style.objectPosition, image.style.transform, image.style.transformOrigin]), ["", "contain", "23% 71%", "scale(1.25)", "23% 71%"]);
+        }
         if ([390, 1440].includes(width)) await page.locator("#public-menus").screenshot({ path: join(output, "allergen-cards-" + width + ".png") });
     }
-    pass("320/390/768/1440px cards wrap names and full notes without horizontal overflow");
+    pass("320/390/768/1024/1440px layout, unstretched cards, square/wide saved thumbnails and no horizontal overflow");
     await page.getByRole("button", { name: "補足元の公開を切替", exact: true }).click();
     assert.equal(await card.getByRole("group", { name: "他の公開メニューの登録情報", exact: true }).count(), 0);
     assert.match(await registered.innerText(), /小麦・乳\s*（2品目）/);
@@ -142,28 +158,34 @@ try {
     await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
     await panel.getByLabel("くるみの表示設定", { exact: true }).selectOption("highlight");
     await panel.getByLabel("乳の表示設定", { exact: true }).selectOption("highlight");
+    await panel.getByLabel("卵の表示設定", { exact: true }).selectOption("highlight");
     const possibility = panel.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ });
     assert.equal(await possibility.isChecked(), false);
     await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
-    assert.equal(await card.getByRole("region", { name: "注目設定に一致", exact: true }).count(), 0);
+    const marks = card.getByText("（注目設定に一致）", { exact: true });
+    assert.equal(await marks.count(), 1);
+    assert.match(await marks.first().locator("..").textContent(), /^卵※/);
     assert.match(await registered.innerText(), /含む可能性あり・要確認\s+乳/);
     await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
     await possibility.focus(); await page.keyboard.press("Space");
     assert.equal(await possibility.isChecked(), true);
-    assert.equal(await card.getByRole("region", { name: "注目設定に一致", exact: true }).count(), 0, "Draft toggle must not change the list before Apply");
+    assert.equal(await marks.count(), 1, "Draft toggle must not change the list before Apply");
     await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
-    const highlight = card.getByRole("region", { name: "注目設定に一致", exact: true });
-    assert.match(await highlight.innerText(), /くるみ（別メニューに含む）/);
-    assert.match(await highlight.innerText(), /乳（含む可能性あり・要確認）/);
-    assert.match(await registered.innerText(), /含む可能性あり・要確認\s+乳\s*（1品目）/);
-    assert.match(await card.getByRole("group", { name: "他の公開メニューの登録情報", exact: true }).innerText(), /別メニューに含む/);
+    const supplement = card.getByRole("group", { name: "他の公開メニューの登録情報", exact: true });
+    assert.equal(await marks.count(), 3);
+    assert.match(await registered.ariaSnapshot(), /乳[\s\S]*注目設定に一致/);
+    assert.match(await supplement.ariaSnapshot(), /くるみ[\s\S]*注目設定に一致/);
+    assert.match(await supplement.innerText(), /別メニューに含む[\s\S]*原材料登録とは別の情報/);
+    assert.equal(await page.getByText("※ は注目設定に一致した品目に表示します。", { exact: true }).count(), 1);
+    assert.equal(await card.getByRole("region", { name: "注目設定に一致", exact: true }).count(), 0);
+    assert.doesNotMatch(await registered.innerText(), /原材料に含まない/);
     for (const width of [390, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
         await card.screenshot({ path: join(output, `possibility-highlight-${width}.png`) });
     }
     await page.reload(); await card.waitFor();
-    assert.match(await highlight.innerText(), /くるみ（別メニューに含む）/);
+    assert.match(await supplement.ariaSnapshot(), /くるみ[\s\S]*注目設定に一致/);
     pass("Unified toggle applies independent highlights only after Apply, persists on reload, and leaves registered MAY visible OFF");
     await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
     await panel.getByLabel("くるみの表示設定", { exact: true }).selectOption("exclude");
@@ -201,11 +223,44 @@ try {
     assert.equal(await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).evaluate(element => element === document.activeElement), true);
     await page.keyboard.press("Tab");
     assert.equal(await card.evaluate(element => element === document.activeElement), true);
+    const accessibility = await context.newCDPSession(page);
+    const { root: { nodeId: documentId } } = await accessibility.send("DOM.getDocument");
+    const { nodeId } = await accessibility.send("DOM.querySelector", { nodeId: documentId, selector: "a:focus" });
+    const { nodes } = await accessibility.send("Accessibility.getPartialAXTree", { nodeId });
+    const focusedLink = nodes.find(node => node.role?.value === "link");
+    assert.equal(focusedLink?.name?.value, "ミックスプレート");
+    assert.match(focusedLink?.description?.value, /含む\s+卵[\s\S]*未入力・未確認\s+乳/);
+    assert.doesNotMatch(focusedLink?.description?.value, /長い注意書き/);
+    await accessibility.detach();
     assert.equal(await card.evaluate(element => element.matches(":focus-visible")), true);
     assert.equal(await card.evaluate(element => {
         const style = getComputedStyle(element);
         return style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0;
     }), true, "Card keyboard focus must be visible");
+
+    const failedImageResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/missing.jpg");
+    await page.goto(base + "/matrix");
+    assert.equal((await failedImageResponse).status(), 404);
+    const broken = page.getByRole("link", { name: "読み込めない画像", exact: true });
+    const free = page.getByRole("link", { name: "全選択FREE", exact: true });
+    const all = page.getByRole("link", { name: /^長い料理名/ });
+    await broken.locator("img").waitFor({ state: "detached" });
+    assert.match(await broken.innerText(), /含む可能性あり・要確認\s+乳\s*（1品目）/);
+    assert.equal(await broken.locator("dt").count(), 1);
+    assert.equal(await broken.getAttribute("href"), "/shops/fixture/menus/broken");
+    assert.equal(await free.locator("img").count(), 0, "Do not pair the thumbnail with a changed menu");
+    assert.equal(await all.locator("img").count(), 0, "No image frame when absent");
+    assert.match(await free.innerText(), /確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。/);
+    await page.getByRole("button", { name: "くるみの別メニュー補足" }).click();
+    assert.match(await free.innerText(), /確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。/);
+    assert.match(await free.getByRole("group", { name: "他の公開メニューの登録情報" }).innerText(), /別メニューに含む/);
+    await page.getByRole("button", { name: "全品目を注目" }).click();
+    assert.equal(await all.locator("dt").count(), 1);
+    assert.equal(await all.getByText("（注目設定に一致）", { exact: true }).count(), 29);
+    assert.match(await all.locator("dd").innerText(), /落花生（ピーナッツ）[\s\S]*ピスタチオ[\s\S]*（29品目）/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    pass("29 exact highlights, long menu name, all-FREE and FREE + supplement, isolated MAY, missing/stale/failed thumbnails");
+
     for (const path of ["/new", "/edit"]) {
         await page.goto(base + path);
         const guide = page.getByRole("group", { name: "アレルゲン状態の入力ガイド", exact: true });

@@ -63,17 +63,20 @@ try {
 
     const defaultChicken = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "照り焼きチキンプレート", exact: true }) });
     assert.match(await defaultChicken.innerText(), /確認対象：特定原材料（9品目）/);
-    assert.match(await defaultChicken.innerText(), /特定原材料：含む/);
     const chickenOther = defaultChicken.getByRole("group", { name: "その他のアレルゲン", exact: true });
     const chickenOtherRows = chickenOther.locator("dl > div");
     assert.match(await chickenOtherRows.filter({ has: page.locator("dt", { hasText: /^含む$/ }) }).innerText(), /大豆・鶏肉\s*（2品目）/);
     assert.match(await chickenOtherRows.filter({ has: page.locator("dt", { hasText: "含む可能性あり・要確認" }) }).innerText(), /ごま\s*（1品目）/);
     // Check the primary counts separately from the other group, so all-29 aggregation cannot pass.
-    const primaryText = await defaultChicken.evaluate(card => card.innerText.split("その他のアレルゲン")[0]);
+    const registeredGroups = { name: "店舗が登録したアレルゲン", exact: true };
+    const primaryText = await defaultChicken.getByRole("group", registeredGroups).first().innerText();
     assert.match(primaryText, /含む\s+卵\s*（1品目）/);
     assert.match(primaryText, /含む可能性あり・要確認\s+小麦・乳\s*（2品目）/);
     const defaultPancake = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "米粉パンケーキ", exact: true }) });
-    assert.doesNotMatch(await defaultPancake.innerText(), /特定原材料：含む/);
+    assert.match(await defaultPancake.innerText(), /確認対象：特定原材料（9品目）/);
+    const pancakePrimary = defaultPancake.getByRole("group", registeredGroups).first();
+    assert.match(await pancakePrimary.innerText(), /確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。/);
+    assert.equal(await pancakePrimary.locator("dl").count(), 0, "All-FREE is a short registration summary");
     assert.match(await defaultPancake.getByRole("group", { name: "その他のアレルゲン", exact: true }).innerText(), /含む\s+大豆\s*（1品目）/);
     pass("Unselected cards classify specified ingredients separately; other CONTAINS/MAY_CONTAIN facts remain visible");
 
@@ -123,6 +126,16 @@ try {
             assert.equal(await logo.locator("span").evaluate(el => getComputedStyle(el).overflow === "hidden"), false, "Wordmark must not crop glyphs");
             if (route === shopHref || route === menuHref) {
                 assert.equal(await visible(page.getByRole("searchbox", { name: "この店舗のメニューを検索", exact: true })).count(), 1);
+            }
+            if (route === shopHref) {
+                const cards = await menuArea.getByRole("link").all();
+                const [first, second, last, info] = await Promise.all([
+                    cards[0].boundingBox(), cards[1].boundingBox(), cards.at(-1).boundingBox(),
+                    page.locator("#shop-info").boundingBox(),
+                ]);
+                assert.equal(first.y === second.y, width >= 1024, "Two columns start at 1024px");
+                assert.ok(info.y > last.y + last.height, "Store information follows the menu list");
+                assert.equal(await page.getByRole("link", { name: "店舗情報を見る" }).getAttribute("href"), "#shop-info");
             }
         }
         pass(`${width}px: home/list/shop/detail/terms, no overflow, full wordmark, one active menu search`);
@@ -184,6 +197,8 @@ try {
     await apply();
     const pancake = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "米粉パンケーキ", exact: true }) });
     assert.match(await pancake.innerText(), /別メニューに含む/);
+    assert.match(await pancake.getByRole("group", { name: "他の公開メニューの登録情報" }).ariaSnapshot(), /卵[\s\S]*注目設定に一致/);
+    assert.equal(await pancake.getByRole("region", { name: "注目設定に一致" }).count(), 0);
     assert.match(await menuArea.getByRole("region", { name: "店舗全体の登録情報", exact: true }).innerText(), /交差接触を確認した結果ではありません/);
     await pancake.press("Enter");
     await page.waitForURL(/\/menus\//);

@@ -7,11 +7,11 @@ import PublicShopListClient from './PublicShopListClient';
 import PublicShopDetailView from './PublicShopDetailView';
 import PublicMenuDetailView from './PublicMenuDetailView';
 import { usePublicFreshnessNavigation } from './PublicFreshnessNavigation';
-import { targetKey, type PublicSnapshot, type PublicTarget } from '../freshness/contracts';
+import { targetKey, type PublicMenuImages, type PublicSnapshot, type PublicTarget } from '../freshness/contracts';
 import { createPublicRevalidator } from '../freshness/revalidation';
 import { PreviousPublicInformation, PublicApplyProof, usePreviousPublicInformation, usePublicApplyProof } from '../freshness/presentation';
 
-type Props = { target: PublicTarget; initialSnapshot: PublicSnapshot };
+type Props = { target: PublicTarget; initialSnapshot: PublicSnapshot; menuImages?: PublicMenuImages };
 
 function Terminal({ unavailable }: { unavailable: boolean }) {
     const previous = usePreviousPublicInformation();
@@ -25,10 +25,10 @@ function Terminal({ unavailable }: { unavailable: boolean }) {
     </main>;
 }
 
-function SnapshotView({ snapshot }: { snapshot: PublicSnapshot }) {
+function SnapshotView({ snapshot, menuImages }: { snapshot: PublicSnapshot; menuImages?: PublicMenuImages }) {
     const result = snapshot.result;
     if (result.kind === 'list') return <PublicShopListClient {...result.data} />;
-    if (result.kind === 'shop') return <PublicShopDetailView {...result.data} />;
+    if (result.kind === 'shop') return <PublicShopDetailView {...result.data} menuImages={menuImages} />;
     if (result.kind === 'menu') return <PublicMenuDetailView {...result.data} />;
     return <Terminal unavailable={result.kind === 'unavailable'} />;
 }
@@ -43,12 +43,15 @@ class ViewBoundary extends React.Component<{ token: string; failed: (token: stri
     render() { return this.state.error ? <p role="alert" className="p-4">取得した内容を表示できません。再取得をお試しください。</p> : this.props.children; }
 }
 
-function Surface({ target, initialSnapshot }: Props) {
+function Surface({ target, initialSnapshot, menuImages }: Props) {
     const key = targetKey(target);
     const pathname = usePathname();
     const [engine] = React.useState(() => createPublicRevalidator(target, initialSnapshot));
     const state = React.useSyncExternalStore(engine.subscribe, engine.getState, engine.getState);
     const snapshot = state.candidate ?? state.displayed;
+    const showMenuImages = !state.stale || state.candidate?.requestId === initialSnapshot.requestId;
+    const currentMenuImages = !showMenuImages ? undefined
+        : snapshot.requestId === initialSnapshot.requestId ? menuImages : snapshot.menuImages;
     const [policy, setPolicy] = React.useState<'reference' | 'hide'>('reference');
     const policyRef = React.useRef<'reference' | 'hide'>('reference');
     const frame = React.useRef<number | null>(null);
@@ -137,7 +140,9 @@ function Surface({ target, initialSnapshot }: Props) {
         <div ref={content} role="region" hidden={oldContentHidden} aria-label={state.stale ? '以前取得した公開情報' : '取得結果の公開情報'}>
             <PreviousPublicInformation.Provider value={state.stale}>
                 <PublicApplyProof.Provider value={proof}>
-                    <ViewBoundary token={snapshot.requestId} failed={failed}><SnapshotView snapshot={snapshot} /></ViewBoundary>
+                    <ViewBoundary token={snapshot.requestId} failed={failed}>
+                        <SnapshotView snapshot={snapshot} menuImages={currentMenuImages} />
+                    </ViewBoundary>
                 </PublicApplyProof.Provider>
             </PreviousPublicInformation.Provider>
         </div>

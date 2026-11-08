@@ -62,6 +62,8 @@ mainへの統合状態は[検証・採用状況](verification.md#freshness-proto
 5. 日付などをブラウザに渡せる形へ整え、一覧や詳細のClient Componentへ渡す。
 6. ブラウザは検索語や端末のアレルゲン設定を使って表示を絞る。設定変更のたびにDBへ問い合わせる構成ではない。店舗内カードの設定なし表示は `buildDefaultAllergenSummaries` で特定原材料とその他を別集計し、設定がある場合は `buildSelectedAllergenSummary` で注目・除外の選択品目を集計する。共通処理が状態別の品目名・件数と別メニュー由来の品目名を分けて返し、`MenuAllergenSummary` が登録状態と自動補足を別枠に描画する。店舗詳細の取得ではメニューの `precaution` も選択し、カードで注意書き全文を表示する。自由文から品目別状態や厨房のリスクを推定しない。
 
+店舗詳細の初期表示と画面内再取得は、公開可否・登録内容・画像の構図を同じトランザクションで取得します。画面内再取得のクライアントだけが `GET /api/public-snapshot` の専用メディアタイプを指定し、許可された画像の一覧を受け取ります。既定の公開JSON v1とメニュー詳細APIの契約は維持します。取得中は旧画像を外し、同じ取得結果の公開メニューに対応する画像を反映します。不正な画像項目はそのカードだけで省きます。
+
 店舗一覧は `PublicShopListPage` が `Shop.nearestStation` を取得し、`PublicShopListClient` が `public-shop-search.ts` の `filterAndRankShops` を呼びます。エリア欄は住所・都道府県・市区町村・最寄り駅、キーワード欄は店舗名・説明・カテゴリが対象です。空白で分けた各語を小文字化して文字列の部分一致を取り、全語一致と一部一致を分けます。駅マスタ・読みや別名の変換・駅位置からの店舗探索は行いません。最寄り駅は管理フォームの任意文字列で、空値はnullへ整えて保存します。未登録値を駅名へ補完する処理はありません。
 
 画像構図の入力は店舗・メニューで `ImageCompositionEditor` を共有します。ドラッグ開始時に枠の実サイズと画像の自然サイズを読み、`menu-image-display.ts` の `getImagePositionTravel` がobject-fitとズーム後の各軸の移動範囲を計算します。`getDraggedImagePosition` はドラッグ量をその範囲に対する位置%へ変換します。画像が枠より小さい場合と大きい場合で符号が変わり、どちらも写真が指・マウスの方向へ動きます。画像未読込や移動範囲0の軸は現在位置を維持します。保存される位置%・公開側のobject-position／transform-origin・API契約は変えていません。
