@@ -7,12 +7,30 @@ import { resolveNpmCli } from "./npm-cli.mjs";
 
 export const ASSESSMENT_MARKER = "<!-- clearallergy-agent:v1 -->";
 const REPOSITORY = "Kaito-Iwase/ClearAllergy";
+const REPOSITORY_URL = `https://github.com/${REPOSITORY}`;
+const CI_WORKFLOW = ".github/workflows/ci.yml";
 const PRIORITIES = ["security", "safety", "regression", "bug", "blocker", "correctness", "testability", "maintainability", "ux", "feature", "optimization"];
 const REQUIRED_SCRIPTS = ["lint", "typecheck", "test", "build"];
+const BLOCKING_LABELS = ["agent-blocked", "human-review", "duplicate", "invalid", "wontfix"];
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const nonempty = (value) => typeof value === "string" && value.trim().length > 0;
 const stringList = (value) => Array.isArray(value) && value.length > 0 && value.every(nonempty);
 const validNumber = (value) => Number.isSafeInteger(value) && value > 0;
+const gitSha = (value) => typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
+const unique = (values) => new Set(values).size === values.length;
+
+function currentObservation(fetchedAt, now) {
+    if (typeof fetchedAt !== "string") return false;
+    const age = now - Date.parse(fetchedAt);
+    return Number.isFinite(age) && age >= -60_000 && age <= 15 * 60_000;
+}
+
+function hasBodyBlocker(issue) {
+    const statusText = issue.body.replace(/[`*#|]/g, "")
+        .replace(/(^|[^\p{L}\p{N}_])_+|_+(?=$|[^\p{L}\p{N}_])/gu, "$1");
+    return /HUMAN_DECISION_REQUIRED|\[Decision\]|\[Blocked\]/i.test(issue.title)
+        || /^\s*(?:[-+]\s+)?(?:状態|Status\b)\s*[:：]?\s*(?:HUMAN_DECISION_REQUIRED|BLOCKED)\b/im.test(statusText);
+}
 export function validScopePath(value) {
     return nonempty(value) && !value.startsWith("/") && !/[\\:\x00-\x1f]/.test(value)
         && value.replace(/\/$/, "").split("/").every((part) => part !== "" && part !== "." && part !== "..");
@@ -49,8 +67,7 @@ export function assessQueue(snapshot, now = Date.now()) {
         || !/^[a-f0-9]{40}$/.test(snapshot.baseSha ?? "") || !Array.isArray(snapshot.issues) || !Array.isArray(snapshot.pullRequests)) {
         throw new Error("Invalid GitHub snapshot; do not select an issue.");
     }
-    const age = now - Date.parse(snapshot.fetchedAt);
-    if (!Number.isFinite(age) || age < -60_000 || age > 15 * 60_000) throw new Error("GitHub snapshot is stale; fetch again.");
+    if (!currentObservation(snapshot.fetchedAt, now)) throw new Error("GitHub snapshot is stale; fetch again.");
     if (snapshot.issues.some((issue) => !nonempty(issue.title) || typeof issue.body !== "string"
         || !["OPEN", "CLOSED"].includes(issue.state) || !Array.isArray(issue.labels) || !issue.labels.every(nonempty)
         || !Array.isArray(issue.assignees) || !issue.assignees.every(nonempty))) throw new Error("Issue definition/labels/ownership unknown; fetch again.");
@@ -65,11 +82,8 @@ export function assessQueue(snapshot, now = Date.now()) {
         const record = issue.assessment;
         const plan = record?.data;
         const reasons = [];
-        const statusText = issue.body.replace(/[`*#|]/g, "")
-            .replace(/(^|[^\p{L}\p{N}_])_+|_+(?=$|[^\p{L}\p{N}_])/gu, "$1");
-        if (/HUMAN_DECISION_REQUIRED|\[Decision\]|\[Blocked\]/i.test(issue.title)
-            || /^\s*(?:[-+]\s+)?(?:状態|Status\b)\s*[:：]?\s*(?:HUMAN_DECISION_REQUIRED|BLOCKED)\b/im.test(statusText)) reasons.push("human decision or body blocker");
-        if ((issue.labels ?? []).some((label) => ["agent-blocked", "human-review", "duplicate", "invalid", "wontfix"].includes(label))) reasons.push("blocking label");
+        if (hasBodyBlocker(issue)) reasons.push("human decision or body blocker");
+        if (issue.labels.some((label) => BLOCKING_LABELS.includes(label))) reasons.push("blocking label");
         if (!(issue.labels ?? []).includes("agent-ready")) reasons.push("not labelled agent-ready");
         if (!plan || record.author !== snapshot.actorLogin || !nonempty(record.url)) reasons.push("missing trusted assessment comment");
         if (plan) {
@@ -112,6 +126,196 @@ export function assessQueue(snapshot, now = Date.now()) {
     return { repository: snapshot.repository, fetchedAt: snapshot.fetchedAt, baseSha: snapshot.baseSha,
         selected: rows.find((row) => row.ready)?.number ?? null, issues: rows,
         nextAction: rows.some((row) => row.ready) ? "re-fetch selected issue, comments, dependencies and PRs; claim before implementation" : "one bounded repository audit; then record blockers and stop if no ready issue" };
+}
+
+function evidenceUrl(value) {
+    if (!nonempty(value) || /[\s<>?]/.test(value)) return false;
+    try {
+        const url = new URL(value);
+        return url.protocol === "https:" && !url.username && !url.password && !url.hash.includes("=");
+    } catch { return false; }
+}
+
+function validCompletionPlan(pulls) {
+    return Array.isArray(pulls) && pulls.length > 0 && pulls.every((pull) =>
+        validNumber(pull?.number) && gitSha(pull.headSha) && nonempty(pull.baseRef)
+        && Array.isArray(pull.deployments) && pull.deployments.every((deployment) =>
+            nonempty(deployment?.target) && evidenceUrl(deployment.origin) && new URL(deployment.origin).origin === deployment.origin)
+        && unique(pull.deployments.map(({ target }) => target))
+        && unique(pull.deployments.map(({ origin }) => origin))
+        && (pull.deployments.length > 0 || nonempty(pull.noDeploymentReason))
+    ) && unique(pulls.map((pull) => pull.number));
+}
+
+function sameAcceptanceScope(left, right) {
+    return left?.criterion === right.criterion && left.pullRequest === right.pullRequest && left.target === right.target;
+}
+
+function validAcceptancePlan(scopes, criteria, pulls) {
+    return Array.isArray(scopes) && scopes.every((scope, index) => {
+        const pull = pulls.find(({ number }) => number === scope?.pullRequest);
+        return criteria.includes(scope?.criterion) && pull
+            && (scope.target === null || pull.deployments.some(({ target }) => target === scope.target))
+            && !scopes.slice(0, index).some((prior) => sameAcceptanceScope(prior, scope));
+    }) && criteria.every((criterion) => scopes.some((scope) => scope.criterion === criterion));
+}
+
+function deploymentIncludesMerge(deployment, mergeSha) {
+    const sha = deployment.commitSha;
+    return gitSha(sha) && (sha === mergeSha || (deployment.comparison?.status === "ahead"
+        && deployment.comparison.url === `${REPOSITORY_URL}/compare/${mergeSha}...${sha}`));
+}
+
+function validRelatedIssues(issues, issueNumber) {
+    return Array.isArray(issues) && issues.every((item) => validNumber(item?.number)
+        && item.number !== issueNumber && ["OPEN", "CLOSED"].includes(item.state))
+        && unique(issues.map(({ number }) => number));
+}
+
+function consistentObservation(observations, key, identity) {
+    const value = JSON.stringify(identity);
+    if (observations.has(key)) return observations.get(key) === value;
+    observations.set(key, value);
+    return true;
+}
+
+// Normalize observations with live GitHub/provider reads before calling this gate.
+// A passing snapshot is a proposal. The caller rechecks it before writing to GitHub.
+export function assessIssueCompletion(snapshot, now = Date.now()) {
+    const issue = snapshot?.issue;
+    const pulls = snapshot?.pullRequests;
+    if (snapshot?.repository !== REPOSITORY || snapshot.version !== 1 || !nonempty(snapshot.actorLogin)
+        || !currentObservation(snapshot.fetchedAt, now) || !validNumber(issue?.number) || !nonempty(issue.title)
+        || typeof issue.body !== "string" || !["OPEN", "CLOSED"].includes(issue.state)
+        || !Array.isArray(issue.labels) || !issue.labels.every(nonempty)
+        || !Array.isArray(issue.assignees) || !issue.assignees.every(nonempty)
+        || !validRelatedIssues(issue.subIssues, issue.number) || !validRelatedIssues(issue.dependencies, issue.number)
+        || !Array.isArray(pulls) || !pulls.every((pull) => validNumber(pull?.number)
+            && ["OPEN", "CLOSED", "MERGED"].includes(pull.state) && Array.isArray(pull.linkedIssues) && pull.linkedIssues.every(validNumber))
+        || !unique(pulls.map((pull) => pull.number)) || !Array.isArray(snapshot.acceptance)) {
+        throw new Error("Invalid or stale completion snapshot; fetch live evidence again.");
+    }
+
+    const blockers = [];
+    const fetchedAt = Date.parse(snapshot.fetchedAt);
+    const hash = definitionHash(issue);
+    const record = issue.assessment;
+    const plan = record?.data;
+    const criteria = plan?.acceptanceCriteria;
+    const plannedPulls = plan?.completion?.pullRequests;
+    const acceptancePlan = plan?.completion?.acceptance;
+    if (issue.state !== "OPEN") blockers.push("issue is already closed");
+    if (hasBodyBlocker(issue) || issue.labels.some((label) => BLOCKING_LABELS.includes(label))) blockers.push("human decision or blocker unresolved");
+    if (issue.assignees.some((login) => login !== snapshot.actorLogin)) blockers.push("assigned to another owner");
+    if ([...issue.subIssues, ...issue.dependencies].some(({ state, stateReason }) => state !== "CLOSED" || stateReason !== "completed")) {
+        blockers.push("sub-issue or dependency unresolved");
+    }
+    if (pulls.some((pull) => pull.state === "OPEN" && pull.linkedIssues.includes(issue.number))) blockers.push("linked PR still open");
+
+    const assessmentPrefix = `${REPOSITORY_URL}/issues/${issue.number}#issuecomment-`;
+    const trustedPlan = record?.author === snapshot.actorLogin && evidenceUrl(record.url)
+        && record.url.startsWith(assessmentPrefix) && /^[1-9]\d*$/.test(record.url.slice(assessmentPrefix.length))
+        && plan?.state === "awaiting-review" && plan.definitionHash === hash
+        && plan.productDecisionRequired === false && plan.approvalRequired === false && plan.blocker === null
+        && Array.isArray(plan.dependencies) && plan.dependencies.every((number) => validNumber(number)
+            && issue.dependencies.some((dependency) => dependency.number === number))
+        && stringList(criteria) && unique(criteria) && validCompletionPlan(plannedPulls)
+        && validAcceptancePlan(acceptancePlan, criteria, plannedPulls);
+    if (!trustedPlan) blockers.push("missing trusted completion plan for the current issue");
+
+    const mergedEvidence = [];
+    const ciByUrl = new Map();
+    const deploymentByUrl = new Map();
+    const activeByOrigin = new Map();
+    const acceptanceEvidence = [];
+    if (trustedPlan) {
+        for (const expected of plannedPulls) {
+            const pull = pulls.find((item) => item.number === expected.number);
+            const mergedAt = Date.parse(pull?.mergedAt);
+            if (pull?.state !== "MERGED" || !pull.linkedIssues.includes(issue.number)
+                || pull.headSha !== expected.headSha || pull.baseRef !== expected.baseRef || !gitSha(pull.mergeSha)
+                || typeof pull.mergedAt !== "string" || !Number.isFinite(mergedAt) || mergedAt > fetchedAt) {
+                blockers.push(`PR #${expected.number} does not match the reviewed merge`);
+                continue;
+            }
+            const ci = pull.ci;
+            const ciStartedAt = Date.parse(ci?.startedAt);
+            const ciCompletedAt = Date.parse(ci?.completedAt);
+            if (ci?.status !== "PASS" || ci.event !== "push" || ci.commitSha !== pull.mergeSha
+                || ci.branch !== pull.baseRef || ci.workflowPath !== CI_WORKFLOW || !validNumber(ci.runAttempt)
+                || typeof ci.startedAt !== "string" || !Number.isFinite(ciStartedAt) || ciStartedAt < mergedAt
+                || typeof ci.completedAt !== "string" || !Number.isFinite(ciCompletedAt) || ciCompletedAt < ciStartedAt || ciCompletedAt > fetchedAt
+                || !evidenceUrl(ci.url) || !ci.url.startsWith(`${REPOSITORY_URL}/actions/runs/`)
+                || !/^[1-9]\d*$/.test(ci.url.slice(`${REPOSITORY_URL}/actions/runs/`.length))) {
+                blockers.push(`PR #${pull.number} lacks successful CI for its merge commit`);
+            } else if (!consistentObservation(ciByUrl, ci.url, [ci.branch, ci.commitSha, ci.runAttempt, ciStartedAt, ciCompletedAt])) {
+                blockers.push("conflicting observations for the same CI run");
+            }
+
+            const deployments = [];
+            for (const { target, origin } of expected.deployments) {
+                const matches = Array.isArray(pull.deployments) ? pull.deployments.filter((item) => item?.target === target) : [];
+                const deployment = matches[0];
+                const verification = deployment?.verification;
+                const readyAt = Date.parse(deployment?.readyAt);
+                const observedAt = Date.parse(verification?.observedAt);
+                if (matches.length !== 1 || deployment.state !== "READY" || deployment.active !== true
+                    || !deploymentIncludesMerge(deployment, pull.mergeSha) || !evidenceUrl(deployment.url)
+                    || verification?.status !== "PASS" || verification.commitSha !== deployment.commitSha
+                    || !evidenceUrl(verification.url) || new URL(verification.url).origin !== origin || !nonempty(verification.summary)
+                    || typeof deployment.readyAt !== "string" || !Number.isFinite(readyAt)
+                    || !currentObservation(verification.observedAt, now) || observedAt < Math.max(readyAt, mergedAt) || observedAt > fetchedAt) {
+                    blockers.push(`PR #${pull.number} lacks current deployment and verification for ${target}`);
+                    continue;
+                }
+                const deploymentUrl = new URL(deployment.url).href;
+                if (!consistentObservation(deploymentByUrl, deploymentUrl, [deployment.commitSha, readyAt])) {
+                    blockers.push("conflicting observations for the same deployment");
+                    continue;
+                }
+                if (!consistentObservation(activeByOrigin, origin, [deploymentUrl])) {
+                    blockers.push(`conflicting active deployments for ${origin}`);
+                    continue;
+                }
+                deployments.push({ target, origin, commitSha: deployment.commitSha, url: deployment.url, readyAt: deployment.readyAt,
+                    comparisonUrl: deployment.commitSha === pull.mergeSha ? null : deployment.comparison.url,
+                    verification: { observedAt: verification.observedAt, url: verification.url, summary: verification.summary } });
+            }
+            mergedEvidence.push({ number: pull.number, url: `${REPOSITORY_URL}/pull/${pull.number}`,
+                baseRef: pull.baseRef, headSha: pull.headSha, mergeSha: pull.mergeSha, mergedAt: pull.mergedAt, ciUrl: ci?.url,
+                ciRunAttempt: ci?.runAttempt,
+                deployments, noDeploymentReason: expected.deployments.length === 0 ? expected.noDeploymentReason : null });
+        }
+        for (const scope of acceptancePlan) {
+            const matching = snapshot.acceptance.filter((check) => sameAcceptanceScope(check, scope));
+            const check = matching[0];
+            const pull = mergedEvidence.find(({ number }) => number === scope.pullRequest);
+            const deployment = pull?.deployments.find(({ target }) => target === scope.target);
+            const commit = scope.target === null ? pull?.mergeSha : deployment?.commitSha;
+            if (matching.length !== 1 || check.status !== "PASS" || !commit || check.commitSha !== commit
+                || !evidenceUrl(check.url) || !nonempty(check.summary)
+                || (deployment && (check.deploymentUrl !== deployment.url || !currentObservation(check.observedAt, now)
+                    || Date.parse(check.observedAt) < Math.max(Date.parse(deployment.readyAt), Date.parse(pull.mergedAt))
+                    || Date.parse(check.observedAt) > fetchedAt))) continue;
+            acceptanceEvidence.push({ criterion: scope.criterion, pullRequest: scope.pullRequest, target: scope.target,
+                commitSha: commit, url: check.url, summary: check.summary, deploymentUrl: deployment?.url ?? null,
+                observedAt: deployment ? check.observedAt : null });
+        }
+        if (acceptanceEvidence.length !== acceptancePlan.length || snapshot.acceptance.length !== acceptancePlan.length) {
+            blockers.push("one or more acceptance criteria lack passing evidence for the required PR and environment");
+        }
+    }
+
+    const readyToClose = blockers.length === 0;
+    const completionKey = readyToClose ? sha256(JSON.stringify([hash, record.url, mergedEvidence.map((pull) =>
+        [pull.number, pull.baseRef, pull.headSha, pull.mergeSha, pull.ciUrl, pull.ciRunAttempt, pull.noDeploymentReason,
+            pull.deployments.map(({ target, origin, commitSha, url }) => [target, origin, commitSha, url])]),
+        acceptanceEvidence.map(({ criterion, pullRequest, target, commitSha, url }) => [criterion, pullRequest, target, commitSha, url])
+    ])) : null;
+    return { repository: REPOSITORY, number: issue.number, definitionHash: hash, fetchedAt: snapshot.fetchedAt,
+        readyToClose, blockers, completionKey, evidence: readyToClose ? { assessmentUrl: record.url, pullRequests: mergedEvidence,
+            acceptance: acceptanceEvidence } : null,
+        nextAction: readyToClose ? "re-fetch live evidence; record completion; close and re-read the issue" : "leave the issue open; resolve the blockers" };
 }
 
 export function verificationCommands(pkg) {
@@ -245,11 +449,12 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
             if (!["--snapshot", "--base", "--output"].includes(args[i]) || !args[i + 1] || flags[args[i]]) throw new Error("Invalid arguments.");
             flags[args[i]] = args[i + 1];
         }
-        const result = command === "queue" && flags["--snapshot"]
-            ? assessQueue(JSON.parse(readFileSync(flags["--snapshot"], "utf8").replace(/^\uFEFF/, "")))
+        const snapshotCommand = flags["--snapshot"] && (command === "queue" || command === "completion");
+        const readSnapshot = () => JSON.parse(readFileSync(flags["--snapshot"], "utf8").replace(/^\uFEFF/, ""));
+        const result = snapshotCommand ? (command === "queue" ? assessQueue(readSnapshot()) : assessIssueCompletion(readSnapshot()))
             : command === "verify" ? verify({ base: flags["--base"], output: flags["--output"] }) : null;
-        if (!result) throw new Error("Use queue --snapshot <file> or verify --base <ref> [--output <name.json>].");
+        if (!result) throw new Error("Use queue/completion --snapshot <file> or verify --base <ref> [--output <name.json>].");
         console.log(JSON.stringify(result, null, 2));
-        if (result.status === "FAIL") process.exitCode = 1;
+        if (result.status === "FAIL" || result.readyToClose === false) process.exitCode = 1;
     } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
