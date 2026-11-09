@@ -113,7 +113,7 @@ npm run test:e2e:ci -- --allow-font-download
 <a id="freshness-prototype"></a>
 ## freshness project
 
-基本public/admin 13件と `e2e/freshness.spec.mjs` の10件を、local/ci共通runnerが全projectとして実行します。公開layoutを離れたSPA履歴復帰の負例も含みます。[固定headの検証記録](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)は21定義中20 PASS・native BFCache1 SKIPで、後続HEADへ流用しません。以下は準備済みの架空アプリへの絞り込みで、アプリ・認証・DBを自動準備するコマンドではありません。
+基本public/adminと `e2e/freshness.spec.mjs` の10件を、local/ci共通runnerが全projectとして実行します。公開layoutを離れたSPA履歴復帰の負例も含みます。[固定headの検証記録](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)は21定義中20 PASS・native BFCache1 SKIPで、後続HEADへ流用しません。以下は準備済みの架空アプリへの絞り込みで、アプリ・認証・DBを自動準備するコマンドではありません。
 
 ```powershell
 npm.cmd run test:e2e -- --project=freshness
