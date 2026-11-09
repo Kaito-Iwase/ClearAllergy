@@ -56,6 +56,19 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         const list = panel.locator('[data-allergen-preference-list]');
         const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('clearallergy:user-allergens')));
         const cards = page.locator('#public-menus').getByRole('link');
+        const tabTo = async (target, key = 'Tab') => {
+            for (let i = 0; i < 12; i++) {
+                if (await target.evaluate(element => element === document.activeElement)) break;
+                await page.keyboard.press(key);
+            }
+            await expect(target).toBeFocused();
+            await expect.poll(() => target.evaluate(element => {
+                const box = element.getBoundingClientRect();
+                return element.matches(':focus-visible') && element.contains(document.elementFromPoint(
+                    box.x + box.width / 2, box.y + box.height / 2,
+                ));
+            })).toBe(true);
+        };
         await expect(cards.first()).toBeVisible();
         const cardCount = await cards.count();
         await open();
@@ -67,13 +80,17 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         }
         await search.fill('こむぎ');
         const wheat = preferenceItem(panel, '小麦');
-        if (width === 1440) await wheat.press('Space');
-        else await wheat.click();
-        await search.fill('ぎゅうにゅう');
-        await preferenceItem(panel, '乳').click();
+        await tabTo(wheat);
+        await page.keyboard.press('Space');
+        await tabTo(search, 'Shift+Tab');
+        await page.keyboard.press('ControlOrMeta+a');
+        await page.keyboard.insertText('ぎゅうにゅう');
+        await tabTo(preferenceItem(panel, '乳'));
+        await page.keyboard.press('Space');
         await expect(action('小麦を選択から外す')).toBeVisible();
         await expect(apply).toBeDisabled();
-        await action('注目にする').click();
+        await tabTo(action('注目にする'), 'Shift+Tab');
+        await page.keyboard.press('Enter');
         await search.fill('たまご');
         await preferenceItem(panel, '卵').click();
         await search.fill('エビ');

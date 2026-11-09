@@ -146,7 +146,8 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
     }
 
     return (
-        <section aria-label="あなた向けのアレルゲン設定" className={"@container min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm " + className}>
+        <section aria-label="あなた向けのアレルゲン設定"
+            className={"@container min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm [&_:is(button,input)]:scroll-mt-32 lg:[&_:is(button,input)]:scroll-mt-16 " + className}>
             <button ref={trigger} type="button" onClick={state.onToggleOpen} aria-expanded={state.isOpen}
                 aria-controls={state.isOpen ? id + "-editor" : undefined}
                 className="flex min-h-11 w-full items-start justify-between gap-3 rounded-2xl p-4 text-left focus-visible:outline-2 sm:p-5">
@@ -216,7 +217,7 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                         <button ref={applyButton} type="button" onClick={() => {
                             if (state.onApply()) { resetSelection(); trigger.current?.focus(); }
                         }} disabled={!dirty || conflict || hasSelection}
-                            className="min-h-11 scroll-mt-32 rounded-lg bg-gray-900 px-2 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:bg-gray-200 disabled:text-gray-600 lg:scroll-mt-16">変更を適用</button>
+                            className="min-h-11 rounded-lg bg-gray-900 px-2 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:bg-gray-200 disabled:text-gray-600">変更を適用</button>
                     </div>
                     <p className="text-xs leading-5 text-gray-700">この設定はログイン不要で、このブラウザ内だけに保存されます。</p>
                 </div>
