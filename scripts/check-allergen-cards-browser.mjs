@@ -1,6 +1,7 @@
 // Real UI components with fictional props. Save responses are simulated;
 // no app, DB, Clerk or upload is used.
 import assert from "node:assert/strict";
+import { setPreferenceMode } from "./allergen-preference-browser-helpers.mjs";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -154,11 +155,10 @@ try {
     assert.equal(await card.count(), 0);
     await page.getByRole("button", { name: "設定を解除", exact: true }).click();
     pass("Preferences preserve selected scope and MAY exclusion; hiding a source card does not remove its supplement");
-    const panel = page.getByRole("region", { name: "あなた向けのアレルゲン設定", exact: true });
-    await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
-    await panel.getByLabel("くるみの表示設定", { exact: true }).selectOption("highlight");
-    await panel.getByLabel("乳の表示設定", { exact: true }).selectOption("highlight");
-    await panel.getByLabel("卵の表示設定", { exact: true }).selectOption("highlight");
+    const panel = page.getByRole("dialog", { name: "あなた向けのアレルゲン設定", exact: true });
+    const preferenceTrigger = page.getByRole("button", { name: /あなた向けのアレルゲン設定/ });
+    await preferenceTrigger.click();
+    await setPreferenceMode(panel, ["くるみ", "乳", "卵"], "highlight");
     const possibility = panel.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ });
     assert.equal(await possibility.isChecked(), false);
     await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
@@ -166,7 +166,7 @@ try {
     assert.equal(await marks.count(), 1);
     assert.match(await marks.first().locator("..").textContent(), /^卵※/);
     assert.match(await registered.innerText(), /含む可能性あり・要確認\s+乳/);
-    await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
+    await preferenceTrigger.click();
     await possibility.focus(); await page.keyboard.press("Space");
     assert.equal(await possibility.isChecked(), true);
     assert.equal(await marks.count(), 1, "Draft toggle must not change the list before Apply");
@@ -187,8 +187,8 @@ try {
     await page.reload(); await card.waitFor();
     assert.match(await supplement.ariaSnapshot(), /くるみ[\s\S]*注目設定に一致/);
     pass("Unified toggle applies independent highlights only after Apply, persists on reload, and leaves registered MAY visible OFF");
-    await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
-    await panel.getByLabel("くるみの表示設定", { exact: true }).selectOption("exclude");
+    await preferenceTrigger.click();
+    await setPreferenceMode(panel, "くるみ", "exclude");
     await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
     assert.equal(await card.count(), 0);
     await page.getByRole("button", { name: "補足元の公開を切替", exact: true }).click();
@@ -220,7 +220,7 @@ try {
     pass("Mixed UNKNOWN remains named and a long note is not truncated or converted into a status");
     await page.getByRole("button", { name: "長い注意書きを切替", exact: true }).focus();
     await page.keyboard.press("Tab");
-    assert.equal(await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).evaluate(element => element === document.activeElement), true);
+    assert.equal(await preferenceTrigger.evaluate(element => element === document.activeElement), true);
     await page.keyboard.press("Tab");
     assert.equal(await card.evaluate(element => element === document.activeElement), true);
     const accessibility = await context.newCDPSession(page);
