@@ -5,6 +5,7 @@
 
 import React from "react";
 import MenuEditClient from "./MenuEditClient";
+import MenuCategoryField from "./MenuCategoryField";
 import { loadSavedMenu, savedMenuEditorProps } from "../saved-menu";
 import type { SavedMenu } from "../schemas/menu-response";
 import { menuCreateResponseSchema } from "../schemas/menu-response";
@@ -58,11 +59,13 @@ const UPLOAD_ERROR_MESSAGE =
 
 export default function NewMenuForm({
     allergens,
+    categoryOptions = [],
     readOnly = false,
     readOnlyPreview = false,
     backHref = "/admin/menus",
 }: {
     allergens: Allergen[];
+    categoryOptions?: string[];
     readOnly?: boolean;
     readOnlyPreview?: boolean;
     backHref?: string;
@@ -277,6 +280,7 @@ export default function NewMenuForm({
             setCreatedMenuId(data.id);
             if (data.publicRefreshPending) setCreatedNotice("作成は完了しましたが、公開表示の更新処理が未完了です。再作成せず公開表示を確認してください。");
             await readCreatedMenu(data.id);
+            router.refresh();
         } catch (err) {
             setError(getThrownErrorMessage(err, CREATE_ERROR_MESSAGE));
         } finally {
@@ -295,7 +299,7 @@ export default function NewMenuForm({
     if (createdMenu) return <div className="space-y-4">
         {createdNotice && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{createdNotice}</p>}
         <a href={`/admin/menus/${createdMenu.id}/edit`} className="text-sm font-semibold text-green-800 underline">この保存済みメニューの編集URL</a>
-        <MenuEditClient {...savedMenuEditorProps(createdMenu)} initialConfirmationSnapshot={createdMenu} />
+        <MenuEditClient {...savedMenuEditorProps(createdMenu)} initialConfirmationSnapshot={createdMenu} categoryOptions={categoryOptions} />
     </div>;
 
     // An acknowledged ID is retried by GET, never by a second creation request.
@@ -421,18 +425,8 @@ export default function NewMenuForm({
                 </div>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label htmlFor="new-menu-field-4" className="mb-1 block text-sm font-medium text-gray-700">
-                            カテゴリ
-                        </label>
-                        <input id="new-menu-field-4"
-                            maxLength={120}
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                            className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
-                            placeholder="例：デザート"
-                        />
-                    </div>
+                    <MenuCategoryField id="new-menu-field-4" value={category} onChange={setCategory}
+                        options={categoryOptions} />
                 </div>
 
                 <div className="mt-4">

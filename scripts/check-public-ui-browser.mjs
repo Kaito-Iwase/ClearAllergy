@@ -1,5 +1,6 @@
 // Public UI adversarial regression. Fictional loopback fixture only; no DB/auth/Blob writes.
 import assert from "node:assert/strict";
+import { preferenceItem, setPreferenceMode } from "./allergen-preference-browser-helpers.mjs";
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_
 let groups = 0;
 const pass = name => { groups++; console.log(`PASS: ${name}`); };
 const visible = locator => locator.filter({ visible: true });
-async function readablePreference(locator, hue) {
+async function readablePreference(locator, label) {
     const appearance = await locator.evaluate(element => {
         const style = getComputedStyle(element);
         const rgb = color => {
@@ -23,15 +24,15 @@ async function readablePreference(locator, hue) {
             context.fillRect(0, 0, 1, 1);
             return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(value => value / 255);
         };
-        return { text: rgb(style.color), background: rgb(style.backgroundColor), border: rgb(style.borderTopColor) };
+        return { text: rgb(style.color), background: rgb(style.backgroundColor) };
     });
     const luminance = rgb => rgb.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
         .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
     const contrast = (left, right) => (Math.max(luminance(left), luminance(right)) + 0.05) / (Math.min(luminance(left), luminance(right)) + 0.05);
-    assert.ok(contrast(appearance.text, appearance.background) >= 4.5, `${hue}: readable selected text`);
-    assert.ok(contrast(appearance.border, appearance.background) >= 3, `${hue}: visible selected boundary`);
+    assert.ok(contrast(appearance.text, appearance.background) >= 4.5, `${label}: readable preference text`);
     const [red, green, blue] = appearance.background;
-    assert.ok(hue === "yellow" ? red > blue && green > blue : red > green && red > blue, `${hue}: requested hue`);
+    assert.ok(label === "注目" ? red > 0.85 && green > 0.8 && green - blue > 0.05
+        : red > 0.85 && red - green > 0.08 && red - blue > 0.08, `${label}: expected background hue`);
 }
 let page;
 async function capture(name) {
@@ -63,17 +64,24 @@ try {
 
     const defaultChicken = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "照り焼きチキンプレート", exact: true }) });
     assert.match(await defaultChicken.innerText(), /確認対象：特定原材料（9品目）/);
-    assert.match(await defaultChicken.innerText(), /特定原材料：含む/);
     const chickenOther = defaultChicken.getByRole("group", { name: "その他のアレルゲン", exact: true });
     const chickenOtherRows = chickenOther.locator("dl > div");
     assert.match(await chickenOtherRows.filter({ has: page.locator("dt", { hasText: /^含む$/ }) }).innerText(), /大豆・鶏肉\s*（2品目）/);
     assert.match(await chickenOtherRows.filter({ has: page.locator("dt", { hasText: "含む可能性あり・要確認" }) }).innerText(), /ごま\s*（1品目）/);
     // Check the primary counts separately from the other group, so all-29 aggregation cannot pass.
-    const primaryText = await defaultChicken.evaluate(card => card.innerText.split("その他のアレルゲン")[0]);
+    const registeredGroups = { name: "店舗が登録したアレルゲン", exact: true };
+    const primaryText = await defaultChicken.getByRole("group", registeredGroups).first().innerText();
     assert.match(primaryText, /含む\s+卵\s*（1品目）/);
     assert.match(primaryText, /含む可能性あり・要確認\s+小麦・乳\s*（2品目）/);
     const defaultPancake = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "米粉パンケーキ", exact: true }) });
-    assert.doesNotMatch(await defaultPancake.innerText(), /特定原材料：含む/);
+    assert.match(await defaultPancake.innerText(), /確認対象：特定原材料（9品目）/);
+    const pancakePrimary = defaultPancake.getByRole("group", registeredGroups).first();
+    assert.match(await pancakePrimary.innerText(), /確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。/);
+    assert.equal(await pancakePrimary.locator("dl").count(), 0, "All-FREE is a short registration summary");
+    const precautionHeading = defaultPancake.getByRole("heading", { name: "店舗の注意書き", exact: true });
+    const precautionId = await precautionHeading.getAttribute("id");
+    assert.ok(precautionId && (await defaultPancake.getAttribute("aria-describedby"))?.split(/\s+/).includes(precautionId),
+        "The card's accessible description identifies the shop precaution next to the all-FREE summary");
     assert.match(await defaultPancake.getByRole("group", { name: "その他のアレルゲン", exact: true }).innerText(), /含む\s+大豆\s*（1品目）/);
     pass("Unselected cards classify specified ingredients separately; other CONTAINS/MAY_CONTAIN facts remain visible");
 
@@ -124,24 +132,46 @@ try {
             if (route === shopHref || route === menuHref) {
                 assert.equal(await visible(page.getByRole("searchbox", { name: "この店舗のメニューを検索", exact: true })).count(), 1);
             }
+            if (route === shopHref) {
+                const curry = menuArea.getByRole("link", { name: "豆乳ベジカレー", exact: true });
+                const chicken = menuArea.getByRole("link", { name: "照り焼きチキンプレート", exact: true });
+                const [first, second, list, description, info] = await Promise.all([
+                    curry.boundingBox(), chicken.boundingBox(), menuArea.boundingBox(),
+                    page.getByRole("heading", { name: "お店の説明", exact: true }).boundingBox(),
+                    page.locator("#shop-info").boundingBox(),
+                ]);
+                assert.equal(first.y === second.y, width >= 768, "Cards in the same category share a row from 768px");
+                assert.ok(description.y < list.y, "The existing store description precedes the menu list");
+                if (width >= 1024) {
+                    assert.ok(info.x >= list.x + list.width && info.y < list.y, "Store information retains its desktop sidebar");
+                } else {
+                    assert.ok(info.y > list.y + list.height, "Store information follows the menu list on narrower screens");
+                }
+                assert.equal(await page.getByRole("link", { name: "公開メニューを見る", exact: true }).getAttribute("href"), "#public-menus");
+                if (width === 390 || width === 1440) {
+                    await visible(page.locator("main")).screenshot({ path: join(output, `shop-layout-${width}.png`) });
+                }
+            }
         }
         pass(`${width}px: home/list/shop/detail/terms, no overflow, full wordmark, one active menu search`);
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(new URL(shopHref, base).href);
-    const panel = () => visible(page.getByRole("button", { name: /あなた向けのアレルゲン設定/ }));
+    const panel = () => page.locator('section[aria-label="あなた向けのアレルゲン設定"] > button[aria-haspopup="dialog"]');
     const open = async () => { if (await panel().getAttribute("aria-expanded") !== "true") await panel().click(); };
-    const mode = (name, value) => visible(page.getByRole("combobox", { name: `${name}の表示設定`, exact: true })).selectOption(value);
+    const mode = (name, value) => setPreferenceMode(page, name, value);
     const apply = () => visible(page.getByRole("button", { name: "変更を適用", exact: true })).click();
     await open();
     await mode("かに", "highlight");
     await mode("えび", "exclude");
-    await readablePreference(visible(page.getByRole("combobox", { name: "かにの表示設定", exact: true })), "yellow");
-    await readablePreference(visible(page.getByRole("combobox", { name: "えびの表示設定", exact: true })), "red");
+    await readablePreference(preferenceItem(page, "かに").getByText("注目", { exact: true }), "注目");
+    await readablePreference(preferenceItem(page, "えび").getByText("除外", { exact: true }), "除外");
     assert.match(await panel().innerText(), /未設定/, "Draft selections are not presented as saved preferences");
-    pass("Japanese font loaded locally; attention yellow/exclusion red have readable text, visible boundaries and unapplied draft labels");
+    pass("Japanese font loaded locally; attention and exclusion are readable text labels and draft edits remain unapplied");
     const editorSummary = visible(page.getByLabel("編集中の表示設定", { exact: true }));
+    await readablePreference(editorSummary.getByText(/^注目：/), "注目");
+    await readablePreference(editorSummary.getByText(/^除外：/), "除外");
     await visible(page.getByRole("searchbox", { name: "アレルゲンを探す", exact: true })).fill("ピスタチオ");
     assert.match(await editorSummary.innerText(), /注目：かに/);
     assert.match(await editorSummary.innerText(), /除外：えび/);
@@ -162,7 +192,7 @@ try {
     await apply();
     assert.equal(await curry.count(), 0, "MAY_CONTAIN exclusion applies only after saving");
     await open();
-    await visible(page.getByRole("button", { name: "すべて設定なしにする（未適用）", exact: true })).click();
+    await visible(page.getByRole("button", { name: "設定をすべて解除", exact: true })).click();
     await apply();
     await open();
     await defaultChicken.waitFor();
@@ -178,12 +208,14 @@ try {
     pass("MAY_CONTAIN exclusion on hides matching menu; FREE retains target and guarantee limitation");
 
     await open();
-    await visible(page.getByRole("button", { name: "すべて設定なしにする（未適用）", exact: true })).click();
+    await visible(page.getByRole("button", { name: "設定をすべて解除", exact: true })).click();
     await mode("卵", "highlight");
     await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).check();
     await apply();
     const pancake = menuArea.getByRole("link").filter({ has: page.getByRole("heading", { name: "米粉パンケーキ", exact: true }) });
     assert.match(await pancake.innerText(), /別メニューに含む/);
+    assert.match(await pancake.getByRole("group", { name: "他の公開メニューの登録情報" }).ariaSnapshot(), /卵[\s\S]*注目設定に一致/);
+    assert.equal(await pancake.getByRole("region", { name: "注目設定に一致" }).count(), 0);
     assert.match(await menuArea.getByRole("region", { name: "店舗全体の登録情報", exact: true }).innerText(), /交差接触を確認した結果ではありません/);
     await pancake.press("Enter");
     await page.waitForURL(/\/menus\//);

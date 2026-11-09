@@ -4,6 +4,7 @@
 
 import MenuEditClient from "@/features/admin/menus/components/MenuEditClient";
 import { foodReviewHistorySelection } from "./food-review-save";
+import { getMenuCategoryOptions } from "./menu-category-data";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -30,7 +31,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
     // 動的ルートの menuId を使って、どのメニューを編集中か決めます。
     const { menuId } = await params;
 
-    const [allergens, menu] = await Promise.all([
+    const [allergens, menu, categoryOptions] = await Promise.all([
         // 編集フォームの選択肢として使うアレルゲンマスタを取得します。
         prisma.allergen.findMany({
             orderBy: { sortOrder: "asc" },
@@ -74,6 +75,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                 },
             },
         }),
+        getMenuCategoryOptions(shopId),
     ]);
 
     if (!menu) {
@@ -116,6 +118,7 @@ export default async function AdminMenuEditPage({ params }: PageProps) {
                         initialDescription={menu.description}
                         initialPriceYen={menu.priceYen}
                         initialCategory={menu.category}
+                        categoryOptions={categoryOptions}
                         initialIngredients={menu.ingredients}
                         initialPrecaution={menu.precaution}
                         initialImageUrl={sanitizeStoredImageUrl(menu.imageUrl, {

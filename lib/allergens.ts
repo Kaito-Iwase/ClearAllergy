@@ -179,6 +179,7 @@ export function buildSelectedAllergenSummary(args: {
     mayContainNames: string[];
     unknownNames: string[];
     storeHandledNames: string[];
+    slugs: Omit<SelectedAllergenStatusGroups, "freeSlugs"> & { storeHandledSlugs: string[] };
     containsCount: number;
     mayCount: number;
     unknownCount: number;
@@ -222,7 +223,8 @@ export function buildSelectedAllergenSummary(args: {
         : args.selectedSlugs.length > 0
           ? "確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。"
           : "確認対象が未設定です";
-    const storeHandledNames = storeHandledSlugs.sort(byRank).map(toName);
+    storeHandledSlugs.sort(byRank);
+    const storeHandledNames = storeHandledSlugs.map(toName);
     if (storeHandledSlugs.length > 0) {
         parts.push(`${storeHandledNames.join("・")}：この店舗の別の公開メニューに「含む」登録があります`);
     }
@@ -236,6 +238,7 @@ export function buildSelectedAllergenSummary(args: {
         mayContainNames,
         unknownNames,
         storeHandledNames,
+        slugs: { containsSlugs, mayContainSlugs, unknownSlugs, storeHandledSlugs },
         badge:
             containsSlugs.length > 0
                 ? "danger"

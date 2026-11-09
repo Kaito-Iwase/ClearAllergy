@@ -11,10 +11,10 @@ import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import {
     parseMenuImageFit, parseMenuImagePositionPercent, parseMenuImageZoom,
 } from "@/lib/utils/menu-image-display";
-import type { PublicShopDetailData } from "@/features/public/shops/freshness/contracts";
+import type { PublicMenuImages, PublicShopDetailData } from "@/features/public/shops/freshness/contracts";
 
-export default function PublicShopDetailView(data: PublicShopDetailData) {
-    const { shop, safeCoverImageUrl, menusForClient, allergenMaster, storeHandledAllergenSlugs } = data;
+export default function PublicShopDetailView(data: PublicShopDetailData & { menuImages?: PublicMenuImages }) {
+    const { shop, safeCoverImageUrl, menusForClient, allergenMaster, storeHandledAllergenSlugs, menuImages } = data;
     const publishedMenuCount = menusForClient.length;
     const allergensForClient = allergenMaster.map(({ slug, nameJa }) => ({ slug, nameJa }));
     const averageBudgetLabel = typeof shop.averageBudgetYen === "number"
@@ -129,10 +129,12 @@ export default function PublicShopDetailView(data: PublicShopDetailData) {
                             }
                         >
                             <ShopMenuListClient
+                                key={shop.id}
                                 storeHandledAllergenSlugs={storeHandledAllergenSlugs}
                                 shopId={shop.id}
                                 menus={menusForClient}
                                 allergenMaster={allergenMaster}
+                                menuImages={menuImages}
                             />
                         </Suspense>
                     </div>

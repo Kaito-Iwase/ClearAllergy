@@ -1,4 +1,5 @@
 import { test, expect } from './playwright.mjs';
+import { preferenceItem } from '../scripts/allergen-preference-browser-helpers.mjs';
 
 const visible = locator => locator.filter({ visible: true });
 test.beforeEach(async ({ context, baseURL }) => {
@@ -40,18 +41,228 @@ test('公開: モバイルの検索0件から解除して一覧へ戻れる', as
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
-test('公開: アレルゲン設定を適用して再読み込みしても保持する', async ({ page }) => {
-    await openShop(page);
-    const panel = visible(page.getByRole('button', { name: /あなた向けのアレルゲン設定/ }));
-    if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
-    await visible(page.getByRole('combobox', { name: '卵の表示設定', exact: true })).selectOption('highlight');
-    await visible(page.getByRole('button', { name: '変更を適用', exact: true })).click();
-    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('clearallergy:user-allergens')).highlightSlugs)).toEqual(['egg']);
-    await page.reload();
-    if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
-    await expect(visible(page.getByRole('combobox', { name: '卵の表示設定', exact: true }))).toHaveValue('highlight');
-});
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`公開: ${width}pxのアレルゲン検索・一括設定・適用・全解除`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await openShop(page);
+        const panel = page.getByRole('dialog', { name: 'あなた向けのアレルゲン設定', exact: true });
+        const trigger = page.getByRole('button', { name: /あなた向けのアレルゲン設定/ });
+        const open = async () => { if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click(); };
+        const search = panel.getByRole('searchbox', { name: 'アレルゲンを探す', exact: true });
+        const action = name => panel.getByRole('button', { name, exact: true });
+        const apply = action('変更を適用');
+        const summary = panel.getByRole('group', { name: '編集中の表示設定', exact: true });
+        const choices = panel.locator('[data-preference-mode]');
+        const list = panel.locator('[data-allergen-preference-list]');
+        const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('clearallergy:user-allergens')));
+        const cards = page.locator('#public-menus').getByRole('link');
+        const tabTo = async (target, key = 'Tab') => {
+            for (let i = 0; i < 12; i++) {
+                if (await target.evaluate(element => element === document.activeElement)) break;
+                await page.keyboard.press(key);
+            }
+            await expect(target).toBeFocused();
+            await expect.poll(() => target.evaluate(element => {
+                const box = element.getBoundingClientRect();
+                return element.matches(':focus-visible') && element.contains(document.elementFromPoint(
+                    box.x + box.width / 2, box.y + box.height / 2,
+                ));
+            })).toBe(true);
+        };
+        await expect(cards.first()).toBeVisible();
+        const cardCount = await cards.count();
+        await trigger.press('Enter');
+        await expect(panel).toBeVisible();
+        await expect(search).toBeFocused();
+        await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('hidden');
+        await page.locator('section[aria-label="あなた向けのアレルゲン設定"] > button').evaluate(button => button.focus());
+        await expect(search).toBeFocused();
+        const dialogBox = await panel.boundingBox();
+        if (width < 500) expect(dialogBox).toEqual({ x: 0, y: 0, width, height });
+        else expect(dialogBox.width).toBeLessThan(width);
+        await expect(choices).toHaveCount(29);
+        for (const [term, name] of [['らっかせい', '落花生（ピーナッツ）'], ['ﾋﾟｰﾅｯﾂ', '落花生（ピーナッツ）']]) {
+            await search.fill(term);
+            await expect(choices).toHaveCount(1);
+            await expect(preferenceItem(panel, name)).toBeVisible();
+        }
+        await search.fill('こむぎ');
+        const wheat = preferenceItem(panel, '小麦');
+        await tabTo(wheat);
+        await page.keyboard.press('Space');
+        await tabTo(search, 'Shift+Tab');
+        await page.keyboard.press('ControlOrMeta+a');
+        await page.keyboard.insertText('ぎゅうにゅう');
+        await tabTo(preferenceItem(panel, '乳'));
+        await page.keyboard.press('Space');
+        await expect(action('小麦を選択から外す')).toBeVisible();
+        await expect(apply).toBeDisabled();
+        await tabTo(action('注目にする'), 'Shift+Tab');
+        await page.keyboard.press('Enter');
+        await search.fill('たまご');
+        await preferenceItem(panel, '卵').click();
+        await search.fill('エビ');
+        await preferenceItem(panel, 'えび').click();
+        await search.fill('');
+        await action('一覧から除外').click();
+        await expect(summary).toContainText('注目：小麦・乳');
+        await expect(summary).toContainText('除外：えび・卵');
+        expect(await saved()).toBeNull();
+        await expect(cards).toHaveCount(cardCount);
+        await expect(apply).toBeFocused();
+        await expect(apply).toBeInViewport();
+        await expect.poll(() => apply.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        })).toBe(true);
+        const [actionsBox, listBox] = await Promise.all([panel.locator('[data-allergen-preference-actions]').boundingBox(), list.boundingBox()]);
+        if (width < 500) expect(actionsBox.y).toBeLessThan(listBox.y);
+        else expect(actionsBox.x).toBeGreaterThanOrEqual(listBox.x + listBox.width);
+        await page.screenshot({ path: testInfo.outputPath('before-apply.png') });
+        if (width === 1440) await apply.press('Enter');
+        else await apply.click();
+        await expect(panel).toBeHidden();
+        await expect(trigger).toBeFocused();
+        expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe('hidden');
+        await expect.poll(saved).toMatchObject({ highlightSlugs: ['wheat', 'milk'], excludedSlugs: ['shrimp', 'egg'], includeMayContain: false });
+        await expect.poll(() => cards.count()).toBeLessThan(cardCount);
+
+        await page.reload();
+        await open();
+        await expect(preferenceItem(panel, '乳')).toHaveAttribute('data-preference-mode', 'highlight');
+        await expect(preferenceItem(panel, '卵')).toHaveAttribute('data-preference-mode', 'exclude');
+        await search.fill('えび');
+        await preferenceItem(panel, 'えび').click();
+        await action('設定を外す').click();
+        await expect(summary).not.toContainText('えび');
+        await search.fill('たまご');
+        await search.dispatchEvent('keydown', { key: 'Escape', isComposing: true });
+        await expect(panel).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(panel).toBeHidden();
+        await expect(trigger).toBeFocused();
+        expect((await saved()).excludedSlugs).toEqual(['shrimp', 'egg']);
+        await open();
+        await expect(search).toHaveValue('');
+        await preferenceItem(panel, '卵').click();
+        await action('設定を閉じる').click();
+        await expect(trigger).toBeFocused();
+        await open();
+        await expect(preferenceItem(panel, '卵')).toHaveAttribute('aria-pressed', 'false');
+        await preferenceItem(panel, '卵').click();
+        await preferenceItem(panel, 'えび').click();
+        await action('設定を外す').click();
+        await expect(summary).toContainText('除外：なし');
+        await expect(summary).toContainText('注目：小麦・乳');
+        await action('元に戻す').click();
+        await expect(summary).toContainText('除外：えび・卵');
+        await action('設定をすべて解除').click();
+        await expect(summary).toContainText('注目：なし');
+        await expect(summary).toContainText('除外：なし');
+        expect((await saved()).excludedSlugs).toEqual(['shrimp', 'egg']);
+        await action('元に戻す').click();
+        await expect(summary).toContainText('除外：えび・卵');
+        await action('設定をすべて解除').click();
+        await expect(apply).toBeFocused();
+        await expect(apply).toBeInViewport();
+        await apply.click();
+        await expect.poll(saved).toMatchObject({ highlightSlugs: [], excludedSlugs: [], includeMayContain: false });
+        await expect(cards).toHaveCount(cardCount);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+
+        if (width === 1440) {
+            await cards.first().click();
+            await expect(page).toHaveURL(/\/menus\//);
+            await open();
+            const [detailActions, detailList] = await Promise.all([panel.locator('[data-allergen-preference-actions]').boundingBox(), list.boundingBox()]);
+            expect(detailActions.x).toBeGreaterThanOrEqual(detailList.x + detailList.width);
+            await search.fill('たまご');
+            await preferenceItem(panel, '卵').click();
+            await page.setViewportSize({ width: 390, height: 844 });
+            await expect(search).toHaveValue('たまご');
+            await expect(preferenceItem(panel, '卵')).toHaveAttribute('aria-pressed', 'true');
+        }
+    });
+}
 
 test('公開: 未認証の管理APIは401', async ({ request }) => {
     expect((await request.get('/api/admin/menus', { maxRedirects: 0 })).status()).toBe(401);
+});
+
+test('公開: 一覧の写真と登録を一括で再取得し、遅延応答を採用しない', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openShop(page);
+    const card = page.locator('#public-menus').getByRole('link').first();
+    const [, shopId, menuId] = (await card.getAttribute('href')).match(/^\/shops\/([^/]+)\/menus\/([^/]+)$/);
+    const controls = page.getByRole('complementary', { name: '公開情報の再取得', exact: true });
+    const surface = page.locator('[data-public-freshness]');
+    const image = card.locator('img');
+    const snapshotRoute = '**/api/public-snapshot?**';
+    let file = 'first.jpg';
+    let release;
+    const hold = new Promise(resolve => { release = resolve; });
+    const seen = [];
+    let menuRequests = 0;
+    page.on('request', request => {
+        if (new URL(request.url()).pathname.startsWith('/api/menus/')) menuRequests++;
+    });
+    await page.route('**/_next/image?**', route => route.fulfill({
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12"><rect width="16" height="12" fill="orange"/></svg>',
+    }));
+    await page.route(snapshotRoute, async route => {
+        const requested = file;
+        const response = await route.fetch();
+        expect(response.headers()['content-type']).toMatch(/^application\/vnd\.clearallergy\.shop-view\+json/);
+        const data = await response.json();
+        const menu = data.result.data.menusForClient.find(item => item.id === menuId);
+        seen.push(requested);
+        if (requested === 'delayed.jpg') await hold;
+        const safeImageUrl = `https://fixture.public.blob.vercel-storage.com/menu-images/${shopId}/${requested}`;
+        data.menuImages = requested === 'removed' ? {} : { [menuId]: {
+            updatedAt: menu.updatedAt, safeImageUrl, imageFrame: 'wide', imageFit: 'contain',
+            imageZoom: 100, imagePositionX: 33, imagePositionY: 50,
+        } };
+        try {
+            await route.fulfill({ status: response.status(), contentType: response.headers()['content-type'], json: data });
+        } catch (error) {
+            if (requested !== 'delayed.jpg') throw error;
+        }
+    });
+    await expect(surface).toHaveAttribute('data-public-freshness', 'ready');
+    await expect(controls).toHaveCount(0);
+    await page.evaluate(() => { window.thumbnailFixturePage = true; });
+    async function requestRefresh(name, { retry = false } = {}) {
+        file = name;
+        if (retry) await controls.getByRole('button', { name: '公開情報を再取得', exact: true }).click();
+        else await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await expect.poll(() => seen.includes(name)).toBe(true);
+    }
+    try {
+        await requestRefresh('first.jpg');
+        await card.scrollIntoViewIfNeeded();
+        await expect(image).toHaveAttribute('src', /first\.jpg/);
+        await expect(image).toHaveCSS('object-position', '33% 50%');
+        await requestRefresh('delayed.jpg');
+        await expect(surface).toHaveAttribute('data-public-freshness', 'loading');
+        await expect(controls.getByText(/表示する登録内容は以前取得した情報です。/)).toBeVisible();
+        await expect(image).toHaveCount(0);
+        const aborted = page.waitForEvent('requestfailed', request => new URL(request.url()).pathname === '/api/public-snapshot');
+        await controls.getByRole('button', { name: '取得を中止', exact: true }).click();
+        await aborted;
+        await expect(image).toHaveCount(0);
+        await requestRefresh('latest.jpg', { retry: true });
+        await card.scrollIntoViewIfNeeded();
+        await expect(image).toHaveAttribute('src', /latest\.jpg/);
+        release();
+        await requestRefresh('removed');
+        await expect(surface).toHaveAttribute('data-public-freshness', 'ready');
+        await expect(controls).toHaveCount(0);
+        await expect(image).toHaveCount(0);
+        await expect(card.getByRole('group', { name: '店舗が登録したアレルゲン', exact: true }).first()).toBeVisible();
+        expect(menuRequests).toBe(0);
+        expect(await page.evaluate(() => window.thumbnailFixturePage)).toBe(true);
+    } finally {
+        release();
+    }
 });

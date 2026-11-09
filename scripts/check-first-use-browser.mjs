@@ -1,5 +1,6 @@
 // 既存Playwrightランナーで公開画面と保存しないデモを確認する。DBは更新しない。
 import assert from "node:assert/strict";
+import { preferenceItem, setPreferenceMode } from "./allergen-preference-browser-helpers.mjs";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -73,7 +74,7 @@ try {
 
     const panelButton = () => visible(page.getByRole("button", { name: /あなた向けのアレルゲン設定/ }));
     const openPreferences = async () => { if (await panelButton().getAttribute("aria-expanded") !== "true") await panelButton().click(); };
-    const setMode = (name, mode) => visible(page.getByRole("combobox", { name: name + "の表示設定", exact: true })).selectOption(mode);
+    const setMode = (name, mode) => setPreferenceMode(page, name, mode);
     const apply = () => visible(page.getByRole("button", { name: "変更を適用", exact: true })).click();
     const preferences = () => page.evaluate(() => JSON.parse(localStorage.getItem("clearallergy:user-allergens")));
     await openPreferences();
@@ -87,9 +88,11 @@ try {
     assert.deepEqual((await preferences()).highlightSlugs, ["egg"]);
     assert.equal((await preferences()).includeMayContain, false);
     assert.equal(await page.getByText("変更を適用しました。", { exact: true }).count(), 0);
-    await panelButton().click();
-    await page.getByText("未適用の変更あり", { exact: true }).waitFor();
+    await page.keyboard.press("Escape");
+    assert.equal(await panelButton().getAttribute("aria-expanded"), "false");
+    assert.equal(await panelButton().evaluate(button => button === document.activeElement), true);
     await openPreferences();
+    assert.equal(await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).isChecked(), false);
     await visible(page.getByRole("button", { name: "キャンセル", exact: true })).click();
     assert.deepEqual((await preferences()).highlightSlugs, ["egg"]);
     await openPreferences();
@@ -104,19 +107,23 @@ try {
     assert.deepEqual((await preferences()).highlightSlugs, ["milk"]);
     await page.reload();
     await openPreferences();
-    assert.equal(await visible(page.getByRole("combobox", { name: "えびの表示設定", exact: true })).inputValue(), "exclude");
+    assert.equal(await preferenceItem(page, "えび").getAttribute("data-preference-mode"), "exclude");
     await screenshot(page, "05-preferences-after-mobile");
-    pass("1件保存後の複数追加・一部解除・オプションも一括適用・折りたたみ中の未適用表示・キャンセル・再読み込み");
+    pass("1件保存後の複数追加・一部解除・一括適用・Escapeで未適用の編集を破棄・キャンセル・再読み込み");
 
     const second = await context.newPage();
     await second.goto(base + shopHref);
+    await visible(page.getByRole("button", { name: "設定をすべて解除", exact: true })).click();
+    await visible(page.getByRole("button", { name: "元に戻す", exact: true })).click();
+    const conflict = visible(page.getByRole("alert").filter({ hasText: "別の画面で設定が変更されました" }));
     await second.evaluate(() => localStorage.setItem("clearallergy:user-allergens", JSON.stringify({
         highlightSlugs: ["milk", "walnut"], excludedSlugs: ["shrimp"], includeMayContain: true })));
-    await page.waitForFunction(() => document.querySelector('select[aria-label="くるみの表示設定"]')?.value === "highlight");
+    await preferenceItem(page, "くるみ").and(page.locator('[data-preference-mode="highlight"]')).waitFor();
+    assert.equal(await conflict.count(), 0, "Undo back to the saved settings must accept the next update from another tab");
     await setMode("えび", "none");
     await second.evaluate(() => localStorage.setItem("clearallergy:user-allergens", JSON.stringify({
         highlightSlugs: ["milk", "walnut", "egg"], excludedSlugs: ["shrimp"], includeMayContain: true })));
-    await visible(page.getByRole("alert").filter({ hasText: "別の画面で設定が変更されました" })).waitFor();
+    await conflict.waitFor();
     assert.equal(await visible(page.getByRole("button", { name: "変更を適用", exact: true })).isDisabled(), true);
     await visible(page.getByRole("button", { name: "編集を破棄して最新の設定を読み直す", exact: true })).click();
     await setMode("えび", "none");
@@ -127,7 +134,7 @@ try {
     await apply();
     await visible(page.getByRole("status").filter({ hasText: "設定を保存できませんでした" })).waitFor();
     assert.deepEqual((await preferences()).excludedSlugs, ["shrimp"]);
-    assert.equal(await visible(page.getByRole("combobox", { name: "えびの表示設定", exact: true })).inputValue(), "none");
+    assert.equal(await preferenceItem(page, "えび").getAttribute("data-preference-mode"), "none");
     await page.evaluate(() => { Storage.prototype.setItem = window.__originalSetItem; });
     await apply();
     assert.deepEqual((await preferences()).highlightSlugs, ["milk", "walnut", "egg"]);
