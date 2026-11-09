@@ -135,6 +135,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await preferenceItem(panel, 'えび').click();
         await action('設定を外す').click();
         await expect(summary).not.toContainText('えび');
+        await search.fill('たまご');
+        await search.dispatchEvent('keydown', { key: 'Escape', isComposing: true });
+        await expect(panel).toBeVisible();
         await page.keyboard.press('Escape');
         await expect(panel).toBeHidden();
         await expect(trigger).toBeFocused();
