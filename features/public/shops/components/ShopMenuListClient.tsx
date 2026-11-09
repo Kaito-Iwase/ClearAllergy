@@ -24,6 +24,7 @@ import { formatDateTimeJa, formatPriceYenLabel } from "@/lib/utils/formatters";
 import { parseMenuImageFit, parseMenuImageFrame, parseMenuImagePositionPercent, parseMenuImageZoom } from "@/lib/utils/menu-image-display";
 import { useUserAllergenPreferences } from "@/features/public/shops/components/UserAllergenPreferenceClient";
 import MenuAllergenSummary from "./MenuAllergenSummary";
+import { groupPublicMenus, searchPublicMenus } from "./public-menu-search";
 import { getAllergenPreferenceMatches } from "@/lib/public-allergen-preference-match";
 import type { PublicMenuImages, PublicShopDetailData } from "../freshness/contracts";
 
@@ -64,6 +65,19 @@ function MenuThumbnail({ image }: { image: PublicMenuImages[string] }) {
     );
 }
 
+function CategoryFilterButton({ active, onClick, children }: {
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <button type="button" aria-pressed={active} onClick={onClick}
+            className="min-h-11 max-w-[15rem] shrink-0 wrap-anywhere rounded-full border border-gray-300 bg-white px-4 py-2 text-left text-sm font-semibold text-gray-800 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700 aria-pressed:border-green-700 aria-pressed:bg-green-100 aria-pressed:text-green-950">
+            {children}
+        </button>
+    );
+}
+
 export default function ShopMenuListClient({
     shopId,
     menus,
@@ -83,6 +97,7 @@ export default function ShopMenuListClient({
     const searchParams = useSearchParams();
     const q = (searchParams.get("q") ?? "").trim();
     const listId = React.useId();
+    const [selectedCategory, setSelectedCategory] = React.useState<string | null>();
 
     // 端末に保存されたアレルゲン設定を読み込み、画面に反映します。
     const { preferences: { highlightSlugs, excludedSlugs, includeMayContain }, loaded } = useUserAllergenPreferences();
@@ -112,24 +127,7 @@ export default function ShopMenuListClient({
             includeMayContain, storeHandledAllergenSlugs }).length > 0;
     }, [excludedSlugs, includeMayContain, storeHandledAllergenSlugs]);
 
-    const searchedMenus = React.useMemo(() => {
-        if (q === "") {
-            return menus;
-        }
-
-        const needle = q.toLocaleLowerCase("ja-JP");
-        return menus.filter((menu) => {
-            return (
-                menu.name.toLocaleLowerCase("ja-JP").includes(needle) ||
-                (menu.description ?? "")
-                    .toLocaleLowerCase("ja-JP")
-                    .includes(needle) ||
-                (menu.category ?? "")
-                    .toLocaleLowerCase("ja-JP")
-                    .includes(needle)
-            );
-        });
-    }, [menus, q]);
+    const searchedMenus = React.useMemo(() => searchPublicMenus(menus, q), [menus, q]);
 
     const menuItems = React.useMemo<MenuItemWithStatus[]>(() => {
         return searchedMenus.map((menu) => ({
@@ -149,12 +147,111 @@ export default function ShopMenuListClient({
     }, [hasPreference, isExcludedByPreference, menuItems]);
 
     const excludedMenuCount = menuItems.length - visibleMenuItems.length;
+    const groups = React.useMemo(() => groupPublicMenus(visibleMenuItems), [visibleMenuItems]);
+    const categoryItems = selectedCategory === undefined ? undefined : groups.get(selectedCategory);
+    if (selectedCategory !== undefined && !categoryItems) setSelectedCategory(undefined);
+    const displayedGroups = categoryItems && selectedCategory !== undefined
+        ? [[selectedCategory, categoryItems] as const] : Array.from(groups);
+    const showCategoryHeadings = groups.size > 1 || !groups.has(null);
+    const CardHeading = showCategoryHeadings ? "h4" : "h3";
+    const CardSubheading = showCategoryHeadings ? "h5" : "h4";
+    let uncategorizedLabel = "カテゴリなし";
+    if (groups.has(uncategorizedLabel)) {
+        uncategorizedLabel = "カテゴリなし（自動）";
+        for (let suffix = 2; groups.has(uncategorizedLabel); suffix++) {
+            uncategorizedLabel = `カテゴリなし（自動${suffix}）`;
+        }
+    }
+    const categoryLabel = (category: string | null) => category ?? uncategorizedLabel;
 
     function clearSearch() {
         const params = new URLSearchParams(searchParams.toString());
         params.delete("q");
         const query = params.toString();
         router.replace(`/shops/${shopId}${query ? `?${query}` : ""}`);
+    }
+
+    function renderMenuCard({ menu, statusBySlug }: MenuItemWithStatus) {
+        const summaryArgs = {
+            statusBySlug,
+            nameJaBySlug,
+            rankBySlug,
+        };
+        const matches = hasPreference
+            ? getAllergenPreferenceMatches({ statusBySlug, slugs: highlightSlugs, includeMayContain, storeHandledAllergenSlugs })
+            : [];
+        const defaults = hasPreference ? null : buildDefaultAllergenSummaries(summaryArgs);
+        const activeSummary = defaults?.specified ?? buildSelectedAllergenSummary({
+            ...summaryArgs,
+            selectedSlugs,
+            includeMayContain,
+            storeHandledAllergenSlugs: new Set(matches.filter(match => match.source === "STORE_HANDLED").map(match => match.slug)),
+        });
+        const showOtherSummary = defaults && defaults.otherCount > 0 && defaults.other.badge !== "safe";
+        const image = menuImages?.[menu.id];
+        const titleId = `${listId}-${menu.id}`;
+        const registrationId = `${titleId}-registration`;
+        const precautionId = menu.precaution?.trim() ? `${titleId}-precaution` : undefined;
+        const descriptionIds = [
+            previous && `${registrationId}-previous`,
+            `${titleId}-scope`,
+            registrationId,
+            activeSummary.storeHandledCount > 0 && `${registrationId}-supplement`,
+            showOtherSummary && `${titleId}-other-heading ${titleId}-other`,
+            precautionId,
+        ].filter(Boolean).join(" ");
+
+        return (
+            <Link
+                key={menu.id}
+                href={`/shops/${shopId}/menus/${menu.id}`}
+                prefetch={false}
+                aria-labelledby={titleId}
+                aria-describedby={descriptionIds}
+                className="group block min-w-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-400 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+            >
+                <div className="flex items-start gap-3">
+                    {image?.updatedAt === menu.updatedAt ? (
+                        <MenuThumbnail key={image.safeImageUrl} image={image} />
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                        <CardHeading id={titleId} className="wrap-anywhere text-lg font-extrabold leading-snug text-gray-900">
+                            {menu.name}
+                        </CardHeading>
+                        <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm leading-6 text-gray-700">
+                            <span className="wrap-anywhere">{menu.category?.trim() || "カテゴリ未設定"}</span>
+                            <span className="font-bold text-gray-900">{formatPriceYenLabel(menu.priceYen)}</span>
+                        </p>
+                    </div>
+
+                    <span aria-hidden="true" className="shrink-0 text-gray-500 group-hover:text-gray-700">
+                        ›
+                    </span>
+                </div>
+
+                <div className="mt-3 border-t border-gray-200 pt-3">
+                    <p id={`${titleId}-scope`} className="wrap-anywhere text-sm leading-6 text-gray-700">
+                        確認対象：{checkedAllergenLabel}
+                    </p>
+                    <MenuAllergenSummary id={registrationId} summary={activeSummary} highlightedSlugs={new Set(matches.map(match => match.slug))} />
+                    {showOtherSummary ? (
+                        <div role="group" aria-label="その他のアレルゲン" className="mt-3 border-t border-gray-200 pt-3">
+                            <CardSubheading id={`${titleId}-other-heading`} className="text-sm font-bold text-gray-900">その他のアレルゲン（{defaults.otherCount}品目）</CardSubheading>
+                            <MenuAllergenSummary id={`${titleId}-other`} summary={defaults.other} />
+                        </div>
+                    ) : null}
+                </div>
+                {precautionId ? (
+                    <div role="group" aria-label="店舗の注意書き" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <CardSubheading id={precautionId} className="text-sm font-bold leading-5 text-gray-700">店舗の注意書き</CardSubheading>
+                        <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm leading-6 text-gray-700">{menu.precaution}</p>
+                    </div>
+                ) : null}
+                <p className="mt-3 text-xs leading-5 text-gray-600">
+                    更新：{formatDateTimeJa(menu.updatedAt)}
+                </p>
+            </Link>
+        );
     }
 
     return (
@@ -165,9 +262,9 @@ export default function ShopMenuListClient({
         >
             <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
                 <h2 id={`${listId}-heading`} className="text-base font-extrabold">公開メニュー</h2>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500" aria-live="polite">
                     {previous && "以前取得した登録情報による表示："}
-                    表示 {visibleMenuItems.length}件 / 検索対象 {searchedMenus.length}件
+                    表示 {categoryItems?.length ?? visibleMenuItems.length}件 / 検索対象 {searchedMenus.length}件
                 </p>
             </div>
 
@@ -186,6 +283,25 @@ export default function ShopMenuListClient({
                     {hasPreference && <p className="mt-1 text-sm leading-6 text-amber-950">{previous ? "以前取得した登録での、あなたの確認対象" : "このうち、あなたの確認対象"}：{allergenMaster.filter(item => storeHandledAllergenSlugs.includes(item.slug) && selectedSlugs.includes(item.slug)).map(item => item.nameJa).join("・") || "該当なし"}</p>}
                     <p className="mt-2 text-xs leading-5 text-amber-900">個々のメニューの原材料登録とは別の情報です。{STORE_ALLERGEN_NOTE}</p>
                 </section>
+            )}
+
+            {groups.size > 1 && (
+                <div className="mb-5">
+                    <p className="mb-2 text-xs leading-5 text-gray-600">料理のカテゴリで絞り込む（検索・除外設定を反映した件数）</p>
+                    <div role="group" aria-label="メニューカテゴリ"
+                        className="flex gap-2 overflow-x-auto p-1 md:flex-wrap">
+                        <CategoryFilterButton active={!categoryItems} onClick={() => setSelectedCategory(undefined)}>
+                            すべて（{visibleMenuItems.length}件）
+                        </CategoryFilterButton>
+                        {Array.from(groups, ([category, items]) => (
+                            <CategoryFilterButton key={category === null ? "uncategorized" : "category:" + category}
+                                active={categoryItems !== undefined && selectedCategory === category}
+                                onClick={() => setSelectedCategory(category)}>
+                                {categoryLabel(category)}（{items.length}件）
+                            </CategoryFilterButton>
+                        ))}
+                    </div>
+                </div>
             )}
 
             {searchedMenus.length === 0 ? (
@@ -214,89 +330,19 @@ export default function ShopMenuListClient({
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-                    {visibleMenuItems.map(({ menu, statusBySlug }) => {
-                        const summaryArgs = {
-                            statusBySlug,
-                            nameJaBySlug,
-                            rankBySlug,
-                        };
-                        const matches = hasPreference
-                            ? getAllergenPreferenceMatches({ statusBySlug, slugs: highlightSlugs, includeMayContain, storeHandledAllergenSlugs })
-                            : [];
-                        const defaults = hasPreference ? null : buildDefaultAllergenSummaries(summaryArgs);
-                        const activeSummary = defaults?.specified ?? buildSelectedAllergenSummary({
-                            ...summaryArgs,
-                            selectedSlugs,
-                            includeMayContain,
-                            storeHandledAllergenSlugs: new Set(matches.filter(match => match.source === "STORE_HANDLED").map(match => match.slug)),
-                        });
-                        const showOtherSummary = defaults && defaults.otherCount > 0 && defaults.other.badge !== "safe";
-                        const image = menuImages?.[menu.id];
-                        const titleId = `${listId}-${menu.id}`;
-                        const registrationId = `${titleId}-registration`;
-                        const precautionId = menu.precaution?.trim() ? `${titleId}-precaution` : undefined;
-                        const descriptionIds = [
-                            previous && `${registrationId}-previous`,
-                            `${titleId}-scope`,
-                            registrationId,
-                            activeSummary.storeHandledCount > 0 && `${registrationId}-supplement`,
-                            showOtherSummary && `${titleId}-other-heading ${titleId}-other`,
-                            precautionId,
-                        ].filter(Boolean).join(" ");
-
-                        return (
-                            <Link
-                                key={menu.id}
-                                href={`/shops/${shopId}/menus/${menu.id}`}
-                                prefetch={false}
-                                aria-labelledby={titleId}
-                                aria-describedby={descriptionIds}
-                                className="group block min-w-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-400 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
-                            >
-                                <div className="flex items-start gap-3">
-                                    {image?.updatedAt === menu.updatedAt ? (
-                                        <MenuThumbnail key={image.safeImageUrl} image={image} />
-                                    ) : null}
-                                    <div className="min-w-0 flex-1">
-                                        <h3 id={titleId} className="wrap-anywhere text-lg font-extrabold leading-snug text-gray-900">
-                                            {menu.name}
-                                        </h3>
-                                        <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm leading-6 text-gray-700">
-                                            <span className="wrap-anywhere">{menu.category || "カテゴリ未設定"}</span>
-                                            <span className="font-bold text-gray-900">{formatPriceYenLabel(menu.priceYen)}</span>
-                                        </p>
-                                    </div>
-
-                                    <span aria-hidden="true" className="shrink-0 text-gray-500 group-hover:text-gray-700">
-                                        ›
-                                    </span>
-                                </div>
-
-                                <div className="mt-3 border-t border-gray-200 pt-3">
-                                    <p id={`${titleId}-scope`} className="wrap-anywhere text-sm leading-6 text-gray-700">
-                                        確認対象：{checkedAllergenLabel}
-                                    </p>
-                                    <MenuAllergenSummary id={registrationId} summary={activeSummary} highlightedSlugs={new Set(matches.map(match => match.slug))} />
-                                    {showOtherSummary ? (
-                                        <div role="group" aria-label="その他のアレルゲン" className="mt-3 border-t border-gray-200 pt-3">
-                                            <h4 id={`${titleId}-other-heading`} className="text-sm font-bold text-gray-900">その他のアレルゲン（{defaults.otherCount}品目）</h4>
-                                            <MenuAllergenSummary id={`${titleId}-other`} summary={defaults.other} />
-                                        </div>
-                                    ) : null}
-                                </div>
-                                {precautionId ? (
-                                    <div role="group" aria-label="店舗の注意書き" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                                        <h4 id={precautionId} className="text-sm font-bold leading-5 text-gray-700">店舗の注意書き</h4>
-                                        <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm leading-6 text-gray-700">{menu.precaution}</p>
-                                    </div>
-                                ) : null}
-                                <p className="mt-3 text-xs leading-5 text-gray-600">
-                                    更新：{formatDateTimeJa(menu.updatedAt)}
-                                </p>
-                            </Link>
-                        );
-                    })}
+                <div className="space-y-6">
+                    {displayedGroups.map(([category, items]) => (
+                        <div key={category === null ? "uncategorized" : "category:" + category}>
+                            {showCategoryHeadings && (
+                                <h3 className="mb-3 wrap-anywhere text-sm font-bold text-gray-900">
+                                    {categoryLabel(category)}（{items.length}件）
+                                </h3>
+                            )}
+                            <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+                                {items.map(renderMenuCard)}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
             {hasPreference ? (

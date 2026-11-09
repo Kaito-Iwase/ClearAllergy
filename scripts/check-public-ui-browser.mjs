@@ -132,13 +132,14 @@ try {
                 assert.equal(await visible(page.getByRole("searchbox", { name: "この店舗のメニューを検索", exact: true })).count(), 1);
             }
             if (route === shopHref) {
-                const cards = await menuArea.getByRole("link").all();
+                const curry = menuArea.getByRole("link", { name: "豆乳ベジカレー", exact: true });
+                const chicken = menuArea.getByRole("link", { name: "照り焼きチキンプレート", exact: true });
                 const [first, second, list, description, info] = await Promise.all([
-                    cards[0].boundingBox(), cards[1].boundingBox(), menuArea.boundingBox(),
+                    curry.boundingBox(), chicken.boundingBox(), menuArea.boundingBox(),
                     page.getByRole("heading", { name: "お店の説明", exact: true }).boundingBox(),
                     page.locator("#shop-info").boundingBox(),
                 ]);
-                assert.equal(first.y === second.y, width >= 768, "The existing two-column list starts at 768px");
+                assert.equal(first.y === second.y, width >= 768, "Cards in the same category share a row from 768px");
                 assert.ok(description.y < list.y, "The existing store description precedes the menu list");
                 if (width >= 1024) {
                     assert.ok(info.x >= list.x + list.width && info.y < list.y, "Store information retains its desktop sidebar");
