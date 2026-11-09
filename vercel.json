@@ -32,7 +32,8 @@
       "fix/public-menu-thumbnail-refresh": false,
       "fix/public-menu-thumbnail-refresh-main": false,
       "agent/issue-143-menu-category-ux": false,
-      "agent/issue-145-allergen-preferences": false
+      "agent/issue-145-allergen-preferences": false,
+      "fix/allergen-preference-modal": false
     }
   }
 }

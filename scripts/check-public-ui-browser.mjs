@@ -30,6 +30,9 @@ async function readablePreference(locator, label) {
         .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
     const contrast = (left, right) => (Math.max(luminance(left), luminance(right)) + 0.05) / (Math.min(luminance(left), luminance(right)) + 0.05);
     assert.ok(contrast(appearance.text, appearance.background) >= 4.5, `${label}: readable preference text`);
+    const [red, green, blue] = appearance.background;
+    assert.ok(label === "注目" ? red > 0.85 && green > 0.8 && green - blue > 0.05
+        : red > 0.85 && red - green > 0.08 && red - blue > 0.08, `${label}: expected background hue`);
 }
 let page;
 async function capture(name) {
@@ -155,7 +158,7 @@ try {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(new URL(shopHref, base).href);
-    const panel = () => visible(page.getByRole("button", { name: /あなた向けのアレルゲン設定/ }));
+    const panel = () => page.locator('section[aria-label="あなた向けのアレルゲン設定"] > button[aria-haspopup="dialog"]');
     const open = async () => { if (await panel().getAttribute("aria-expanded") !== "true") await panel().click(); };
     const mode = (name, value) => setPreferenceMode(page, name, value);
     const apply = () => visible(page.getByRole("button", { name: "変更を適用", exact: true })).click();
@@ -167,6 +170,8 @@ try {
     assert.match(await panel().innerText(), /未設定/, "Draft selections are not presented as saved preferences");
     pass("Japanese font loaded locally; attention and exclusion are readable text labels and draft edits remain unapplied");
     const editorSummary = visible(page.getByLabel("編集中の表示設定", { exact: true }));
+    await readablePreference(editorSummary.getByText(/^注目：/), "注目");
+    await readablePreference(editorSummary.getByText(/^除外：/), "除外");
     await visible(page.getByRole("searchbox", { name: "アレルゲンを探す", exact: true })).fill("ピスタチオ");
     assert.match(await editorSummary.innerText(), /注目：かに/);
     assert.match(await editorSummary.innerText(), /除外：えび/);
@@ -187,7 +192,7 @@ try {
     await apply();
     assert.equal(await curry.count(), 0, "MAY_CONTAIN exclusion applies only after saving");
     await open();
-    await visible(page.getByRole("button", { name: "すべて外す", exact: true })).click();
+    await visible(page.getByRole("button", { name: "設定をすべて解除", exact: true })).click();
     await apply();
     await open();
     await defaultChicken.waitFor();
@@ -203,7 +208,7 @@ try {
     pass("MAY_CONTAIN exclusion on hides matching menu; FREE retains target and guarantee limitation");
 
     await open();
-    await visible(page.getByRole("button", { name: "すべて外す", exact: true })).click();
+    await visible(page.getByRole("button", { name: "設定をすべて解除", exact: true })).click();
     await mode("卵", "highlight");
     await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).check();
     await apply();

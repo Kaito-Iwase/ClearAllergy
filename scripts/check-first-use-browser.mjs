@@ -88,9 +88,11 @@ try {
     assert.deepEqual((await preferences()).highlightSlugs, ["egg"]);
     assert.equal((await preferences()).includeMayContain, false);
     assert.equal(await page.getByText("変更を適用しました。", { exact: true }).count(), 0);
-    await panelButton().click();
-    await page.getByText("未適用の変更あり", { exact: true }).waitFor();
+    await page.keyboard.press("Escape");
+    assert.equal(await panelButton().getAttribute("aria-expanded"), "false");
+    assert.equal(await panelButton().evaluate(button => button === document.activeElement), true);
     await openPreferences();
+    assert.equal(await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).isChecked(), false);
     await visible(page.getByRole("button", { name: "キャンセル", exact: true })).click();
     assert.deepEqual((await preferences()).highlightSlugs, ["egg"]);
     await openPreferences();
@@ -107,11 +109,11 @@ try {
     await openPreferences();
     assert.equal(await preferenceItem(page, "えび").getAttribute("data-preference-mode"), "exclude");
     await screenshot(page, "05-preferences-after-mobile");
-    pass("1件保存後の複数追加・一部解除・オプションも一括適用・折りたたみ中の未適用表示・キャンセル・再読み込み");
+    pass("1件保存後の複数追加・一部解除・一括適用・Escapeで未適用の編集を破棄・キャンセル・再読み込み");
 
     const second = await context.newPage();
     await second.goto(base + shopHref);
-    await visible(page.getByRole("button", { name: "すべて外す", exact: true })).click();
+    await visible(page.getByRole("button", { name: "設定をすべて解除", exact: true })).click();
     await visible(page.getByRole("button", { name: "元に戻す", exact: true })).click();
     const conflict = visible(page.getByRole("alert").filter({ hasText: "別の画面で設定が変更されました" }));
     await second.evaluate(() => localStorage.setItem("clearallergy:user-allergens", JSON.stringify({
