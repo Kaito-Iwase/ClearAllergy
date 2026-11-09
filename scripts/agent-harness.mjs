@@ -166,6 +166,19 @@ function deploymentIncludesMerge(deployment, mergeSha) {
         && deployment.comparison.url === `${REPOSITORY_URL}/compare/${mergeSha}...${sha}`));
 }
 
+function validRelatedIssues(issues, issueNumber) {
+    return Array.isArray(issues) && issues.every((item) => validNumber(item?.number)
+        && item.number !== issueNumber && ["OPEN", "CLOSED"].includes(item.state))
+        && unique(issues.map(({ number }) => number));
+}
+
+function consistentObservation(observations, key, identity) {
+    const value = JSON.stringify(identity);
+    if (observations.has(key)) return observations.get(key) === value;
+    observations.set(key, value);
+    return true;
+}
+
 // Normalize observations with live GitHub/provider reads before calling this gate.
 // A passing snapshot is a proposal. The caller rechecks it before writing to GitHub.
 export function assessIssueCompletion(snapshot, now = Date.now()) {
@@ -176,10 +189,7 @@ export function assessIssueCompletion(snapshot, now = Date.now()) {
         || typeof issue.body !== "string" || !["OPEN", "CLOSED"].includes(issue.state)
         || !Array.isArray(issue.labels) || !issue.labels.every(nonempty)
         || !Array.isArray(issue.assignees) || !issue.assignees.every(nonempty)
-        || !Array.isArray(issue.openSubIssues) || !issue.openSubIssues.every(validNumber)
-        || !Array.isArray(issue.dependencies) || !issue.dependencies.every((dependency) =>
-            validNumber(dependency?.number) && ["OPEN", "CLOSED"].includes(dependency.state))
-        || !unique(issue.dependencies.map(({ number }) => number))
+        || !validRelatedIssues(issue.subIssues, issue.number) || !validRelatedIssues(issue.dependencies, issue.number)
         || !Array.isArray(pulls) || !pulls.every((pull) => validNumber(pull?.number)
             && ["OPEN", "CLOSED", "MERGED"].includes(pull.state) && Array.isArray(pull.linkedIssues) && pull.linkedIssues.every(validNumber))
         || !unique(pulls.map((pull) => pull.number)) || !Array.isArray(snapshot.acceptance)) {
@@ -197,7 +207,9 @@ export function assessIssueCompletion(snapshot, now = Date.now()) {
     if (issue.state !== "OPEN") blockers.push("issue is already closed");
     if (hasBodyBlocker(issue) || issue.labels.some((label) => BLOCKING_LABELS.includes(label))) blockers.push("human decision or blocker unresolved");
     if (issue.assignees.some((login) => login !== snapshot.actorLogin)) blockers.push("assigned to another owner");
-    if (issue.openSubIssues.length || issue.dependencies.some(({ state }) => state !== "CLOSED")) blockers.push("sub-issue or dependency unresolved");
+    if ([...issue.subIssues, ...issue.dependencies].some(({ state, stateReason }) => state !== "CLOSED" || stateReason !== "completed")) {
+        blockers.push("sub-issue or dependency unresolved");
+    }
     if (pulls.some((pull) => pull.state === "OPEN" && pull.linkedIssues.includes(issue.number))) blockers.push("linked PR still open");
 
     const assessmentPrefix = `${REPOSITORY_URL}/issues/${issue.number}#issuecomment-`;
@@ -206,12 +218,14 @@ export function assessIssueCompletion(snapshot, now = Date.now()) {
         && plan?.state === "awaiting-review" && plan.definitionHash === hash
         && plan.productDecisionRequired === false && plan.approvalRequired === false && plan.blocker === null
         && Array.isArray(plan.dependencies) && plan.dependencies.every((number) => validNumber(number)
-            && issue.dependencies.some((dependency) => dependency.number === number && dependency.state === "CLOSED"))
+            && issue.dependencies.some((dependency) => dependency.number === number))
         && stringList(criteria) && unique(criteria) && validCompletionPlan(plannedPulls)
         && validAcceptancePlan(acceptancePlan, criteria, plannedPulls);
     if (!trustedPlan) blockers.push("missing trusted completion plan for the current issue");
 
     const mergedEvidence = [];
+    const ciByUrl = new Map();
+    const deploymentByUrl = new Map();
     const activeByOrigin = new Map();
     const acceptanceEvidence = [];
     if (trustedPlan) {
@@ -234,6 +248,8 @@ export function assessIssueCompletion(snapshot, now = Date.now()) {
                 || !evidenceUrl(ci.url) || !ci.url.startsWith(`${REPOSITORY_URL}/actions/runs/`)
                 || !/^[1-9]\d*$/.test(ci.url.slice(`${REPOSITORY_URL}/actions/runs/`.length))) {
                 blockers.push(`PR #${pull.number} lacks successful CI for its merge commit`);
+            } else if (!consistentObservation(ciByUrl, ci.url, [ci.branch, ci.commitSha, ci.runAttempt, ciStartedAt, ciCompletedAt])) {
+                blockers.push("conflicting observations for the same CI run");
             }
 
             const deployments = [];
@@ -252,12 +268,15 @@ export function assessIssueCompletion(snapshot, now = Date.now()) {
                     blockers.push(`PR #${pull.number} lacks current deployment and verification for ${target}`);
                     continue;
                 }
-                const active = JSON.stringify([deployment.commitSha, deployment.url, readyAt]);
-                if (activeByOrigin.has(origin) && activeByOrigin.get(origin) !== active) {
+                const deploymentUrl = new URL(deployment.url).href;
+                if (!consistentObservation(deploymentByUrl, deploymentUrl, [deployment.commitSha, readyAt])) {
+                    blockers.push("conflicting observations for the same deployment");
+                    continue;
+                }
+                if (!consistentObservation(activeByOrigin, origin, [deploymentUrl])) {
                     blockers.push(`conflicting active deployments for ${origin}`);
                     continue;
                 }
-                activeByOrigin.set(origin, active);
                 deployments.push({ target, origin, commitSha: deployment.commitSha, url: deployment.url, readyAt: deployment.readyAt,
                     comparisonUrl: deployment.commitSha === pull.mergeSha ? null : deployment.comparison.url,
                     verification: { observedAt: verification.observedAt, url: verification.url, summary: verification.summary } });

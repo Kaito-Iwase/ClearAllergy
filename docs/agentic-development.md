@@ -143,15 +143,17 @@ self review（自己レビュー）では、差分・空白エラーと受け入
 3. 下のsnapshotを作り、`completion` を実行する。マージ時点のPRチェック、ローカルのPASS、VercelのReadyはそれぞれ別の証拠として扱う。必要な結果が揃っていない場合は、Issueに残る条件と解除に必要な証拠を記録する。
 4. `readyToClose: true` の場合は、Issueの定義・状態・担当・依存、関連PR、必要な配備先を再取得して差分を確認する。操作前にリポジトリ、Issue番号、actor、`completionKey` を `.agent-runs/completion-pending.json` に控える。未確認の控えは上書きしない。自律運用の依頼で許可された範囲内で、GitHub connectorの `add_issue_comment` で完了コメントを先に投稿する。
    - 先頭に `<!-- clearallergy-completion:v1 <completionKey> -->` を付け、Issue定義のハッシュ、PRとマージSHA、CIの実行と試行、配備先・配備のリンク・SHA、確認日時、受け入れ条件ごとの結果と証跡、対象外の確認を記載する。同じキーの自分のコメントが既にあれば、内容と現状を照合して再利用する。
-   - コメントを読み戻し、最新の状態で `completion` を再実行する。同じキーで `readyToClose: true` を確認してから、`issue_write` の `method: "update"`、`state: "closed"`、`state_reason: "completed"` で閉じる。最後に閉じた状態・理由、Issue定義とコメントを読み戻し、確認結果を控えに記録する。読み取りと書き込みの間に変化が見つかった場合は、その差分を報告する。合意した対象への配備操作は、既存の配備許可に従う。
+   - コメントを読み戻し、最新の状態で `completion` を再実行する。同じキーで `readyToClose: true` を確認し、最新の証跡とコメント内容を照合してから、`issue_write` の `method: "update"`、`state: "closed"`、`state_reason: "completed"` で閉じる。最後に閉じた状態・理由、Issue定義とコメントを読み戻し、確認結果を控えに記録する。読み取りと書き込みの間に変化が見つかった場合は、その差分を報告する。合意した対象への配備操作は、既存の配備許可に従う。
 5. コメントやクローズの応答が失われた場合は、控えのIssue番号からGitHubの状態を取得する。既に閉じていれば理由と証跡を照合する。開いていれば最新の証跡で判定し、同じキーの自分のコメントを確認してから再開する。証跡を確認できないまま閉じていた場合は、完了確認が不足していると報告する。
 
 `completion` はGitHubへ書き込まず、取得済みの事実を照合する。Codexが下記を原典から埋め、最後の取得時刻を `fetchedAt` として `.agent-runs/completion.json` に保存する。取得できない項目は空の成功扱いにせず保留する。秘密値や共有トークン付きURLを保存しない。
 
+同一のActions実行、同一の配備URL、同一の固定オリジンに対する観測が食い違う場合は、原典を取り直す。
+
 | snapshotの項目 | 入れる事実 |
 | --- | --- |
 | `version`、`repository`、`actorLogin`、`fetchedAt` | `1`、`Kaito-Iwase/ClearAllergy`、認証済みのGitHubログイン名、取得完了のISO時刻。取得から15分以内 |
-| `issue` | queueと同じ `number`、`title`、`body`、`state`、`labels`、`assignees`、`assessment`。未完了の子Issue番号を `openSubIssues` に、本文・assessment・GitHubにある依存Issueすべての `{ number, state }` を `dependencies` に入れる。空配列は該当なしを確認した場合だけ使う |
+| `issue` | queueと同じ `number`、`title`、`body`、`state`、`labels`、`assignees`、`assessment`。子Issueを `subIssues` に、本文・assessment・GitHubにある依存Issueを `dependencies` に、それぞれ全件の `{ number, state, stateReason }` として入れる。完了には `CLOSED` かつ `completed` が必要。重複で閉じている場合は元Issueを特定し、関係を整理するまで保留する。空配列は該当なしを確認した場合だけ使う |
 | `pullRequests` | 全関連PRの `number`、`state`、`linkedIssues`。GitHubでmergedを確認したPRは `MERGED` に正規化する。完了計画にある各PRには `baseRef`、`headSha`、`mergeSha`、ISO時刻の `mergedAt`、`ci`、必要な `deployments` も入れる |
 | 各PRの `ci` | マージ後のコミットを検証したpush実行の `event: "push"`、`commitSha`、マージ先と一致する `branch`、`workflowPath: ".github/workflows/ci.yml"`、最新の `runAttempt`、試行の開始・完了ISO時刻 `startedAt` / `completedAt`、Actions実行の `url`、`status`。最新試行で必須ジョブがすべて成功したときだけ `PASS` |
 | 各配備の証跡 | 計画にある `target`、Vercelなどの `state`、`commitSha`、配備固有の `url`、配備完了のISO時刻 `readyAt`、固定URLで対象配備を確認した `active: true`。より新しいSHAなら `comparison: { status: "ahead", url }` に当該マージSHAと現配備SHAのGitHub比較を入れる |
