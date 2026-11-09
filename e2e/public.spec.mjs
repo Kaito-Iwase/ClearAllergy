@@ -45,8 +45,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     test(`公開: ${width}pxのアレルゲン検索・一括設定・適用・全解除`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height });
         await openShop(page);
-        const panel = visible(page.getByRole('region', { name: 'あなた向けのアレルゲン設定', exact: true }));
-        const trigger = panel.getByRole('button', { name: /あなた向けのアレルゲン設定/ });
+        const panel = page.getByRole('dialog', { name: 'あなた向けのアレルゲン設定', exact: true });
+        const trigger = page.getByRole('button', { name: /あなた向けのアレルゲン設定/ });
         const open = async () => { if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click(); };
         const search = panel.getByRole('searchbox', { name: 'アレルゲンを探す', exact: true });
         const action = name => panel.getByRole('button', { name, exact: true });
@@ -71,7 +71,15 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         };
         await expect(cards.first()).toBeVisible();
         const cardCount = await cards.count();
-        await open();
+        await trigger.press('Enter');
+        await expect(panel).toBeVisible();
+        await expect(search).toBeFocused();
+        await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('hidden');
+        await page.locator('section[aria-label="あなた向けのアレルゲン設定"] > button').evaluate(button => button.focus());
+        await expect(search).toBeFocused();
+        const dialogBox = await panel.boundingBox();
+        if (width < 500) expect(dialogBox).toEqual({ x: 0, y: 0, width, height });
+        else expect(dialogBox.width).toBeLessThan(width);
         await expect(choices).toHaveCount(29);
         for (const [term, name] of [['らっかせい', '落花生（ピーナッツ）'], ['ﾋﾟｰﾅｯﾂ', '落花生（ピーナッツ）']]) {
             await search.fill(term);
@@ -113,6 +121,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await page.screenshot({ path: testInfo.outputPath('before-apply.png') });
         if (width === 1440) await apply.press('Enter');
         else await apply.click();
+        await expect(panel).toBeHidden();
+        await expect(trigger).toBeFocused();
+        expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe('hidden');
         await expect.poll(saved).toMatchObject({ highlightSlugs: ['wheat', 'milk'], excludedSlugs: ['shrimp', 'egg'], includeMayContain: false });
         await expect.poll(() => cards.count()).toBeLessThan(cardCount);
 
@@ -120,6 +131,24 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await open();
         await expect(preferenceItem(panel, '乳')).toHaveAttribute('data-preference-mode', 'highlight');
         await expect(preferenceItem(panel, '卵')).toHaveAttribute('data-preference-mode', 'exclude');
+        await search.fill('えび');
+        await preferenceItem(panel, 'えび').click();
+        await action('設定を外す').click();
+        await expect(summary).not.toContainText('えび');
+        await search.fill('たまご');
+        await search.dispatchEvent('keydown', { key: 'Escape', isComposing: true });
+        await expect(panel).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(panel).toBeHidden();
+        await expect(trigger).toBeFocused();
+        expect((await saved()).excludedSlugs).toEqual(['shrimp', 'egg']);
+        await open();
+        await expect(search).toHaveValue('');
+        await preferenceItem(panel, '卵').click();
+        await action('設定を閉じる').click();
+        await expect(trigger).toBeFocused();
+        await open();
+        await expect(preferenceItem(panel, '卵')).toHaveAttribute('aria-pressed', 'false');
         await preferenceItem(panel, '卵').click();
         await preferenceItem(panel, 'えび').click();
         await action('設定を外す').click();
@@ -127,13 +156,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await expect(summary).toContainText('注目：小麦・乳');
         await action('元に戻す').click();
         await expect(summary).toContainText('除外：えび・卵');
-        await action('すべて外す').click();
+        await action('設定をすべて解除').click();
         await expect(summary).toContainText('注目：なし');
         await expect(summary).toContainText('除外：なし');
         expect((await saved()).excludedSlugs).toEqual(['shrimp', 'egg']);
         await action('元に戻す').click();
         await expect(summary).toContainText('除外：えび・卵');
-        await action('すべて外す').click();
+        await action('設定をすべて解除').click();
         await expect(apply).toBeFocused();
         await expect(apply).toBeInViewport();
         await apply.click();
