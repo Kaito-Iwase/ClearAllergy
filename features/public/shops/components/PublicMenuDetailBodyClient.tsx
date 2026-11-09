@@ -97,7 +97,7 @@ export default function PublicMenuDetailBodyClient(props: {
 
     return (
         <>
-            <div className="lg:hidden">{preferencePanel}</div>
+            {preferencePanel}
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:items-start">
                 <div className="space-y-8 lg:col-span-2">
@@ -288,7 +288,6 @@ export default function PublicMenuDetailBodyClient(props: {
                         </Link>
                     </div>
 
-                    <div className="hidden lg:block">{preferencePanel}</div>
                 </div>
             </div>
         </>

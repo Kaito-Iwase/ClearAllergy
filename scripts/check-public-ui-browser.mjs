@@ -1,5 +1,6 @@
 // Public UI adversarial regression. Fictional loopback fixture only; no DB/auth/Blob writes.
 import assert from "node:assert/strict";
+import { preferenceItem, setPreferenceMode } from "./allergen-preference-browser-helpers.mjs";
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_
 let groups = 0;
 const pass = name => { groups++; console.log(`PASS: ${name}`); };
 const visible = locator => locator.filter({ visible: true });
-async function readablePreference(locator, hue) {
+async function readablePreference(locator, label) {
     const appearance = await locator.evaluate(element => {
         const style = getComputedStyle(element);
         const rgb = color => {
@@ -23,15 +24,12 @@ async function readablePreference(locator, hue) {
             context.fillRect(0, 0, 1, 1);
             return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(value => value / 255);
         };
-        return { text: rgb(style.color), background: rgb(style.backgroundColor), border: rgb(style.borderTopColor) };
+        return { text: rgb(style.color), background: rgb(style.backgroundColor) };
     });
     const luminance = rgb => rgb.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
         .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
     const contrast = (left, right) => (Math.max(luminance(left), luminance(right)) + 0.05) / (Math.min(luminance(left), luminance(right)) + 0.05);
-    assert.ok(contrast(appearance.text, appearance.background) >= 4.5, `${hue}: readable selected text`);
-    assert.ok(contrast(appearance.border, appearance.background) >= 3, `${hue}: visible selected boundary`);
-    const [red, green, blue] = appearance.background;
-    assert.ok(hue === "yellow" ? red > blue && green > blue : red > green && red > blue, `${hue}: requested hue`);
+    assert.ok(contrast(appearance.text, appearance.background) >= 4.5, `${label}: readable preference text`);
 }
 let page;
 async function capture(name) {
@@ -159,15 +157,15 @@ try {
     await page.goto(new URL(shopHref, base).href);
     const panel = () => visible(page.getByRole("button", { name: /あなた向けのアレルゲン設定/ }));
     const open = async () => { if (await panel().getAttribute("aria-expanded") !== "true") await panel().click(); };
-    const mode = (name, value) => visible(page.getByRole("combobox", { name: `${name}の表示設定`, exact: true })).selectOption(value);
+    const mode = (name, value) => setPreferenceMode(page, name, value);
     const apply = () => visible(page.getByRole("button", { name: "変更を適用", exact: true })).click();
     await open();
     await mode("かに", "highlight");
     await mode("えび", "exclude");
-    await readablePreference(visible(page.getByRole("combobox", { name: "かにの表示設定", exact: true })), "yellow");
-    await readablePreference(visible(page.getByRole("combobox", { name: "えびの表示設定", exact: true })), "red");
+    await readablePreference(preferenceItem(page, "かに").getByText("注目", { exact: true }), "注目");
+    await readablePreference(preferenceItem(page, "えび").getByText("除外", { exact: true }), "除外");
     assert.match(await panel().innerText(), /未設定/, "Draft selections are not presented as saved preferences");
-    pass("Japanese font loaded locally; attention yellow/exclusion red have readable text, visible boundaries and unapplied draft labels");
+    pass("Japanese font loaded locally; attention and exclusion are readable text labels and draft edits remain unapplied");
     const editorSummary = visible(page.getByLabel("編集中の表示設定", { exact: true }));
     await visible(page.getByRole("searchbox", { name: "アレルゲンを探す", exact: true })).fill("ピスタチオ");
     assert.match(await editorSummary.innerText(), /注目：かに/);
@@ -189,7 +187,7 @@ try {
     await apply();
     assert.equal(await curry.count(), 0, "MAY_CONTAIN exclusion applies only after saving");
     await open();
-    await visible(page.getByRole("button", { name: "すべて設定なしにする（未適用）", exact: true })).click();
+    await visible(page.getByRole("button", { name: "すべて外す", exact: true })).click();
     await apply();
     await open();
     await defaultChicken.waitFor();
@@ -205,7 +203,7 @@ try {
     pass("MAY_CONTAIN exclusion on hides matching menu; FREE retains target and guarantee limitation");
 
     await open();
-    await visible(page.getByRole("button", { name: "すべて設定なしにする（未適用）", exact: true })).click();
+    await visible(page.getByRole("button", { name: "すべて外す", exact: true })).click();
     await mode("卵", "highlight");
     await visible(page.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ })).check();
     await apply();

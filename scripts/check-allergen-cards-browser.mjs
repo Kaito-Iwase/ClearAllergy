@@ -1,6 +1,7 @@
 // Real UI components with fictional props. Save responses are simulated;
 // no app, DB, Clerk or upload is used.
 import assert from "node:assert/strict";
+import { setPreferenceMode } from "./allergen-preference-browser-helpers.mjs";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -156,9 +157,7 @@ try {
     pass("Preferences preserve selected scope and MAY exclusion; hiding a source card does not remove its supplement");
     const panel = page.getByRole("region", { name: "あなた向けのアレルゲン設定", exact: true });
     await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
-    await panel.getByLabel("くるみの表示設定", { exact: true }).selectOption("highlight");
-    await panel.getByLabel("乳の表示設定", { exact: true }).selectOption("highlight");
-    await panel.getByLabel("卵の表示設定", { exact: true }).selectOption("highlight");
+    await setPreferenceMode(panel, ["くるみ", "乳", "卵"], "highlight");
     const possibility = panel.getByRole("checkbox", { name: /含む可能性があるものを除外・強調/ });
     assert.equal(await possibility.isChecked(), false);
     await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
@@ -188,7 +187,7 @@ try {
     assert.match(await supplement.ariaSnapshot(), /くるみ[\s\S]*注目設定に一致/);
     pass("Unified toggle applies independent highlights only after Apply, persists on reload, and leaves registered MAY visible OFF");
     await panel.getByRole("button", { name: /あなた向けのアレルゲン設定/ }).click();
-    await panel.getByLabel("くるみの表示設定", { exact: true }).selectOption("exclude");
+    await setPreferenceMode(panel, "くるみ", "exclude");
     await panel.getByRole("button", { name: "変更を適用", exact: true }).click();
     assert.equal(await card.count(), 0);
     await page.getByRole("button", { name: "補足元の公開を切替", exact: true }).click();
