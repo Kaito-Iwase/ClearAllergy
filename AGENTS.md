@@ -26,6 +26,7 @@
 - 意味・安全/法務文言・認可model・schema/migration/本番data・公開契約・課金・major依存等の未承認判断を確定しない。通常PRはmergeしない。安全/認証/認可/DB/アレルゲン関係はauto merge対象外。
 - PR後は証拠のある改善だけ重複検索して最大3 follow-up。live Queueを再取得し次の独立Readyへ進む。Readyがなければ監査1回、session最大3実装Issueで無限loopを防ぐ。
 - 実行結果・最終HEAD・review・PR・blocker・次の操作をGitHubに残す。PR作成はIssue close/Done/merge/deployではない。
+- マージ済みPRに対応するIssueは[完了判定](docs/agentic-development.md#issue-completion)へ進める。必要なマージ後CI・配備・受け入れ検証を照合し、証跡コメントを確認してから、許可されたIssueを理由 `completed` で閉じる。
 
 ## 作業環境と開始時の確認
 
