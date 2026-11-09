@@ -66,7 +66,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
             await expect(preferenceItem(panel, name)).toBeVisible();
         }
         await search.fill('こむぎ');
-        await preferenceItem(panel, '小麦').click();
+        const wheat = preferenceItem(panel, '小麦');
+        if (width === 1440) await wheat.press('Space');
+        else await wheat.click();
         await search.fill('ぎゅうにゅう');
         await preferenceItem(panel, '乳').click();
         await expect(action('小麦を選択から外す')).toBeVisible();
@@ -92,7 +94,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         if (width < 500) expect(actionsBox.y).toBeLessThan(listBox.y);
         else expect(actionsBox.x).toBeGreaterThanOrEqual(listBox.x + listBox.width);
         await page.screenshot({ path: testInfo.outputPath('before-apply.png') });
-        await apply.click();
+        if (width === 1440) await apply.press('Enter');
+        else await apply.click();
         await expect.poll(saved).toMatchObject({ highlightSlugs: ['wheat', 'milk'], excludedSlugs: ['shrimp', 'egg'], includeMayContain: false });
         await expect.poll(() => cards.count()).toBeLessThan(cardCount);
 
@@ -100,6 +103,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await open();
         await expect(preferenceItem(panel, '乳')).toHaveAttribute('data-preference-mode', 'highlight');
         await expect(preferenceItem(panel, '卵')).toHaveAttribute('data-preference-mode', 'exclude');
+        await preferenceItem(panel, '卵').click();
+        await preferenceItem(panel, 'えび').click();
+        await action('設定を外す').click();
+        await expect(summary).toContainText('除外：なし');
+        await expect(summary).toContainText('注目：小麦・乳');
+        await action('元に戻す').click();
+        await expect(summary).toContainText('除外：えび・卵');
         await action('すべて外す').click();
         await expect(summary).toContainText('注目：なし');
         await expect(summary).toContainText('除外：なし');

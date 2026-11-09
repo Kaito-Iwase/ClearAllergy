@@ -111,13 +111,17 @@ try {
 
     const second = await context.newPage();
     await second.goto(base + shopHref);
+    await visible(page.getByRole("button", { name: "すべて外す", exact: true })).click();
+    await visible(page.getByRole("button", { name: "元に戻す", exact: true })).click();
+    const conflict = visible(page.getByRole("alert").filter({ hasText: "別の画面で設定が変更されました" }));
     await second.evaluate(() => localStorage.setItem("clearallergy:user-allergens", JSON.stringify({
         highlightSlugs: ["milk", "walnut"], excludedSlugs: ["shrimp"], includeMayContain: true })));
     await preferenceItem(page, "くるみ").and(page.locator('[data-preference-mode="highlight"]')).waitFor();
+    assert.equal(await conflict.count(), 0, "Undo back to the saved settings must accept the next update from another tab");
     await setMode("えび", "none");
     await second.evaluate(() => localStorage.setItem("clearallergy:user-allergens", JSON.stringify({
         highlightSlugs: ["milk", "walnut", "egg"], excludedSlugs: ["shrimp"], includeMayContain: true })));
-    await visible(page.getByRole("alert").filter({ hasText: "別の画面で設定が変更されました" })).waitFor();
+    await conflict.waitFor();
     assert.equal(await visible(page.getByRole("button", { name: "変更を適用", exact: true })).isDisabled(), true);
     await visible(page.getByRole("button", { name: "編集を破棄して最新の設定を読み直す", exact: true })).click();
     await setMode("えび", "none");
