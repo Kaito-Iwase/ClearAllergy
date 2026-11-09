@@ -4,11 +4,18 @@ test.beforeEach(async ({ context, baseURL }) => {
     await context.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
 });
 const controls = page => page.getByRole('complementary', { name: '公開情報の再取得', exact: true });
+const surface = page => page.locator('[data-public-freshness]');
 const publicURL = menu => `/shops/${menu.shopId}/menus/${menu.id}`;
-async function ready(page) { await expect(controls(page)).toHaveAttribute('data-public-freshness', 'ready'); await expect(controls(page)).toHaveAttribute('data-previous-information', 'false'); }
-async function refresh(page) {
+async function ready(page) {
+    await expect(surface(page)).toHaveAttribute('data-public-freshness', 'ready');
+    await expect(surface(page)).toHaveAttribute('data-previous-information', 'false');
+    await expect(controls(page)).toHaveCount(0);
+}
+async function resume(page) { await page.evaluate(() => window.dispatchEvent(new Event('focus'))); }
+async function refresh(page, { retry = false } = {}) {
     const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/public-snapshot');
-    await controls(page).getByRole('button', { name: '公開情報を再取得', exact: true }).click();
+    if (retry) await controls(page).getByRole('button', { name: '公開情報を再取得', exact: true }).click();
+    else await resume(page);
     const result = await response; await ready(page); return result;
 }
 async function stop(menu) {
@@ -36,10 +43,12 @@ async function selectPreferences(page, settings) {
     await page.getByRole('button', { name: '変更を適用', exact: true }).filter({ visible: true }).click();
 }
 
-test('鮮度: 三画面を手動で完全再取得し検索入力を保持する', async ({ createMenu, page }) => {
+test('鮮度: 三画面で通常時のパネルを表示せず、復帰時に再取得して検索入力を保持する', async ({ createMenu, page }) => {
     const menu = await createMenu(); await publish(menu);
     for (const [url, kind] of [['/shops', 'list'], [`/shops/${menu.shopId}`, 'shop'], [publicURL(menu), 'menu']]) {
         await page.goto(url); await ready(page);
+        await expect(page.getByRole('heading', { name: '公開情報の取得状態', exact: true })).toHaveCount(0);
+        await expect(page.getByText('旧情報の表示を比較する', { exact: true })).toHaveCount(0);
         const result = await refresh(page); expect(result.status()).toBe(200);
         const body = await result.json(); expect(body.result.kind).toBe(kind); expect(body.targetKey).toBe(url);
         expect(JSON.stringify(body)).not.toContain('publicationConfirmedFoodVersion');
@@ -49,7 +58,7 @@ test('鮮度: 三画面を手動で完全再取得し検索入力を保持する
     await expect(search).toHaveCount(1); await search.fill('未適用の検索入力'); await refresh(page); await expect(search).toHaveValue('未適用の検索入力');
 });
 
-test('鮮度: 取得中/失敗の旧FREE要約を抑え、注意保持と遮蔽を比較して回復する', async ({ createMenu, page }, testInfo) => {
+test('鮮度: 取得中・失敗の旧FREE要約を抑え、注意情報を保持して再試行で回復する', async ({ createMenu, page }, testInfo) => {
     const menu = await createMenu(); await statuses(menu); await page.goto(publicURL(menu)); await ready(page);
     const allergenCount = (await readMenu(menu)).allergens.length;
     const panel = page.getByRole('button', { name: /あなた向けのアレルゲン設定/ }).filter({ visible: true });
@@ -59,32 +68,42 @@ test('鮮度: 取得中/失敗の旧FREE要約を抑え、注意保持と遮蔽�
     await expect(page.getByRole('heading', { name: '原材料に含まない', exact: true })).toBeVisible();
     await shot(page, testInfo, 'normal');
     let release; const held = new Promise(resolve => { release = resolve; });
-    const handler = async route => { await held; await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'explicit fictional failure' }) }); };
+    let requests = 0;
+    const handler = async route => {
+        requests++;
+        await held;
+        await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'explicit fictional failure' }) });
+    };
     await page.route('**/api/public-snapshot?**', handler);
     try {
-        await controls(page).getByRole('button', { name: '公開情報を再取得', exact: true }).click();
-        await expect(controls(page)).toHaveAttribute('data-public-freshness', 'loading');
+        await resume(page);
+        await expect(surface(page)).toHaveAttribute('data-public-freshness', 'loading');
         await expect(page.getByRole('heading', { name: '原材料に含まない', exact: true })).toHaveCount(0);
         await expect(page.getByText('未再確認のため、条件に合うかの要約は表示していません。詳細の登録状態も以前取得した情報です。', { exact: true })).toBeVisible();
         const old = page.getByRole('region', { name: '以前取得した公開情報', exact: true });
         await expect(old.getByText('含む', { exact: true })).toBeVisible();
         await expect(old.getByText('含む可能性あり・要確認', { exact: true })).toBeVisible();
         await expect(old.getByText('以前取得した登録・現在は未再確認', { exact: true })).toHaveCount(allergenCount);
-        await shot(page, testInfo, 'loading'); release();
-        await expect(controls(page)).toHaveAttribute('data-public-freshness', 'error');
+        await shot(page, testInfo, 'loading');
+        // A failure between pointer-down and pointer-up must not turn cancel into retry.
+        const cancel = controls(page).getByRole('button', { name: '取得を中止', exact: true });
+        await cancel.scrollIntoViewIfNeeded();
+        const button = await cancel.boundingBox();
+        expect(button).not.toBeNull();
+        await page.mouse.move(button.x + 4, button.y + button.height / 2);
+        await page.mouse.down();
+        release();
+        await expect(controls(page).getByRole('button', { name: '公開情報を再取得', exact: true })).toBeVisible();
+        await page.mouse.up();
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        expect(requests).toBe(1);
+        await expect(surface(page)).toHaveAttribute('data-public-freshness', 'error');
+        await expect(controls(page).getByRole('alert')).toHaveText('再取得できませんでした。');
         await expect(page.getByText(menu.ingredients, { exact: true })).toBeVisible();
         await page.setViewportSize({ width: 390, height: 844 }); await shot(page, testInfo, 'failure-mobile');
-        await controls(page).locator('summary').click();
-        await controls(page).getByRole('radio', { name: /旧情報を隠す/ }).check();
-        await expect(page.getByText(menu.ingredients, { exact: true })).not.toBeVisible();
-        await expect(page.getByText('未再確認の旧情報を隠しています。既知の含有・混入注意も表示されていません。', { exact: true })).toBeVisible();
-        await shot(page, testInfo, 'hide-mobile');
-        await controls(page).getByRole('radio', { name: /注意情報を残し/ }).check();
-        await expect(page.getByText(menu.ingredients, { exact: true })).toBeVisible();
     } finally { release(); await page.unroute('**/api/public-snapshot?**', handler); }
-    await refresh(page);
+    await refresh(page, { retry: true });
     await expect(page.getByRole('heading', { name: '原材料に含まない', exact: true })).toBeVisible();
-    await controls(page).getByRole('radio', { name: /旧情報を隠す/ }).check();
     const focused = page.getByRole('link', { name: '店舗ページで他のメニューを見る', exact: true });
     await focused.focus();
     let releaseFocus; let cancelled = false; const focusHold = new Promise(resolve => { releaseFocus = resolve; });
@@ -95,14 +114,15 @@ test('鮮度: 取得中/失敗の旧FREE要約を抑え、注意保持と遮蔽�
     };
     await page.route('**/api/public-snapshot?**', focusHandler);
     try {
-        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-        await expect(controls(page).getByRole('heading', { name: '公開情報の取得状態', exact: true })).toBeFocused();
-        await expect(page.getByText(menu.ingredients, { exact: true })).not.toBeVisible();
-        cancelled = true; await controls(page).getByRole('button', { name: '取得を中止', exact: true }).click();
-        await expect(controls(page)).toHaveAttribute('data-public-freshness', 'error');
+        await resume(page);
+        await expect(surface(page)).toHaveAttribute('data-public-freshness', 'loading');
+        await expect(focused).toBeFocused();
+        await expect(page.getByText(menu.ingredients, { exact: true })).toBeVisible();
+        cancelled = true; await controls(page).getByRole('button', { name: '取得を中止', exact: true }).press('Enter');
+        await expect(surface(page)).toHaveAttribute('data-public-freshness', 'error');
         await expect(controls(page).getByText('再取得を中止しました。', { exact: true })).toBeVisible();
     } finally { releaseFocus(); await page.unroute('**/api/public-snapshot?**', focusHandler); }
-    await refresh(page);
+    await refresh(page, { retry: true });
 });
 
 test('鮮度: 混在する含有・混入・FREEも取得中/失敗時は同じFREE行を以前の登録と示す', async ({ createMenu, page }, testInfo) => {
@@ -116,18 +136,18 @@ test('鮮度: 混在する含有・混入・FREEも取得中/失敗時は同じF
     const handler = async route => { await held; await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); };
     await page.route('**/api/public-snapshot?**', handler);
     try {
-        await controls(page).getByRole('button', { name: '公開情報を再取得', exact: true }).click();
-        await expect(controls(page)).toHaveAttribute('data-public-freshness', 'loading');
+        await resume(page);
+        await expect(surface(page)).toHaveAttribute('data-public-freshness', 'loading');
         await expect(milk).toContainText('以前の登録は「原材料に含まない」');
         await expect(milk).toContainText('以前取得した登録・現在は未再確認');
         await expect(page.getByRole('heading', { name: '含む', exact: true })).toBeVisible();
         await expect(page.getByRole('heading', { name: '含む可能性あり・要確認', exact: true })).toBeVisible();
         await expect(page.getByRole('heading', { name: '原材料に含まない', exact: true })).toHaveCount(0);
-        release(); await expect(controls(page)).toHaveAttribute('data-public-freshness', 'error');
+        release(); await expect(surface(page)).toHaveAttribute('data-public-freshness', 'error');
         await expect(milk).toContainText('以前取得した登録・現在は未再確認');
         await page.setViewportSize({ width: 390, height: 844 }); await shot(page, testInfo, 'mixed-failure-mobile');
     } finally { release(); await page.unroute('**/api/public-snapshot?**', handler); }
-    await refresh(page);
+    await refresh(page, { retry: true });
     await expect(milk).toContainText('原材料に含まない'); await expect(milk).not.toContainText('現在は未再確認');
     const saved = await readMenu(menu);
     for (const [slug, status] of [['egg', 'CONTAINS'], ['wheat', 'MAY_CONTAIN'], ['milk', 'FREE']]) expect(saved.allergens.find(row => row.slug === slug)?.status).toBe(status);
@@ -143,8 +163,8 @@ test('鮮度: 旧除外結果を再確認済みの条件一致と呼ばず、実
     const handler = async route => { await held; await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); };
     await page.route('**/api/public-snapshot?**', handler);
     try {
-        await controls(page).getByRole('button', { name: '公開情報を再取得', exact: true }).click();
-        await expect(controls(page)).toHaveAttribute('data-public-freshness', 'loading');
+        await resume(page);
+        await expect(surface(page)).toHaveAttribute('data-public-freshness', 'loading');
         await statuses(menu); // Actual save and separate publish: old FREE becomes CONTAINS.
         const changed = await readMenu(menu); expect(changed.isPublished).toBe(true);
         expect(changed.allergens.find(row => row.slug === 'egg')?.status).toBe('CONTAINS');
@@ -152,12 +172,12 @@ test('鮮度: 旧除外結果を再確認済みの条件一致と呼ばず、実
         await expect(page.getByRole('heading', { name: '条件に一致するClearAllergy登録済み店舗', exact: true })).toHaveCount(0);
         await expect(page.getByRole('heading', { name: '以前取得した登録情報による店舗一覧', exact: true })).toBeVisible();
         await expect(page.getByText('表示・非表示の判定は以前取得した登録情報によるものです。現在のアレルゲン登録を再確認できていません。', { exact: true })).toBeVisible();
-        release(); await expect(controls(page)).toHaveAttribute('data-public-freshness', 'error');
+        release(); await expect(surface(page)).toHaveAttribute('data-public-freshness', 'error');
         await expect(card).toBeVisible();
         await expect(page.getByRole('heading', { name: '以前取得した登録情報による店舗一覧', exact: true })).toBeVisible();
         await page.setViewportSize({ width: 390, height: 844 }); await shot(page, testInfo, 'list-failure-mobile');
     } finally { release(); await page.unroute('**/api/public-snapshot?**', handler); }
-    await refresh(page);
+    await refresh(page, { retry: true });
     await expect(card).toHaveCount(0);
     await expect(page.getByRole('heading', { name: '条件に一致するClearAllergy登録済み店舗', exact: true })).toBeVisible();
     await expect(page.getByText('表示・非表示の判定は以前取得した登録情報によるものです。現在のアレルゲン登録を再確認できていません。', { exact: true })).toHaveCount(0);
@@ -240,7 +260,7 @@ test('鮮度: 公開layout外から複数履歴を戻り、訂正された食品
     await page.locator('a[href="/admin/login"]').first().click();
     await expect(page).toHaveURL(new URL('/admin/shop', baseURL).href);
     await expect(page.getByLabel('お店の説明', { exact: true })).toBeVisible();
-    await expect(controls(page)).toHaveCount(0);
+    await expect(surface(page)).toHaveCount(0);
 
     // Keep the target published so either a cached or a new RSC result mounts
     // its Surface. A fresh server 404 would correctly have no Surface to wake.

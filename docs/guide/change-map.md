@@ -27,7 +27,7 @@
 <a id="pages"></a>
 ## 公開鮮度の再取得経路
 
-PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。この変更をmainへ取り込む場合の入口を以下に示します。公開3ページの初期取得は `server/public-shop-list-data.ts` / `public-shop-detail-data.ts` / `public-menu-detail-data.ts` の共有loaderへ移し、同じ公開条件・RepeatableRead・補足を使います。既存caller4件と10負例のsource参照はloaderへ追従し、検出条件を維持しています。
+PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。公開鮮度の入口を以下に示します。公開3ページの初期取得は `server/public-shop-list-data.ts` / `public-shop-detail-data.ts` / `public-menu-detail-data.ts` の共有loaderへ移し、同じ公開条件・RepeatableRead・補足を使います。既存caller4件と10負例のsource参照はloaderへ追従し、検出条件を維持しています。
 
 | 入口 | 実装・検証 |
 | --- | --- |
@@ -35,7 +35,7 @@ PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。こ�
 | 三画面の再取得と表示 | `PublicFreshnessSurface.tsx` / root `app/layout.tsx` の `PublicFreshnessNavigation.tsx` / `freshness/revalidation.ts` / `freshness/presentation.tsx`。`SelectedAllergenResultCardsClient.tsx` / `PublicShopListClient.tsx` / `PublicShopMap.tsx`。`tests/public-freshness.test.ts`、`tests/public-freshness-presentation.test.ts`、`e2e/freshness.spec.mjs` |
 | 内容と適用proof | `PublicShopDetailView.tsx` / `PublicMenuDetailView.tsx` と既存list/menu本文。shopはmenu・検索要約の両方を待つ。FREE要約抑制と注意保持は `MenuAllergenSummary.tsx` / `SelectedAllergenResultCardsClient.tsx`。店舗内の集計・件数・0件の局所注記は `ShopMenuListClient.tsx` |
 
-[実装・実行結果](../verification/public-freshness-prototype-20261105.md)、[操作と暫定表示方式](product.md#freshness-prototype)、[統合状態](verification.md#freshness-prototype-status)を参照します。コードの取込を表示方式A/Bの最終決定や実サービスの到達保証へ読み替えません。
+[実装・実行結果](../verification/public-freshness-prototype-20261105.md)、[再取得と未再確認時の表示](product.md#freshness-prototype)、[統合状態](verification.md#freshness-prototype-status)を参照します。コードの取込を表示方式A/Bの最終決定や実サービスの到達保証へ読み替えません。
 
 ## 全ページの入口
 
