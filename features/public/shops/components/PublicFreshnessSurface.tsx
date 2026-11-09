@@ -108,12 +108,12 @@ function Surface({ target, initialSnapshot }: Props) {
         {showNotice && <aside aria-label="公開情報の再取得" className="mx-auto max-w-5xl space-y-1 px-4 py-2 text-sm text-gray-900">
             <p role={state.phase === 'error' ? 'alert' : 'status'} className="font-semibold">{message}</p>
             {hasPreviousInformation && <p>表示する登録内容は以前取得した情報です。FREE（原材料に含まない）の登録も、現在の状態として再確認できていません。</p>}
-            {(busy || state.phase === 'error') && <button type="button" onClick={() => {
+            {(busy || state.phase === 'error') && <button key={busy ? 'cancel' : 'retry'} type="button" onClick={() => {
+                content.current?.focus();
                 if (busy) {
                     engine.cancel();
                     return;
                 }
-                content.current?.focus();
                 if (frame.current !== null) cancelAnimationFrame(frame.current);
                 frame.current = null;
                 engine.request();
