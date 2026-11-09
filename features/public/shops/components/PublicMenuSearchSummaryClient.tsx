@@ -4,6 +4,7 @@ import { usePublicApplyProof } from "../freshness/presentation";
 
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import { searchPublicMenus } from "./public-menu-search";
 
 type MenuSearchItem = {
     name: string;
@@ -20,24 +21,7 @@ export default function PublicMenuSearchSummaryClient({
     const searchParams = useSearchParams();
     const q = (searchParams.get("q") ?? "").trim();
 
-    const resultCount = useMemo(() => {
-        if (q === "") {
-            return menus.length;
-        }
-
-        const needle = q.toLocaleLowerCase("ja-JP");
-        return menus.filter((menu) => {
-            return (
-                menu.name.toLocaleLowerCase("ja-JP").includes(needle) ||
-                (menu.description ?? "")
-                    .toLocaleLowerCase("ja-JP")
-                    .includes(needle) ||
-                (menu.category ?? "")
-                    .toLocaleLowerCase("ja-JP")
-                    .includes(needle)
-            );
-        }).length;
-    }, [menus, q]);
+    const resultCount = useMemo(() => searchPublicMenus(menus, q).length, [menus, q]);
 
     if (q === "") {
         return null;
