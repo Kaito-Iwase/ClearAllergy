@@ -181,7 +181,7 @@ node scripts/browser-runner.mjs ui
 | 確認スクリプト | 対象・副作用・成功時の確認 |
 | --- | --- |
 | `scripts/check-first-use-browser.mjs` | 公開検索、スマホ表示、個人設定の追加・解除・競合・保存失敗、詳細遷移、デモの未保存保護等。ブラウザ内設定を操作しDB更新はしない。PASS出力とスクリーンショットを確認 |
-| `scripts/check-public-ui-browser.mjs` | `ui` で実行。320・390・768・1024・1440pxのトップ／一覧／店舗／詳細／規約、日本語Webフォントの実読込と入力欄との統一、ロゴ、横幅、個人設定のモノクロ「注目」「除外」ラベルの文字コントラスト、適用前後、MAY_CONTAIN除外ON/OFF、FREEの対象・保証の限界、別メニュー補足、キーボード詳細遷移、404を検査。ブラウザ内設定だけを変更しDB・認証・Blobには書き込まない。PASS出力とスクリーンショットを確認 |
+| `scripts/check-public-ui-browser.mjs` | `ui` で実行。320・390・768・1024・1440pxのトップ／一覧／店舗／詳細／規約、日本語Webフォントの実読込と入力欄との統一、ロゴ、横幅、個人設定ダイアログの黄色「注目」と赤「除外」の品目ラベル・要約の文字コントラスト、適用前後、MAY_CONTAIN除外ON/OFF、FREEの対象・保証の限界、別メニュー補足、キーボード詳細遷移、404を検査。ブラウザ内設定だけを変更しDB・認証・Blobには書き込まない。PASS出力とスクリーンショットを確認 |
 | `scripts/check-image-composition-browser.mjs` | `composition` で実行。架空SVG画像と実編集部品で、描画した画素の移動・範囲・ズームとタッチを検査。ブラウザの外部通信を遮断し、DB・認証・画像保存は使わない。変更前後のスクリーンショットとPASS出力を確認 |
 | `scripts/check-shop-qr-browser.mjs` | `qr` で実行。実QR部品と架空URLで、4幅の正方形・サイズ比率・入力、印刷mm指定・説明の非印刷・afterprint解除を検査。JSON・スクリーンショットとA4／100%のPDFを出力。外部通信・DB・実印刷は使わない |
 | `scripts/check-saved-publication-browser.mjs` | `node scripts/browser-runner.mjs publication` で実行。実新規・編集・公開確認部品と同じworktreeのビルド済みCSSを使い、全通信を架空応答へ置換。保存と公開の失敗・版不一致・二重クリック・新規再読込・UNKNOWNの修正再保存・320/390/768/1536px・キーボードを検査。DB・Clerk・Blob・本番・利用者の既存ブラウザは使わない。JSON・画像を `CLEARALLERGY_BROWSER_OUTPUT` へ出力。CIでも実行 |

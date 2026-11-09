@@ -19,6 +19,13 @@ import { filterAndGroupPreferenceItems } from "./public-allergen-preference-opti
 export type UserAllergenPreferenceAllergen = { slug: string; nameJa: string };
 
 const modeLabel = { none: "設定なし", highlight: "注目", exclude: "除外" };
+const dialogTitle = "あなた向けのアレルゲン設定";
+const badgeColors = { highlight: "bg-amber-100 text-amber-950", exclude: "bg-red-100 text-red-900" };
+const itemColors = {
+    none: "border-gray-300 bg-white text-gray-900",
+    highlight: "border-amber-400 bg-amber-50 text-gray-900",
+    exclude: "border-red-300 bg-red-50 text-gray-900",
+};
 const secondaryButton = "min-h-11 rounded-lg border border-gray-300 bg-white px-2 text-sm font-bold text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:bg-gray-100 disabled:text-gray-600";
 
 export function useUserAllergenPreferences() {
@@ -80,7 +87,7 @@ export function useUserAllergenPreferenceState() {
         loaded: snapshot.loaded,
         message: snapshot.storageError || message,
         isOpen,
-        onToggleOpen: () => setIsOpen((value) => !value),
+        onOpen: () => { setMessage(""); setIsOpen(true); },
         canUndo: edit?.previous != null,
         onChangeModes: (slugs: string[], mode: AllergenPreferenceMode) =>
             change((value) => slugs.reduce((next, slug) => setAllergenPreferenceMode(next, slug, mode), value), "items"),
@@ -108,10 +115,22 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
 }) {
     const id = React.useId();
     const trigger = React.useRef<HTMLButtonElement>(null);
+    const dialog = React.useRef<HTMLDialogElement>(null);
     const search = React.useRef<HTMLInputElement>(null);
     const applyButton = React.useRef<HTMLButtonElement>(null);
     const [query, setQuery] = React.useState("");
     const [selectedSlugs, setSelectedSlugs] = React.useState<string[]>([]);
+    React.useLayoutEffect(() => {
+        const element = dialog.current;
+        if (!element) return;
+        if (state.isOpen && !element.open) {
+            element.showModal();
+            search.current?.focus();
+        } else if (!state.isOpen && element.open) {
+            element.close();
+            trigger.current?.focus();
+        }
+    }, [state.isOpen]);
     if (!state.loaded) return null;
 
     const { saved, draft, dirty, conflict } = state;
@@ -121,6 +140,7 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
     const hasSelection = selected.length > 0;
     const canRemove = selected.some(({ slug }) => getAllergenPreferenceMode(draft, slug) !== "none");
     const focusApply = () => requestAnimationFrame(() => {
+        if (!dialog.current?.open) return;
         const button = applyButton.current;
         if (button && !button.disabled) {
             button.scrollIntoView({ block: "nearest" });
@@ -131,6 +151,11 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
     function resetSelection() {
         setSelectedSlugs([]);
         setQuery("");
+    }
+
+    function cancel() {
+        state.onCancel();
+        resetSelection();
     }
 
     function toggleSelection(slug: string) {
@@ -145,27 +170,8 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
         focusApply();
     }
 
-    return (
-        <section aria-label="あなた向けのアレルゲン設定"
-            className={"@container min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm [&_:is(button,input)]:scroll-mt-32 lg:[&_:is(button,input)]:scroll-mt-16 " + className}>
-            <button ref={trigger} type="button" onClick={state.onToggleOpen} aria-expanded={state.isOpen}
-                aria-controls={state.isOpen ? id + "-editor" : undefined}
-                className="flex min-h-11 w-full items-start justify-between gap-3 rounded-2xl p-4 text-left focus-visible:outline-2 sm:p-5">
-                <span className="min-w-0">
-                    <span className="block text-base font-bold text-gray-900">あなた向けのアレルゲン設定</span>
-                    <span className="mt-2 block break-words text-sm leading-6 text-gray-700">
-                        {saved.selectedSlugs.length === 0 ? "未設定" : <>
-                            {saved.highlightSlugs.length > 0 && <span className="block">注目：{names(saved.highlightSlugs)}</span>}
-                            {saved.excludedSlugs.length > 0 && <span className="block">除外：{names(saved.excludedSlugs)}</span>}
-                        </>}
-                    </span>
-                    {dirty && <span className="mt-1 block text-sm font-bold text-gray-900">未適用の変更あり</span>}
-                </span>
-                <span aria-hidden="true" className="shrink-0 text-gray-600">{state.isOpen ? "▴" : "▾"}</span>
-            </button>
-            {state.message && <p role="status" className="mx-4 mb-4 rounded-lg bg-gray-100 p-3 text-sm text-gray-900">{state.message}</p>}
-            {state.isOpen && <div id={id + "-editor"}
-                className="grid items-start gap-4 border-t border-gray-100 p-4 sm:p-5 @min-[48rem]:grid-cols-[minmax(0,1fr)_minmax(16rem,21rem)] @min-[48rem]:gap-x-6">
+    const editor = state.isOpen && (
+            <div className="grid items-start gap-4 p-4 sm:p-5 @min-[48rem]:grid-cols-[minmax(0,1fr)_minmax(16rem,21rem)] @min-[48rem]:gap-x-6">
                 <div className="min-w-0 rounded-xl bg-gray-100 px-3 py-2 @min-[48rem]:col-start-2 @min-[48rem]:row-start-1">
                     <div className="flex flex-wrap items-center justify-between gap-x-2">
                         <p className="text-sm text-gray-700">{dirty ? "変更後の設定（未適用）" : "適用済みの設定"}</p>
@@ -173,11 +179,11 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                             state.onClear();
                             setSelectedSlugs([]);
                             focusApply();
-                        }} className="min-h-11 px-1 text-sm font-bold underline focus-visible:outline-2">すべて外す</button>}
+                        }} className="min-h-11 px-1 text-sm font-bold underline focus-visible:outline-2">設定をすべて解除</button>}
                     </div>
                     <div role="group" aria-label="編集中の表示設定" className="space-y-1 break-words text-sm leading-6 text-gray-900">
-                        <p>注目：{names(draft.highlightSlugs) || "なし"}</p>
-                        <p>除外：{names(draft.excludedSlugs) || "なし"}</p>
+                        <p className={"w-fit max-w-full rounded-md px-1.5 " + (draft.highlightSlugs.length ? badgeColors.highlight : "text-gray-600")}>注目：{names(draft.highlightSlugs) || "なし"}</p>
+                        <p className={"w-fit max-w-full rounded-md px-1.5 " + (draft.excludedSlugs.length ? badgeColors.exclude : "text-gray-600")}>除外：{names(draft.excludedSlugs) || "なし"}</p>
                     </div>
                 </div>
                 <div className="min-w-0 @min-[48rem]:col-start-1 @min-[48rem]:row-start-1">
@@ -209,13 +215,14 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                         <button type="button" onClick={() => { state.onReload(); resetSelection(); search.current?.focus(); }}
                             className="min-h-11 font-bold underline focus-visible:outline-2">編集を破棄して最新の設定を読み直す</button>
                     </div>}
+                    {state.message && <p role="status" className="rounded-lg bg-white p-3 text-sm text-gray-900">{state.message}</p>}
                     {state.canUndo && <button type="button" onClick={() => { state.onUndo(); focusApply(); }}
                         className="min-h-11 px-1 text-sm font-bold underline focus-visible:outline-2">元に戻す</button>}
                     <div className="grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => { state.onCancel(); resetSelection(); trigger.current?.focus(); }}
+                        <button type="button" onClick={cancel}
                             className={secondaryButton}>キャンセル</button>
                         <button ref={applyButton} type="button" onClick={() => {
-                            if (state.onApply()) { resetSelection(); trigger.current?.focus(); }
+                            if (state.onApply()) resetSelection();
                         }} disabled={!dirty || conflict || hasSelection}
                             className="min-h-11 rounded-lg bg-gray-900 px-2 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:bg-gray-200 disabled:text-gray-600">変更を適用</button>
                     </div>
@@ -233,17 +240,49 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                                     aria-describedby={modeId} data-preference-mode={mode}
                                     onClick={() => toggleSelection(slug)}
                                     className={"flex min-h-11 min-w-12 max-w-full items-center gap-1 rounded-lg border px-2 text-left text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 "
-                                        + (pressed ? "border-gray-900 bg-gray-900 text-white focus-visible:outline-gray-900" : "border-gray-300 bg-white text-gray-900")}>
+                                        + (pressed ? "border-gray-900 bg-gray-900 text-white focus-visible:outline-gray-900" : itemColors[mode])}>
                                     {pressed && <span aria-hidden="true">✓</span>}
                                     <span className="break-words">{nameJa}</span>
-                                    <span id={modeId} className={mode === "none" ? "sr-only" : "shrink-0 rounded bg-gray-100 px-1 text-xs text-gray-900"}>{modeLabel[mode]}</span>
+                                    <span id={modeId} className={mode === "none" ? "sr-only" : "shrink-0 rounded px-1 text-xs " + badgeColors[mode]}>{modeLabel[mode]}</span>
                                 </button>;
                             })}
                         </div>
                     </section>)}
                     {groups.length === 0 && <p role="status" className="text-sm text-gray-700">一致する項目がありません。</p>}
                 </div>
-            </div>}
+            </div>
+    );
+
+    return (
+        <section aria-label={dialogTitle}
+            className={"min-w-0 rounded-2xl border border-gray-200 bg-white shadow-sm " + className}>
+            <button ref={trigger} type="button" onClick={state.onOpen} aria-haspopup="dialog" aria-expanded={state.isOpen}
+                aria-controls={id + "-dialog"}
+                className="flex min-h-11 w-full scroll-mt-32 flex-wrap items-center justify-between gap-3 rounded-2xl p-4 text-left focus-visible:outline-2 sm:p-5 lg:scroll-mt-16">
+                <span className="min-w-0">
+                    <span className="block text-base font-bold text-gray-900">{dialogTitle}</span>
+                    <span className="mt-2 flex flex-wrap gap-1.5 break-words text-sm leading-6 text-gray-700">
+                        {saved.selectedSlugs.length === 0 ? "未設定" : <>
+                            {saved.highlightSlugs.length > 0 && <span className={"rounded-md px-1.5 " + badgeColors.highlight}>注目：{names(saved.highlightSlugs)}</span>}
+                            {saved.excludedSlugs.length > 0 && <span className={"rounded-md px-1.5 " + badgeColors.exclude}>除外：{names(saved.excludedSlugs)}</span>}
+                        </>}
+                    </span>
+                </span>
+                <span className="shrink-0 rounded-lg bg-gray-900 px-3 py-2 text-sm font-bold text-white">設定を開く</span>
+            </button>
+            {!state.isOpen && state.message && <p role="status" className="mx-4 mb-4 rounded-lg bg-gray-100 p-3 text-sm text-gray-900">{state.message}</p>}
+            <dialog ref={dialog} id={id + "-dialog"} aria-labelledby={id + "-title"} data-allergen-preference-dialog
+                onCancel={(event) => { event.preventDefault(); cancel(); }}
+                className="fixed inset-0 m-auto hidden h-dvh max-h-dvh w-full max-w-none flex-col overflow-hidden bg-white text-gray-900 open:flex backdrop:bg-gray-950/65 sm:h-auto sm:max-h-[calc(100dvh_-_3rem)] sm:w-[calc(100%_-_3rem)] sm:max-w-[1060px] sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-xl">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 px-4 py-2 sm:px-5">
+                    <h2 id={id + "-title"} className="text-base font-bold">{dialogTitle}</h2>
+                    <button type="button" aria-label="設定を閉じる" onClick={cancel}
+                        className="min-h-11 min-w-11 rounded-lg text-2xl focus-visible:outline-2">×</button>
+                </div>
+                <div className="@container min-h-0 overflow-y-auto overscroll-contain">
+                    {editor}
+                </div>
+            </dialog>
         </section>
     );
 }
