@@ -30,7 +30,8 @@
       "ci/staging-incident-20261107": false,
       "ci/staging-explicit-alias-20261107": false,
       "fix/public-menu-thumbnail-refresh": false,
-      "fix/public-menu-thumbnail-refresh-main": false
+      "fix/public-menu-thumbnail-refresh-main": false,
+      "agent/issue-143-menu-category-ux": false
     }
   }
 }
