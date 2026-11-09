@@ -161,11 +161,11 @@ export default function ShopMenuListClient({
         <section
             id="public-menus"
             aria-labelledby={`${listId}-heading`}
-            className="min-w-0 scroll-mt-32"
+            className="min-w-0 scroll-mt-32 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6"
         >
             <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-                <h2 id={`${listId}-heading`} className="text-xl font-extrabold">公開メニュー</h2>
-                <p className="text-sm text-gray-600">
+                <h2 id={`${listId}-heading`} className="text-base font-extrabold">公開メニュー</h2>
+                <p className="text-xs text-gray-500">
                     {previous && "以前取得した登録情報による表示："}
                     表示 {visibleMenuItems.length}件 / 検索対象 {searchedMenus.length}件
                 </p>
@@ -214,7 +214,7 @@ export default function ShopMenuListClient({
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
                     {visibleMenuItems.map(({ menu, statusBySlug }) => {
                         const summaryArgs = {
                             statusBySlug,
@@ -235,12 +235,14 @@ export default function ShopMenuListClient({
                         const image = menuImages?.[menu.id];
                         const titleId = `${listId}-${menu.id}`;
                         const registrationId = `${titleId}-registration`;
+                        const precautionId = menu.precaution?.trim() ? `${titleId}-precaution` : undefined;
                         const descriptionIds = [
                             previous && `${registrationId}-previous`,
                             `${titleId}-scope`,
                             registrationId,
                             activeSummary.storeHandledCount > 0 && `${registrationId}-supplement`,
                             showOtherSummary && `${titleId}-other-heading ${titleId}-other`,
+                            precautionId,
                         ].filter(Boolean).join(" ");
 
                         return (
@@ -283,9 +285,9 @@ export default function ShopMenuListClient({
                                         </div>
                                     ) : null}
                                 </div>
-                                {menu.precaution?.trim() ? (
+                                {precautionId ? (
                                     <div role="group" aria-label="店舗の注意書き" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                                        <h4 className="text-sm font-bold leading-5 text-gray-700">店舗の注意書き</h4>
+                                        <h4 id={precautionId} className="text-sm font-bold leading-5 text-gray-700">店舗の注意書き</h4>
                                         <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm leading-6 text-gray-700">{menu.precaution}</p>
                                     </div>
                                 ) : null}

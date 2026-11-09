@@ -62,6 +62,7 @@ test('公開: 一覧の写真と登録を一括で再取得し、遅延応答を
     const card = page.locator('#public-menus').getByRole('link').first();
     const [, shopId, menuId] = (await card.getAttribute('href')).match(/^\/shops\/([^/]+)\/menus\/([^/]+)$/);
     const controls = page.getByRole('complementary', { name: '公開情報の再取得', exact: true });
+    const surface = page.locator('[data-public-freshness]');
     const image = card.locator('img');
     const snapshotRoute = '**/api/public-snapshot?**';
     let file = 'first.jpg';
@@ -95,11 +96,13 @@ test('公開: 一覧の写真と登録を一括で再取得し、遅延応答を
             if (requested !== 'delayed.jpg') throw error;
         }
     });
-    await expect(controls).toHaveAttribute('data-public-freshness', 'ready');
+    await expect(surface).toHaveAttribute('data-public-freshness', 'ready');
+    await expect(controls).toHaveCount(0);
     await page.evaluate(() => { window.thumbnailFixturePage = true; });
-    async function requestRefresh(name) {
+    async function requestRefresh(name, { retry = false } = {}) {
         file = name;
-        await controls.getByRole('button', { name: '公開情報を再取得', exact: true }).click();
+        if (retry) await controls.getByRole('button', { name: '公開情報を再取得', exact: true }).click();
+        else await page.evaluate(() => window.dispatchEvent(new Event('focus')));
         await expect.poll(() => seen.includes(name)).toBe(true);
     }
     try {
@@ -108,18 +111,20 @@ test('公開: 一覧の写真と登録を一括で再取得し、遅延応答を
         await expect(image).toHaveAttribute('src', /first\.jpg/);
         await expect(image).toHaveCSS('object-position', '33% 50%');
         await requestRefresh('delayed.jpg');
-        await expect(controls).toHaveAttribute('data-public-freshness', 'loading');
+        await expect(surface).toHaveAttribute('data-public-freshness', 'loading');
+        await expect(controls.getByText(/表示する登録内容は以前取得した情報です。/)).toBeVisible();
         await expect(image).toHaveCount(0);
         const aborted = page.waitForEvent('requestfailed', request => new URL(request.url()).pathname === '/api/public-snapshot');
         await controls.getByRole('button', { name: '取得を中止', exact: true }).click();
         await aborted;
         await expect(image).toHaveCount(0);
-        await requestRefresh('latest.jpg');
+        await requestRefresh('latest.jpg', { retry: true });
         await card.scrollIntoViewIfNeeded();
         await expect(image).toHaveAttribute('src', /latest\.jpg/);
         release();
         await requestRefresh('removed');
-        await expect(controls).toHaveAttribute('data-public-freshness', 'ready');
+        await expect(surface).toHaveAttribute('data-public-freshness', 'ready');
+        await expect(controls).toHaveCount(0);
         await expect(image).toHaveCount(0);
         await expect(card.getByRole('group', { name: '店舗が登録したアレルゲン', exact: true }).first()).toBeVisible();
         expect(menuRequests).toBe(0);

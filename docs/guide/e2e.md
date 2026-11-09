@@ -113,14 +113,14 @@ npm run test:e2e:ci -- --allow-font-download
 <a id="freshness-prototype"></a>
 ## freshness project
 
-この変更をmainへ取り込む場合、基本public/admin 11件と `e2e/freshness.spec.mjs` の10件を、local/ci共通runnerが全projectとして実行します。公開layoutを離れたSPA履歴復帰の負例も含みます。[固定headの検証記録](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)は21定義中20 PASS・native BFCache1 SKIPで、後続HEADへ流用しません。以下は準備済みの架空アプリへの絞り込みで、アプリ・認証・DBを自動準備するコマンドではありません。
+基本public/adminと `e2e/freshness.spec.mjs` の10件を、local/ci共通runnerが全projectとして実行します。公開layoutを離れたSPA履歴復帰の負例も含みます。[固定headの検証記録](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)は21定義中20 PASS・native BFCache1 SKIPで、後続HEADへ流用しません。以下は準備済みの架空アプリへの絞り込みで、アプリ・認証・DBを自動準備するコマンドではありません。
 
 ```powershell
 npm.cmd run test:e2e -- --project=freshness
 ```
 
-管理fixtureを使うため、既存の対象ガード・所有データcleanupが必要です。承認された使い捨てDB＋Clerk境界模擬での実行を優先し、実Clerk版へ無断で切り替えません。手動3画面・入力保持・取得中/失敗/回復・参照/遮蔽・実STOP・補足依存・合成復帰・実SPA履歴に加え、混在FREEの行別旧情報表示と、実訂正後の旧除外結果／再取得による除去を確認します。公開layoutを離れたSPA復帰は隔離1経路のCIで同一document・popstate1回と訂正API／DOM反映を確認しました。全復帰経路の保証ではありません。native BFCacheは復元を実際に試し、persisted=trueを観測できない場合SKIPとして未実証を残します。合成pageshow成功で置き換えません。自動再実行は0のままです。
+管理fixtureを使うため、既存の対象ガード・所有データcleanupが必要です。承認された使い捨てDB＋Clerk境界模擬での実行を優先し、実Clerk版へ無断で切り替えません。通常時に3画面でパネルが出ないこと、復帰時の再取得と入力保持、取得中・失敗・中止・回復、注意情報の保持、実STOP、補足依存、合成復帰、実SPA履歴に加え、混在FREEの行別旧情報表示と、実訂正後の旧除外結果／再取得による除去を確認します。公開layoutを離れたSPA復帰は隔離1経路のCIで同一document・popstate1回と訂正API／DOM反映を確認しました。全復帰経路の保証ではありません。native BFCacheは復元を実際に試し、persisted=trueを観測できない場合SKIPとして未実証を残します。合成pageshow成功で置き換えません。自動再実行は0のままです。
 
 当初のDraft公開では#128のbranch `test/practical-e2e-main-20261105` 宛pull_requestもCI／依存監査の対象へ限定追加しました。PR #128のmergeとPR #129のmainへのretargetに伴い、この一時base filterを削除し、main/developを対象とする定義へ戻します。手動workflow起動は行わず、PRの自動実行と測定対象SHAを照合します。head `test/public-freshness-prototype-20261105` のVercel Git配備はexact falseですが、mainへの採用や手動配備を抑止する設定ではありません。
 
-匿名の架空公開画面だけを明示撮影し、取得中・失敗・遮蔽等を保存します。trace・認証画面・cookie・tokenは保存しません。mainへのコード取込と表示方式A/Bの最終選定・安全性の実証を区別し、[対象・結果・native未確認の理由](../verification/public-freshness-prototype-20261105.md)を参照します。
+匿名の架空公開画面だけを明示撮影し、通常時・取得中・失敗等を保存します。trace・認証画面・cookie・tokenは保存しません。mainへのコード取込と表示方式A/Bの最終選定・安全性の実証を区別し、[対象・結果・native未確認の理由](../verification/public-freshness-prototype-20261105.md)を参照します。

@@ -76,18 +76,12 @@ export default function PublicShopDetailView(data: PublicShopDetailData & { menu
                                     </Suspense>
                                 </div>
 
-                                <div className="relative z-10 flex shrink-0 flex-wrap gap-3">
+                                <div className="relative z-10 flex gap-3">
                                     <Link
                                         href="#public-menus"
                                         className="rounded-lg bg-[#13ec13] px-4 py-2 text-sm font-bold text-black shadow-sm transition hover:bg-[#0db80d]"
                                     >
                                         公開メニューを見る
-                                    </Link>
-                                    <Link
-                                        href="#shop-info"
-                                        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 hover:bg-gray-100"
-                                    >
-                                        店舗情報を見る
                                     </Link>
                                 </div>
                             </div>
@@ -97,61 +91,63 @@ export default function PublicShopDetailView(data: PublicShopDetailData & { menu
 
                 <UserAllergenPreferenceClient allergens={allergensForClient} />
 
-                <Suspense
-                    fallback={
-                        <div className="rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-600 shadow-sm sm:p-6">
-                            公開メニューを読み込み中です。
-                        </div>
-                    }
-                >
-                    <ShopMenuListClient
-                        storeHandledAllergenSlugs={storeHandledAllergenSlugs}
-                        shopId={shop.id}
-                        menus={menusForClient}
-                        allergenMaster={allergenMaster}
-                        menuImages={menuImages}
-                    />
-                </Suspense>
-
-                <div className="grid items-start gap-6 lg:grid-cols-2">
-                    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
-                        <h2 className="text-base font-extrabold">
-                            お店の説明
-                        </h2>
-                        <p className="mt-2 wrap-anywhere text-sm text-gray-700">
-                            {shop.description || "未設定"}
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
-                            <span className="rounded-full bg-gray-100 px-2 py-1">
-                                公開メニュー {publishedMenuCount}件
-                            </span>
-                            <span className="rounded-full bg-gray-100 px-2 py-1">
-                                平均予算 {averageBudgetLabel}
-                            </span>
-                            <span className="rounded-full bg-gray-100 px-2 py-1">
-                                アレルゲン{allergenMaster.length}品目を表示
-                            </span>
-                            <span className="rounded-full bg-gray-100 px-2 py-1">
-                                価格表示あり
-                            </span>
-                            {shop.category ? (
+                <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="order-1 flex flex-col gap-6 lg:col-span-2">
+                        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
+                            <h2 className="text-base font-extrabold">
+                                お店の説明
+                            </h2>
+                            <p className="mt-2 text-sm text-gray-700">
+                                {shop.description || "未設定"}
+                            </p>
+                            <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
                                 <span className="rounded-full bg-gray-100 px-2 py-1">
-                                    {shop.category}
+                                    公開メニュー {publishedMenuCount}件
                                 </span>
-                            ) : null}
+                                <span className="rounded-full bg-gray-100 px-2 py-1">
+                                    平均予算 {averageBudgetLabel}
+                                </span>
+                                <span className="rounded-full bg-gray-100 px-2 py-1">
+                                    アレルゲン{allergenMaster.length}品目を表示
+                                </span>
+                                <span className="rounded-full bg-gray-100 px-2 py-1">
+                                    価格表示あり
+                                </span>
+                                {shop.category ? (
+                                    <span className="rounded-full bg-gray-100 px-2 py-1">
+                                        {shop.category}
+                                    </span>
+                                ) : null}
+                            </div>
                         </div>
+
+                        <Suspense
+                            fallback={
+                                <div className="rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-600 shadow-sm sm:p-6">
+                                    公開メニューを読み込み中です。
+                                </div>
+                            }
+                        >
+                            <ShopMenuListClient
+                                storeHandledAllergenSlugs={storeHandledAllergenSlugs}
+                                shopId={shop.id}
+                                menus={menusForClient}
+                                allergenMaster={allergenMaster}
+                                menuImages={menuImages}
+                            />
+                        </Suspense>
                     </div>
 
                     <aside
                         id="shop-info"
-                        className="min-w-0 scroll-mt-32"
+                        className="order-3 flex flex-col gap-6"
                     >
                         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
                             <h2 className="text-base font-extrabold">
                                 店舗情報
                             </h2>
 
-                            <div className="mt-4 space-y-3 wrap-anywhere text-sm text-gray-700">
+                            <div className="mt-4 space-y-3 text-sm text-gray-700">
                                 <div className="flex items-start gap-2">
                                     <span className="mt-0.5 text-gray-500">
                                         📍
@@ -268,7 +264,7 @@ export default function PublicShopDetailView(data: PublicShopDetailData & { menu
                             </p>
                         </div>
                     </aside>
-                </div>
+                </section>
             </div>
         </main>
     );

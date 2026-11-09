@@ -27,7 +27,7 @@
 <a id="pages"></a>
 ## 公開鮮度の再取得経路
 
-PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。この変更をmainへ取り込む場合の入口を以下に示します。公開3ページの初期取得は `server/public-shop-list-data.ts` / `public-shop-detail-data.ts` / `public-menu-detail-data.ts` の共有loaderへ移し、同じ公開条件・RepeatableRead・補足を使います。既存caller4件と10負例のsource参照はloaderへ追従し、検出条件を維持しています。
+PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。公開鮮度の入口を以下に示します。公開3ページの初期取得は `server/public-shop-list-data.ts` / `public-shop-detail-data.ts` / `public-menu-detail-data.ts` の共有loaderへ移し、同じ公開条件・RepeatableRead・補足を使います。既存caller4件と10負例のsource参照はloaderへ追従し、検出条件を維持しています。
 
 | 入口 | 実装・検証 |
 | --- | --- |
@@ -35,7 +35,7 @@ PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。こ�
 | 三画面の再取得と表示 | `PublicFreshnessSurface.tsx` / root `app/layout.tsx` の `PublicFreshnessNavigation.tsx` / `freshness/revalidation.ts` / `freshness/presentation.tsx`。`SelectedAllergenResultCardsClient.tsx` / `PublicShopListClient.tsx` / `PublicShopMap.tsx`。`tests/public-freshness.test.ts`、`tests/public-freshness-presentation.test.ts`、`e2e/freshness.spec.mjs` |
 | 内容と適用proof | `PublicShopDetailView.tsx` / `PublicMenuDetailView.tsx` と既存list/menu本文。shopはmenu・検索要約の両方を待つ。FREE要約抑制と注意保持は `MenuAllergenSummary.tsx` / `SelectedAllergenResultCardsClient.tsx`。店舗内の集計・件数・0件の局所注記は `ShopMenuListClient.tsx` |
 
-[実装・実行結果](../verification/public-freshness-prototype-20261105.md)、[操作と暫定表示方式](product.md#freshness-prototype)、[統合状態](verification.md#freshness-prototype-status)を参照します。コードの取込を表示方式A/Bの最終決定や実サービスの到達保証へ読み替えません。
+[実装・実行結果](../verification/public-freshness-prototype-20261105.md)、[再取得と未再確認時の表示](product.md#freshness-prototype)、[統合状態](verification.md#freshness-prototype-status)を参照します。コードの取込を表示方式A/Bの最終決定や実サービスの到達保証へ読み替えません。
 
 ## 全ページの入口
 
@@ -45,7 +45,7 @@ PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。こ�
 | --- | --- | --- | --- | --- |
 | `/` トップ | [利用者](product.md#public) | `app/page.tsx` → `features/public/shops/server/HomePage.tsx`、`features/public/shops/components/HomePageView.tsx` | `/shops` へのリンク | 一覧へ進む手動確認。公開画面回帰は `/shops` から開始 |
 | `/shops` 店舗一覧 | [利用者](product.md#public) | `app/(public)/shops/page.tsx` → `features/public/shops/server/PublicShopListPage.tsx`、`features/public/shops/components/PublicShopListClient.tsx` | `features/public/shops/components/public-shop-search.ts` の `filterAndRankShops`、Shop/MenuItem/Allergen、端末設定 | `tests/readability-helpers.test.ts`（検索処理）、`tests/public-places.test.ts`（旧API）、初回ブラウザ回帰（入力ラベルを含む）。店舗0件・障害・位置情報拒否は手動 |
-| `/shops/[shopId]` 店舗詳細 | [利用者](product.md#public) | `app/(public)/shops/[shopId]/page.tsx` → `features/public/shops/server/PublicShopDetailPage.tsx`、`public-shop-detail-data.ts`、`features/public/shops/components/ShopMenuListClient.tsx`、`features/public/shops/components/MenuAllergenSummary.tsx` | Shop/MenuItem、公開判定、初期ページの画像props、`features/public/shops/components/ShareShopUrlButton.tsx` | `tests/public-read-callers.test.ts`（画像URL・公開条件・再取得APIの応答）、`browser-runner.mjs allergens`（品目別の注目・画像失敗）、`browser-runner.mjs ui`（5幅と店舗情報への導線）、`scripts/check-first-use-browser.mjs`（検索0件・除外後0件・解除・リンクのフォーカス／Enter・共有成功）。共有失敗は手動 |
+| `/shops/[shopId]` 店舗詳細 | [利用者](product.md#public) | `app/(public)/shops/[shopId]/page.tsx` → `features/public/shops/server/PublicShopDetailPage.tsx`、`public-shop-detail-data.ts`、`features/public/shops/components/ShopMenuListClient.tsx`、`features/public/shops/components/MenuAllergenSummary.tsx` | Shop/MenuItem、公開判定、初期ページの画像props、`features/public/shops/components/ShareShopUrlButton.tsx` | `tests/public-read-callers.test.ts`（画像URL・公開条件・再取得APIの応答）、`browser-runner.mjs allergens`（品目別の注目・画像失敗）、`browser-runner.mjs ui`（5幅でのメニューと店舗情報の配置、詳細への導線）、`scripts/check-first-use-browser.mjs`（検索0件・除外後0件・解除・リンクのフォーカス／Enter・共有成功）。共有失敗は手動 |
 | `/shops/[shopId]/menus/[menuId]` メニュー詳細 | [利用者](product.md#public) | `app/(public)/shops/[shopId]/menus/[menuId]/page.tsx` → `features/public/shops/server/PublicMenuDetailPage.tsx`、`features/public/shops/components/PublicMenuDetailBodyClient.tsx` | MenuItem/Allergen/MenuItemAllergen、店舗補足、[公開ルール](rules.md#publication) | `tests/allergen-display.test.ts`、実画面は両ブラウザ回帰。初回回帰はh1が1個であることも検査。APIテストだけではページ取得は未検証 |
 | `/terms` 規約 | [補助画面](product.md#demo) | `app/(public)/terms/page.tsx` | `lib/public-prototype.ts` | 文言の専門レビューは未確認。手動でリンク・共通注意を確認 |
 | `/admin` 振り分け | [管理入口](product.md#admin) | `app/admin/page.tsx` | Clerk、`lib/auth/admin-auth.ts`、`lib/auth/admin-platform-auth.ts` | 手動：未認証／未割当／所有者／運営の遷移。全分岐の専用単体テストなし |

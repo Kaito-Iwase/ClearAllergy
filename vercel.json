@@ -29,7 +29,8 @@
       "perf/public-read-main-20261028": false,
       "ci/staging-incident-20261107": false,
       "ci/staging-explicit-alias-20261107": false,
-      "fix/public-menu-thumbnail-refresh": false
+      "fix/public-menu-thumbnail-refresh": false,
+      "fix/public-menu-thumbnail-refresh-main": false
     }
   }
 }

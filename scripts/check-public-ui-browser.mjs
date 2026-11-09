@@ -77,6 +77,10 @@ try {
     const pancakePrimary = defaultPancake.getByRole("group", registeredGroups).first();
     assert.match(await pancakePrimary.innerText(), /確認対象は原材料に含まないと登録されています。食品安全の保証ではありません。/);
     assert.equal(await pancakePrimary.locator("dl").count(), 0, "All-FREE is a short registration summary");
+    const precautionHeading = defaultPancake.getByRole("heading", { name: "店舗の注意書き", exact: true });
+    const precautionId = await precautionHeading.getAttribute("id");
+    assert.ok(precautionId && (await defaultPancake.getAttribute("aria-describedby"))?.split(/\s+/).includes(precautionId),
+        "The card's accessible description identifies the shop precaution next to the all-FREE summary");
     assert.match(await defaultPancake.getByRole("group", { name: "その他のアレルゲン", exact: true }).innerText(), /含む\s+大豆\s*（1品目）/);
     pass("Unselected cards classify specified ingredients separately; other CONTAINS/MAY_CONTAIN facts remain visible");
 
@@ -129,13 +133,22 @@ try {
             }
             if (route === shopHref) {
                 const cards = await menuArea.getByRole("link").all();
-                const [first, second, last, info] = await Promise.all([
-                    cards[0].boundingBox(), cards[1].boundingBox(), cards.at(-1).boundingBox(),
+                const [first, second, list, description, info] = await Promise.all([
+                    cards[0].boundingBox(), cards[1].boundingBox(), menuArea.boundingBox(),
+                    page.getByRole("heading", { name: "お店の説明", exact: true }).boundingBox(),
                     page.locator("#shop-info").boundingBox(),
                 ]);
-                assert.equal(first.y === second.y, width >= 1024, "Two columns start at 1024px");
-                assert.ok(info.y > last.y + last.height, "Store information follows the menu list");
-                assert.equal(await page.getByRole("link", { name: "店舗情報を見る" }).getAttribute("href"), "#shop-info");
+                assert.equal(first.y === second.y, width >= 768, "The existing two-column list starts at 768px");
+                assert.ok(description.y < list.y, "The existing store description precedes the menu list");
+                if (width >= 1024) {
+                    assert.ok(info.x >= list.x + list.width && info.y < list.y, "Store information retains its desktop sidebar");
+                } else {
+                    assert.ok(info.y > list.y + list.height, "Store information follows the menu list on narrower screens");
+                }
+                assert.equal(await page.getByRole("link", { name: "公開メニューを見る", exact: true }).getAttribute("href"), "#public-menus");
+                if (width === 390 || width === 1440) {
+                    await visible(page.locator("main")).screenshot({ path: join(output, `shop-layout-${width}.png`) });
+                }
             }
         }
         pass(`${width}px: home/list/shop/detail/terms, no overflow, full wordmark, one active menu search`);

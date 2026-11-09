@@ -124,8 +124,8 @@ try {
         await page.setViewportSize({ width, height: 1000 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, width + "px overflow");
         const [first, second] = await Promise.all([card.boundingBox(), source.boundingBox()]);
-        assert.equal(first.y === second.y, width >= 1024, "Two columns start at 1024px");
-        if (width >= 1024) assert.ok(first.height > second.height, "Shorter cards must not stretch");
+        assert.equal(first.y === second.y, width >= 768, "The existing two-column list starts at 768px");
+        if (width >= 768) assert.ok(first.height > second.height, "Shorter cards must not stretch");
         for (const [menu, ratio] of [[card, 4 / 3], [source, 1]]) {
             const thumbnail = menu.locator("img");
             await thumbnail.evaluate(image => image.decode());
