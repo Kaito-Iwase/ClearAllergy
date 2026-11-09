@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { closeSync, existsSync, linkSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { assessQueue, assessmentFromComments, beginReport, definitionHash, prepareReportPath, protectedArea, publishReport, verificationCommands } from "../scripts/agent-harness.mjs";
+import { assessIssueCompletion, assessQueue, assessmentFromComments, beginReport, definitionHash, prepareReportPath, protectedArea, publishReport, verificationCommands } from "../scripts/agent-harness.mjs";
 
 const now = Date.parse("2026-10-04T04:00:00Z");
 const baseSha = "a".repeat(40);
@@ -19,6 +20,209 @@ function ready(number = 1, priority = "correctness") {
 function snapshot(issues = [ready()]) {
     return { version: 1, repository: "Kaito-Iwase/ClearAllergy", actorLogin: "Kaito-Iwase", baseSha, fetchedAt: new Date(now).toISOString(), issues, pullRequests: [] as { number: number; state: string; linkedIssues: number[]; changedFiles: string[] }[] };
 }
+
+function completionSnapshot(timestamp = now) {
+    const repository = "Kaito-Iwase/ClearAllergy";
+    const repositoryUrl = `https://github.com/${repository}`;
+    const issue = { number: 7, title: "Public menu fix", body: "Verify both environments", state: "OPEN",
+        labels: [] as string[], assignees: [] as string[], openSubIssues: [] as number[], dependencies: [] as { number: number; state: string }[] };
+    const fetchedAt = new Date(timestamp).toISOString();
+    const targets = [
+        { number: 10, baseRef: "main", target: "production", headSha: "b".repeat(40), mergeSha: "c".repeat(40) },
+        { number: 11, baseRef: "test/staging", target: "staging", headSha: "d".repeat(40), mergeSha: "e".repeat(40) },
+    ];
+    const pullRequests = targets.map(({ number, baseRef, target, headSha, mergeSha }) => ({
+        number, baseRef, headSha, mergeSha, mergedAt: new Date(timestamp - 60_000).toISOString(),
+        state: "MERGED", linkedIssues: [issue.number],
+        ci: { status: "PASS", event: "push", commitSha: mergeSha, branch: baseRef, runAttempt: 1,
+            startedAt: new Date(timestamp - 55_000).toISOString(), completedAt: new Date(timestamp - 35_000).toISOString(),
+            workflowPath: ".github/workflows/ci.yml", url: `${repositoryUrl}/actions/runs/${number}` },
+        deployments: [{ target, state: "READY", active: true, commitSha: mergeSha, url: `https://vercel.com/project/deployment-${number}`,
+            readyAt: new Date(timestamp - 30_000).toISOString(),
+            verification: { status: "PASS", commitSha: mergeSha, observedAt: fetchedAt,
+                url: `https://${target}.example.org/shops/demo`, summary: "Opened the menu and checked the card." } }],
+    }));
+    const acceptanceCriteria = ["Show the registered allergen states", "Keep existing API fields"];
+    const acceptancePlan = acceptanceCriteria.map((criterion, i) => ({
+        criterion, pullRequest: targets[i].number, target: targets[i].target as string | null,
+    }));
+    const assessment = { author: "Kaito-Iwase", url: `${repositoryUrl}/issues/7#issuecomment-51`, data: {
+        state: "awaiting-review", definitionHash: definitionHash(issue), productDecisionRequired: false, approvalRequired: false,
+        blocker: null, dependencies: [] as number[], acceptanceCriteria, completion: {
+            pullRequests: targets.map(({ number, baseRef, target, headSha }) => ({ number, baseRef, headSha,
+                deployments: [{ target, origin: `https://${target}.example.org` }] })),
+            acceptance: acceptancePlan,
+        },
+    } };
+    return { version: 1, repository, actorLogin: "Kaito-Iwase", fetchedAt, issue: { ...issue, assessment }, pullRequests,
+        acceptance: acceptancePlan.map((scope, i) => ({ ...scope, commitSha: targets[i].mergeSha, status: "PASS",
+            deploymentUrl: pullRequests[i].deployments[0].url, observedAt: fetchedAt,
+            url: `${repositoryUrl}/issues/7#issuecomment-52`, summary: "Observed the expected behavior." })) };
+}
+
+test("post-merge evidence for all required environments and criteria prepares a close proposal", () => {
+    const result = assessIssueCompletion(completionSnapshot(), now);
+    assert.equal(result.readyToClose, true);
+    assert.equal(result.evidence?.pullRequests.length, 2);
+    assert.equal(result.evidence?.acceptance.length, 2);
+    assert.match(result.completionKey ?? "", /^[a-f0-9]{64}$/);
+    const retry = completionSnapshot();
+    retry.fetchedAt = new Date(now + 10_000).toISOString();
+    assert.equal(assessIssueCompletion(retry, now + 10_000).completionKey, result.completionKey);
+    retry.acceptance[0].url += "-replacement";
+    const newProof = assessIssueCompletion(retry, now + 10_000);
+    assert.equal(newProof.readyToClose, true);
+    assert.notEqual(newProof.completionKey, result.completionKey);
+    retry.pullRequests[0].ci.runAttempt = 2;
+    const rerun = assessIssueCompletion(retry, now + 10_000);
+    assert.equal(rerun.readyToClose, true);
+    assert.notEqual(rerun.completionKey, newProof.completionKey);
+    retry.pullRequests[0].deployments[0].url = "https://vercel.com/project/redeployment";
+    assert.equal(assessIssueCompletion(retry, now + 10_000).readyToClose, false);
+    retry.acceptance[0].deploymentUrl = retry.pullRequests[0].deployments[0].url;
+    assert.notEqual(assessIssueCompletion(retry, now + 10_000).completionKey, rerun.completionKey);
+});
+
+test("CI must pass for the merge SHA, target branch and required workflow", () => {
+    for (const fields of [{ event: "pull_request" }, { commitSha: "b".repeat(40) }, { branch: "other" },
+        { workflowPath: ".github/workflows/other.yml" }, { status: "FAIL" }, { runAttempt: 0 },
+        { startedAt: new Date(now - 65_000).toISOString() }, { completedAt: new Date(now + 1).toISOString() }]) {
+        const data = completionSnapshot();
+        Object.assign(data.pullRequests[0].ci, fields);
+        const result = assessIssueCompletion(data, now);
+        assert.equal(result.readyToClose, false);
+        assert.match(result.blockers.join(), /successful CI for its merge commit/);
+        assert.equal(result.evidence, null);
+        assert.equal(result.completionKey, null);
+    }
+});
+
+test("an open, unrelated or changed PR blocks closure", () => {
+    for (const fields of [{ state: "OPEN" }, { linkedIssues: [8] }, { headSha: "f".repeat(40) }, { baseRef: "other" }]) {
+        const data = completionSnapshot();
+        Object.assign(data.pullRequests[0], fields);
+        assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+    }
+    const data = completionSnapshot();
+    data.pullRequests.push({ ...data.pullRequests[0], number: 20, state: "OPEN" });
+    assert.match(assessIssueCompletion(data, now).blockers.join(), /linked PR still open/);
+});
+
+test("deploy readiness alone, outdated live mapping and missing post-deploy checks block closure", () => {
+    for (const fields of [{ active: false }, { state: "BUILDING" }, { commitSha: "f".repeat(40) }]) {
+        const data = completionSnapshot();
+        Object.assign(data.pullRequests[1].deployments[0], fields);
+        assert.match(assessIssueCompletion(data, now).blockers.join(), /deployment and verification for staging/);
+    }
+    const data = completionSnapshot();
+    const observation = data.pullRequests[1].deployments[0].verification;
+    const correctUrl = observation.url;
+    observation.url = data.pullRequests[0].deployments[0].verification.url;
+    assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+    observation.url = correctUrl;
+    observation.observedAt = new Date(now - 45_000).toISOString();
+    assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+    observation.observedAt = new Date(now - 120_000).toISOString();
+    assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+    observation.observedAt = data.fetchedAt;
+    observation.status = "UNVERIFIED";
+    assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+    data.pullRequests[1].deployments = [];
+    assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+});
+
+test("a newer active deployment needs ancestry and new app verification on that SHA", () => {
+    const data = completionSnapshot();
+    const pull = data.pullRequests[0];
+    const deployment = pull.deployments[0];
+    deployment.commitSha = "f".repeat(40);
+    Object.assign(deployment, { comparison: { status: "ahead", url: `https://github.com/${data.repository}/compare/${pull.mergeSha}...${deployment.commitSha}` } });
+    assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+    deployment.verification.commitSha = deployment.commitSha;
+    assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+    data.acceptance[0].commitSha = deployment.commitSha;
+    assert.equal(assessIssueCompletion(data, now).readyToClose, true);
+});
+
+test("the same fixed origin cannot have conflicting live deployments", () => {
+    const data = completionSnapshot();
+    const stagingPlan = data.issue.assessment.data.completion.pullRequests[1];
+    stagingPlan.deployments[0].origin = data.issue.assessment.data.completion.pullRequests[0].deployments[0].origin;
+    data.pullRequests[1].deployments[0].verification.url = data.pullRequests[0].deployments[0].verification.url;
+    assert.match(assessIssueCompletion(data, now).blockers.join(), /conflicting active deployments/);
+});
+
+test("an acceptance criterion planned for two environments requires both results", () => {
+    const data = completionSnapshot();
+    const scope = { ...data.acceptance[1], criterion: data.acceptance[0].criterion };
+    data.issue.assessment.data.completion.acceptance.push({
+        criterion: scope.criterion, pullRequest: scope.pullRequest, target: scope.target,
+    });
+    assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+    data.acceptance.push(scope);
+    assert.equal(assessIssueCompletion(data, now).readyToClose, true);
+});
+
+test("documented no-deploy changes can close after merge CI and acceptance verification", () => {
+    const data = completionSnapshot();
+    const plan = data.issue.assessment.data.completion.pullRequests[0];
+    plan.deployments = [];
+    assert.match(assessIssueCompletion(data, now).blockers.join(), /trusted completion plan/);
+    Object.assign(plan, { noDeploymentReason: "Documentation only" });
+    data.pullRequests[0].deployments = [];
+    data.issue.assessment.data.completion.acceptance[0].target = null;
+    data.acceptance[0].target = null;
+    assert.equal(assessIssueCompletion(data, now).readyToClose, true);
+});
+
+test("incomplete acceptance, stale issue state and unresolved decisions cannot close", () => {
+    for (const [index, change] of [
+        (data: ReturnType<typeof completionSnapshot>) => { data.acceptance.pop(); },
+        (data: ReturnType<typeof completionSnapshot>) => { data.acceptance[1].criterion = data.acceptance[0].criterion; },
+        (data: ReturnType<typeof completionSnapshot>) => { data.acceptance[0].commitSha = "a".repeat(40); },
+        (data: ReturnType<typeof completionSnapshot>) => { data.acceptance[1].commitSha = data.pullRequests[0].mergeSha; },
+        (data: ReturnType<typeof completionSnapshot>) => { data.acceptance[1].observedAt = new Date(now - 45_000).toISOString(); },
+        (data: ReturnType<typeof completionSnapshot>) => { data.acceptance[0].url += "?token=hidden"; },
+        (data: ReturnType<typeof completionSnapshot>) => { data.issue.body += " Changed requirement."; },
+        (data: ReturnType<typeof completionSnapshot>) => { data.issue.assessment.author = "someone-else"; },
+        (data: ReturnType<typeof completionSnapshot>) => { data.issue.labels.push("human-review"); },
+        (data: ReturnType<typeof completionSnapshot>) => { data.issue.openSubIssues.push(9); },
+        (data: ReturnType<typeof completionSnapshot>) => { data.issue.dependencies.push({ number: 9, state: "OPEN" }); },
+        (data: ReturnType<typeof completionSnapshot>) => { data.issue.assessment.data.dependencies.push(9); },
+        (data: ReturnType<typeof completionSnapshot>) => { data.issue.state = "CLOSED"; },
+    ].entries()) {
+        const data = completionSnapshot();
+        change(data);
+        assert.equal(assessIssueCompletion(data, now).readyToClose, false, `variant ${index + 1}`);
+    }
+    assert.throws(() => assessIssueCompletion(completionSnapshot(), now + 16 * 60_000), /stale completion snapshot/);
+});
+
+test("completion CLI reports ready, blocked and malformed snapshots with the right exit code", () => {
+    const directory = mkdtempSync(join(tmpdir(), "clearallergy-completion-"));
+    const file = join(directory, "snapshot.json");
+    const run = () => spawnSync(process.execPath, ["scripts/agent-harness.mjs", "completion", "--snapshot", file], { encoding: "utf8" });
+    try {
+        const data = completionSnapshot(Date.now());
+        writeFileSync(file, JSON.stringify(data));
+        const ready = run();
+        assert.equal(ready.status, 0, ready.stderr);
+        assert.equal(JSON.parse(ready.stdout).readyToClose, true);
+
+        data.issue.dependencies.push({ number: 9, state: "OPEN" });
+        writeFileSync(file, JSON.stringify(data));
+        const blocked = run();
+        assert.equal(blocked.status, 1);
+        assert.equal(JSON.parse(blocked.stdout).readyToClose, false);
+
+        writeFileSync(file, "{}");
+        const invalid = run();
+        assert.equal(invalid.status, 1);
+        assert.match(invalid.stderr, /Invalid or stale completion snapshot/);
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
 
 test("a current complete assessment enables a proposal, never merge authority", () => {
     const result = assessQueue(snapshot(), now);
