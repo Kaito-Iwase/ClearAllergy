@@ -31,7 +31,8 @@
       "ci/staging-explicit-alias-20261107": false,
       "fix/public-menu-thumbnail-refresh": false,
       "fix/public-menu-thumbnail-refresh-main": false,
-      "agent/issue-143-menu-category-ux": false
+      "agent/issue-143-menu-category-ux": false,
+      "agent/issue-145-allergen-preferences": false
     }
   }
 }
