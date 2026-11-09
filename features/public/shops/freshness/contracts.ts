@@ -94,6 +94,19 @@ export const publicShopDetailDataSchema = z.object({
 }).strict();
 export type PublicShopDetailData = z.infer<typeof publicShopDetailDataSchema>;
 
+// App-only representation. The default v1 JSON response stays strict.
+export const SHOP_VIEW_MEDIA_TYPE = "application/vnd.clearallergy.shop-view+json";
+export const publicMenuImageSchema = z.object({
+    updatedAt: isoDateTime,
+    safeImageUrl: text,
+    imageFrame: nullableText,
+    imageFit: nullableText,
+    imageZoom: nullableNumber,
+    imagePositionX: nullableNumber,
+    imagePositionY: nullableNumber,
+}).strict();
+export type PublicMenuImages = Record<string, z.infer<typeof publicMenuImageSchema>>;
+
 export const publicMenuDetailDataSchema = z.object({
     shopId: text,
     shopName: text,
@@ -142,3 +155,5 @@ export const publicSnapshotSchema = z.object({
     result: publicResultSchema,
 }).strict();
 export type PublicSnapshot = z.infer<typeof publicSnapshotSchema>;
+export const shopViewSnapshotSchema = publicSnapshotSchema.extend({ menuImages: z.unknown().optional() });
+export type PublicViewSnapshot = PublicSnapshot & { menuImages?: PublicMenuImages };

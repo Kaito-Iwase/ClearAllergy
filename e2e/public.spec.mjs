@@ -55,3 +55,81 @@ test('公開: アレルゲン設定を適用して再読み込みしても保持
 test('公開: 未認証の管理APIは401', async ({ request }) => {
     expect((await request.get('/api/admin/menus', { maxRedirects: 0 })).status()).toBe(401);
 });
+
+test('公開: 一覧の写真と登録を一括で再取得し、遅延応答を採用しない', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openShop(page);
+    const card = page.locator('#public-menus').getByRole('link').first();
+    const [, shopId, menuId] = (await card.getAttribute('href')).match(/^\/shops\/([^/]+)\/menus\/([^/]+)$/);
+    const controls = page.getByRole('complementary', { name: '公開情報の再取得', exact: true });
+    const surface = page.locator('[data-public-freshness]');
+    const image = card.locator('img');
+    const snapshotRoute = '**/api/public-snapshot?**';
+    let file = 'first.jpg';
+    let release;
+    const hold = new Promise(resolve => { release = resolve; });
+    const seen = [];
+    let menuRequests = 0;
+    page.on('request', request => {
+        if (new URL(request.url()).pathname.startsWith('/api/menus/')) menuRequests++;
+    });
+    await page.route('**/_next/image?**', route => route.fulfill({
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12"><rect width="16" height="12" fill="orange"/></svg>',
+    }));
+    await page.route(snapshotRoute, async route => {
+        const requested = file;
+        const response = await route.fetch();
+        expect(response.headers()['content-type']).toMatch(/^application\/vnd\.clearallergy\.shop-view\+json/);
+        const data = await response.json();
+        const menu = data.result.data.menusForClient.find(item => item.id === menuId);
+        seen.push(requested);
+        if (requested === 'delayed.jpg') await hold;
+        const safeImageUrl = `https://fixture.public.blob.vercel-storage.com/menu-images/${shopId}/${requested}`;
+        data.menuImages = requested === 'removed' ? {} : { [menuId]: {
+            updatedAt: menu.updatedAt, safeImageUrl, imageFrame: 'wide', imageFit: 'contain',
+            imageZoom: 100, imagePositionX: 33, imagePositionY: 50,
+        } };
+        try {
+            await route.fulfill({ status: response.status(), contentType: response.headers()['content-type'], json: data });
+        } catch (error) {
+            if (requested !== 'delayed.jpg') throw error;
+        }
+    });
+    await expect(surface).toHaveAttribute('data-public-freshness', 'ready');
+    await expect(controls).toHaveCount(0);
+    await page.evaluate(() => { window.thumbnailFixturePage = true; });
+    async function requestRefresh(name, { retry = false } = {}) {
+        file = name;
+        if (retry) await controls.getByRole('button', { name: '公開情報を再取得', exact: true }).click();
+        else await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await expect.poll(() => seen.includes(name)).toBe(true);
+    }
+    try {
+        await requestRefresh('first.jpg');
+        await card.scrollIntoViewIfNeeded();
+        await expect(image).toHaveAttribute('src', /first\.jpg/);
+        await expect(image).toHaveCSS('object-position', '33% 50%');
+        await requestRefresh('delayed.jpg');
+        await expect(surface).toHaveAttribute('data-public-freshness', 'loading');
+        await expect(controls.getByText(/表示する登録内容は以前取得した情報です。/)).toBeVisible();
+        await expect(image).toHaveCount(0);
+        const aborted = page.waitForEvent('requestfailed', request => new URL(request.url()).pathname === '/api/public-snapshot');
+        await controls.getByRole('button', { name: '取得を中止', exact: true }).click();
+        await aborted;
+        await expect(image).toHaveCount(0);
+        await requestRefresh('latest.jpg', { retry: true });
+        await card.scrollIntoViewIfNeeded();
+        await expect(image).toHaveAttribute('src', /latest\.jpg/);
+        release();
+        await requestRefresh('removed');
+        await expect(surface).toHaveAttribute('data-public-freshness', 'ready');
+        await expect(controls).toHaveCount(0);
+        await expect(image).toHaveCount(0);
+        await expect(card.getByRole('group', { name: '店舗が登録したアレルゲン', exact: true }).first()).toBeVisible();
+        expect(menuRequests).toBe(0);
+        expect(await page.evaluate(() => window.thumbnailFixturePage)).toBe(true);
+    } finally {
+        release();
+    }
+});
