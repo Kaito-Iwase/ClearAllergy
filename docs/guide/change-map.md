@@ -25,6 +25,10 @@
 `admin` は `scripts/check-test-browser.mjs` を使い、専用テスト環境の実Clerk・DB・Blobを必要とします。CIの公開画面回帰の成功を、実認証や外部サービス連携の確認済みとは扱いません。今回の観察・修正・確認範囲は [UI/UX精査記録](ui-ux-review.md) を参照してください。
 
 <a id="pages"></a>
+## メニューカテゴリ
+
+管理画面は `menu-category-data.ts` で認証済み店舗の候補を集計し、新規・編集で `MenuCategoryField.tsx` を共用します。公開一覧では `public-menu-search.ts` と `ShopMenuListClient.tsx` が検索・除外後に分類します。候補の一致順と公開グループ順は `tests/menu-categories.test.ts`、保存・食品版・補足・再取得は `e2e/admin.spec.mjs` と `e2e/freshness.spec.mjs` のカテゴリ回帰で確認します。公開カードの横並びはカテゴリ内で検査し、レビュー用ブランチのGit自動配備は `vercel.json` で抑止します。
+
 ## 公開鮮度の再取得経路
 
 PR #129はPR #128 head bcc4c0cdから作った公開鮮度の変更です。公開鮮度の入口を以下に示します。公開3ページの初期取得は `server/public-shop-list-data.ts` / `public-shop-detail-data.ts` / `public-menu-detail-data.ts` の共有loaderへ移し、同じ公開条件・RepeatableRead・補足を使います。既存caller4件と10負例のsource参照はloaderへ追従し、検出条件を維持しています。

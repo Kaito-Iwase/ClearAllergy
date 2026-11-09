@@ -5,22 +5,24 @@
 import Link from "next/link";
 import NewMenuForm from "@/features/admin/menus/components/NewMenuForm";
 import { prisma } from "@/lib/db";
+import { getMenuCategoryOptions } from "./menu-category-data";
 import { requireCurrentAdminContextOrRedirect } from "@/lib/auth/admin-auth";
 
 export default async function AdminMenuNewPage() {
-    // 新規作成も管理画面の操作なので、先に認証確認だけしておきます。
-    await requireCurrentAdminContextOrRedirect();
+    const { shop } = await requireCurrentAdminContextOrRedirect();
 
-    // アレルゲンの選択肢は全メニューで共通なので、マスタをまとめて読みます。
-    const allergens = await prisma.allergen.findMany({
-        orderBy: { sortOrder: "asc" },
-        select: {
-            slug: true,
-            nameJa: true,
-            nameEn: true,
-            sortOrder: true,
-        },
-    });
+    const [allergens, categoryOptions] = await Promise.all([
+        prisma.allergen.findMany({
+            orderBy: { sortOrder: "asc" },
+            select: {
+                slug: true,
+                nameJa: true,
+                nameEn: true,
+                sortOrder: true,
+            },
+        }),
+        getMenuCategoryOptions(shop.id),
+    ]);
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -41,7 +43,7 @@ export default async function AdminMenuNewPage() {
                 </p>
 
                 <div className="mt-6">
-                    <NewMenuForm allergens={allergens} />
+                    <NewMenuForm allergens={allergens} categoryOptions={categoryOptions} />
                 </div>
             </div>
         </div>
