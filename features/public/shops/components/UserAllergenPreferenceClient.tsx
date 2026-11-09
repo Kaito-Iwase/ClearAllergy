@@ -194,7 +194,7 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                         <button type="button" disabled={!hasSelection} onClick={() => assign("exclude")} className={secondaryButton}>一覧から除外</button>
                         <button type="button" disabled={!canRemove} onClick={() => assign("none")} className={secondaryButton}>設定を外す</button>
                     </div>
-                    <p className="text-xs leading-5 text-gray-700">「注目して表示」は選んだ項目を確認対象にします。「一覧から除外」は、その項目を「含む」と登録したメニューを非表示にします。</p>
+                    <p className="text-xs leading-5 text-gray-700">「注目にする」は選んだ項目を確認対象にします。「一覧から除外」は、その項目を「含む」と登録したメニューを非表示にします。</p>
                     <label className="flex min-h-11 items-start gap-2 border-t border-gray-200 pt-2 text-sm">
                         <input type="checkbox" checked={draft.includeMayContain} onChange={state.onToggleIncludeMayContain} className="mt-1 h-5 w-5 shrink-0 accent-gray-900" />
                         <span><span className="font-bold">含む可能性があるものを除外・強調</span>
