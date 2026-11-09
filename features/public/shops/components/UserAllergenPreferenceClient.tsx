@@ -189,6 +189,13 @@ export function UserAllergenPreferencePanel({ allergens, state, className = "" }
                 <div className="min-w-0 @min-[48rem]:col-start-1 @min-[48rem]:row-start-1">
                     <label htmlFor={id + "-search"} className="block text-sm font-bold">アレルゲンを探す</label>
                     <input ref={search} id={id + "-search"} type="search" value={query} onChange={(event) => setQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                            // The native search field consumes Escape when it has text.
+                            if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+                                event.preventDefault();
+                                cancel();
+                            }
+                        }}
                         placeholder="例：たまご、こむぎ" className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 text-base focus-visible:outline-2" />
                 </div>
                 <div data-allergen-preference-actions
