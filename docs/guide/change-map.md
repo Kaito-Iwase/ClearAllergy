@@ -10,6 +10,8 @@
 
 表の「テスト」は検査するコードが存在するという意味で、今回実行済みという意味ではありません。APIの単体テストはClerk・DB・Blob等をモック（外部処理の代用品）に置き換え、実PostgreSQLの制約回帰とは分けています。「手動」は[開発手順のブラウザ確認](development.md#browser)に従います。専用テスト未整備の機能も、説明対象から除いていません。
 
+自律開発の候補選択・ローカル検証・[マージ後のIssue完了判定](../agentic-development.md#issue-completion)は `scripts/agent-harness.mjs` が入口です。判定条件と証跡の回帰は `tests/agent-harness.test.ts` で検査します。
+
 公開3ページと `GET /api/menus/[menuId]` の実routeを通るtransaction client回帰は `tests/public-read-callers.test.ts`、10か所の元clientへの誤置換を検出する負例は `scripts/check-public-caller-mutations.mjs` です。以下の公開4入口すべてに対応し、実SQLの並行更新は別の `scripts/check-public-read-snapshot.ts` が担当します。[実測と限界](../verification/public-read-callers-20261028.md)を参照してください。F1/F4の候補専用コードはこの対応表のmain向け実装として扱いません。
 
 店舗一覧・店舗詳細の取得済み品目マスタの再利用は `features/public/shops/server/public-allergen-links.ts`、状態・欠損・未知ID・要求間の対応は `tests/public-allergen-links.test.ts` が入口です。F3 fixtureは新取得形の `allergenId` を含み、従来のメニュー詳細/API用のslugも保持します。4入口の正例・10負例・実SQL snapshotはそれぞれ上記の既存入口で検査し、[今回の測定](../verification/public-shop-read-performance-20261028.md)と旧候補の性能測定を区別します。
