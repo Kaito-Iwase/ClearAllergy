@@ -68,7 +68,12 @@ test('鮮度: 取得中・失敗の旧FREE要約を抑え、注意情報を保�
     await expect(page.getByRole('heading', { name: '原材料に含まない', exact: true })).toBeVisible();
     await shot(page, testInfo, 'normal');
     let release; const held = new Promise(resolve => { release = resolve; });
-    const handler = async route => { await held; await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'explicit fictional failure' }) }); };
+    let requests = 0;
+    const handler = async route => {
+        requests++;
+        await held;
+        await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'explicit fictional failure' }) });
+    };
     await page.route('**/api/public-snapshot?**', handler);
     try {
         await resume(page);
@@ -79,7 +84,19 @@ test('鮮度: 取得中・失敗の旧FREE要約を抑え、注意情報を保�
         await expect(old.getByText('含む', { exact: true })).toBeVisible();
         await expect(old.getByText('含む可能性あり・要確認', { exact: true })).toBeVisible();
         await expect(old.getByText('以前取得した登録・現在は未再確認', { exact: true })).toHaveCount(allergenCount);
-        await shot(page, testInfo, 'loading'); release();
+        await shot(page, testInfo, 'loading');
+        // A failure between pointer-down and pointer-up must not turn cancel into retry.
+        const cancel = controls(page).getByRole('button', { name: '取得を中止', exact: true });
+        await cancel.scrollIntoViewIfNeeded();
+        const button = await cancel.boundingBox();
+        expect(button).not.toBeNull();
+        await page.mouse.move(button.x + 4, button.y + button.height / 2);
+        await page.mouse.down();
+        release();
+        await expect(controls(page).getByRole('button', { name: '公開情報を再取得', exact: true })).toBeVisible();
+        await page.mouse.up();
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        expect(requests).toBe(1);
         await expect(surface(page)).toHaveAttribute('data-public-freshness', 'error');
         await expect(controls(page).getByRole('alert')).toHaveText('再取得できませんでした。');
         await expect(page.getByText(menu.ingredients, { exact: true })).toBeVisible();
