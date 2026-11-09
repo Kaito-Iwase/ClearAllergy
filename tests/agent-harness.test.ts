@@ -24,8 +24,9 @@ function snapshot(issues = [ready()]) {
 function completionSnapshot(timestamp = now) {
     const repository = "Kaito-Iwase/ClearAllergy";
     const repositoryUrl = `https://github.com/${repository}`;
+    type RelatedIssue = { number: number; state: string; stateReason?: string };
     const issue = { number: 7, title: "Public menu fix", body: "Verify both environments", state: "OPEN",
-        labels: [] as string[], assignees: [] as string[], openSubIssues: [] as number[], dependencies: [] as { number: number; state: string }[] };
+        labels: [] as string[], assignees: [] as string[], subIssues: [] as RelatedIssue[], dependencies: [] as RelatedIssue[] };
     const fetchedAt = new Date(timestamp).toISOString();
     const targets = [
         { number: 10, baseRef: "main", target: "production", headSha: "b".repeat(40), mergeSha: "c".repeat(40) },
@@ -152,6 +153,18 @@ test("the same fixed origin cannot have conflicting live deployments", () => {
     assert.match(assessIssueCompletion(data, now).blockers.join(), /conflicting active deployments/);
 });
 
+test("a CI run or a deployment URL cannot identify different commits", () => {
+    const data = completionSnapshot();
+    const [production, staging] = data.pullRequests;
+    staging.ci.url = production.ci.url;
+    staging.deployments[0].url = production.deployments[0].url;
+    data.acceptance[1].deploymentUrl = staging.deployments[0].url;
+    const result = assessIssueCompletion(data, now);
+    assert.equal(result.readyToClose, false);
+    assert.match(result.blockers.join(), /same CI run/);
+    assert.match(result.blockers.join(), /same deployment/);
+});
+
 test("an acceptance criterion planned for two environments requires both results", () => {
     const data = completionSnapshot();
     const scope = { ...data.acceptance[1], criterion: data.acceptance[0].criterion };
@@ -186,7 +199,7 @@ test("incomplete acceptance, stale issue state and unresolved decisions cannot c
         (data: ReturnType<typeof completionSnapshot>) => { data.issue.body += " Changed requirement."; },
         (data: ReturnType<typeof completionSnapshot>) => { data.issue.assessment.author = "someone-else"; },
         (data: ReturnType<typeof completionSnapshot>) => { data.issue.labels.push("human-review"); },
-        (data: ReturnType<typeof completionSnapshot>) => { data.issue.openSubIssues.push(9); },
+        (data: ReturnType<typeof completionSnapshot>) => { data.issue.subIssues.push({ number: 9, state: "OPEN" }); },
         (data: ReturnType<typeof completionSnapshot>) => { data.issue.dependencies.push({ number: 9, state: "OPEN" }); },
         (data: ReturnType<typeof completionSnapshot>) => { data.issue.assessment.data.dependencies.push(9); },
         (data: ReturnType<typeof completionSnapshot>) => { data.issue.state = "CLOSED"; },
@@ -196,6 +209,21 @@ test("incomplete acceptance, stale issue state and unresolved decisions cannot c
         assert.equal(assessIssueCompletion(data, now).readyToClose, false, `variant ${index + 1}`);
     }
     assert.throws(() => assessIssueCompletion(completionSnapshot(), now + 16 * 60_000), /stale completion snapshot/);
+});
+
+test("closed related issues must be completed, not abandoned or unresolved as a duplicate", () => {
+    for (const relation of ["subIssues", "dependencies"] as const) {
+        const data = completionSnapshot();
+        if (relation === "dependencies") data.issue.assessment.data.dependencies.push(9);
+        const item = { number: 9, state: "CLOSED", stateReason: "not_planned" };
+        data.issue[relation].push(item);
+        for (const stateReason of ["not_planned", "duplicate", "unknown"]) {
+            item.stateReason = stateReason;
+            assert.equal(assessIssueCompletion(data, now).readyToClose, false);
+        }
+        item.stateReason = "completed";
+        assert.equal(assessIssueCompletion(data, now).readyToClose, true);
+    }
 });
 
 test("completion CLI reports ready, blocked and malformed snapshots with the right exit code", () => {
