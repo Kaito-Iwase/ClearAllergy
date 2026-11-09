@@ -1,15 +1,24 @@
-import { publicSnapshotSchema, targetKey, type PublicSnapshot, type PublicTarget } from './contracts';
+import { parseStoredImagePath } from '@/lib/storage/stored-image-path';
+import { publicMenuImageSchema, publicSnapshotSchema, shopViewSnapshotSchema, SHOP_VIEW_MEDIA_TYPE, targetKey,
+    type PublicSnapshot, type PublicTarget, type PublicViewSnapshot, type PublicMenuImages } from './contracts';
 
 export type RevalidationState = {
-    displayed: PublicSnapshot;
-    candidate: PublicSnapshot | null;
+    displayed: PublicViewSnapshot;
+    candidate: PublicViewSnapshot | null;
     phase: 'ready' | 'loading' | 'applying' | 'error';
     stale: boolean;
     error: 'request' | 'cancelled' | 'render' | null;
 };
 
-export async function readSnapshotResponse(target: PublicTarget, requestId: string, response: Pick<Response, 'status' | 'json'>): Promise<PublicSnapshot> {
-    const snapshot = publicSnapshotSchema.parse(await response.json());
+export async function readSnapshotResponse(target: PublicTarget, requestId: string,
+    response: Pick<Response, 'status' | 'json'> & { headers?: Headers },
+): Promise<PublicViewSnapshot> {
+    const body: unknown = await response.json();
+    const isShopView = target.kind === 'shop' && response.headers?.get('content-type')?.split(';', 1)[0] === SHOP_VIEW_MEDIA_TYPE;
+    const view = isShopView ? shopViewSnapshotSchema.parse(body) : undefined;
+    const snapshot = view
+        ? { version: view.version, targetKey: view.targetKey, requestId: view.requestId, startedAt: view.startedAt, result: view.result }
+        : publicSnapshotSchema.parse(body);
     if (snapshot.requestId !== requestId || snapshot.targetKey !== targetKey(target)) throw Error('Snapshot correlation mismatch');
     const result = snapshot.result;
     if (result.kind === 'unavailable') throw Error('Public read unavailable');
@@ -20,17 +29,27 @@ export async function readSnapshotResponse(target: PublicTarget, requestId: stri
         if (result.kind === 'shop' && target.kind === 'shop' && result.data.shop.id !== target.shopId) throw Error('Wrong shop');
         if (result.kind === 'menu' && target.kind === 'menu' && result.data.shopId !== target.shopId) throw Error('Wrong shop');
     }
-    return snapshot;
+    if (result.kind !== 'shop' || !view?.menuImages || typeof view.menuImages !== 'object') return snapshot;
+    const rawImages = view.menuImages as Record<string, unknown>;
+    const menuImages: PublicMenuImages = Object.fromEntries(result.data.menusForClient.flatMap(menu => {
+        if (!Object.hasOwn(rawImages, menu.id)) return [];
+        const image = publicMenuImageSchema.safeParse(rawImages[menu.id]);
+        if (!image.success || image.data.updatedAt !== menu.updatedAt) return [];
+        const url = parseStoredImagePath(image.data.safeImageUrl, { kind: 'menu', shopId: result.data.shop.id });
+        return url ? [[menu.id, { ...image.data, safeImageUrl: url.href }]] : [];
+    }));
+    return { ...snapshot, menuImages };
 }
 
-export async function fetchPublicSnapshot(target: PublicTarget, requestId: string, signal: AbortSignal): Promise<PublicSnapshot> {
+export async function fetchPublicSnapshot(target: PublicTarget, requestId: string, signal: AbortSignal): Promise<PublicViewSnapshot> {
     const query = new URLSearchParams({ kind: target.kind, requestId });
     if (target.kind !== 'list') query.set('shopId', target.shopId);
     if (target.kind === 'menu') query.set('menuId', target.menuId);
     const response = await fetch('/api/public-snapshot?' + query, {
         // Keep the browser's existing same-origin deployment-protection session.
         // Public loaders remain anonymous and never personalize the snapshot.
-        signal, cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' },
+        signal, cache: 'no-store', credentials: 'same-origin',
+        headers: { Accept: target.kind === 'shop' ? SHOP_VIEW_MEDIA_TYPE : 'application/json' },
     });
     return readSnapshotResponse(target, requestId, response);
 }

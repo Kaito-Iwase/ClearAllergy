@@ -7,10 +7,17 @@ import {
     createStatusBySlug, getStoreContainsAllergenSlugs,
     isMenuPublishable, isMenuPublicationCurrent,
 } from "@/lib/allergens";
-import { publicShopDetailDataSchema, type PublicResult } from "@/features/public/shops/freshness/contracts";
+import { publicShopDetailDataSchema, type PublicMenuImages, type PublicResult } from "@/features/public/shops/freshness/contracts";
 
 export async function loadPublicShopDetail(shopId: string): Promise<PublicResult> {
-    if (!shopId) return { kind: "not-found" };
+    return (await loadPublicShopDetailPageData(shopId, false)).result;
+}
+
+export async function loadPublicShopDetailPageData(shopId: string, includeMenuImages = true): Promise<{
+    result: PublicResult;
+    menuImages?: PublicMenuImages;
+}> {
+    if (!shopId) return { result: { kind: "not-found" } };
 
     const {
         data: publicShopData,
@@ -74,6 +81,14 @@ export async function loadPublicShopDetail(shopId: string): Promise<PublicResult
                                 priceYen: true,
                                 category: true,
                                 precaution: true,
+                                ...(includeMenuImages ? {
+                                    imageUrl: true,
+                                    imageFrame: true,
+                                    imageFit: true,
+                                    imageZoom: true,
+                                    imagePositionX: true,
+                                    imagePositionY: true,
+                                } : {}),
                                 updatedAt: true,
                                 foodVersion: true,
                                 reviewedFoodVersion: true, publicationConfirmedFoodVersion: true,
@@ -108,14 +123,14 @@ export async function loadPublicShopDetail(shopId: string): Promise<PublicResult
         { context: `public-shop-detail:${shopId}` },
     );
 
-    if (!isDatabaseAvailable) return { kind: "unavailable" };
+    if (!isDatabaseAvailable) return { result: { kind: "unavailable" } };
 
     const { allergenMaster, shop } = publicShopData;
 
     if (!shop) {
         // 公開メニューが 1 件も無い店舗は、公開準備中として 404 にします。
         // これにより、店舗情報だけ先に外部へ見えてしまう状態を防ぎます。
-        return { kind: "not-found" };
+        return { result: { kind: "not-found" } };
     }
 
     // 公開フラグだけでなく、現行マスタの全品目が確定済みかを公開時にも再確認します。
@@ -131,7 +146,7 @@ export async function loadPublicShopDetail(shopId: string): Promise<PublicResult
     );
 
     if (publishableMenus.length === 0) {
-        return { kind: "not-found" };
+        return { result: { kind: "not-found" } };
     }
 
     const storeHandledAllergenSlugs = [...getStoreContainsAllergenSlugs(publishableMenus, allergenMaster)];
@@ -154,9 +169,22 @@ export async function loadPublicShopDetail(shopId: string): Promise<PublicResult
     }));
 
     const safeCoverImageUrl = sanitizeStoredImageUrl(shop.coverImageUrl, { kind: "shop", shopId });
+    const menuImages = includeMenuImages ? Object.fromEntries(publishableMenus.flatMap(menu => {
+        const safeImageUrl = sanitizeStoredImageUrl(menu.imageUrl, { kind: "menu", shopId });
+        return safeImageUrl ? [[menu.id, {
+            updatedAt: menu.updatedAt.toISOString(),
+            safeImageUrl,
+            imageFrame: menu.imageFrame,
+            imageFit: menu.imageFit,
+            imageZoom: menu.imageZoom,
+            imagePositionX: menu.imagePositionX,
+            imagePositionY: menu.imagePositionY,
+        }]] : [];
+    })) : undefined;
+
     return {
-        kind: "shop",
-        data: publicShopDetailDataSchema.parse({
+        menuImages,
+        result: { kind: "shop", data: publicShopDetailDataSchema.parse({
             shop: {
                 id: shop.id,
                 name: shop.name,
@@ -179,6 +207,6 @@ export async function loadPublicShopDetail(shopId: string): Promise<PublicResult
             menusForClient,
             allergenMaster,
             storeHandledAllergenSlugs,
-        }),
+        }) },
     };
 }
