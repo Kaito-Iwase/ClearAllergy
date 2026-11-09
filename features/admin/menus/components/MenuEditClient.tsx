@@ -12,6 +12,7 @@ import { isMenuPublicationCurrent } from "@/lib/allergens";
 import { foodSnapshot, foodContentChanged, hasUnresolvedFoodIssue,  type FoodReviewSummary } from "../food-review";
 import { getMenuSavePlan } from "../menu-save-plan";
 import MenuSaveOutcomeNotice from "./MenuSaveOutcomeNotice";
+import MenuCategoryField from "./MenuCategoryField";
 import { useRouter } from "next/navigation";
 import { useUnsavedMenuChanges } from "./useUnsavedMenuChanges";
 import {
@@ -78,6 +79,7 @@ export default function MenuEditClient(props: {
     initialDescription: string | null;
     initialPriceYen: number | null;
     initialCategory: string | null;
+    categoryOptions?: string[];
     initialIngredients: string | null;
     initialPrecaution: string | null;
     initialImageUrl: string | null;
@@ -105,6 +107,7 @@ export default function MenuEditClient(props: {
         initialDescription,
         initialPriceYen,
         initialCategory,
+        categoryOptions = [],
         initialIngredients,
         initialPrecaution,
         initialImageUrl,
@@ -127,6 +130,7 @@ export default function MenuEditClient(props: {
         initialDescription ?? "",
     );
     const [category, setCategory] = React.useState(initialCategory ?? "");
+    const [savedCategory, setSavedCategory] = React.useState(initialCategory);
     const [ingredients, setIngredients] = React.useState(
         initialIngredients ?? "",
     );
@@ -195,7 +199,10 @@ export default function MenuEditClient(props: {
     const [reviewHistory, setReviewHistory] = React.useState(props.initialFoodReviews ?? []);
     const [savedFoodSnapshot, setSavedFoodSnapshot] = React.useState(() => foodSnapshot({ name: initialName, description: initialDescription, category: initialCategory, ingredients: initialIngredients, precaution: initialPrecaution, imageUrl: initialImageUrl }, allergens, initialStatusBySlug));
     const currentFoodSnapshot = foodSnapshot({ name, description, category, ingredients, precaution, imageUrl }, allergens, statusBySlug);
-    const foodChanged = selectedFile !== null || foodContentChanged(savedFoodSnapshot, currentFoodSnapshot);
+    const nextCategory = normalizeOptionalMenuText(category);
+    // Omit an unchanged field so a legacy value with surrounding whitespace is not rewritten.
+    const categoryChanged = category !== (savedCategory ?? "") && nextCategory !== savedCategory;
+    const foodChanged = selectedFile !== null || categoryChanged || foodContentChanged(savedFoodSnapshot, currentFoodSnapshot);
     const unknownAllergenNames = React.useMemo(
         () => getUnknownAllergenNames({ allergens, statusBySlug }),
         [allergens, statusBySlug],
@@ -406,7 +413,7 @@ export default function MenuEditClient(props: {
                 name: trimmedName,
                 description: normalizeOptionalMenuText(description),
                 priceYen,
-                category: normalizeOptionalMenuText(category),
+                ...(categoryChanged ? { category: nextCategory } : {}),
                 ingredients: normalizeOptionalMenuText(ingredients),
                 precaution: normalizeOptionalMenuText(precaution),
                 imageUrl: uploadedImageUrl,
@@ -446,6 +453,7 @@ export default function MenuEditClient(props: {
             setReviewHistory(data.menu.foodReviews);
             setSavedFoodVersion(data.menu.foodVersion);
             setSavedFoodSnapshot({ ...currentFoodSnapshot, imageUrl: data.menu.imageUrl ?? null });
+            if (categoryChanged) setSavedCategory(nextCategory);
             setSavedIsPublished(data.menu.isPublished);
             setSavedDraft(JSON.stringify({ ...draftValues, isPublished: data.menu.isPublished,
                 imageUrl: typeof data.menu.imageUrl === "string" ? data.menu.imageUrl : "" }));
@@ -457,7 +465,7 @@ export default function MenuEditClient(props: {
             if (data.publicRefreshPending) setNotice("保存は完了しましたが、公開表示の更新処理が未完了です。再保存せず、公開表示を確認してください。");
             setSelectedFile(null);
             if (!data.menu.isPublished) await openSavedConfirmation(data.menu, true);
-            else router.refresh();
+            if (data.menu.isPublished || categoryChanged) router.refresh();
         } catch (e) {
             setError(getThrownErrorMessage(e, SAVE_ERROR_MESSAGE));
         } finally {
@@ -683,18 +691,8 @@ export default function MenuEditClient(props: {
                 </div>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label htmlFor="edit-menu-field-4" className="mb-1 block text-sm font-medium text-gray-700">
-                            カテゴリ
-                        </label>
-                        <input id="edit-menu-field-4"
-                            maxLength={120}
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                            className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:border-green-500"
-                            placeholder="例：デザート"
-                        />
-                    </div>
+                    <MenuCategoryField id="edit-menu-field-4" value={category} onChange={setCategory}
+                        options={categoryOptions} willUnpublish={savedIsPublished && categoryChanged} />
                 </div>
 
                 <div className="mt-4">
