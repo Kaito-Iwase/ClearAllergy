@@ -87,9 +87,12 @@ export function useUserAllergenPreferenceState() {
         onToggleIncludeMayContain: () => change((value) => ({ ...value, includeMayContain: !value.includeMayContain })),
         onClear: () => change(() => normalizeUserAllergenPreferences(null), "all"),
         onUndo: () => {
-            setEdit((current) => current?.previous
-                ? { ...current, value: normalizeUserAllergenPreferences({ ...current.value, ...current.previous }), previous: null }
-                : current);
+            setEdit((current) => {
+                if (!current?.previous) return current;
+                const value = normalizeUserAllergenPreferences({ ...current.value, ...current.previous });
+                if (areAllergenPreferencesEqual(value, current.base) || areAllergenPreferencesEqual(value, snapshot.preferences)) return null;
+                return { ...current, value, previous: null };
+            });
             setMessage("");
         },
         onApply: apply,
