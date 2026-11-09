@@ -129,6 +129,7 @@ export default function PublicShopDetailView(data: PublicShopDetailData & { menu
                             }
                         >
                             <ShopMenuListClient
+                                key={shop.id}
                                 storeHandledAllergenSlugs={storeHandledAllergenSlugs}
                                 shopId={shop.id}
                                 menus={menusForClient}
