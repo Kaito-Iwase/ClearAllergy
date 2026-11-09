@@ -155,11 +155,11 @@ export default function ShopMenuListClient({
     const showCategoryHeadings = groups.size > 1 || !groups.has(null);
     const CardHeading = showCategoryHeadings ? "h4" : "h3";
     const CardSubheading = showCategoryHeadings ? "h5" : "h4";
-    let uncategorizedLabel = "その他のメニュー";
+    let uncategorizedLabel = "カテゴリなし";
     if (groups.has(uncategorizedLabel)) {
-        uncategorizedLabel = "その他のメニュー（未分類）";
+        uncategorizedLabel = "カテゴリなし（自動）";
         for (let suffix = 2; groups.has(uncategorizedLabel); suffix++) {
-            uncategorizedLabel = "その他のメニュー（未分類" + suffix + "）";
+            uncategorizedLabel = `カテゴリなし（自動${suffix}）`;
         }
     }
     const categoryLabel = (category: string | null) => category ?? uncategorizedLabel;

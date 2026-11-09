@@ -315,7 +315,7 @@ test('鮮度: native BFCache復元を試み、persisted=trueの場合だけ復�
 test.describe('公開カテゴリ', () => {
     test.use({ hasTouch: true });
 
-    test('カテゴリ: 検索・除外・店舗補足を維持し、公開停止後に選択を解除する', async ({ createMenu, page }) => {
+    test('カテゴリ: 空欄と店の分類を区別し、検索・除外・公開停止時も店舗補足を維持する', async ({ createMenu, page }, testInfo) => {
         const create = (category, options = {}) => createMenu('a', async admin => {
             await admin.getByRole('combobox', { name: 'カテゴリ', exact: true }).fill(category);
             if (options.search) await admin.getByLabel('説明', { exact: true }).fill('架空カテゴリ検索');
@@ -325,7 +325,7 @@ test.describe('公開カテゴリ', () => {
             }
         });
         const drink = await create('ドリンク', { search: true }); await publish(drink);
-        const food = await create('フード', { search: true, source: true }); await publish(food);
+        const food = await create('その他のメニュー', { search: true, source: true }); await publish(food);
         const other = await create(''); await publish(other);
         await page.goto('/shops/' + drink.shopId);
         await ready(page);
@@ -335,7 +335,12 @@ test.describe('公開カテゴリ', () => {
         const option = category => filters.getByRole('button', { name: category + '（1件）', exact: true });
         const note = menus.getByRole('region', { name: '店舗全体の登録情報', exact: true });
         await expect(all).toHaveAttribute('aria-pressed', 'true');
-        await expect(menus.getByRole('heading', { name: 'その他のメニュー（1件）', exact: true })).toBeVisible();
+        const uncategorizedHeading = menus.getByRole('heading', { name: 'カテゴリなし（1件）', exact: true });
+        await expect(uncategorizedHeading).toBeVisible();
+        await expect(filters.getByRole('button').last()).toHaveText('カテゴリなし（1件）');
+        await option('その他のメニュー').click();
+        await expect(menus.getByRole('heading', { name: food.name, exact: true })).toBeVisible();
+        await expect(menus.getByRole('heading', { name: other.name, exact: true })).toHaveCount(0);
         await option('ドリンク').click();
         await expect(menus.getByText('表示 1件 / 検索対象 3件', { exact: true })).toBeVisible();
         await expect(menus.getByRole('heading', { name: drink.name, exact: true })).toBeVisible();
@@ -343,8 +348,10 @@ test.describe('公開カテゴリ', () => {
         await expect(note).toContainText('小麦');
 
         await page.setViewportSize({ width: 390, height: 844 });
-        await option('その他のメニュー').tap();
+        await option('カテゴリなし').tap();
         await expect(menus.getByRole('heading', { name: other.name, exact: true })).toBeVisible();
+        await expect(menus.getByRole('heading', { name: food.name, exact: true })).toHaveCount(0);
+        await shot(page, testInfo, 'public-uncategorized');
         expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
         const search = page.getByRole('searchbox', { name: 'この店舗のメニューを検索', exact: true }).filter({ visible: true });
         await search.fill('架空カテゴリ検索');
@@ -363,7 +370,7 @@ test.describe('公開カテゴリ', () => {
         await expect(menus.getByText('表示 1件 / 検索対象 3件', { exact: true })).toBeVisible();
 
         await selectPreferences(page, [['卵', 'exclude'], ['小麦', 'highlight']], true);
-        await expect(option('フード')).toHaveCount(0);
+        await expect(option('その他のメニュー')).toHaveCount(0);
         await expect(option('ドリンク')).toHaveAttribute('aria-pressed', 'true');
         await expect(note).toContainText('小麦');
         await expect(menus.getByText('別メニューに含む', { exact: true }).first()).toBeVisible();
@@ -371,7 +378,17 @@ test.describe('公開カテゴリ', () => {
         await refresh(page);
         await expect(filters).toHaveCount(0);
         await expect(menus.getByRole('heading', { name: other.name, exact: true })).toBeVisible();
-        await expect(menus.getByRole('heading', { name: 'その他のメニュー（1件）', exact: true })).toHaveCount(0);
+        await expect(uncategorizedHeading).toHaveCount(0);
         await expect(note).toContainText('小麦');
+
+        const named = await create('カテゴリなし'); await publish(named);
+        await page.reload();
+        await ready(page);
+        await option('カテゴリなし').click();
+        await expect(menus.getByRole('heading', { name: named.name, exact: true })).toBeVisible();
+        await expect(menus.getByRole('heading', { name: other.name, exact: true })).toHaveCount(0);
+        await option('カテゴリなし（自動）').click();
+        await expect(menus.getByRole('heading', { name: other.name, exact: true })).toBeVisible();
+        await expect(menus.getByRole('heading', { name: named.name, exact: true })).toHaveCount(0);
     });
 });
