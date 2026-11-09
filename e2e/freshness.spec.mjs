@@ -1,4 +1,5 @@
 import { test, expect, publish, readMenu } from './admin-fixtures.mjs';
+import { setPreferenceMode } from '../scripts/allergen-preference-browser-helpers.mjs';
 
 test.beforeEach(async ({ context, baseURL }) => {
     await context.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
@@ -39,7 +40,7 @@ async function shot(page, testInfo, name) {
 async function selectPreferences(page, settings) {
     const panel = page.getByRole('button', { name: /あなた向けのアレルゲン設定/ }).filter({ visible: true });
     if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
-    for (const [name, value] of settings) await page.getByRole('combobox', { name: `${name}の表示設定`, exact: true }).filter({ visible: true }).selectOption(value);
+    for (const [name, value] of settings) await setPreferenceMode(page, name, value);
     await page.getByRole('button', { name: '変更を適用', exact: true }).filter({ visible: true }).click();
 }
 
@@ -63,7 +64,7 @@ test('鮮度: 取得中・失敗の旧FREE要約を抑え、注意情報を保�
     const allergenCount = (await readMenu(menu)).allergens.length;
     const panel = page.getByRole('button', { name: /あなた向けのアレルゲン設定/ }).filter({ visible: true });
     if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
-    await page.getByRole('combobox', { name: '乳の表示設定', exact: true }).filter({ visible: true }).selectOption('highlight');
+    await setPreferenceMode(page, '乳', 'highlight');
     await page.getByRole('button', { name: '変更を適用', exact: true }).filter({ visible: true }).click();
     await expect(page.getByRole('heading', { name: '原材料に含まない', exact: true })).toBeVisible();
     await shot(page, testInfo, 'normal');

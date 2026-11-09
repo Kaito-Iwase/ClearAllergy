@@ -1,4 +1,5 @@
 import { test, expect } from './playwright.mjs';
+import { preferenceItem } from '../scripts/allergen-preference-browser-helpers.mjs';
 
 const visible = locator => locator.filter({ visible: true });
 test.beforeEach(async ({ context, baseURL }) => {
@@ -40,17 +41,93 @@ test('公開: モバイルの検索0件から解除して一覧へ戻れる', as
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
-test('公開: アレルゲン設定を適用して再読み込みしても保持する', async ({ page }) => {
-    await openShop(page);
-    const panel = visible(page.getByRole('button', { name: /あなた向けのアレルゲン設定/ }));
-    if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
-    await visible(page.getByRole('combobox', { name: '卵の表示設定', exact: true })).selectOption('highlight');
-    await visible(page.getByRole('button', { name: '変更を適用', exact: true })).click();
-    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('clearallergy:user-allergens')).highlightSlugs)).toEqual(['egg']);
-    await page.reload();
-    if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
-    await expect(visible(page.getByRole('combobox', { name: '卵の表示設定', exact: true }))).toHaveValue('highlight');
-});
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`公開: ${width}pxのアレルゲン検索・一括設定・適用・全解除`, async ({ page }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await openShop(page);
+        const panel = visible(page.getByRole('region', { name: 'あなた向けのアレルゲン設定', exact: true }));
+        const trigger = panel.getByRole('button', { name: /あなた向けのアレルゲン設定/ });
+        const open = async () => { if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click(); };
+        const search = panel.getByRole('searchbox', { name: 'アレルゲンを探す', exact: true });
+        const action = name => panel.getByRole('button', { name, exact: true });
+        const apply = action('変更を適用');
+        const summary = panel.getByRole('group', { name: '編集中の表示設定', exact: true });
+        const choices = panel.locator('[data-preference-mode]');
+        const list = panel.locator('[data-allergen-preference-list]');
+        const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('clearallergy:user-allergens')));
+        const cards = page.locator('#public-menus').getByRole('link');
+        await expect(cards.first()).toBeVisible();
+        const cardCount = await cards.count();
+        await open();
+        await expect(choices).toHaveCount(29);
+        for (const [term, name] of [['らっかせい', '落花生（ピーナッツ）'], ['ﾋﾟｰﾅｯﾂ', '落花生（ピーナッツ）']]) {
+            await search.fill(term);
+            await expect(choices).toHaveCount(1);
+            await expect(preferenceItem(panel, name)).toBeVisible();
+        }
+        await search.fill('こむぎ');
+        await preferenceItem(panel, '小麦').click();
+        await search.fill('ぎゅうにゅう');
+        await preferenceItem(panel, '乳').click();
+        await expect(action('小麦を選択から外す')).toBeVisible();
+        await expect(apply).toBeDisabled();
+        await action('注目にする').click();
+        await search.fill('たまご');
+        await preferenceItem(panel, '卵').click();
+        await search.fill('エビ');
+        await preferenceItem(panel, 'えび').click();
+        await search.fill('');
+        await action('一覧から除外').click();
+        await expect(summary).toContainText('注目：小麦・乳');
+        await expect(summary).toContainText('除外：えび・卵');
+        expect(await saved()).toBeNull();
+        await expect(cards).toHaveCount(cardCount);
+        await expect(apply).toBeFocused();
+        await expect(apply).toBeInViewport();
+        await expect.poll(() => apply.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        })).toBe(true);
+        const [actionsBox, listBox] = await Promise.all([panel.locator('[data-allergen-preference-actions]').boundingBox(), list.boundingBox()]);
+        if (width < 500) expect(actionsBox.y).toBeLessThan(listBox.y);
+        else expect(actionsBox.x).toBeGreaterThanOrEqual(listBox.x + listBox.width);
+        await page.screenshot({ path: testInfo.outputPath('before-apply.png') });
+        await apply.click();
+        await expect.poll(saved).toMatchObject({ highlightSlugs: ['wheat', 'milk'], excludedSlugs: ['shrimp', 'egg'], includeMayContain: false });
+        await expect.poll(() => cards.count()).toBeLessThan(cardCount);
+
+        await page.reload();
+        await open();
+        await expect(preferenceItem(panel, '乳')).toHaveAttribute('data-preference-mode', 'highlight');
+        await expect(preferenceItem(panel, '卵')).toHaveAttribute('data-preference-mode', 'exclude');
+        await action('すべて外す').click();
+        await expect(summary).toContainText('注目：なし');
+        await expect(summary).toContainText('除外：なし');
+        expect((await saved()).excludedSlugs).toEqual(['shrimp', 'egg']);
+        await action('元に戻す').click();
+        await expect(summary).toContainText('除外：えび・卵');
+        await action('すべて外す').click();
+        await expect(apply).toBeFocused();
+        await expect(apply).toBeInViewport();
+        await apply.click();
+        await expect.poll(saved).toMatchObject({ highlightSlugs: [], excludedSlugs: [], includeMayContain: false });
+        await expect(cards).toHaveCount(cardCount);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+
+        if (width === 1440) {
+            await cards.first().click();
+            await expect(page).toHaveURL(/\/menus\//);
+            await open();
+            const [detailActions, detailList] = await Promise.all([panel.locator('[data-allergen-preference-actions]').boundingBox(), list.boundingBox()]);
+            expect(detailActions.x).toBeGreaterThanOrEqual(detailList.x + detailList.width);
+            await search.fill('たまご');
+            await preferenceItem(panel, '卵').click();
+            await page.setViewportSize({ width: 390, height: 844 });
+            await expect(search).toHaveValue('たまご');
+            await expect(preferenceItem(panel, '卵')).toHaveAttribute('aria-pressed', 'true');
+        }
+    });
+}
 
 test('公開: 未認証の管理APIは401', async ({ request }) => {
     expect((await request.get('/api/admin/menus', { maxRedirects: 0 })).status()).toBe(401);
