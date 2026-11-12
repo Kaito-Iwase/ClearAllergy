@@ -3,6 +3,7 @@
   "git": {
     "deploymentEnabled": {
       "test/staging": false,
+      "ci/dependency-gate-20261112": false,
       "ci/staging-actions-20261106": false,
       "ci/staging-branch-preview-20261107": false,
       "ci/staging-sync-20261107": false,
