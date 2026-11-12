@@ -31,6 +31,7 @@ test("real npm audit fails closed for high advisories and unusable registry resp
                 const code = await new Promise<number | null>((resolve, reject) => {
                     const child = spawn(process.execPath, [cli, "audit", "--json", "--ignore-scripts", "--audit-level=high", `--registry=http://127.0.0.1:${address.port}`, "--fetch-retries=0", "--update-notifier=false", "--proxy=null", "--https-proxy=null", "--noproxy=*", "--fetch-timeout=2000", `--cache=${join(root, mode)}`], { cwd: root, env: { ...process.env, npm_config_userconfig: join(root, "absent-npmrc") }, stdio: ["ignore", "pipe", "pipe"], timeout: 30000 });
                     child.stdout.on("data", chunk => { output += chunk.toString(); });
+                    child.stderr.resume();
                     child.once("error", reject);
                     child.once("close", resolve);
                 });

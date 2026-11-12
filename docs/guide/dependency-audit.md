@@ -6,7 +6,7 @@ Scope: issue #153. This is a proposed code change until reviewed and merged by a
 
 The existing `Test, lint, typecheck, and build` job runs `npm audit --ignore-scripts --audit-level=high` after `npm ci`, before tests/build. The command audits locked production and development dependencies. There is no path filter, conditional step, `continue-on-error`, production-only omission, or fallback that treats an unavailable registry as clean. A three-minute timeout fails the job rather than waiting indefinitely. This uses the existing required check; do not add the path-filtered standalone audit as a required check.
 
-The standalone dependency-audit workflow remains supplementary weekly/manual discovery and dependency-PR feedback. Ordinary, docs-only, Node-only and dependency PRs targeting the CI branches all run the build gate. Staging's existing CI-success prerequisite consequently includes this command after this proposal is merged. No staging run is authorized by this change alone.
+The standalone dependency-audit workflow remains supplementary weekly/manual discovery and dependency-PR feedback. Ordinary, docs-only, Node-only and dependency PRs targeting the CI branches all run the build gate. Staging's existing CI-success prerequisite includes this command only when the tested test/staging revision also contains this change and that CI succeeds. Merging to main alone does not establish that condition. No staging run is authorized by this change alone.
 
 ## Failure and recovery
 
