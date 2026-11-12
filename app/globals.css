@@ -18,6 +18,10 @@ body:has([data-admin-dashboard]) {
   background-color: #f6f8f6;
 }
 
+body:has([data-allergen-preference-dialog][open]) {
+  overflow: hidden;
+}
+
 :where(a, button, input, select, textarea):focus-visible {
     outline: 2px solid #15803d;
     outline-offset: 3px;

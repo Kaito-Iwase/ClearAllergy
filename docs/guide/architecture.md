@@ -22,19 +22,19 @@ Vercel・Neonは想定する配備構成です。図はリポジトリの実装�
 <a id="freshness-prototype"></a>
 ## 完全snapshotの再取得
 
-この変更をmainへ取り込む場合、公開3ページのquery・公開判定・DTO変換を `server/public-*-data.ts` へ分離し、初期SSRと新しい `GET /api/public-snapshot` で共用します。UI本文は検証済みの完全snapshotを一括適用し、店舗名・件数・全状態・他メニュー由来の補足を混在させません。server pageは維持し、初期取得後に変わる本文だけをclient viewへ分離しています。構成図は初期表示と主要処理の概要として照合し、省略している公開snapshot APIの経路を以下に分けます。
+公開3ページのquery・公開判定・DTO変換を `server/public-*-data.ts` へ分離し、初期SSRと `GET /api/public-snapshot` で共用します。UI本文は検証済みの完全snapshotを一括適用し、店舗名・件数・全状態・他メニュー由来の補足を混在させません。server pageは維持し、初期取得後に変わる本文だけをclient viewへ分離しています。構成図は初期表示と主要処理の概要として照合し、省略している公開snapshot APIの経路を以下に分けます。
 
 ```mermaid
 flowchart LR
   Page[公開3ページの初期SSR] --> Loader[共有server loader]
-  Client[復帰・手動再取得] --> API[公開snapshot GET]
+  Client[復帰・失敗後の再試行] --> API[公開snapshot GET]
   API --> Loader
   Loader --> Snapshot[RepeatableRead・同一txの補足・公開条件]
   Snapshot --> DTO[公開whitelist DTO]
   DTO --> View[一括React view・内容のDOM適用proof]
 ```
 
-root layoutの `PublicFreshnessNavigation` が履歴等の契機を受け、公開画面の再取得を要求します。取得先は相対URLの公開snapshot APIに固定し、same-originの既存保護sessionを使います。公開projectionは匿名のままで、Cookie／Authorizationを手動転送しません。相関IDとresource key、取消・要求世代を照合し、旧後着を破棄します。正常な対象なしと取得不能を分け、型不一致・HTML・表示失敗を確認成功にしません。list/menuの本文とshopのmenu・要約の両方のcommitを待ちます。取得失敗は登録状態を変えず、旧情報表示は参照／遮蔽の比較候補です。数値TTL・polling・配送保証はありません。既存の公開メニューAPIは維持しています。
+root layoutの `PublicFreshnessNavigation` が履歴等の契機を受け、公開画面の再取得を要求します。取得先は相対URLの公開snapshot APIに固定し、same-originの既存保護sessionを使います。公開projectionは匿名のままで、Cookie／Authorizationを手動転送しません。相関IDとresource key、取消・要求世代を照合し、旧後着を破棄します。正常な対象なしと取得不能を分け、型不一致・HTML・表示失敗を確認成功にしません。list/menuの本文とshopのmenu・要約の両方のcommitを待ちます。取得失敗時は、以前の登録を未再確認と明示して注意情報を保持し、再試行を案内します。数値TTL・polling・配送保証はありません。既存の公開メニューAPIは維持しています。
 
 mainへの統合状態は[検証・採用状況](verification.md#freshness-prototype-status)で確認します。コードの取込は表示方式A/Bの最終選定や、[操作と結果](../verification/public-freshness-prototype-20261105.md)の範囲を超える稼働・安全保証を意味しません。公開layoutを離れたSPA復帰は[固定headの隔離CI](../verification/public-freshness-prototype-20261105.md#linux-ci-cd18f209)の1経路で、同一document・popstate1回と訂正反映を確認しました。native BFCacheの実復元や全復帰経路の保証ではありません。
 
@@ -62,6 +62,8 @@ mainへの統合状態は[検証・採用状況](verification.md#freshness-proto
 5. 日付などをブラウザに渡せる形へ整え、一覧や詳細のClient Componentへ渡す。
 6. ブラウザは検索語や端末のアレルゲン設定を使って表示を絞る。設定変更のたびにDBへ問い合わせる構成ではない。店舗内カードの設定なし表示は `buildDefaultAllergenSummaries` で特定原材料とその他を別集計し、設定がある場合は `buildSelectedAllergenSummary` で注目・除外の選択品目を集計する。共通処理が状態別の品目名・件数と別メニュー由来の品目名を分けて返し、`MenuAllergenSummary` が登録状態と自動補足を別枠に描画する。店舗詳細の取得ではメニューの `precaution` も選択し、カードで注意書き全文を表示する。自由文から品目別状態や厨房のリスクを推定しない。
 
+店舗詳細の初期表示と画面内再取得は、公開可否・登録内容・画像の構図を同じトランザクションで取得します。画面内再取得のクライアントだけが `GET /api/public-snapshot` の専用メディアタイプを指定し、許可された画像の一覧を受け取ります。既定の公開JSON v1とメニュー詳細APIの契約は維持します。取得中は旧画像を外し、同じ取得結果の公開メニューに対応する画像を反映します。不正な画像項目はそのカードだけで省きます。
+
 店舗一覧は `PublicShopListPage` が `Shop.nearestStation` を取得し、`PublicShopListClient` が `public-shop-search.ts` の `filterAndRankShops` を呼びます。エリア欄は住所・都道府県・市区町村・最寄り駅、キーワード欄は店舗名・説明・カテゴリが対象です。空白で分けた各語を小文字化して文字列の部分一致を取り、全語一致と一部一致を分けます。駅マスタ・読みや別名の変換・駅位置からの店舗探索は行いません。最寄り駅は管理フォームの任意文字列で、空値はnullへ整えて保存します。未登録値を駅名へ補完する処理はありません。
 
 画像構図の入力は店舗・メニューで `ImageCompositionEditor` を共有します。ドラッグ開始時に枠の実サイズと画像の自然サイズを読み、`menu-image-display.ts` の `getImagePositionTravel` がobject-fitとズーム後の各軸の移動範囲を計算します。`getDraggedImagePosition` はドラッグ量をその範囲に対する位置%へ変換します。画像が枠より小さい場合と大きい場合で符号が変わり、どちらも写真が指・マウスの方向へ動きます。画像未読込や移動範囲0の軸は現在位置を維持します。保存される位置%・公開側のobject-position／transform-origin・API契約は変えていません。
@@ -78,14 +80,14 @@ Prismaの入れ子の取得指定（nested select）でもSQLが分かれるた�
 
 食品情報を載せる店舗一覧・店舗詳細・メニュー詳細は、ルート入口と実装の `force-dynamic` によりアクセスごとにDBを読みます。以前の `force-static` / `revalidate = 60` は、停止後も新しい要求へ古い情報を返すことがローカル本番buildで再現したため、これらの3ルートでは使いません。DB読取は増えます。Cache Componentsや別のDBキャッシュは導入していません。
 
-変更APIは `lib/public-cache.ts` の関数で関連ページの再検証も要求します。これだけで既に開いた画面・戻る操作・オフライン画面へ訂正を配送することはできません。[公開3画面の手動・復帰時再取得](#freshness-prototype)と、全閲覧者への到達保証は別です。トップ・規約等の静的ページは別で、実Vercel配備の応答や負荷は別途確認が必要です。
+変更APIは `lib/public-cache.ts` の関数で関連ページの再検証も要求します。これだけで既に開いた画面・戻る操作・オフライン画面へ訂正を配送することはできません。[公開3画面の復帰時の再取得](#freshness-prototype)と、全閲覧者への到達保証は別です。トップ・規約等の静的ページは別で、実Vercel配備の応答や負荷は別途確認が必要です。
 
 <a id="preferences"></a>
 ## 個人設定を適用する処理
 
 1. `UserAllergenPreferenceClient` が `lib/public-allergen-preferences.ts` の購読処理を使い、保存済み設定を読む。
 2. 未知の品目・重複・旧形式を正規化する。同じ品目が強調と非表示の両方なら非表示側を優先する。
-3. 保存済み値と編集案を分け、個々の選択で編集案だけを変更する。
+3. 品目の選択と編集案を分け、注目・除外・解除の一括操作で編集案だけを変更する。
 4. 適用時に `localStorage` へ全体を保存する。書込失敗は保存済み状態に反映しない。
 5. 同じ画面と別タブの変更通知を受け、一覧・詳細が共通の確認対象を読む。編集中の別タブ変更には競合処理を挟む。
 
@@ -174,7 +176,7 @@ DB接続障害、外部サービス失敗、業務上の入力・権限エラー
 
 ## 技術構成と選定記録
 
-現行はNext.js 16.4.1、React 19系、TypeScript、Tailwind CSS、Hono、Clerk、Prisma 6系、PostgreSQL、Vercel Blobです。正確な解決バージョンは `package-lock.json` を優先します。Node.jsとnpmの開発基準は[開発手順](development.md#environment)へ集約しています。
+現行はNext.js 16.4.5、React 19系、TypeScript、Tailwind CSS、Hono、Clerk、Prisma 6系、PostgreSQL、Vercel Blobです。正確な解決バージョンは `package-lock.json` を優先します。Node.jsとnpmの開発基準は[開発手順](development.md#environment)へ集約しています。
 
 ページの `params` / `searchParams` はPromiseとして受け取り、`await` して読みます。型確認に加え、buildが生成するNext.jsのページ型との整合性も検証します。
 

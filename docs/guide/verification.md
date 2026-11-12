@@ -60,7 +60,7 @@ PR #128はmain `51adcb23945b80bb34b110d2d0f263d29629a821` を基準としたE2E�
 <a id="freshness-prototype-status"></a>
 ## 公開鮮度UIの取込対象と確認状態
 
-PR #129はPR #128 head `bcc4c0cd` を基点に、公開3画面の共有loader・完全JSON snapshot・手動／復帰取得・状態表示・旧情報の参照／遮蔽を追加します。この変更をmainへ取り込む場合の動作は[操作説明](product.md#freshness-prototype)と[内部処理](architecture.md#freshness-prototype)を参照してください。参照表示Aは比較用の暫定設定で、コード取込だけで最終表示方式・文言・利用者理解・安全性を確定しません。
+PR #129は公開3画面の共有loader・完全JSON snapshot・再取得を追加しました。今回の変更では常設の取得状態パネルと表示比較を外し、復帰時の再取得・未再確認時の注意・失敗後の再試行を残します。[操作説明](product.md#freshness-prototype)と[内部処理](architecture.md#freshness-prototype)を参照してください。以下のCIはPR #129の比較UIを含む当時の記録です。
 
 混在FREEの行別注記と旧一覧の判定表現を修正した固定head `88ca4630d42f82063c7d6d7bd5c2f24cd76432ba` の[CI 42134197073](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197073)は、実checkout `8fc3998ba27de087b290b3d9afaed3e5e7e20a5c` でunit324/324、E2E19 PASS・native BFCache1 SKIPでした。[依存監査 42134197138](https://github.com/Kaito-Iwase/ClearAllergy/actions/runs/42134197138)もhigh閾値で成功しましたが、moderate8件が残っています。初期17件、Windowsの指定1件除外付きunit323件とは[追補記録](../verification/public-freshness-prototype-20261105.md#main-adoption-preparation-20261106)で区別します。
 

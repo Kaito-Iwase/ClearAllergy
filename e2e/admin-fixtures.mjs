@@ -118,7 +118,7 @@ export const test = base.extend({
     createMenu: async ({ actors }, provide, testInfo) => {
         const created = [];
         const pages = [];
-        try { await provide(async (role = 'a') => {
+        try { await provide(async (role = 'a', configure) => {
             const actor = actors[role];
             const page = await actor.context.newPage();
             pages.push(page);
@@ -134,6 +134,7 @@ export const test = base.extend({
             const count = await free.count();
             expect(count).toBeGreaterThan(0);
             for (let i = 0; i < count; i++) await free.nth(i).click();
+            await configure?.(page);
             const responsePromise = page.waitForResponse(r => new URL(r.url()).pathname === '/api/admin/menus' && r.request().method() === 'POST');
             await page.getByRole('button', { name: 'メニューを登録する', exact: true }).click();
             const response = await responsePromise;

@@ -168,7 +168,9 @@ node scripts/browser-runner.mjs ui
 
 `node scripts/browser-runner.mjs allergens` は実 `ShopMenuListClient` と新規・編集フォーム、管理メニュー一覧を、架空データの隔離loopback fixtureで検査します。アプリ・DB・Clerkの起動は不要ですが、事前にアプリのビルド済みCSSと隔離ブラウザランナーが必要です。
 
-320／390／768／1440pxの品目名・状態別件数・対象範囲・注意書き全文、個人設定とMAY_CONTAIN除外、補足元の非公開化、混在するUNKNOWN、新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスを確認します。
+320／390／768／1024／1440pxの列数、カードの高さ、画像構図、29品目の状態別件数、対象範囲、注意書き全文を確認します。注目マークと読み上げ用の文言、設定適用とMAY_CONTAIN除外、補足元の非公開化、FREEと別メニュー補足、異常データでのUNKNOWN表示、画像未登録・読込失敗・更新日時の不一致を検査します。新規・編集ガイドと注意書きによる状態の非変更、カードと注意書き欄のキーボードフォーカスも検査します。
+
+標準Playwrightの `public` project では、実公開画面で写真の再取得・差し替え・削除、遅延応答の中止を検査します。登録情報は架空DBの実応答を使い、画像URL・配信のみブラウザで置き換えます。既定の公開JSONと画面専用の応答、公開判定、登録と画像の照合、別店舗URLの拒否は `tests/public-read-callers.test.ts` で確認します。
 
 食品確認の必須欄・履歴、保存競合時の入力保持、保存成功と公開反映失敗の表示、不正な成功DTO・作成IDと通信断、送信中の独自の画像ジェスチャーによる変更拒否も確認します。管理一覧では品目未設定・現行確認・旧確認・最新未解決・記録なし・通常STOPを分け、件数・検索／filter・編集入口・版付き削除後の件数・空表示・保存しないデモを検査します。
 
@@ -179,7 +181,7 @@ node scripts/browser-runner.mjs ui
 | 確認スクリプト | 対象・副作用・成功時の確認 |
 | --- | --- |
 | `scripts/check-first-use-browser.mjs` | 公開検索、スマホ表示、個人設定の追加・解除・競合・保存失敗、詳細遷移、デモの未保存保護等。ブラウザ内設定を操作しDB更新はしない。PASS出力とスクリーンショットを確認 |
-| `scripts/check-public-ui-browser.mjs` | `ui` で実行。320・390・768・1024・1440pxのトップ／一覧／店舗／詳細／規約、日本語Webフォントの実読込と入力欄との統一、ロゴ、横幅、注目＝黄色／除外＝赤色の文字・枠コントラスト、適用前後、MAY_CONTAIN除外ON/OFF、FREEの対象・保証の限界、別メニュー補足、キーボード詳細遷移、404を検査。ブラウザ内設定だけを変更しDB・認証・Blobには書き込まない。PASS出力とスクリーンショットを確認 |
+| `scripts/check-public-ui-browser.mjs` | `ui` で実行。320・390・768・1024・1440pxのトップ／一覧／店舗／詳細／規約、日本語Webフォントの実読込と入力欄との統一、ロゴ、横幅、個人設定ダイアログの黄色「注目」と赤「除外」の品目ラベル・要約の文字コントラスト、適用前後、MAY_CONTAIN除外ON/OFF、FREEの対象・保証の限界、別メニュー補足、キーボード詳細遷移、404を検査。ブラウザ内設定だけを変更しDB・認証・Blobには書き込まない。PASS出力とスクリーンショットを確認 |
 | `scripts/check-image-composition-browser.mjs` | `composition` で実行。架空SVG画像と実編集部品で、描画した画素の移動・範囲・ズームとタッチを検査。ブラウザの外部通信を遮断し、DB・認証・画像保存は使わない。変更前後のスクリーンショットとPASS出力を確認 |
 | `scripts/check-shop-qr-browser.mjs` | `qr` で実行。実QR部品と架空URLで、4幅の正方形・サイズ比率・入力、印刷mm指定・説明の非印刷・afterprint解除を検査。JSON・スクリーンショットとA4／100%のPDFを出力。外部通信・DB・実印刷は使わない |
 | `scripts/check-saved-publication-browser.mjs` | `node scripts/browser-runner.mjs publication` で実行。実新規・編集・公開確認部品と同じworktreeのビルド済みCSSを使い、全通信を架空応答へ置換。保存と公開の失敗・版不一致・二重クリック・新規再読込・UNKNOWNの修正再保存・320/390/768/1536px・キーボードを検査。DB・Clerk・Blob・本番・利用者の既存ブラウザは使わない。JSON・画像を `CLEARALLERGY_BROWSER_OUTPUT` へ出力。CIでも実行 |
@@ -255,7 +257,7 @@ scopeは任意です。対象を絞ると読みやすい場合に、既存の機
 
 件名だけでは判断理由・影響が分からない変更には、空行を挟んで本文を付けます。従来の問題、選んだ対応の理由、利用者・呼び出し元・運用への影響、実施した検証と未実施の範囲を書きます。小さい誤字修正のように件名で十分な変更に定型文の水増しは不要です。本文の文字数下限は設けず、段落や箇条書きで読みやすくします。
 
-関連Issueがある場合は末尾に `Refs: #番号` を記載します。存在しないIssueを作り上げず、表記のためだけのIssue作成も不要です。`Closes` / `Fixes` / `Resolves` は、対象Issue全体の完了とクローズの意図が確認できる場合に限ります。部分対応・検証候補では自動クローズの語を使いません。
+関連Issueがある場合は末尾に `Refs: #番号` を記載します。存在しないIssueを作り上げず、表記のためだけのIssue作成も不要です。`Closes` / `Fixes` / `Resolves` は、対象Issue全体の完了とクローズの意図が確認できる場合に限ります。部分対応・検証候補・[ハーネスでマージ後に完了を判定するPR](../agentic-development.md#issue-completion)では、自動クローズの語を使いません。
 
 互換性を壊す変更は、typeまたはscopeの直後、コロンの直前に `!` を付け、本文末尾に `BREAKING CHANGE: 日本語の説明` を記載します。Conventional Commits自体は片方の表記でも認めていますが、CAでは一覧での発見と移行説明の両方を残すため、両方を使います。何が互換でなくなるか、影響を受ける利用者・呼び出し元、必要な移行手順を具体的に示します。変更量の大きさや内部整理だけでは `!` を付けません。安全仕様変更・DB migration等の承認境界は別に維持します。
 
@@ -345,7 +347,7 @@ CI定義は `.github/workflows/ci.yml`。main/develop/test/staging向けPR、mai
 
 依存検査は別の `.github/workflows/dependency-audit.yml` が担当します。main/develop向けの依存ファイル・当該workflow変更PR、毎週月曜03:27 UTC（12:27 JST）、手動実行が入口です。`npm audit --ignore-scripts --audit-level=high` で既知の高・重大の問題を検出すると失敗します。自動修正やパッケージ更新はしません。通信障害の失敗と検出された脆弱性を区別して調べます。対象はdevを含むアプリlockfileで、Node配布のnpm CLI・OS・隔離Playwrightの脆弱性まで修正した証拠ではありません。
 
-Next.jsのlint設定は全ルールを維持します。`@next/eslint-plugin-next@16.4.1` のルートディレクトリ検索だけ、`scripts/next-root-glob` のローカル互換層へoverrideします。既存tinyglobby 0.2.17を使い、ディレクトリの自動展開を無効にして絶対パス・末尾区切りを正規化します。パターンは65,536文字・入れ子128段までとし、超過と未対応の範囲brace（波括弧による範囲指定。`app{1..12}` 等）は検査失敗です。範囲は明示した配列か選択braceへ置き換えてください。`.npmrc` の `install-links=true` をinstall/ciで共有し、Dockerはローカルpackageをnpm ciの前にCOPYします。一般のfast-glob代替として使わず、Next plugin更新時には利用API・rootDir検索・内部リンク検知とclean install/auditを再確認してください。保守対象はこのリポジトリです。検証は `tests/next-root-glob.test.ts` と `tests/npm-cli.test.ts` から追えます。
+Next.jsのlint設定は全ルールを維持します。`@next/eslint-plugin-next@16.4.5` のルートディレクトリ検索だけ、`scripts/next-root-glob` のローカル互換層へoverrideします。既存tinyglobby 0.2.17を使い、ディレクトリの自動展開を無効にして絶対パス・末尾区切りを正規化します。パターンは65,536文字・入れ子128段までとし、超過と未対応の範囲brace（波括弧による範囲指定。`app{1..12}` 等）は検査失敗です。範囲は明示した配列か選択braceへ置き換えてください。`.npmrc` の `install-links=true` をinstall/ciで共有し、Dockerはローカルpackageをnpm ciの前にCOPYします。一般のfast-glob代替として使わず、Next plugin更新時には利用API・rootDir検索・内部リンク検知とclean install/auditを再確認してください。保守対象はこのリポジトリです。検証は `tests/next-root-glob.test.ts` と `tests/npm-cli.test.ts` から追えます。
 
 ### 要求IDから障害を調べる
 

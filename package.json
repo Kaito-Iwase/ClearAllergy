@@ -55,7 +55,7 @@
   },
   "overrides": {
     "postcss": "$postcss",
-    "@next/eslint-plugin-next@16.4.1": {
+    "@next/eslint-plugin-next@16.4.5": {
       "fast-glob": "$fast-glob"
     },
     "@prisma/config@6.19.3": {

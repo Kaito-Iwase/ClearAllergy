@@ -304,3 +304,67 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
         expect((await readMenu(menu)).ingredients).toBe(wanted);
     });
 }
+
+test('管理: 自店舗のカテゴリだけを候補に出し、選択・空欄保存と食品版を検証する', async ({ createMenu }) => {
+    const category = page => page.getByRole('combobox', { name: 'カテゴリ', exact: true });
+    const fillCategory = value => page => category(page).fill(value);
+    const draft = await createMenu('a', fillCategory('ドリンク'));
+    await draft.page.getByRole('button', { name: '公開の確認を閉じる', exact: true }).click();
+    await expect(draft.page.getByRole('button', { name: '保存する', exact: true })).toBeFocused();
+    await category(draft.page).focus();
+    await expect(draft.page.getByRole('option', { name: 'ドリンク', exact: true })).toBeVisible();
+    const published = await createMenu('a', fillCategory('ランチ'));
+    await publish(published);
+    await createMenu('b', fillCategory('他店舗限定'));
+
+    const selected = await createMenu('a', async page => {
+        const combo = category(page);
+        const option = label => page.getByRole('option', { name: label, exact: true });
+        await combo.focus();
+        await expect(option('ランチ')).toBeVisible();
+        await expect(option('ドリンク')).toBeVisible();
+        await expect(option('他店舗限定')).toHaveCount(0);
+        await combo.fill('ど');
+        await expect(option('ドリンク')).toBeVisible();
+        await combo.press('ArrowDown');
+        await combo.dispatchEvent('compositionstart');
+        await combo.dispatchEvent('keydown', { key: 'Enter', isComposing: true });
+        await combo.dispatchEvent('compositionend');
+        await expect(combo).toHaveValue('ど');
+        await combo.press('Escape');
+        await expect(combo).toHaveAttribute('aria-expanded', 'false');
+        await expect(combo).toHaveValue('ど');
+        await expect(combo).toBeFocused();
+        await combo.click();
+        await expect(option('ドリンク')).toBeVisible();
+        await expect(combo).toHaveValue('ど');
+        await combo.fill('ﾄﾞ');
+        await expect(option('ドリンク')).toBeVisible();
+        await combo.press('ArrowDown');
+        await expect(option('ドリンク')).toHaveAttribute('aria-selected', 'true');
+        await combo.press('Enter');
+        await expect(combo).toHaveValue('ドリンク');
+        await expect(combo).toHaveAttribute('aria-expanded', 'false');
+    });
+    expect((await readMenu(selected)).category).toBe('ドリンク');
+    expect((await readMenu(published)).category).toBe('ランチ');
+    await published.page.goto(published.editURL);
+    const combo = category(published.page);
+    const before = await readMenu(published);
+    await combo.focus();
+    await expect(published.page.getByRole('option', { name: 'ランチ', exact: true })).toBeVisible();
+    await published.page.getByRole('option', { name: 'ランチ', exact: true }).click();
+    await published.page.getByLabel(/価格/).fill('500');
+    async function save() {
+        const response = published.page.waitForResponse(r => new URL(r.url()).pathname === published.api && r.request().method() === 'PUT');
+        await published.page.getByRole('button', { name: '保存する', exact: true }).click();
+        expect((await response).status()).toBe(200);
+        return readMenu(published);
+    }
+    const unchanged = await save();
+    expect(unchanged).toMatchObject({ category: 'ランチ', isPublished: true, foodVersion: before.foodVersion });
+    await combo.fill('');
+    await expect(published.page.getByText(/カテゴリを変更して保存すると公開が停止します/)).toBeVisible();
+    const cleared = await save();
+    expect(cleared).toMatchObject({ category: null, isPublished: false, foodVersion: before.foodVersion + 1 });
+});
