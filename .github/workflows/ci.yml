@@ -115,6 +115,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Keep audit inside the existing required check and staging CI success gate.
+      # No paths/if/continue-on-error: registry failures must also block this job.
+      - name: Audit locked dependencies
+        timeout-minutes: 3
+        run: npm audit --ignore-scripts --audit-level=high
+
       - name: Generate Prisma Client
         run: npx prisma generate
 

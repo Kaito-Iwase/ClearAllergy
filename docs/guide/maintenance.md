@@ -77,3 +77,8 @@ git status --short
 ## 完了報告の書き方
 
 実装の変更内容（なければ「変更なし」）、更新文書と理由、関連文書の更新不要理由、実行した確認と結果、未確認・不一致・残課題を簡潔に記載します。コードと文書の両方が必要な作業は片方だけで完了としません。作成ファイル数を根拠に「全仕様検証済み」「完全に文書化」とは報告しません。
+
+
+## Dependency audit gate
+
+See [dependency audit gate](dependency-audit.md) for the required CI command, failure handling, residual risks and verification boundaries (issue #153).
