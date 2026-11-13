@@ -5,6 +5,7 @@ import { closeSync, existsSync, linkSync, mkdtempSync, readFileSync, renameSync,
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { assessIssueCompletion, assessQueue, assessmentFromComments, beginReport, definitionHash, prepareReportPath, protectedArea, publishReport, verificationCommands } from "../scripts/agent-harness.mjs";
+import { formatHarnessSummary } from "../scripts/agent-harness-output.mjs";
 
 const now = Date.parse("2026-10-04T04:00:00Z");
 const baseSha = "a".repeat(40);
@@ -229,19 +230,26 @@ test("closed related issues must be completed, not abandoned or unresolved as a 
 test("completion CLI reports ready, blocked and malformed snapshots with the right exit code", () => {
     const directory = mkdtempSync(join(tmpdir(), "clearallergy-completion-"));
     const file = join(directory, "snapshot.json");
-    const run = () => spawnSync(process.execPath, ["scripts/agent-harness.mjs", "completion", "--snapshot", file], { encoding: "utf8" });
+    const run = (...args: string[]) => spawnSync(process.execPath, ["scripts/agent-harness.mjs", "completion", "--snapshot", file, ...args], { encoding: "utf8" });
     try {
         const data = completionSnapshot(Date.now());
         writeFileSync(file, JSON.stringify(data));
         const ready = run();
         assert.equal(ready.status, 0, ready.stderr);
         assert.equal(JSON.parse(ready.stdout).readyToClose, true);
+        assert.equal(run("--format", "json").stdout, ready.stdout);
+        const summary = run("--format", "summary");
+        assert.equal(summary.status, ready.status);
+        assert.match(summary.stdout, /完了処理の候補（close未実行）/);
 
         data.issue.dependencies.push({ number: 9, state: "OPEN" });
         writeFileSync(file, JSON.stringify(data));
         const blocked = run();
         assert.equal(blocked.status, 1);
         assert.equal(JSON.parse(blocked.stdout).readyToClose, false);
+        const blockedSummary = run("--format", "summary");
+        assert.equal(blockedSummary.status, blocked.status);
+        assert.match(blockedSummary.stdout, /子Issueまたは依存Issueが未解決/);
 
         writeFileSync(file, "{}");
         const invalid = run();
@@ -249,6 +257,148 @@ test("completion CLI reports ready, blocked and malformed snapshots with the rig
         assert.match(invalid.stderr, /Invalid or stale completion snapshot/);
     } finally {
         rmSync(directory, { recursive: true, force: true });
+    }
+});
+
+test("queue CLI preserves default JSON and exposes a separate human summary", () => {
+    const directory = mkdtempSync(join(tmpdir(), "clearallergy-summary-"));
+    const file = join(directory, "snapshot.json");
+    try {
+        const data = snapshot();
+        data.fetchedAt = new Date().toISOString();
+        Object.assign(data.issues[0].assessment, { data: { ...Object(data.issues[0].assessment).data, assessedAt: data.fetchedAt } });
+        writeFileSync(file, JSON.stringify(data));
+        const run = (...args: string[]) => spawnSync(process.execPath, ["scripts/agent-harness.mjs", "queue", "--snapshot", file, ...args], { encoding: "utf8" });
+        const json = run();
+        assert.equal(json.status, 0, json.stderr);
+        assert.equal(run("--format", "json").stdout, json.stdout);
+        const summary = run("--format", "summary");
+        assert.equal(summary.status, json.status);
+        assert.match(summary.stdout, /着手候補 #1/);
+        assert.ok(summary.stdout.trim().split("\n").length <= 8);
+        assert.ok(summary.stdout.length < json.stdout.length);
+        data.issues[0].labels = [];
+        writeFileSync(file, JSON.stringify(data));
+        const none = run("--format", "summary");
+        assert.equal(none.status, 0);
+        assert.match(none.stdout, /着手候補なし（作業全体の完了ではありません）/);
+        assert.match(none.stdout, /着手候補のラベルなし/);
+        data.fetchedAt = new Date(Date.now() - 16 * 60_000).toISOString();
+        writeFileSync(file, JSON.stringify(data));
+        const stale = run("--format", "summary");
+        assert.equal(stale.status, 1);
+        assert.equal(stale.stdout, "");
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
+test("summary normalizes untrusted titles and retains high-risk and blocked queue states", () => {
+    const issue = ready();
+    issue.title = "Example\n次: 偽の操作\u001b[2J\u202e";
+    Object.assign(issue.assessment, { data: { ...Object(issue.assessment).data, definitionHash: definitionHash(issue), paths: ["lib/allergens.ts"] } });
+    const result = assessQueue(snapshot([issue]), now);
+    const before = JSON.stringify(result);
+    const summary = formatHarnessSummary("queue", result, { snapshotPath: "queue.json" });
+    assert.match(summary, /重要な領域/);
+    assert.equal(summary.split("\n").filter((item) => item.startsWith("次:")).length, 1);
+    assert.equal(summary.includes("\u001b"), false);
+    assert.equal(summary.includes("\u202e"), false);
+    assert.equal(JSON.stringify(result), before);
+    issue.body = "Status: HUMAN_DECISION_REQUIRED";
+    Object.assign(issue.assessment, { data: { ...Object(issue.assessment).data, definitionHash: definitionHash(issue) } });
+    const blocked = formatHarnessSummary("queue", assessQueue(snapshot([issue]), now));
+    assert.match(blocked, /人の判断または本文のブロッカーが未解決/);
+});
+
+test("completion summaries keep every detected blocker and do not count acceptance criteria", () => {
+    const data = completionSnapshot();
+    data.issue.labels = ["human-review"];
+    data.issue.assignees = ["someone-else"];
+    data.issue.dependencies.push({ number: 9, state: "OPEN" });
+    for (const pull of data.pullRequests) pull.ci.status = "FAIL";
+    data.acceptance[0].status = "FAIL";
+    const result = assessIssueCompletion(data, now);
+    assert.ok(result.blockers.length > 3);
+    const summary = formatHarnessSummary("completion", result, { snapshotPath: "completion.json" });
+    assert.equal(summary.split("\n").filter((item) => item.startsWith("保留:")).length, result.blockers.length);
+    assert.match(summary, /検出した保留理由/);
+    assert.match(summary, /受け入れ条件の成功証拠が不足/);
+    assert.match(summary, /人の判断またはブロッカーが未解決/);
+});
+
+test("a closed issue is not presented as unfinished or as a newly completed operation", () => {
+    const data = completionSnapshot();
+    data.issue.state = "CLOSED";
+    const result = assessIssueCompletion(data, now);
+    assert.equal(result.readyToClose, false);
+    const summary = formatHarnessSummary("completion", result);
+    assert.match(summary, /既にCLOSED（今回のclose操作なし）/);
+    assert.match(summary, /既存の完了記録と理由を確認/);
+    assert.doesNotMatch(summary, /完了判定を保留|完了処理の候補/);
+});
+
+test("a missing completion plan remains unassessed, not a single missing criterion", () => {
+    const data = completionSnapshot();
+    data.issue.assessment.author = "someone-else";
+    const summary = formatHarnessSummary("completion", assessIssueCompletion(data, now));
+    assert.match(summary, /残り条件も未判定/);
+});
+
+function verificationResult() {
+    return { status: "PASS", diffCheck: "PASS", candidateUnchanged: true, publicationSafe: true,
+        runtime: { matches: true, actualNode: "22.23.5", expectedNode: "22.23.5" },
+        commands: ["lint", "typecheck", "test", "build"].map((name) => ({ name, status: "PASS", exitCode: 0,
+            counts: name === "test" ? { tests: 42, pass: 42, fail: 0, skipped: 0, cancelled: 0, todo: 0 } : {} })) };
+}
+const summaryOptions = { plannedCommands: ["lint", "typecheck", "test", "build"], reportPath: ".agent-runs/result.json" };
+
+test("successful verification stays local and test counts are actual observations", () => {
+    const result = verificationResult();
+    const summary = formatHarnessSummary("verify", result, summaryOptions);
+    assert.match(summary, /ローカル検証 PASS/);
+    assert.match(summary, /42件 \/ 成功 42/);
+    assert.match(summary, /範囲外: 実DB・ブラウザ/);
+    assert.ok(summary.split("\n").length <= 8);
+    result.commands[2].counts = {};
+    assert.match(formatHarnessSummary("verify", result, summaryOptions), /テスト: 未確認件/);
+});
+
+test("verification summaries expose failures outside commands and suppress unsafe evidence paths", () => {
+    const result = verificationResult();
+    Object.assign(result, { status: "FAIL", diffCheck: "FAIL", candidateUnchanged: false, publicationSafe: false });
+    result.runtime.matches = false;
+    result.runtime.actualNode = "22.15.1";
+    const summary = formatHarnessSummary("verify", result, summaryOptions);
+    assert.match(summary, /ローカル検証 FAIL/);
+    assert.match(summary, /差分検査/);
+    assert.match(summary, /ファイル・HEADの同一性/);
+    assert.match(summary, /保存パスは証拠として使用不可/);
+    assert.match(summary, /Nodeの版が指定と不一致/);
+    assert.equal(summary.includes(summaryOptions.reportPath), false);
+    const mismatch = verificationResult();
+    mismatch.runtime.matches = false;
+    assert.match(formatHarnessSummary("verify", mismatch, summaryOptions), /注意: Node/);
+});
+
+test("a failed command lists the checks that never ran", () => {
+    const result = verificationResult();
+    result.status = "FAIL";
+    result.commands = [{ name: "lint", status: "FAIL", exitCode: 1, counts: {} }];
+    const summary = formatHarnessSummary("verify", result, summaryOptions);
+    assert.match(summary, /1\/4工程を実行、0工程が成功/);
+    assert.match(summary, /失敗: lint/);
+    assert.match(summary, /未実施: typecheck、test、build/);
+    assert.doesNotMatch(summary, /テスト: 0件/);
+});
+
+test("invalid format options fail before verification starts", () => {
+    for (const args of [["--format", "brief"], ["--format"], ["--format", "json", "--format", "summary"]]) {
+        const run = spawnSync(process.execPath, ["scripts/agent-harness.mjs", "verify", "--base", "--invalid-base", ...args], { encoding: "utf8" });
+        assert.equal(run.status, 1);
+        assert.match(run.stderr, /Use --format|Invalid arguments/);
+        assert.doesNotMatch(run.stderr, /Specify an existing base|prisma-generate/);
+        assert.equal(run.stdout, "");
     }
 });
 

@@ -20,7 +20,7 @@
 - Problem → Evidence → Cause → Candidate solutions → Decision → VerificationをIssue commentへ記録する。labelだけではReadyにしない。
 - GitHub本文のHUMAN_DECISION_REQUIRED、依存、owner、対象環境、既存PRを再確認し、不明ならblockする。claim後も再取得する。既定の実装並列度は1。
 - canonical checkoutを入口に、許可された独立worktreeで1 Issue / 1 branch / 1 worktree / 1 PR。既存未commit変更・他の作業領域を保持する。
-- `node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json`は候補の提案、`node scripts/agent-harness.mjs verify --base origin/main`は既存scriptsのローカル検証。GitHubと実DB/browserの確認は別。snapshot/出力に秘密値を含めない。
+- 人向けの確認には `node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json --format summary`（候補の提案）と `node scripts/agent-harness.mjs verify --base origin/main --format summary`（ローカル検証）を使う。機械処理は既定のJSONまたは `--format json`。GitHubと実DB/browserの確認は別。snapshot/出力に秘密値を含めない。
 - 検証用npmはアプリ依存に同梱せず、Node配布またはnpm lifecycleの既存CLIを `scripts/npm-cli.mjs` で解決する。CLIが見つからない場合は導入せず停止する。[開発手順](docs/guide/development.md#environment)とreportの実Node/npm版を確認する。Next lintの限定glob互換層はplugin更新時に利用API・rootDir・内部リンク検知・clean install/auditを再確認する。
 - 独立reviewは、実装履歴を共有しない読取専用subagentへ委任する。Issue、base/head、diff、Invariantと検証結果を渡し、self reviewと区別する。委任できなければDraftで未実施を明記。fix→verify→reviewは最大3 rounds、同じ重大指摘の再発2回で停止。
 - 意味・安全/法務文言・認可model・schema/migration/本番data・公開契約・課金・major依存等の未承認判断を確定しない。通常PRはmergeしない。安全/認証/認可/DB/アレルゲン関係はauto merge対象外。
@@ -274,16 +274,12 @@ npx.cmd prisma generate
 
 ## 完了報告
 
-原則として日本語で、変更規模に応じて簡潔に報告する。
+日本語で、まず「何が変わったか・現在どこまで進んだか」「ユーザーの操作が必要か」「次の担当と操作」を示す。通常は4〜8行程度を目安にし、小さな変更は短い一段の報告でよい。詳しい形式は[報告の書き方](docs/guide/maintenance.md#reporting)を正本とする。
 
-1. 実装の変更内容と理由（文書のみなら実装変更なしと明記）
-2. 更新した文書・ファイルと理由、関連文書を更新不要と判断した場合はその理由
-3. 主な受け入れ条件の `PASS`／`FAIL`／`UNVERIFIED`
-4. 実行したコマンドと実際の結果（テストは件数も記載）
-5. 実行しなかった検証と理由
-6. 未確認事項、不一致、残課題、残る手動確認、前提、リスク
-
-未実行のコマンドを成功と報告しない。必要なビルド・型検査・認可・手動動作が未確認の場合は、実装完了と検証完了を区別する。
+- 必須検証の失敗・未実施、未解決の重要リスク、判断待ちは先頭に残す。行数を守るために省略しない。実装・検証・PR・マージ・配備を区別する。
+- 技術的に解決できる作業はエージェントが続ける。ユーザー判断が必要なときだけ、判断する対象・推奨案・影響を短く示す。既存の許可を繰り返し確認しない。
+- コマンド・件数・対象SHA・文書更新/不要理由などの詳細は、既存の検証記録・PRの折りたたみ・参照先に集約する。チャットへ同じ証拠を転記せず、毎回新しい報告ファイルを作る義務も設けない。
+- 未実行を成功と報告しない。進捗は変化・新しい発見・次に解消する不確実性を伝え、同じ状態や成功ログを繰り返さない。
 
 ## 判断を求める条件
 
