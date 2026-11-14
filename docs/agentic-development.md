@@ -31,6 +31,21 @@
 
 進捗コメントは節目（claim、plan変更、failure、review、verification、PR、blocker）で書き、同じ結果を連投しない。既存の本文、依存、Project/子Issueの状態を勝手に置換しない。Projectを使う場合はnative状態を再取得して同期する。Issue/PR/commitにowner・base/head・検証結果・次の操作があることを再開条件とする。
 
+<a id="issue-writing"></a>
+## Issueの書き方と更新順序
+
+[既存テンプレート](../.github/ISSUE_TEMPLATE/agent-task.md)で、**目的・現在地 → 残り・次の担当と操作 → 完了条件**から読めるようにする。冒頭には確認日と根拠リンクを添え、詳細な再現・比較案・コマンドは必要なときに開く。必須検証のFAIL/未実施、重要なリスク、HOLD・レビュー上限、未解決の判断は折りたたまない。ラベルだけから本人の判断待ちと断定せず、AIが進められる照合・修復を先に行う。
+
+既存Issueを整理する場合は、最新の本文・コメント・関連PRだけでなく、現行ガイドと採用済みの判断記録も照合する。古い「未実装」「未公開」「判断待ち」を転記して、既存の決定を再要求しない。一方、実装やマージだけでIssue全体の完了・配備・受け入れを推測しない。置換PRのcloseと元PRのmergeも区別する。
+
+節目には**冒頭の同じ概要を更新**し、現在地を探すために全コメントを読む必要をなくす。意味のある経過・実行証拠はコメントに残し、既存の原典へリンクする。小さいIssueに空の詳細欄や新しい報告ファイルを必須にしない。
+
+- 依頼された表示整理では、元の定義・受け入れ条件・制約を全文保持した `<details>` と、その上の短い概要に分けられる。原文全体を無効な過去資料とは扱わない。既存のタイトル・ラベル・担当・依存・親子・完了状態を表示整理と一緒に変えない。
+- **本文更新 → 最終本文と証拠の再照合 → assessment → 完了判定・完了記録**の順にする。表示だけの本文更新でも `definitionHash` と完了判定の前提が変わる。古いhash・評価日時だけを付け替えてReadyや完了計画を再利用しない。完了コメント後に本文を変えた場合も、古い `completionKey` で閉じず再判定する。
+- 折りたたんだ元本文の `Status: BLOCKED` 等も停止判定の対象。概要に「着手可能」と書くだけでは解除できない。旧条件の解除や仕様の整合は、その範囲の権限と証拠を確認する別の判断であり、過去欄を一律に機械判定から除外しない。
+- 既存記録の編集前に原文を控え、直前に本文・コメント・メタデータと要約が参照するPR/Issueの状態を再取得する。変化があればその項目を再評価する。対象の本文または自分の評価コメントだけを更新し、原文保持・予定本文・変更しない状態を読み戻す。APIの更新は排他ロックではなく、読戻し成功も同時更新がなかった証明にはならない。
+- 更新応答が不明なら、現在の本文が元の内容・予定内容・第三の内容のどれかを照合して再開する。他人の編集へ無条件に再送・復元しない。一括整理では1件目を確認してから残りを逐次更新し、最後に一覧を再取得する。閉じたIssueの履歴や古い評価コメントを表示統一だけで書き直さない。
+
 ## Queue runner
 
 GitHub connectorで取得した事実を以下のsnapshot（取得時点の写し）へ正規化し、Git管理しない`.agent-runs/queue.json`へUTF-8で保存する。snapshotに秘密値・個人データは含めない。runnerはGitHubへ通信・書込せず、このファイルの信頼性を保証する仕組みでもない。取得漏れ、authorやURLの偽装、意図的に欠かした依存を自動発見できないため、Codexがlive原典との一致を確認する。snapshotは15分で失効する。
@@ -49,12 +64,20 @@ GitHub connectorで取得した事実を以下のsnapshot（取得時点の写�
 
 Issueには`number/title/body/state`（OPEN/CLOSED）、label名配列`labels`、login配列`assignees`、`assessment`を含める。依存するclosed Issueも配列へ加える。PRには`number/state/linkedIssues/changedFiles`を含める。Issueのowner/labels/stateやPRのstate/scopeを取得できなければ空配列へ変換せずsnapshotを拒否する。scopeは相対パスで、directoryの末尾slash有無にかかわらず包含を照合する。GitHubのlowercase値は大文字へ正規化する。
 
-assessmentはIssue本文へ埋めず、認証済みactorが書いた最新のmarkerコメントから`assessmentFromComments`で抽出する。commentsを時系列昇順へ整列し、APIの`url`/`html_url`をwebコメントURLへ正規化する。最新markerが壊れていれば古いReadyへ戻らない。`definitionHash(issue)`でnumber/title/bodyをhashし、本文やbaseが変われば再評価する。コメント・labelの更新だけではhashを変えない。
+assessmentはIssue本文へ埋めず、最新のmarkerコメントから`assessmentFromComments`で抽出し、認証済みactor・コメントURLを照合する。commentsは**作成時刻 `created_at` の昇順**へ整列し、APIの`url`/`html_url`をwebコメントURLへ正規化する。編集時刻で並べ替えて古いReadyを最新にしない。最新markerが壊れていれば古いReadyへ戻らない。`definitionHash(issue)`でnumber/title/bodyをhashし、本文やbaseが変われば再評価する。コメント・labelの更新だけではhashを変えない。
 
-markerコメントの形式（実値で置き換える）:
+<a id="assessment-format"></a>
+### 評価コメントの形式
+
+人向けの短い説明の後に、次の機械用記録を置く（実値で置き換える）。marker・タグ・summaryの文言は固定し、1コメントにmarkerとJSONをそれぞれ1つだけ置く。
 
 ````text
+ここに結果・残り・次の操作と証拠へのリンクを短く書く。
+
 <!-- clearallergy-agent:v1 -->
+<details>
+<summary>機械用の評価記録</summary>
+
 ```json
 {
   "state": "ready",
@@ -79,7 +102,11 @@ markerコメントの形式（実値で置き換える）:
   "environmentReady": true
 }
 ```
+
+</details>
 ````
+
+従来のmarker直後にJSONだけを置く形式も読める。指定外のタグ・重複marker・JSON後の文章は不正とし、古い評価へ戻らない。既存の機械用記録を折りたたむ場合は、mainの対応版を確認し、最新markerコメントの人向け文・JSON・評価日時をそのまま保持する。これは再評価ではない。古いハーネスは新形式を読めないため、最新mainの処理へ更新してから選別・完了判定する。GitHubの[折りたたみ記法](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections)自体は任意の文章を囲めるが、機械用記録は上記の限定形式を使う。
 
 Readyの選定に使うassessmentは24時間で失効する。`implementationAllowed`は証拠を読んだCodexの記録であり、ユーザー承認を創作するfieldではない。必要な承認が未取得なら`approvalRequired: true`を保つ。
 

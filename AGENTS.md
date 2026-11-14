@@ -18,6 +18,7 @@
 自律開発を依頼されたセッションでは、[Issue中心の自律開発](docs/agentic-development.md)から開始し、Issue番号の指定を待たずlive GitHubから安全なReady Issueを選ぶ。通常の依頼へcommit/push/PR作成の許可を拡大しない。[導入時監査](docs/agentic-audit.md)は過去snapshotであり毎回再確認する。
 
 - Problem → Evidence → Cause → Candidate solutions → Decision → VerificationをIssue commentへ記録する。labelだけではReadyにしない。
+- Issueの冒頭に目的・現在地・残り・次の担当と操作をまとめ、節目に同じ概要を更新する。[Issueの書き方](docs/agentic-development.md#issue-writing)に従い、本文更新後に定義と証拠を再評価してからassessmentを記録する。重要な失敗・HOLD・判断待ちは折りたたまない。
 - GitHub本文のHUMAN_DECISION_REQUIRED、依存、owner、対象環境、既存PRを再確認し、不明ならblockする。claim後も再取得する。既定の実装並列度は1。
 - canonical checkoutを入口に、許可された独立worktreeで1 Issue / 1 branch / 1 worktree / 1 PR。既存未commit変更・他の作業領域を保持する。
 - 人向けの確認には `node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json --format summary`（候補の提案）と `node scripts/agent-harness.mjs verify --base origin/main --format summary`（ローカル検証）を使う。機械処理は既定のJSONまたは `--format json`。GitHubと実DB/browserの確認は別。snapshot/出力に秘密値を含めない。
