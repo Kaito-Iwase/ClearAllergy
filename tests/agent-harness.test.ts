@@ -553,6 +553,76 @@ test("malformed or latest blocking assessment does not fall back to old ready ev
     assert.equal(assessmentFromComments([{ body }, { body: "<!-- clearallergy-agent:v1 -->broken" }]), null);
     assert.equal(assessmentFromComments([{ body: "untrusted ordinary prose" }]), null);
 });
+test("folded and legacy assessments preserve queue and completion decisions and provenance", () => {
+    const queueIssue = ready();
+    const completion = completionSnapshot();
+    for (const record of [Object(queueIssue.assessment), completion.issue.assessment]) {
+        const json = `\`\`\`json\r\n${JSON.stringify(record.data, null, 2)}\r\n\`\`\``;
+        const prefix = "結果と次の操作。\n<!-- clearallergy-agent:v1 -->\n";
+        const plain = { body: prefix + json, user: { login: record.author }, html_url: record.url };
+        const folded = { ...plain, body: `${prefix}<details>\n<summary>機械用の評価記録</summary>\n\n${json}\n\n</details>\n` };
+        const parsed = assessmentFromComments([folded]);
+        assert.deepEqual(parsed, assessmentFromComments([plain]));
+        assert.deepEqual(parsed, record);
+        assert.ok(parsed);
+        if (record.data.state === "ready") {
+            const before = assessQueue(snapshot([queueIssue]), now);
+            queueIssue.assessment = parsed;
+            assert.deepEqual(assessQueue(snapshot([queueIssue]), now), before);
+        } else {
+            const before = assessIssueCompletion(completion, now);
+            Object.assign(completion.issue, { assessment: parsed });
+            assert.deepEqual(assessIssueCompletion(completion, now), before);
+        }
+    }
+});
+test("invalid latest folded records and duplicate markers cannot revive an older Ready", () => {
+    const marker = "<!-- clearallergy-agent:v1 -->";
+    const json = `\`\`\`json\n${JSON.stringify(Object(ready().assessment).data)}\n\`\`\``;
+    const wrapper = `<details>\n<summary>機械用の評価記録</summary>\n${json}\n</details>`;
+    const older = { body: `${marker}\n${json}` };
+    for (const suffix of [
+        wrapper.replace("</details>", ""), wrapper.replace("<details>", "<details open>"),
+        wrapper.replace("機械用の評価記録", "別の説明"), wrapper.replace("</summary>", "</summary>extra"),
+        wrapper + "\ntrailing prose", wrapper + `\n${json}`, `<details>${wrapper}</details>`,
+        wrapper.replace(json, "```json\n{broken\n```"), json + marker + "broken", wrapper + marker,
+    ]) assert.equal(assessmentFromComments([older, { body: marker + "\n" + suffix }]), null, suffix);
+    const fakePrefix = `${marker}\n${json}\n`;
+    assert.equal(assessmentFromComments([{ body: fakePrefix + marker + "\n" + wrapper }]), null);
+});
+test("folding never bypasses latest blockers, authorship or comment URL checks", () => {
+    const issue = ready();
+    const original = Object(issue.assessment);
+    const body = (data: unknown) => `<!-- clearallergy-agent:v1 -->\n<details>\n<summary>機械用の評価記録</summary>\n\n\`\`\`json\n${JSON.stringify(data)}\n\`\`\`\n</details>`;
+    const earlier = { body: body(original.data), user: { login: original.author }, html_url: original.url };
+    for (const latest of [
+        { ...earlier, body: body({ ...original.data, state: "blocked", blocker: "approval needed" }) },
+        { ...earlier, user: { login: "another-actor" } },
+        { ...earlier, html_url: "" },
+    ]) {
+        issue.assessment = assessmentFromComments([earlier, latest])!;
+        assert.equal(assessQueue(snapshot([issue]), now).selected, null);
+    }
+    const completion = completionSnapshot();
+    Object.assign(completion.issue, { assessment: assessmentFromComments([{
+        body: body(completion.issue.assessment.data), user: { login: completion.actorLogin },
+        html_url: "https://github.com/Kaito-Iwase/ClearAllergy/issues/999#issuecomment-1",
+    }]) });
+    assert.equal(assessIssueCompletion(completion, now).readyToClose, false);
+});
+test("overview edits invalidate both assessments and folded body blockers remain effective", () => {
+    const issue = ready();
+    issue.body = `現在地の案内\n<details>\n<summary>元の定義</summary>\n\n${issue.body}\n</details>`;
+    assert.equal(assessQueue(snapshot([issue]), now).selected, null);
+    const completion = completionSnapshot();
+    completion.issue.body = "現在地の案内\n" + completion.issue.body;
+    assert.equal(assessIssueCompletion(completion, now).readyToClose, false);
+    issue.body += "\n<details>\n<summary>当時の記録</summary>\n\nStatus: BLOCKED\n</details>";
+    Object.assign(issue.assessment, { data: { ...Object(issue.assessment).data, definitionHash: definitionHash(issue) } });
+    const result = assessQueue(snapshot([issue]), now);
+    assert.equal(result.selected, null);
+    assert.ok(result.issues[0].reasons.includes("human decision or body blocker"));
+});
 test("commands are discovered from package scripts; missing gates never silently skip", () => {
     const scripts = { lint: "eslint", typecheck: "tsc --noEmit", test: "node --test", build: "next build" };
     assert.deepEqual(verificationCommands({ scripts }).map((command: {name: string}) => command.name), ["lint", "typecheck", "test", "build"]);

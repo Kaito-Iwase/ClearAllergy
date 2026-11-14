@@ -1,39 +1,33 @@
 ---
-name: Evidence-backed engineering task
-about: 安全に選別できる問題・根拠・受け入れ条件を記録する
+name: 問題・改善・判断を記録する
+about: 目的・現在地・次の操作から読み、必要な根拠へ進む
 title: ""
 labels: ""
 assignees: ""
 ---
 
-## Problem / Impact
+## 目的・現在地
 
-## Evidence
+<!-- 誰の何の問題を解決するか。未評価・調査中・実装済み・PR待ち等、確認できた段階と確認日を短く。 -->
 
-対象base SHA（比較基点のコミット識別子）、ファイル・関数名、観察または再現結果。未確認事項は`UNKNOWN`（未確認）。
+## 残り・次の操作
 
-## Cause / Candidate solutions / Decision
+<!-- 必須検証の失敗/未実施、HOLD、判断待ち、重要リスクを折りたたまない。次の担当と具体的な操作、必要な環境・依存を示す。本人の判断が必要なら対象・推奨案・影響を添える。 -->
 
-変更しない案も比較する。製品判断は未決のまま残す。
+## 完了条件
 
-## Acceptance Criteria
+- [ ] 判定できる期待結果
 
-- [ ] 判定可能な結果
+<details>
+<summary>根拠・範囲・検証の詳細</summary>
 
-## Affected Area / Scope
+<!-- 必要な項目だけ具体化する。評価時には根拠・原因・比較案・判断・検証を揃える。既存の証拠はリンクで参照し、未確認は未確認と記す。 -->
 
-影響範囲・編集範囲・確認のみの範囲と、対象外の作業（non-goals）。
+- 根拠：対象の版・環境、観察/再現、コード・PR・記録へのリンク。
+- 原因・比較案・判断：変更しない案も比較する。未承認の製品判断は確定しない。
+- 範囲：影響する範囲・編集する範囲・確認だけの範囲、対象外。依存Issue・既存PR・担当との重複。
+- 検証：期待する失敗と成功、実在するコマンド、必要な副作用の許可と戻し方。代用品・実DB・実ブラウザを区別する。
 
-## Dependencies / Blockers / Ownership
+</details>
 
-Issueリンク、対象環境、担当者、重複PR・進行中作業。
-
-## Risks / Human approval
-
-安全・意味・認可モデル・DB・契約・課金等の判断が必要か。
-
-## Verification Plan
-
-実在するコマンド、RED/GREEN（修正前の失敗と修正後の成功）、mock（代用品）と実DB・実ブラウザの区別、必要な副作用の許可、rollback（変更を戻す手順）。
-
-Issue作成だけではReady（着手可能）にしない。[自律開発手順](https://github.com/Kaito-Iwase/ClearAllergy/blob/main/docs/agentic-development.md)に従い、GitHubの最新情報でassessment（Issueの評価記録）を作る。
+Issueの作成・概要更新だけでは着手許可や完了になりません。[Issueの書き方・更新順序](https://github.com/Kaito-Iwase/ClearAllergy/blob/main/docs/agentic-development.md#issue-writing)に従って最新の定義と証拠を評価します。

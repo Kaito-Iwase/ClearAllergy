@@ -50,7 +50,12 @@ export function definitionHash(issue) {
 export function assessmentFromComments(comments) {
     const latest = [...comments].reverse().find((comment) => comment.body?.includes(ASSESSMENT_MARKER));
     if (!latest) return null;
-    const match = latest.body.split(ASSESSMENT_MARKER)[1]?.match(/^\s*```json\s*([\s\S]*?)\s*```\s*$/);
+    const parts = latest.body.split(ASSESSMENT_MARKER);
+    if (parts.length !== 2) return null;
+    // Accept one documented wrapper, not arbitrary HTML or a JSON substring.
+    // An invalid latest record must never revive an older Ready assessment.
+    const folded = parts[1].match(/^\s*<details>\s*<summary>機械用の評価記録<\/summary>\s*([\s\S]*?)\s*<\/details>\s*$/);
+    const match = (folded?.[1] ?? parts[1]).match(/^\s*```json\s*([\s\S]*?)\s*```\s*$/);
     if (!match) return null;
     try { return { data: JSON.parse(match[1]), author: latest.user?.login, url: latest.html_url }; }
     catch { return null; }

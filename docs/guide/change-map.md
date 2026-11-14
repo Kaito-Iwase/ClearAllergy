@@ -10,7 +10,7 @@
 
 表の「テスト」は検査するコードが存在するという意味で、今回実行済みという意味ではありません。APIの単体テストはClerk・DB・Blob等をモック（外部処理の代用品）に置き換え、実PostgreSQLの制約回帰とは分けています。「手動」は[開発手順のブラウザ確認](development.md#browser)に従います。専用テスト未整備の機能も、説明対象から除いていません。
 
-自律開発の候補選択・ローカル検証・[マージ後のIssue完了判定](../agentic-development.md#issue-completion)は `scripts/agent-harness.mjs` が入口です。人向け要約は `scripts/agent-harness-output.mjs`、判定・証跡・JSON互換性・要約の回帰は `tests/agent-harness.test.ts` で検査します。AI報告・PRの読み順は[報告の書き方](maintenance.md#reporting)、PRの書式は `.github/pull_request_template.md` が入口です。
+自律開発の候補選択・ローカル検証・[マージ後のIssue完了判定](../agentic-development.md#issue-completion)は `scripts/agent-harness.mjs` が入口です。人向け要約は `scripts/agent-harness-output.mjs`、判定・証跡・JSON互換性・要約の回帰は `tests/agent-harness.test.ts` で検査します。AI報告・PRの読み順は[報告の書き方](maintenance.md#reporting)、PRの書式は `.github/pull_request_template.md` が入口です。Issueは既存の `.github/ISSUE_TEMPLATE/agent-task.md` と[本文・評価の更新手順](../agentic-development.md#issue-writing)を使います。折りたたんだassessmentの読取、旧形式との判定一致、不正な最新記録と本文更新時の評価失効も同じハーネステストで確認します。
 
 公開3ページと `GET /api/menus/[menuId]` の実routeを通るtransaction client回帰は `tests/public-read-callers.test.ts`、10か所の元clientへの誤置換を検出する負例は `scripts/check-public-caller-mutations.mjs` です。以下の公開4入口すべてに対応し、実SQLの並行更新は別の `scripts/check-public-read-snapshot.ts` が担当します。[実測と限界](../verification/public-read-callers-20261028.md)を参照してください。F1/F4の候補専用コードはこの対応表のmain向け実装として扱いません。
 
