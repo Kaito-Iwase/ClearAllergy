@@ -31,6 +31,21 @@
 
 進捗コメントは節目（claim、plan変更、failure、review、verification、PR、blocker）で書き、同じ結果を連投しない。既存の本文、依存、Project/子Issueの状態を勝手に置換しない。Projectを使う場合はnative状態を再取得して同期する。Issue/PR/commitにowner・base/head・検証結果・次の操作があることを再開条件とする。
 
+<a id="issue-writing"></a>
+## Issueの書き方と更新順序
+
+[既存テンプレート](../.github/ISSUE_TEMPLATE/agent-task.md)で、**目的・現在地 → 残り・次の担当と操作 → 完了条件**から読めるようにする。冒頭には確認日と根拠リンクを添え、詳細な再現・比較案・コマンドは必要なときに開く。必須検証のFAIL/未実施、重要なリスク、HOLD・レビュー上限、未解決の判断は折りたたまない。ラベルだけから本人の判断待ちと断定せず、AIが進められる照合・修復を先に行う。
+
+既存Issueを整理する場合は、最新の本文・コメント・関連PRだけでなく、現行ガイドと採用済みの判断記録も照合する。古い「未実装」「未公開」「判断待ち」を転記して、既存の決定を再要求しない。一方、実装やマージだけでIssue全体の完了・配備・受け入れを推測しない。置換PRのcloseと元PRのmergeも区別する。
+
+節目には**冒頭の同じ概要を更新**し、現在地を探すために全コメントを読む必要をなくす。意味のある経過・実行証拠はコメントに残し、既存の原典へリンクする。小さいIssueに空の詳細欄や新しい報告ファイルを必須にしない。
+
+- 依頼された表示整理では、元の定義・受け入れ条件・制約を全文保持した `<details>` と、その上の短い概要に分けられる。原文全体を無効な過去資料とは扱わない。既存のタイトル・ラベル・担当・依存・親子・完了状態を表示整理と一緒に変えない。
+- **本文更新 → 最終本文と証拠の再照合 → assessment → 完了判定・完了記録**の順にする。表示だけの本文更新でも `definitionHash` と完了判定の前提が変わる。古いhash・評価日時だけを付け替えてReadyや完了計画を再利用しない。完了コメント後に本文を変えた場合も、古い `completionKey` で閉じず再判定する。
+- 折りたたんだ元本文の `Status: BLOCKED` 等も停止判定の対象。概要に「着手可能」と書くだけでは解除できない。旧条件の解除や仕様の整合は、その範囲の権限と証拠を確認する別の判断であり、過去欄を一律に機械判定から除外しない。
+- 既存記録の編集前に原文を控え、直前に本文・コメント・メタデータと要約が参照するPR/Issueの状態を再取得する。変化があればその項目を再評価する。対象の本文または自分の評価コメントだけを更新し、原文保持・予定本文・変更しない状態を読み戻す。APIの更新は排他ロックではなく、読戻し成功も同時更新がなかった証明にはならない。
+- 更新応答が不明なら、現在の本文が元の内容・予定内容・第三の内容のどれかを照合して再開する。他人の編集へ無条件に再送・復元しない。一括整理では1件目を確認してから残りを逐次更新し、最後に一覧を再取得する。閉じたIssueの履歴や古い評価コメントを表示統一だけで書き直さない。
+
 ## Queue runner
 
 GitHub connectorで取得した事実を以下のsnapshot（取得時点の写し）へ正規化し、Git管理しない`.agent-runs/queue.json`へUTF-8で保存する。snapshotに秘密値・個人データは含めない。runnerはGitHubへ通信・書込せず、このファイルの信頼性を保証する仕組みでもない。取得漏れ、authorやURLの偽装、意図的に欠かした依存を自動発見できないため、Codexがlive原典との一致を確認する。snapshotは15分で失効する。
@@ -49,12 +64,20 @@ GitHub connectorで取得した事実を以下のsnapshot（取得時点の写�
 
 Issueには`number/title/body/state`（OPEN/CLOSED）、label名配列`labels`、login配列`assignees`、`assessment`を含める。依存するclosed Issueも配列へ加える。PRには`number/state/linkedIssues/changedFiles`を含める。Issueのowner/labels/stateやPRのstate/scopeを取得できなければ空配列へ変換せずsnapshotを拒否する。scopeは相対パスで、directoryの末尾slash有無にかかわらず包含を照合する。GitHubのlowercase値は大文字へ正規化する。
 
-assessmentはIssue本文へ埋めず、認証済みactorが書いた最新のmarkerコメントから`assessmentFromComments`で抽出する。commentsを時系列昇順へ整列し、APIの`url`/`html_url`をwebコメントURLへ正規化する。最新markerが壊れていれば古いReadyへ戻らない。`definitionHash(issue)`でnumber/title/bodyをhashし、本文やbaseが変われば再評価する。コメント・labelの更新だけではhashを変えない。
+assessmentはIssue本文へ埋めず、最新のmarkerコメントから`assessmentFromComments`で抽出し、認証済みactor・コメントURLを照合する。commentsは**作成時刻 `created_at` の昇順**へ整列し、APIの`url`/`html_url`をwebコメントURLへ正規化する。編集時刻で並べ替えて古いReadyを最新にしない。最新markerが壊れていれば古いReadyへ戻らない。`definitionHash(issue)`でnumber/title/bodyをhashし、本文やbaseが変われば再評価する。コメント・labelの更新だけではhashを変えない。
 
-markerコメントの形式（実値で置き換える）:
+<a id="assessment-format"></a>
+### 評価コメントの形式
+
+人向けの短い説明の後に、次の機械用記録を置く（実値で置き換える）。marker・タグ・summaryの文言は固定し、1コメントにmarkerとJSONをそれぞれ1つだけ置く。
 
 ````text
+ここに結果・残り・次の操作と証拠へのリンクを短く書く。
+
 <!-- clearallergy-agent:v1 -->
+<details>
+<summary>機械用の評価記録</summary>
+
 ```json
 {
   "state": "ready",
@@ -79,15 +102,21 @@ markerコメントの形式（実値で置き換える）:
   "environmentReady": true
 }
 ```
+
+</details>
 ````
+
+従来のmarker直後にJSONだけを置く形式も読める。指定外のタグ・重複marker・JSON後の文章は不正とし、古い評価へ戻らない。既存の機械用記録を折りたたむ場合は、mainの対応版を確認し、最新markerコメントの人向け文・JSON・評価日時をそのまま保持する。これは再評価ではない。古いハーネスは新形式を読めないため、最新mainの処理へ更新してから選別・完了判定する。GitHubの[折りたたみ記法](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections)自体は任意の文章を囲めるが、機械用記録は上記の限定形式を使う。
 
 Readyの選定に使うassessmentは24時間で失効する。`implementationAllowed`は証拠を読んだCodexの記録であり、ユーザー承認を創作するfieldではない。必要な承認が未取得なら`approvalRequired: true`を保つ。
 
 ```powershell
-node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json
+node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json --format summary
 ```
 
-`selected: null`でも失敗ではない。理由を読み、[改善探索と次Issue](#改善探索と次issue)のReadyがない場合の手順へ進む。queue出力をそのままGitHubへ書かず、原典とコードを照合する。
+人向けの `--format summary` は候補と次の操作を日本語で示す。候補なしの場合は保留理由を重複排除し、各理由に該当するIssue件数を示す。同じIssueに複数理由があり、件数を足して総数にしない。機械向けの既定出力と `--format json` は従来どおり全JSONを返す。どちらも判定・終了コード・操作権限は同じ。
+
+要約の「着手候補なし」（JSONの `selected: null`）でも失敗や作業全体の完了ではない。理由を読み、[改善探索と次Issue](#改善探索と次issue)へ進む。候補があるときの保留件数は別Issueの状態であり、ユーザーへの判断依頼ではない。queue出力をそのままGitHubへ書かず、原典とコードを照合する。全件の詳細を `--format json` で再評価する場合もsnapshotは15分で失効するため、必要ならlive情報を取得し直す。
 
 ## 実装と隔離
 
@@ -104,7 +133,7 @@ node scripts/agent-harness.mjs queue --snapshot .agent-runs/queue.json
 package.jsonのscriptsとCIを毎回読み、コマンドと副作用を確認してから実行する。現在の必須scriptsはlint/typecheck/test/build。Prismaが配置されていればgenerate/validateもrunnerが実行する。必須scriptがなければ失敗として止め、成功扱いでskipしない。依存変更は既存依存で合理的に解決できない場合だけ人間判断を経て行う。以降、次の段階へ進むために必須の検証をgateと呼ぶ。
 
 ```powershell
-node scripts/agent-harness.mjs verify --base origin/main --output verification.json
+node scripts/agent-harness.mjs verify --base origin/main --output verification.json --format summary
 ```
 
 runnerは `scripts/npm-cli.mjs` で解決したNode配布またはnpm lifecycleの既存CLIをNodeから呼び、OS必須変数だけ引き継ぐ。npmをアプリ依存に同梱しない。DBは到達不能なlocalhost、ClerkはCIと同じ非実在キーへ限定し、`.env`/account fileがあるworktreeでは停止する。real DB/browser fixtureの初期化、seed、repair、migration、Clerk/Blob writeは実行しない。buildのGoogle Fontsなど既存の公開通信は必要になる。失敗時の生ログはreportに保存せず、コマンド・exit・出力hash・test件数を保存する。詳細調査が必要なら同じ非秘密環境で失敗コマンドを実行し、原因を確認する。
@@ -112,6 +141,8 @@ runnerは `scripts/npm-cli.mjs` で解決したNode配布またはnpm lifecycle�
 既存reportは上書きせず、再検証では`--output verification-next.json`等の新しい名前を指定する。directoryのリンク・既存file/linkを事前拒否し、検証開始前に排他的に新規作成したfile descriptorを保持する。暫定VERIFYINGを書き、candidateとdirectory/file同一性の最終確認が失敗したら保存済みJSONにもFAILを記録する。directoryが途中でリンクへ交換されても保持したdescriptor以外へ書かない。`.agent-runs/verification.json`はhead/base、candidate file hashの前後、lock hash、実Nodeと`.node-version`の差、実npm版、実行結果・件数・未実施領域を含む。PASSはローカルコマンドの成功で、runtime差やGitHub/DB/browserの確認を補わない。内容・HEADが途中で変わればFAIL。commit後にコードを変更したら再実行し、PRは最終HEADのcheckを取得する。doc-onlyなら指示に従い動作gate省略可能だが、ハーネスrunnerのコード変更は通常gate対象。
 
 認可・安全・公開条件・DBを触ったら影響に応じて別店舗/未認証/API回帰、接続guard下の実PostgreSQL制約・rollback、mobile/desktop/keyboard/状態を追加する。mock、build、schema validateは実DBの代用ではない。専用環境の対象と副作用が未許可ならUNVERIFIEDを記録して該当gateで停止する。既存CIは公開browserを実行するが実Clerk/Blobの試験ではない。
+
+要約でも、失敗した工程・後続の未実施・差分検査・検証対象の変化・保存先の不整合・Node版の差を表示する。成功したコマンドの詳細は既存JSONへ残す。保存先の整合性が失われた場合は通常の証拠パスを表示せず、そのパスを証拠として使えないことを示す。要約の成功もローカル検証の成功であり、実DB・実ブラウザ・実認証・GitHub・配備・利用者理解を含まない。
 
 ## Self review → Independent review → Repair
 
@@ -121,7 +152,7 @@ self review（自己レビュー）では、差分・空白エラーと受け入
 
 ## PRとmerge
 
-テンプレートのWhy/What/Issue/Evidence/decisions/tests/risk/manual/remainingに実結果を記載。Issueのリンクと最終HEADを含める。UIは可能な環境でbefore/afterまたは確認Evidenceを残す。必要gateが未実施/失敗ならDraftとし、残る具体的な条件を示す。
+[PRテンプレート](../.github/pull_request_template.md)の冒頭に変更と現在地・判断/次の操作・確認結果を示す。実コマンド、最終HEAD、Issue、レビュー、文書対応などの証拠は詳細欄か既存記録へのリンクへ集約する。UIは可能な環境でbefore/afterまたは確認Evidenceを残す。必要gateが未実施/失敗ならDraftとし、残る具体的な条件を冒頭にも示す。
 
 実装PRのcommit/push/PR作成はこの自律運用をユーザーが依頼したセッションの許可範囲で行う。通常の別依頼へその許可を拡大しない。push前にclean worktree、具体的commit、push remote、対象branch、PR baseを確認し、単一の明示refspecを使う。push後にremote SHA一致とmain不変を確認する。作成したPRはCodexへattachする。
 
@@ -161,10 +192,12 @@ self review（自己レビュー）では、差分・空白エラーと受け入
 | `acceptance` | 計画の `{ criterion, pullRequest, target }` ごとに、`status`、検証済みの `commitSha`、結果の `summary` と証跡の `url` を入れる。環境を指定した条件には対象配備の `deploymentUrl` と、マージ・配備後の確認ISO時刻 `observedAt` を入れる。確認時の配備と現行の配備が一致する場合だけ使う |
 
 ```powershell
-node scripts/agent-harness.mjs completion --snapshot .agent-runs/completion.json
+node scripts/agent-harness.mjs completion --snapshot .agent-runs/completion.json --format summary
 ```
 
 `readyToClose: false` または不正なsnapshotは終了コード1。検証が揃った場合の `completionKey` は、Issue定義・assessment、マージ、CIの試行、配備、条件ごとの検証対象と証跡リンクが同じ間は変わらない。コメント再利用時は確認内容も照合する。GitHubへの書き込み結果は別に再取得して確認する。
+
+要約は「完了処理の候補」と実際のcloseを区別する。保留理由は全件表示し、検出した理由の件数を受け入れ条件の未達総数とは扱わない。信頼できる完了計画がない場合は残り条件も未判定。既にCLOSEDなら既存の完了記録と理由の確認を案内し、reopenや完了理由の確認済みを含意しない。既定JSONと終了コードは従来どおり。
 
 ## 改善探索と次Issue
 
@@ -176,4 +209,4 @@ GitHubを再取得し、独立したReady Issueがあれば人間の番号指定
 
 意味/注意/安全保証/医学/法務/責任、認証方式・認可model、schema・migration・本番data、secrets、課金service/provider、大規模architecture、major dependency、public API/URL契約、privacyは既存許可を照合し、未承認なら停止する。選択肢・利点・risk・推奨・解除条件を記録する。証拠不足、対象環境不明、owner衝突、重大review未解消、必要gate失敗、基点の変化でも停止。停止は該当Issueだけに適用できるが、共通Invariantを壊す基盤問題はsession全体を止める。
 
-最終報告は変更・文書更新/不要理由、PASS/FAIL/UNVERIFIED、実コマンド/件数、PR/follow-up、blocker・次の操作を日本語で簡潔に示す。過去の成功、PR公開、merged、deployment、食品安全の証明を混同しない。
+最終報告は[報告の書き方](guide/maintenance.md#reporting)に従い、結果と現在地・判断/次の操作・証拠の順に示す。実コマンドや文書更新/不要理由などは既存記録へまとめ、必須の失敗・未確認・判断待ちは入口に残す。過去の成功、PR公開、merged、deployment、食品安全の証明を混同しない。

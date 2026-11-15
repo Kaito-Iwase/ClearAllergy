@@ -4,6 +4,7 @@ import { closeSync, existsSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, 
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveNpmCli } from "./npm-cli.mjs";
+import { formatHarnessSummary } from "./agent-harness-output.mjs";
 
 export const ASSESSMENT_MARKER = "<!-- clearallergy-agent:v1 -->";
 const REPOSITORY = "Kaito-Iwase/ClearAllergy";
@@ -49,7 +50,12 @@ export function definitionHash(issue) {
 export function assessmentFromComments(comments) {
     const latest = [...comments].reverse().find((comment) => comment.body?.includes(ASSESSMENT_MARKER));
     if (!latest) return null;
-    const match = latest.body.split(ASSESSMENT_MARKER)[1]?.match(/^\s*```json\s*([\s\S]*?)\s*```\s*$/);
+    const parts = latest.body.split(ASSESSMENT_MARKER);
+    if (parts.length !== 2) return null;
+    // Accept one documented wrapper, not arbitrary HTML or a JSON substring.
+    // An invalid latest record must never revive an older Ready assessment.
+    const folded = parts[1].match(/^\s*<details>\s*<summary>機械用の評価記録<\/summary>\s*([\s\S]*?)\s*<\/details>\s*$/);
+    const match = (folded?.[1] ?? parts[1]).match(/^\s*```json\s*([\s\S]*?)\s*```\s*$/);
     if (!match) return null;
     try { return { data: JSON.parse(match[1]), author: latest.user?.login, url: latest.html_url }; }
     catch { return null; }
@@ -446,15 +452,21 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
         const [command, ...args] = process.argv.slice(2);
         const flags = {};
         for (let i = 0; i < args.length; i += 2) {
-            if (!["--snapshot", "--base", "--output"].includes(args[i]) || !args[i + 1] || flags[args[i]]) throw new Error("Invalid arguments.");
+            if (!["--snapshot", "--base", "--output", "--format"].includes(args[i]) || !args[i + 1] || flags[args[i]]) throw new Error("Invalid arguments.");
             flags[args[i]] = args[i + 1];
         }
+        const format = flags["--format"] ?? "json";
+        if (!["json", "summary"].includes(format)) throw new Error("Use --format json or --format summary.");
+        const plannedCommands = command === "verify" && format === "summary"
+            ? verificationCommands(JSON.parse(readFileSync("package.json", "utf8"))).map((item) => item.name) : [];
         const snapshotCommand = flags["--snapshot"] && (command === "queue" || command === "completion");
         const readSnapshot = () => JSON.parse(readFileSync(flags["--snapshot"], "utf8").replace(/^\uFEFF/, ""));
         const result = snapshotCommand ? (command === "queue" ? assessQueue(readSnapshot()) : assessIssueCompletion(readSnapshot()))
             : command === "verify" ? verify({ base: flags["--base"], output: flags["--output"] }) : null;
-        if (!result) throw new Error("Use queue/completion --snapshot <file> or verify --base <ref> [--output <name.json>].");
-        console.log(JSON.stringify(result, null, 2));
+        if (!result) throw new Error("Use queue/completion --snapshot <file> or verify --base <ref> [--output <name.json>] [--format summary|json].");
+        console.log(format === "json" ? JSON.stringify(result, null, 2) : formatHarnessSummary(command, result, {
+            snapshotPath: flags["--snapshot"], reportPath: `.agent-runs/${flags["--output"] ?? "verification.json"}`, plannedCommands,
+        }));
         if (result.status === "FAIL" || result.readyToClose === false) process.exitCode = 1;
     } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
