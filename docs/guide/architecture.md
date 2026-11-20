@@ -182,7 +182,7 @@ DB接続障害、外部サービス失敗、業務上の入力・権限エラー
 
 従来READMEには、Next.jsで公開・管理・APIを一緒に扱う、TypeScriptでデータ型を扱う、Tailwindで表示状態を調整する、Prismaで型とDBを対応させる、PostgreSQLで関連データを扱う、Clerkへ認証を委ねる、Blobへ画像を分離する、Vercelで配備するという選定意図が記録されていました。これは既存の説明の保存であり、今回比較実験をした結果ではありません。
 
-Prisma設定依存の `deepmerge-ts` には限定overrideがあります。互換性の試験入口は変更対応表にあります。過去の脆弱性検査結果を現在の安全性の根拠にはしません。
+Prisma設定依存の `deepmerge-ts` と `effect` には限定overrideがあります。互換性の試験入口は変更対応表にあります。過去の脆弱性検査結果を現在の安全性の根拠にはしません。
 
 店舗編集のプレビュー・QRは `ShopEditClient` の直接ボタンとnative dialogで表示します。未保存プレビューと公開ページを区別し、ダイアログを閉じても入力・画像設定を維持します。管理領域のcanvas背景は `data-admin-dashboard` を持つ画面だけに適用します。
 
