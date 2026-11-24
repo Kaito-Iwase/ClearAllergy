@@ -4,6 +4,50 @@
 
 このハーネス（作業手順と検証をまとめた仕組み）は、CodexがGitHubの作業キューを読み、実装・検証・レビュー・PR（Pull Request、変更提案）の公開を繰り返すためのもの。手順とrunner（候補選択や検証を行うスクリプト）で構成する。GitHubを状態の正本とし、runnerは選択候補、検証結果、マージ後のIssue完了候補を出す。Issueの文章をシェル命令へ変換する機能、常駐処理、課金API、新しいフレームワークは追加しない。次回のCodexに「AGENTS.mdの自律開発手順を再開して」と依頼すれば、Issue番号の指定は不要。セッションが動いていない間の実行には別途スケジューラーと実行環境が必要であり、この変更では導入しない。
 
+<a id="communication-skills"></a>
+## 全工程での推敲と図解
+
+通常の開発依頼と自律開発で共通の手順を使う。要件と計画を相談するとき、実装中に判断を求めるとき、検証・レビューの結果を伝えるときに適用する。準備は最初に必要になったエージェントが行う。
+
+- **yomiyasu** — 人が読む日本語のIssue・計画・PR・レビュー・進捗・最終報告を書くときは、下表の `SKILL.md` を読み、対象の下書きに適用する。誰が何を確認したか、どの条件で成り立つかを原文と照合する。機械用assessment、ログ、識別子、引用、実測値、`PASS`／`FAIL`／`UNVERIFIED`、承認済みの公開文言は原文を保つ。検査用の下書きは作業用ディレクトリに置く。
+- **visual-explainer** — 選択肢、状態遷移、処理順、画面差分など、読み手が関係を追って判断する箇所で `SKILL.md` を読み、図解を作る。たとえばメニュー一覧の変更では、計画時に同じ幅の現行・提案を並べ、検証時は測定条件と差を添える。短い進捗は本文だけで伝える。図から仕様・実装・検証記録の根拠に戻れるようにする。
+
+### 固定版の準備
+
+リポジトリのルートを起点に次のファイルを直接読む。この方法はCodexのスキル一覧への登録を必要としない。`.agent-runs/` はGit管理外で、アプリとCIの依存には含めない。
+
+| スキル・固定した配布元 | このチェックアウトでの入口 |
+| --- | --- |
+| [yomiyasu 3.3.0](https://github.com/nanaism/yomiyasu/tree/ddf365b5d5b36a7aa4ffab798dce1b694dbb1afd/skills/yomiyasu) | `.agent-runs/skill-sources/yomiyasu-ddf365b5/skills/yomiyasu/SKILL.md` |
+| [visual-explainer 0.15.0](https://github.com/nicobailon/visual-explainer/tree/9d5f880b7e8e0a9a80c890b8e1bb6918b68481ad/plugins/visual-explainer) | `.agent-runs/skill-sources/visual-explainer-9d5f880b/plugins/visual-explainer/SKILL.md` |
+
+新しいチェックアウトではPowerShellで以下を実行する。既存の配置には上書きしない。取得失敗時はエラーに表示された作業先を確認する。部分取得したディレクトリを固定版として使わない。
+
+```powershell
+$cache = '.agent-runs/skill-sources'
+New-Item -ItemType Directory -Force -Path $cache | Out-Null
+$sources = @(
+    @{ repo = 'nanaism/yomiyasu'; sha = 'ddf365b5d5b36a7aa4ffab798dce1b694dbb1afd'; skill = 'skills/yomiyasu' },
+    @{ repo = 'nicobailon/visual-explainer'; sha = '9d5f880b7e8e0a9a80c890b8e1bb6918b68481ad'; skill = 'plugins/visual-explainer' }
+)
+foreach ($source in $sources) {
+    $name = Split-Path -Leaf $source.repo
+    $destination = Join-Path $cache ($name + '-' + $source.sha.Substring(0, 8))
+    if (Test-Path -LiteralPath (Join-Path $destination ($source.skill + '/SKILL.md'))) { continue }
+    if (Test-Path -LiteralPath $destination) { throw "配置先を確認してください: $destination" }
+    $staging = Join-Path $cache ([guid]::NewGuid().ToString('N'))
+    git init --quiet $staging
+    if ($LASTEXITCODE) { throw "準備失敗: $staging" }
+    git -C $staging fetch --quiet --depth=1 "https://github.com/$($source.repo).git" $source.sha
+    if ($LASTEXITCODE) { throw "取得失敗: $staging" }
+    git -C $staging -c core.autocrlf=false restore --source=$($source.sha) --worktree -- $source.skill LICENSE
+    if ($LASTEXITCODE) { throw "展開失敗: $staging" }
+    [System.IO.Directory]::Move((Resolve-Path $staging).Path, $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($destination))
+}
+```
+
+推敲の検査はスキルに同梱の `scripts/yomiyasu_check.py run`（Python）、HTML生成は `kit/render.mjs`（Node.js）を使う。コマンドは各スキルのディレクトリを基準に解決する。チャットの下書きは UTF-8 の標準入力で `run --stdin` に渡せる。HTML生成時に `Visual check skipped` と出た場合、表示の確認には既存のPlaywrightかブラウザを使う。図は依頼に合う場所へ届ける。推敲や図解の結果で、Issueの実装承認やハーネスの検証判定を変更しない。
+
 ## 再開と選別
 
 1. 現在のブランチ・作業状態・HEAD・remote、AGENTS.md、README、package/lock、CI（継続的な自動検証）を読む。guideが存在するcheckoutではREADMEの読む順番・変更対応表・関連仕様も読む。元の未コミット変更と他のworktree（ブランチごとに分離した作業ディレクトリ）は保持する。mainとローカル未公開branchを同じ状態と扱わない。
