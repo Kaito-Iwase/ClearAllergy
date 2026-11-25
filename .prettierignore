@@ -1,0 +1,16 @@
+# Format TypeScript source files only.
+*
+!*/
+!*.ts
+!*.tsx
+
+# Generated output and local verification artifacts.
+/next-env.d.ts
+/.next/
+/out/
+/build/
+/coverage/
+/test-results/
+/playwright-report/
+/.agent-runs/
+/docs/

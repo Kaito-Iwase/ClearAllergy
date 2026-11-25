@@ -134,6 +134,20 @@ docker compose -f compose.test.yaml run --rm --no-deps app npm run build
 docker compose -f compose.test.yaml up -d app
 ```
 
+<a id="formatting"></a>
+### 変更したTypeScriptファイルを整形する
+
+人とCodexが同じ書式で編集できるよう、Prettierの版を開発依存で固定しています。字下げは既存コードに合わせて4スペースとし、各ファイルの改行形式を保ちます。ESLintは引き続きコードの規則を検査します。
+
+PRを出す前に、そのPRで追加・変更した `.ts`・`.tsx` を整形します。リポジトリのルートから、対象ファイルのパスを `--` の後に指定してください。たとえば次の2ファイルを変更した場合は、次のように整形して確認します。
+
+```powershell
+npm.cmd run format -- lib/utils/formatters.ts app/layout.tsx
+npm.cmd run format:check -- lib/utils/formatters.ts app/layout.tsx
+```
+
+`format` は指定ファイルを書き換えます。`format:check` は書き換えず、すべて整形済みなら終了コード0、整形が必要なら1を返します。生成ファイルは対象外です。対象ファイルがないPRではこの手順を省略できます。段階的に導入する理由は [Issue #163](https://github.com/Kaito-Iwase/ClearAllergy/issues/163) に記録しています。
+
 <a id="browser"></a>
 ### ブラウザ・実DB検証
 
