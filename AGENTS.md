@@ -15,6 +15,8 @@
 
 ## 自律開発ハーネス
 
+通常の依頼・自律開発ともに、要件整理から完了報告まで、人に渡す日本語の下書きは `yomiyasu` で推敲する。状態の分岐・案の比較・画面の違いを図にすると判断しやすい場合は、その工程で `visual-explainer` を使う。各スキルの実体・準備・使い分けは[全工程での推敲と図解](docs/agentic-development.md#communication-skills)を参照する。
+
 自律開発を依頼されたセッションでは、[Issue中心の自律開発](docs/agentic-development.md)から開始し、Issue番号の指定を待たずlive GitHubから安全なReady Issueを選ぶ。通常の依頼へcommit/push/PR作成の許可を拡大しない。[導入時監査](docs/agentic-audit.md)は過去snapshotであり毎回再確認する。
 
 - Problem → Evidence → Cause → Candidate solutions → Decision → VerificationをIssue commentへ記録する。labelだけではReadyにしない。
