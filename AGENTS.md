@@ -231,6 +231,7 @@ Server Componentsを基本とし、状態・副作用・イベント・ブラウ
 
 - コミットメッセージ・PRタイトルは英語のtypeと日本語の説明で書く。本文、scope、互換性破壊、Issue参照、squash時の確認は[開発手順の表記規約](docs/guide/development.md#commit-pr-conventions)に従う。既存履歴を表記統一のために書き換えない。
 
+- PRで追加・変更した `.ts`・`.tsx` ファイルをPrettierで整形し、同じファイルを `format:check` で確認する。対象とコマンド例は[開発手順](docs/guide/development.md#formatting)を参照する。
 - 無関係な未コミット変更を破棄・上書き・一括整形しない。
 - 明示的な依頼なしに、commit、push、merge、force-push、`git reset --hard`、変更を破棄するcheckoutを実行しない。
 - pushはユーザーの明示的な指示がある場合に実行する。修正やcommitだけの依頼をpushの許可と解釈しない。
