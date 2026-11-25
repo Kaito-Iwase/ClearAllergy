@@ -298,3 +298,9 @@ npx.cmd prisma generate
 - ストレージ提供元の変更
 - 破壊的なGit・DB操作
 - 意味の異なる複数の製品仕様からの選択
+
+## プロジェクトローカルSkill
+
+技術スタック俯瞰図には `.agents/skills/stack-diagram/` を使用する。導入元・固定commit・ライセンス・更新方法は [.agents/skills/README.md](.agents/skills/README.md) を参照する。Codex/Cursorで共有するため同じ配置を維持し、他のSkillを変更しない。
+
+生成図は補助資料とし、既存の仕様・正式なdraw.io/SVGを正本とする。構成・接続を実コードへ照合し、実装済み・候補・未確認を分ける。HTMLからライト／ダークPNGをレンダリングして目視確認する。秘密情報・内部URL・個人データを含めず、Skillの任意共有手順や `share.py` による外部ギャラリー送信は行わない。

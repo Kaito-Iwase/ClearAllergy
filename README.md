@@ -54,6 +54,8 @@ mainへの採用、別ブランチで検証済みの候補、未検証・HOLD、
 
 [図を拡大する](docs/guide/diagrams/clearallergy-architecture.svg) · [draw.io編集用ファイル](docs/guide/diagrams/clearallergy-architecture.drawio)
 
+技術ごとの役割をロゴ付きで見る[技術スタック俯瞰図（HTML・ライト／ダークPNG）](docs/guide/diagrams/clearallergy-stack-overview.md)もあります。コード照合時点の補助資料で、仕様・上記の正式図・実環境の確認記録とは区別します。
+
 公開ページの初期表示では、Server ComponentがPrismaを通じてDBから取得します。管理画面の保存はNext.js Route Handlerを入口とし、Honoの処理で認証・所有権・入力・公開条件を確認してからDBを更新します。画像はサーバー経由でVercel Blobへアップロードし、DBにはURLと表示設定を保存します。
 
 図は主要な閲覧・更新経路を示しています。公開メニューAPI、管理ページの初期データ取得、管理画面のGoogle Places店舗候補検索などの詳細は[内部処理](docs/guide/architecture.md#system-diagram)と[変更対応表](docs/guide/change-map.md)を参照してください。Vercel・Neonは配備先として想定する構成で、実際の接続先・設定・稼働状況は別途確認が必要です。
